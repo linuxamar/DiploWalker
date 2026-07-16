@@ -8,6 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Plugins\INetworkDriver.fs" />
+    <Compile Include="Plugins\BridgeDriver.fs" />
+    <Compile Include="Plugins\CustomCniDriver.fs" />
+    <Compile Include="Plugins\NoneDriver.fs" />
+    <Compile Include="Services\NetworkServiceImpl.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -23,6 +28,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Diplo.Contracts\Diplo.Contracts.fsproj" />
     <ProjectReference Include="..\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
+    <ProjectReference Include="..\Diplo.Grpc\Diplo.Grpc.csproj" />
   </ItemGroup>
-
 </Project>

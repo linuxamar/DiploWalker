@@ -1,3 +1,4 @@
+open System.Collections.Generic
 open System.IO
 open System.Net
 open Microsoft.AspNetCore.Builder
@@ -8,6 +9,9 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Serilog
 open Serilog.Extensions.Hosting
+open Diplo.Grpc.Network
+open Diplo.Network.Plugins
+open Diplo.Network.Services
 
 [<EntryPoint>]
 let main args =
@@ -24,6 +28,13 @@ let main args =
         builder.Services.AddWindowsService(fun opts -> opts.ServiceName <- "Diplo.Network") |> ignore
         builder.Services.AddGrpc() |> ignore
         builder.Services.AddSerilog() |> ignore
+
+        let drivers = Dictionary<NetworkDriver, INetworkDriver>()
+        drivers.[NetworkDriver.Bridge] <- BridgeNetworkDriver() :> INetworkDriver
+        drivers.[NetworkDriver.CustomCni] <- CustomCniDriver() :> INetworkDriver
+        drivers.[NetworkDriver.``None``] <- NoneDriver() :> INetworkDriver
+        builder.Services.AddSingleton<IReadOnlyDictionary<NetworkDriver, INetworkDriver>>(drivers :> IReadOnlyDictionary<_, _>) |> ignore
+        builder.Services.AddSingleton<NetworkServiceImpl>() |> ignore
 
         builder.WebHost.ConfigureKestrel(fun (ctx: WebHostBuilderContext) (opts: KestrelServerOptions) ->
             let config = ctx.Configuration
@@ -43,6 +54,7 @@ let main args =
         ) |> ignore
 
         let app = builder.Build()
+        app.MapGrpcService<NetworkServiceImpl>() |> ignore
         app.Run()
         0
     with ex ->

@@ -131,10 +131,27 @@ let removeWindowsService (serviceName: string) = task {
         printfn "  [!] Code retour %d (service peut-être déjà supprimé)" exitCode
 }
 
-// ─── Configuration ───────────────────────────────────────────────────────
+// ─── Configuration containerd ─────────────────────────────────────────────
 
-let buildAppSettingsJson (grpcPort: int) (pipeName: string) =
-    let nl = System.Environment.NewLine
+let buildContainerdConfigToml () =
+    """# configuration containerd Diplo — isolation process (pas de virtualisation)
+version = 2
+
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "io.containerd.runhcs.v1"
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes."io.containerd.runhcs.v1"]
+          runtime_type = "io.containerd.runhcs.v1"
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes."io.containerd.runhcs.v1".options]
+            PlatformSupported = false
+            IsolationType = "process"
+"""
+
+// ─── Configuration services ───────────────────────────────────────────────
+
+let buildAppSettingsJson (grpcPort: int) (pipeName: string) (isolationType: string option) =
     let sb = System.Text.StringBuilder()
     sb.AppendLine("{") |> ignore
     sb.AppendLine("  \"ServiceSettings\": {") |> ignore
@@ -143,6 +160,9 @@ let buildAppSettingsJson (grpcPort: int) (pipeName: string) =
     sb.AppendLine("    \"UseTcp\": true,") |> ignore
     sb.AppendLine("    \"UseNamedPipes\": true") |> ignore
     sb.AppendLine("  },") |> ignore
+    match isolationType with
+    | Some iso -> sb.AppendLine(sprintf "  \"IsolationType\": \"%s\"," iso) |> ignore
+    | None -> ()
     sb.AppendLine("  \"Logging\": {") |> ignore
     sb.AppendLine("    \"LogLevel\": {") |> ignore
     sb.AppendLine("      \"Default\": \"Information\",") |> ignore
@@ -156,10 +176,19 @@ let createConfigFiles () =
     printfn "=== Création de la configuration ==="
     ensureDirectory configDir
 
+    // config.toml containerd — isolation process uniquement
+    let containerdConfigPath = Path.Combine(containerdDir, "config.toml")
+    if not (File.Exists(containerdConfigPath)) then
+        File.WriteAllText(containerdConfigPath, buildContainerdConfigToml ())
+        printfn "  [+] config.toml (isolation process)"
+    else
+        printfn "  [=] config.toml existe déjà, ignoré"
+
     // appsettings pour chaque service
     for (serviceName, _, port) in services do
         let pipeName = serviceName.ToLowerInvariant().Replace(".", "-")
-        let settings = buildAppSettingsJson port pipeName
+        let isolationType = if serviceName = "Diplo.Container" then Some "process" else None
+        let settings = buildAppSettingsJson port pipeName isolationType
 
         let settingsPath = Path.Combine(configDir, sprintf "%s.appsettings.json" serviceName)
         if not (File.Exists(settingsPath)) then
@@ -266,9 +295,11 @@ let main argv =
             printfn "  - Windows Server (2019 ou plus récent)"
             printfn "  - .NET 10 Runtime"
             printfn "  - Droits administrateur"
+            printfn "  - PAS de virtualisation requise (isolation process uniquement)"
             printfn ""
             printfn "Fonctionnalités:"
             printfn "  - Télécharge et installe containerd %s" downloadContainerdVersion
+            printfn "  - Configure containerd en isolation process (pas de Hyper-V)"
             printfn "  - Crée les services Windows Diplo.Container, Diplo.Volume, Diplo.Network"
             printfn "  - Configure les logs, la config et les répertoires"
             0

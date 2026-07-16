@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+option csharp_namespace = "Diplo.Grpc.Container";
+
+package diplo.container;
+
+service ContainerService {
+  rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse);
+  rpc StartContainer(StartContainerRequest) returns (StartContainerResponse);
+  rpc StopContainer(StopContainerRequest) returns (StopContainerResponse);
+  rpc DeleteContainer(DeleteContainerRequest) returns (DeleteContainerResponse);
+  rpc InspectContainer(InspectContainerRequest) returns (InspectContainerResponse);
+  rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
+  rpc GetContainerLogs(GetContainerLogsRequest) returns (stream ContainerLogEntry);
+  rpc ExecInContainer(ExecInContainerRequest) returns (stream ExecOutput);
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
+  rpc ListNamespaces(ListNamespacesRequest) returns (ListNamespacesResponse);
+}
+
+enum ContainerState {
+  UNKNOWN = 0;
+  CREATED = 1;
+  RUNNING = 2;
+  PAUSED = 3;
+  STOPPED = 4;
+  FAILED = 5;
+}
+
+message CreateContainerRequest {
+  string name = 1;
+  string image = 2;
+  map<string, string> env = 3;
+  repeated string command = 4;
+  repeated string args = 5;
+  map<string, string> labels = 6;
+  uint32 pid_limit = 7;
+  int64 memory_limit = 8;
+  int64 cpu_shares = 9;
+}
+
+message CreateContainerResponse {
+  string id = 1;
+  string name = 2;
+  ContainerState state = 3;
+  string created_at = 4;
+}
+
+message StartContainerRequest {
+  string id = 1;
+}
+
+message StartContainerResponse {
+  ContainerState state = 1;
+  string message = 2;
+}
+
+message StopContainerRequest {
+  string id = 1;
+  int32 timeout_seconds = 2;
+}
+
+message StopContainerResponse {
+  ContainerState state = 1;
+  string message = 2;
+}
+
+message DeleteContainerRequest {
+  string id = 1;
+  bool force = 2;
+}
+
+message DeleteContainerResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message InspectContainerRequest {
+  string id = 1;
+}
+
+message InspectContainerResponse {
+  string id = 1;
+  string name = 2;
+  string image = 3;
+  ContainerState state = 4;
+  string created_at = 5;
+  string started_at = 6;
+  string finished_at = 7;
+  map<string, string> labels = 8;
+  map<string, string> env = 9;
+  int64 pid = 10;
+  int64 exit_code = 11;
+}
+
+message ListContainersRequest {
+  bool all = 1;
+  map<string, string> filters = 2;
+}
+
+message ContainerInfo {
+  string id = 1;
+  string name = 2;
+  string image = 3;
+  ContainerState state = 4;
+  string created_at = 5;
+  map<string, string> labels = 6;
+}
+
+message ListContainersResponse {
+  repeated ContainerInfo containers = 1;
+}
+
+message GetContainerLogsRequest {
+  string id = 1;
+  bool follow = 2;
+  int32 tail = 3;
+  string since = 4;
+}
+
+message ContainerLogEntry {
+  string timestamp = 1;
+  string stream = 2;
+  string log = 3;
+}
+
+message ExecInContainerRequest {
+  string id = 1;
+  repeated string command = 2;
+  bool attach_stdin = 3;
+  bool attach_stdout = 4;
+  bool attach_stderr = 5;
+}
+
+message ExecOutput {
+  string stream = 1;
+  bytes data = 2;
+}
+
+message GetVersionRequest {}
+message GetVersionResponse {
+  string version = 1;
+  string revision = 2;
+  string go_version = 3;
+  string os = 4;
+  string arch = 5;
+}
+
+message ListNamespacesRequest {}
+message ListNamespacesResponse {
+  repeated string namespaces = 1;
+}

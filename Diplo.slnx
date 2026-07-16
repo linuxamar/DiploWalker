@@ -6,6 +6,7 @@
     <Project Path="src/Diplo.Network/Diplo.Network.fsproj" />
     <Project Path="src/Diplo.Volume/Diplo.Volume.fsproj" />
     <Project Path="src/Diplo.Installer/Diplo.Installer.fsproj" />
+    <Project Path="src/Diplo.Grpc/Diplo.Grpc.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Diplo.Container.Tests/Diplo.Container.Tests.fsproj" />
