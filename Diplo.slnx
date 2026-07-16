@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Diplo.Abstractions/Diplo.Abstractions.fsproj" />
+    <Project Path="src/Diplo.Container/Diplo.Container.fsproj" />
+    <Project Path="src/Diplo.Contracts/Diplo.Contracts.fsproj" />
+    <Project Path="src/Diplo.Network/Diplo.Network.fsproj" />
+    <Project Path="src/Diplo.Volume/Diplo.Volume.fsproj" />
+    <Project Path="src/Diplo.Installer/Diplo.Installer.fsproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Diplo.Container.Tests/Diplo.Container.Tests.fsproj" />
+    <Project Path="tests/Diplo.Network.Tests/Diplo.Network.Tests.fsproj" />
+    <Project Path="tests/Diplo.Volume.Tests/Diplo.Volume.Tests.fsproj" />
+  </Folder>
+</Solution>
