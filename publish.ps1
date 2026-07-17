@@ -23,7 +23,10 @@ $Projects = @(
     "Diplo.Container",
     "Diplo.Volume",
     "Diplo.Network",
-    "Diplo.Installer"
+    "Diplo.Installer",
+    "Diplo.Abstractions",
+    "Diplo.Contracts",
+    "Diplo.Grpc"
 )
 
 $Platforms = if ($Platform) { @($Platform) } else { @("x64", "x86") }
@@ -51,15 +54,19 @@ function Publish-Project {
         return
     }
 
+    $rid = "win-$Plat"
+
     Write-Host ""
     Write-Host "═══ $ProjectName  ($Plat) ═══" -ForegroundColor Cyan
     Write-Host "  Source  : $projectPath"
+    Write-Host "  RID     : $rid"
     Write-Host "  Sortie  : $outputDir"
 
     dotnet publish $projectPath `
         --configuration Release `
         --output $outputDir `
         --self-contained true `
+        -r $rid `
         -p:Platform=$Plat `
         -p:PublishTrimmed=false `
         -p:PublishSingleFile=false `
