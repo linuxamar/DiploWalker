@@ -8,6 +8,7 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Serilog
 open Serilog.Extensions.Hosting
+open Diplo.Abstractions.Interfaces
 open Diplo.Container.Clients
 open Diplo.Container.Services
 
@@ -26,9 +27,9 @@ let main args =
         builder.Services.AddWindowsService(fun opts -> opts.ServiceName <- "Diplo.Container") |> ignore
         builder.Services.AddGrpc() |> ignore
         builder.Services.AddSerilog() |> ignore
-        builder.Services.AddSingleton<ContainerdClient>(fun sp ->
+        builder.Services.AddSingleton<IContainerdClient>(fun sp ->
             let socket = sp.GetRequiredService<IConfiguration>().GetValue<string>("ContainerdSocket")
-            ContainerdClient(if System.String.IsNullOrEmpty(socket) then "unix:///run/containerd/containerd.sock" else socket)) |> ignore
+            ContainerdClient(if System.String.IsNullOrEmpty(socket) then "unix:///run/containerd/containerd.sock" else socket) :> IContainerdClient) |> ignore
         builder.Services.AddSingleton<ContainerServiceImpl>() |> ignore
 
         builder.WebHost.ConfigureKestrel(fun (ctx: WebHostBuilderContext) (opts: KestrelServerOptions) ->

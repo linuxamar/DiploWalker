@@ -6,9 +6,9 @@ open System.Threading.Tasks
 open Grpc.Core
 open Serilog
 open Diplo.Grpc.Container
-open Diplo.Container.Clients
+open Diplo.Abstractions.Interfaces
 
-type ContainerServiceImpl(client: ContainerdClient) =
+type ContainerServiceImpl(client: IContainerdClient) =
     inherit ContainerService.ContainerServiceBase()
 
     override _.CreateContainer(request, context) =

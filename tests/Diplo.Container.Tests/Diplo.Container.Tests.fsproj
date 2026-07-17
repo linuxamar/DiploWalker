@@ -6,7 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="MockContainerdClient.fs" />
     <Compile Include="Placeholder.fs" />
+    <Compile Include="ContainerServiceImplTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -14,10 +16,13 @@
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.0.0" />
     <PackageReference Include="FsUnit.xUnit" Version="7.1.1" />
+    <PackageReference Include="Grpc.Core.Testing" Version="2.46.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Container\Diplo.Container.fsproj" />
+    <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.csproj" />
   </ItemGroup>
 
 </Project>
