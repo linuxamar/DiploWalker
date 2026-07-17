@@ -4,6 +4,7 @@ open System
 open System.Text.Json
 open System.Threading.Tasks
 open Grpc.Core
+open Serilog
 open Diplo.Grpc.Volume
 open Diplo.Volume.Drivers
 
@@ -47,7 +48,8 @@ type VolumeServiceImpl(driver: LocalVolumeDriver) =
                     response.Driver <- StorageDriverType.Local
                     response.State <- MountState.Unmounted
                     response.SizeBytes <- driver.GetVolumeSize(request.Id)
-                with _ -> ()
+                with ex ->
+                    Log.Warning(ex, "Erreur lors du parsing des informations du volume {VolumeId}", request.Id)
                 return response
             | None ->
                 return InspectVolumeResponse()
@@ -65,7 +67,8 @@ type VolumeServiceImpl(driver: LocalVolumeDriver) =
                     if vol.TryGetProperty("id", &v) then info.Id <- v.GetString()
                     if vol.TryGetProperty("name", &v) then info.Name <- v.GetString()
                     info.Driver <- StorageDriverType.Local
-                with _ -> ()
+                with ex ->
+                    Log.Warning(ex, "Erreur lors du parsing du volume dans la liste")
                 response.Volumes.Add(info)
             return response
         }

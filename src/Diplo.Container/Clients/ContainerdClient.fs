@@ -3,6 +3,7 @@ namespace Diplo.Container.Clients
 open System
 open System.Diagnostics
 open System.Text.Json
+open Serilog
 open Diplo.Abstractions.Interfaces
 
 type ContainerdClient(containerdSocket: string) =
@@ -69,7 +70,8 @@ type ContainerdClient(containerdSocket: string) =
     member _.DeleteContainer(namespaceName: string, id: string, force: bool) =
         if force then
             let killArgs = sprintf "task kill --namespace %s --signal SIGKILL %s" namespaceName id
-            try runCtr killArgs |> ignore with _ -> ()
+            try runCtr killArgs |> ignore
+            with ex -> Log.Warning(ex, "Erreur lors de l'arrêt forcé du conteneur {ContainerId}", id)
         let args = sprintf "container delete --namespace %s %s" namespaceName id
         runCtr args |> ignore
 
@@ -103,6 +105,16 @@ type ContainerdClient(containerdSocket: string) =
             output
         with ex ->
             sprintf "Erreur d'exécution: %s" ex.Message
+
+    member _.TaskInfo(namespaceName: string, id: string) =
+        try
+            let args = sprintf "task info --namespace %s %s" namespaceName id
+            let output = runCtr args
+            parseJson output
+        with ex ->
+            Log.Warning(ex, "Erreur lors de la récupération des informations de tâche {ContainerId}", id)
+            use doc = JsonDocument.Parse("{}")
+            doc.RootElement
 
     member _.Version() =
         let output = runCtr "version"

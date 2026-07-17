@@ -6,6 +6,7 @@ open System.Diagnostics
 open System.Text.Json
 open System.Threading.Tasks
 open Grpc.Core
+open Serilog
 open Diplo.Grpc.Network
 open Diplo.Network.Plugins
 
@@ -220,7 +221,8 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                                     let ns = dns.GetProperty("nameservers")
                                     if ns.GetArrayLength() > 0 then
                                         gw <- ns.[0].GetString()
-                        with _ -> ()
+                        with ex ->
+                            Log.Warning(ex, "Erreur lors du parsing du résultat CNI")
                     let response = RunCniPluginResponse()
                     response.Success <- (proc.ExitCode = 0)
                     response.Ifname <- ifname

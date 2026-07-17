@@ -3,6 +3,7 @@ namespace Diplo.Network.Plugins
 open System
 open System.Diagnostics
 open System.Text.Json
+open Serilog
 open Diplo.Grpc.Network
 
 type CustomCniDriver() =
@@ -52,7 +53,9 @@ type CustomCniDriver() =
                     if ns.GetArrayLength() > 0 then
                         gw <- ns.[0].GetString()
             (ifname, ipv4, gw)
-        with _ -> ("", "", "")
+        with ex ->
+            Log.Warning(ex, "Erreur lors du parsing du résultat CNI")
+            ("", "", "")
 
     member _.GetAvailableSubnet() =
         let candidates = [

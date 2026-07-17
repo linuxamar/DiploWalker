@@ -4,6 +4,7 @@ open System
 open System.Text.Json
 open System.Threading.Tasks
 open Grpc.Core
+open Serilog
 open Diplo.Grpc.Container
 open Diplo.Container.Clients
 
@@ -45,17 +46,46 @@ type ContainerServiceImpl(client: ContainerdClient) =
     override _.InspectContainer(request, context) =
         task {
             let info = client.InspectContainer("default", request.Id)
+            let taskInfo = client.TaskInfo("default", request.Id)
             let response = InspectContainerResponse()
             response.Id <- request.Id
             try
+                let mutable temp = Unchecked.defaultof<JsonElement>
+                if info.TryGetProperty("id", &temp) then
+                    response.Name <- temp.GetString()
+                if info.TryGetProperty("image", &temp) then
+                    response.Image <- temp.GetString()
+                if info.TryGetProperty("created_at", &temp) then
+                    response.CreatedAt <- temp.GetString()
                 let mutable labelsValue = Unchecked.defaultof<JsonElement>
                 if info.TryGetProperty("labels", &labelsValue) then
                     for prop in labelsValue.EnumerateObject() do
                         response.Labels[prop.Name] <- prop.Value.GetString()
-                let mutable nameValue = Unchecked.defaultof<JsonElement>
-                if info.TryGetProperty("id", &nameValue) then
-                    response.Name <- nameValue.GetString()
-            with _ -> ()
+                if info.TryGetProperty("env", &labelsValue) then
+                    for prop in labelsValue.EnumerateObject() do
+                        response.Env[prop.Name] <- prop.Value.GetString()
+                if info.TryGetProperty("exit_code", &temp) then
+                    response.ExitCode <- temp.GetInt64()
+            with ex ->
+                Log.Warning(ex, "Erreur lors du parsing des métadonnées du conteneur {ContainerId}", request.Id)
+            try
+                let mutable temp = Unchecked.defaultof<JsonElement>
+                if taskInfo.TryGetProperty("pid", &temp) then
+                    response.Pid <- temp.GetInt64()
+                if taskInfo.TryGetProperty("status", &temp) then
+                    let status = temp.GetString()
+                    response.State <- 
+                        match status.ToLowerInvariant() with
+                        | "running" -> ContainerState.Running
+                        | "created" -> ContainerState.Created
+                        | "paused" | "pausing" -> ContainerState.Paused
+                        | "stopped" | "deleted" -> ContainerState.Stopped
+                        | "dead" -> ContainerState.Failed
+                        | _ -> ContainerState.Unknown
+                if taskInfo.TryGetProperty("exited_at", &temp) then
+                    response.FinishedAt <- temp.GetString()
+            with ex ->
+                Log.Warning(ex, "Erreur lors du parsing de la tâche du conteneur {ContainerId}", request.Id)
             return response
         }
 
@@ -101,7 +131,9 @@ type ContainerServiceImpl(client: ContainerdClient) =
                 let mutable v = Unchecked.defaultof<JsonElement>
                 if info.TryGetProperty("Version", &v) then response.Version <- v.GetString()
                 if info.TryGetProperty("Revision", &v) then response.Revision <- v.GetString()
-            with _ -> response.Version <- "unknown"
+            with ex ->
+                Log.Warning(ex, "Erreur lors du parsing de la version containerd")
+                response.Version <- "unknown"
             return response
         }
 

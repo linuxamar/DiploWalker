@@ -4,6 +4,7 @@ open System
 open System.Diagnostics
 open System.Net.NetworkInformation
 open System.Collections.Concurrent
+open Serilog
 open Diplo.Grpc.Network
 
 type BridgeNetworkDriver() =
@@ -52,7 +53,9 @@ type BridgeNetworkDriver() =
                     props.UnicastAddresses
                     |> Seq.tryHead
                     |> Option.map (fun addr -> addr.Address.ToString())
-                with _ -> None)
+                with ex ->
+                    Log.Debug(ex, "Impossible de récupérer l'adresse IP de l'interface {Interface}", iface.Name)
+                    None)
             |> Set.ofArray
         let candidates = [
             "172.18.0.0/16"; "172.19.0.0/16"; "172.20.0.0/16"; "172.21.0.0/16"
@@ -104,7 +107,8 @@ type BridgeNetworkDriver() =
                     let args = sprintf "Remove-VMSwitch -Name '%s' -Force" netInfo.Name
                     runPowershell args |> ignore
                     let natArgs = sprintf "Remove-NetNat -Name '%sNat' -Confirm:$false" netInfo.Name
-                    try runPowershell natArgs |> ignore with _ -> ()
+                    try runPowershell natArgs |> ignore
+                    with ex -> Log.Warning(ex, "Erreur lors de la suppression du NAT {NatName}", netInfo.Name + "Nat")
                     networks.TryRemove(id) |> ignore
                     Ok ()
                 with ex ->
