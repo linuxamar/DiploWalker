@@ -1,0 +1,15 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      Plateformes autorisées : x64 ou x86 exclusivement.
+      AnyCPU est interdit — les binaires Diplo ciblent containerd/WSL2 nativement.
+      Par défaut x64 ; override avec -p:Platform=x86
+    -->
+    <Platforms>x64;x86</Platforms>
+    <Platform>x64</Platform>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+
+</Project>
