@@ -69,13 +69,13 @@ module VolumeServiceImplTests =
         result.Message |> should equal "Volume supprimé"
 
     [<Fact>]
-    let ``RemoveVolume sur volume inexistant retourne false`` () =
+    let ``RemoveVolume sur volume inexistant lance RpcException NotFound`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
         let req = RemoveVolumeRequest(Id = "nonexistent", Force = false)
-        let result = svc.RemoveVolume(req, ctx).Result
-        result.Success |> should equal false
-        result.Message |> should equal "Volume introuvable"
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveVolume(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.NotFound
 
     [<Fact>]
     let ``InspectVolume retourne les metadonnees du volume`` () =
@@ -92,12 +92,13 @@ module VolumeServiceImplTests =
         result.SizeBytes |> should equal 1024L
 
     [<Fact>]
-    let ``InspectVolume sur volume inexistant retourne reponse vide`` () =
+    let ``InspectVolume sur volume inexistant lance RpcException NotFound`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
         let req = InspectVolumeRequest(Id = "nonexistent")
-        let result = svc.InspectVolume(req, ctx).Result
-        String.IsNullOrEmpty(result.Id) |> should equal true
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectVolume(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.NotFound
 
     [<Fact>]
     let ``ListVolumes retourne les volumes crees`` () =

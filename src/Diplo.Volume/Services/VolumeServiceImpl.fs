@@ -28,31 +28,37 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
 
     override _.RemoveVolume(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
             try
                 let success = driver.RemoveVolume(request.Id, request.Force)
-                return RemoveVolumeResponse(Success = success, Message = if success then "Volume supprimé" else "Volume introuvable")
-            with ex ->
+                if not success then
+                    raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" request.Id)))
+                return RemoveVolumeResponse(Success = true, Message = "Volume supprimé")
+            with ex when not (ex :? RpcException) ->
                 return RemoveVolumeResponse(Success = false, Message = ex.Message)
         }
 
     override _.InspectVolume(request, context) =
         task {
-            match driver.InspectVolume(request.Id) with
-            | Some info ->
-                let response = InspectVolumeResponse()
-                try
-                    let mutable v = Unchecked.defaultof<JsonElement>
-                    if info.TryGetProperty("id", &v) then response.Id <- v.GetString()
-                    if info.TryGetProperty("name", &v) then response.Name <- v.GetString()
-                    if info.TryGetProperty("mountpoint", &v) then response.Mountpoint <- v.GetString()
-                    response.Driver <- StorageDriverType.Local
-                    response.State <- MountState.Unmounted
-                    response.SizeBytes <- driver.GetVolumeSize(request.Id)
-                with ex ->
-                    Log.Warning(ex, "Erreur lors du parsing des informations du volume {VolumeId}", request.Id)
-                return response
-            | None ->
-                return InspectVolumeResponse()
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
+            let volResult = driver.InspectVolume(request.Id)
+            if volResult.IsNone then
+                raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" request.Id)))
+            let info = volResult.Value
+            let response = InspectVolumeResponse()
+            try
+                let mutable v = Unchecked.defaultof<JsonElement>
+                if info.TryGetProperty("id", &v) then response.Id <- v.GetString()
+                if info.TryGetProperty("name", &v) then response.Name <- v.GetString()
+                if info.TryGetProperty("mountpoint", &v) then response.Mountpoint <- v.GetString()
+                response.Driver <- StorageDriverType.Local
+                response.State <- MountState.Unmounted
+                response.SizeBytes <- driver.GetVolumeSize(request.Id)
+            with ex ->
+                Log.Warning(ex, "Erreur lors du parsing des informations du volume {VolumeId}", request.Id)
+            return response
         }
 
     override _.ListVolumes(request, context) =
@@ -75,6 +81,10 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
 
     override _.MountVolume(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
+            if String.IsNullOrEmpty(request.TargetPath) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin cible est requis")))
             try
                 let options = request.Options |> Seq.map (fun kv -> kv.Key + "=" + kv.Value) |> String.concat ";"
                 let (_, mountpoint) = driver.MountVolume(request.Id, request.TargetPath, options)
@@ -89,6 +99,10 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
 
     override _.UnmountVolume(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
+            if String.IsNullOrEmpty(request.TargetPath) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin cible est requis")))
             try
                 let (_, message) = driver.UnmountVolume(request.Id, request.TargetPath)
                 return UnmountVolumeResponse(State = MountState.Unmounted, Message = message)

@@ -13,6 +13,8 @@ type ContainerServiceImpl(client: IContainerdClient) =
 
     override _.CreateContainer(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Image) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'image du conteneur est requise")))
             let name = if String.IsNullOrEmpty(request.Name) then Guid.NewGuid().ToString("N") else request.Name
             let labels = request.Labels |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
             let id = client.CreateContainer("default", name, request.Image, labels)
@@ -26,12 +28,16 @@ type ContainerServiceImpl(client: IContainerdClient) =
 
     override _.StartContainer(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             client.StartContainer("default", request.Id)
             return StartContainerResponse(State = ContainerState.Running, Message = "Conteneur démarré")
         }
 
     override _.StopContainer(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let timeout = if request.TimeoutSeconds > 0 then request.TimeoutSeconds else 10
             client.StopContainer("default", request.Id, timeout)
             return StopContainerResponse(State = ContainerState.Stopped, Message = "Conteneur arrêté")
@@ -39,12 +45,16 @@ type ContainerServiceImpl(client: IContainerdClient) =
 
     override _.DeleteContainer(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             client.DeleteContainer("default", request.Id, request.Force)
             return DeleteContainerResponse(Success = true, Message = "Conteneur supprimé")
         }
 
     override _.InspectContainer(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let info = client.InspectContainer("default", request.Id)
             let taskInfo = client.TaskInfo("default", request.Id)
             let response = InspectContainerResponse()
@@ -102,6 +112,8 @@ type ContainerServiceImpl(client: IContainerdClient) =
 
     override _.GetContainerLogs(request, responseStream, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let tail = if request.Tail > 0 then request.Tail else 100
             let logs = client.GetContainerLogs("default", request.Id, tail)
             for line in logs do
@@ -116,6 +128,10 @@ type ContainerServiceImpl(client: IContainerdClient) =
 
     override _.ExecInContainer(request, responseStream, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            if request.Command.Count = 0 then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "Au moins une commande est requise")))
             let command = request.Command |> Seq.toArray
             let result = client.ExecInContainer("default", request.Id, command)
             let output = ExecOutput(Stream = "stdout", Data = Google.Protobuf.ByteString.CopyFromUtf8(result))

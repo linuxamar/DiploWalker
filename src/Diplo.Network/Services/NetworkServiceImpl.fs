@@ -23,54 +23,56 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.CreateNetwork(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Name) |> not && request.Name.Length > 63 then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom du réseau ne doit pas dépasser 63 caractères")))
             let name = if String.IsNullOrEmpty(request.Name) then Guid.NewGuid().ToString("N") else request.Name
             let driverType = request.Driver
             let driver = getDriver driverType |> Option.defaultValue (defaultDriver ())
-            match driver.Create(name, request.Subnet, request.Gateway, request.IpRange, Map.empty, Map.empty) with
-            | Ok info ->
-                let response = CreateNetworkResponse()
-                response.Id <- info.Id
-                response.Name <- info.Name
-                response.Driver <- info.Driver
-                response.Subnet <- info.Subnet
-                response.Gateway <- info.Gateway
-                response.CreatedAt <- info.CreatedAt
-                return response
-            | Error msg ->
-                raise (Exception(sprintf "Échec de la création du réseau: %s" msg))
-                return CreateNetworkResponse()
+            let result = driver.Create(name, request.Subnet, request.Gateway, request.IpRange, Map.empty, Map.empty)
+            let errorMsg = match result with Ok _ -> "" | Error msg -> msg
+            if result.IsError then
+                raise (RpcException(Status(StatusCode.Internal, sprintf "Échec de la création du réseau: %s" errorMsg)))
+            let info = match result with Ok v -> v | Error _ -> failwith "impossible"
+            let response = CreateNetworkResponse()
+            response.Id <- info.Id
+            response.Name <- info.Name
+            response.Driver <- info.Driver
+            response.Subnet <- info.Subnet
+            response.Gateway <- info.Gateway
+            response.CreatedAt <- info.CreatedAt
+            return response
         }
 
     override _.RemoveNetwork(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
             let mutable foundDriver = None
             for kvp in drivers do
                 match kvp.Value.Inspect(request.Id) with
                 | Ok info when info.Driver = kvp.Key ->
                     foundDriver <- Some kvp.Value
                 | _ -> ()
-            match foundDriver with
-            | Some driver ->
-                match driver.Remove(request.Id, request.Force) with
-                | Ok () ->
-                    let r = RemoveNetworkResponse()
-                    r.Success <- true
-                    r.Message <- "Réseau supprimé"
-                    return r
-                | Error msg ->
-                    let r = RemoveNetworkResponse()
-                    r.Success <- false
-                    r.Message <- msg
-                    return r
-            | None ->
+            if foundDriver.IsNone then
+                raise (RpcException(Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.Id)))
+            let driver = foundDriver.Value
+            match driver.Remove(request.Id, request.Force) with
+            | Ok () ->
+                let r = RemoveNetworkResponse()
+                r.Success <- true
+                r.Message <- "Réseau supprimé"
+                return r
+            | Error msg ->
                 let r = RemoveNetworkResponse()
                 r.Success <- false
-                r.Message <- sprintf "Réseau '%s' introuvable" request.Id
+                r.Message <- msg
                 return r
         }
 
     override _.InspectNetwork(request, context) =
         task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
             let mutable result = None
             for kvp in drivers do
                 if result.IsNone then
@@ -84,9 +86,9 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                         response.Gateway <- info.Gateway
                         result <- Some response
                     | Error _ -> ()
-            match result with
-            | Some r -> return r
-            | None -> return InspectNetworkResponse()
+            if result.IsNone then
+                raise (RpcException(Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.Id)))
+            return result.Value
         }
 
     override _.ListNetworks(request, context) =
@@ -110,6 +112,10 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.ConnectContainer(request, context) =
         task {
+            if String.IsNullOrEmpty(request.NetworkId) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
+            if String.IsNullOrEmpty(request.ContainerId) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requise")))
             let driverType =
                 let mutable found = None
                 for kvp in drivers do
@@ -135,6 +141,10 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.DisconnectContainer(request, context) =
         task {
+            if String.IsNullOrEmpty(request.NetworkId) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
+            if String.IsNullOrEmpty(request.ContainerId) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requise")))
             let mutable foundDriver = None
             for kvp in drivers do
                 match kvp.Value.Inspect(request.NetworkId) with

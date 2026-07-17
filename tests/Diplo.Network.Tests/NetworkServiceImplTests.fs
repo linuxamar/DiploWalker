@@ -61,13 +61,13 @@ module NetworkServiceImplTests =
         result.Message |> should equal "Réseau supprimé"
 
     [<Fact>]
-    let ``RemoveNetwork sur reseau inexistant retourne false`` () =
+    let ``RemoveNetwork sur reseau inexistant lance RpcException NotFound`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
         let req = RemoveNetworkRequest(Id = "nonexistent", Force = false)
-        let result = svc.RemoveNetwork(req, ctx).Result
-        result.Success |> should equal false
-        result.Message.Contains("introuvable") |> should equal true
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveNetwork(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.NotFound
 
     [<Fact>]
     let ``InspectNetwork retourne les metadonnees du reseau`` () =
@@ -83,12 +83,13 @@ module NetworkServiceImplTests =
         result.Gateway |> should equal "10.0.0.1"
 
     [<Fact>]
-    let ``InspectNetwork sur reseau inexistant retourne reponse vide`` () =
+    let ``InspectNetwork sur reseau inexistant lance RpcException NotFound`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
         let req = InspectNetworkRequest(Id = "nonexistent")
-        let result = svc.InspectNetwork(req, ctx).Result
-        String.IsNullOrEmpty(result.Id) |> should equal true
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectNetwork(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.NotFound
 
     [<Fact>]
     let ``ListNetworks retourne les reseaux crees`` () =
