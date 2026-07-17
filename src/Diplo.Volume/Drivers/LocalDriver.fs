@@ -3,6 +3,7 @@ namespace Diplo.Volume.Drivers
 open System
 open System.IO
 open System.Text.Json
+open Diplo.Abstractions.Interfaces
 
 type LocalVolumeDriver(dataRoot: string) =
 
@@ -99,3 +100,12 @@ type LocalVolumeDriver(dataRoot: string) =
             Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
             |> Array.sumBy (fun f -> FileInfo(f).Length)
         else 0L
+
+    interface IVolumeDriver with
+        member this.CreateVolume(name, driverOpts, labels) = this.CreateVolume(name, driverOpts, labels)
+        member this.RemoveVolume(id, force) = this.RemoveVolume(id, force)
+        member this.InspectVolume(id) = this.InspectVolume(id)
+        member this.ListVolumes(filters) = this.ListVolumes(filters)
+        member this.MountVolume(id, targetPath, options) = this.MountVolume(id, targetPath, options)
+        member this.UnmountVolume(id, targetPath) = this.UnmountVolume(id, targetPath)
+        member this.GetVolumeSize(id) = this.GetVolumeSize(id)

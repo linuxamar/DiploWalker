@@ -8,6 +8,7 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Serilog
 open Serilog.Extensions.Hosting
+open Diplo.Abstractions.Interfaces
 open Diplo.Volume.Drivers
 open Diplo.Volume.Services
 
@@ -26,10 +27,10 @@ let main args =
         builder.Services.AddWindowsService(fun opts -> opts.ServiceName <- "Diplo.Volume") |> ignore
         builder.Services.AddGrpc() |> ignore
         builder.Services.AddSerilog() |> ignore
-        builder.Services.AddSingleton<LocalVolumeDriver>(fun sp ->
+        builder.Services.AddSingleton<IVolumeDriver>(fun sp ->
             let value = sp.GetRequiredService<IConfiguration>().GetValue<string>("VolumeDataRoot")
             let dataRoot = if System.String.IsNullOrEmpty(value) then "C:\\ProgramData\\Diplo\\Volume" else value
-            LocalVolumeDriver(dataRoot)) |> ignore
+            LocalVolumeDriver(dataRoot) :> IVolumeDriver) |> ignore
         builder.Services.AddSingleton<VolumeServiceImpl>() |> ignore
 
         builder.WebHost.ConfigureKestrel(fun (ctx: WebHostBuilderContext) (opts: KestrelServerOptions) ->

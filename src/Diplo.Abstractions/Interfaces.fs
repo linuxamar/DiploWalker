@@ -21,6 +21,16 @@ module Interfaces =
         abstract member Version: unit -> JsonElement
         abstract member Namespaces: unit -> string list
 
+    /// Driver de volumes pour la gestion du stockage
+    type IVolumeDriver =
+        abstract member CreateVolume: name: string * driverOpts: Map<string, string> * labels: Map<string, string> -> string * string
+        abstract member RemoveVolume: id: string * force: bool -> bool
+        abstract member InspectVolume: id: string -> JsonElement option
+        abstract member ListVolumes: filters: Map<string, string> -> JsonElement list
+        abstract member MountVolume: id: string * targetPath: string * options: string -> bool * string
+        abstract member UnmountVolume: id: string * targetPath: string -> bool * string
+        abstract member GetVolumeSize: id: string -> int64
+
     /// Plugin CNI pour la gestion réseau
     type ICniPlugin =
         abstract member Name: string

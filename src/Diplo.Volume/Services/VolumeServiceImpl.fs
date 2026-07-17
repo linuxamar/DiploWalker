@@ -6,9 +6,9 @@ open System.Threading.Tasks
 open Grpc.Core
 open Serilog
 open Diplo.Grpc.Volume
-open Diplo.Volume.Drivers
+open Diplo.Abstractions.Interfaces
 
-type VolumeServiceImpl(driver: LocalVolumeDriver) =
+type VolumeServiceImpl(driver: IVolumeDriver) =
     inherit VolumeService.VolumeServiceBase()
 
     override _.CreateVolume(request, context) =
