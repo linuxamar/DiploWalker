@@ -331,26 +331,11 @@ let createCniConfig () =
     ensureDirectory cniConfDir
     let configPath = Path.Combine(cniConfDir, "0-containerd-nat.conf")
     if not (File.Exists(configPath)) then
-        let config = """{
-    "cniVersion": "0.3.0",
-    "name": "nat",
-    "type": "nat",
-    "master": "Ethernet",
-    "ipam": {
-        "subnet": "172.20.0.0/16",
-        "routes": [
-            {
-                "gateway": "172.20.0.1"
-            }
-        ]
-    },
-    "capabilities": {
-        "portMappings": true,
-        "dns": true
-    }
-}"""
+        let (_, subnet, gateway) = Diplo.Abstractions.NetworkConfig.resolveAll None
+        let config = Diplo.Abstractions.NetworkConfig.generateCniConflistJson
+                        Diplo.Abstractions.NetworkConfig.defaultConfig subnet gateway
         File.WriteAllText(configPath, config)
-        printfn "  [+] config CNI: %s" (Path.GetFileName(configPath))
+        printfn "  [+] config CNI: %s (subnet: %s, gateway: %s)" (Path.GetFileName(configPath)) subnet gateway
     else
         printfn "  [=] config CNI existe déjà, ignoré"
 

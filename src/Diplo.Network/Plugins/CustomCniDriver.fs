@@ -4,6 +4,7 @@ open System
 open System.Diagnostics
 open System.Text.Json
 open Serilog
+open Diplo.Abstractions.NetworkConfig
 open Diplo.Grpc.Network
 
 type CustomCniDriver() =
@@ -26,12 +27,9 @@ type CustomCniDriver() =
         (proc.ExitCode, stdout, stderr)
 
     member _.GetAvailableSubnet() =
-        let candidates = [
-            "10.244.0.0/16"; "10.245.0.0/16"; "10.246.0.0/16"
-            "172.30.0.0/16"; "172.31.0.0/16"
-        ]
+        let config = loadConfig None
         let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
-        candidates |> List.tryFind (fun c -> not (existing.Contains c)) |> Option.defaultValue "10.244.0.0/16"
+        findAvailableSubnet config.SubnetCandidates existing
 
     interface INetworkDriver with
         member _.DriverType = NetworkDriver.CustomCni
@@ -39,17 +37,12 @@ type CustomCniDriver() =
         member _.Create(name, subnet, gateway, ipRange, options, labels) =
             try
                 let actualSubnet = if String.IsNullOrEmpty(subnet) then
-                                       let candidates = [
-                                           "10.244.0.0/16"; "10.245.0.0/16"; "10.246.0.0/16"
-                                           "172.30.0.0/16"; "172.31.0.0/16"
-                                       ]
+                                       let config = loadConfig None
                                        let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
-                                       candidates |> List.tryFind (fun c -> not (existing.Contains c)) |> Option.defaultValue "10.244.0.0/16"
+                                       findAvailableSubnet config.SubnetCandidates existing
                                    else subnet
                 let actualGateway = if String.IsNullOrEmpty(gateway) then
-                                        let parts = actualSubnet.Split('/')
-                                        let ipParts = parts.[0].Split('.')
-                                        sprintf "%s.%s.%s.1" ipParts.[0] ipParts.[1] ipParts.[2]
+                                        deriveGateway actualSubnet
                                     else gateway
                 let id = Guid.NewGuid().ToString("N")
                 let info = {

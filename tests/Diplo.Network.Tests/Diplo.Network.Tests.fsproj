@@ -10,6 +10,7 @@
     <Compile Include="CustomCniDriverTests.fs" />
     <Compile Include="MockNetworkDriver.fs" />
     <Compile Include="NetworkServiceImplTests.fs" />
+    <Compile Include="NetworkConfigTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,6 +5,7 @@ open System.Diagnostics
 open System.Net.NetworkInformation
 open System.Collections.Concurrent
 open Serilog
+open Diplo.Abstractions.NetworkConfig
 open Diplo.Grpc.Network
 
 type BridgeNetworkDriver() =
@@ -46,33 +47,12 @@ type BridgeNetworkDriver() =
         stdout
 
     let getAvailableSubnet () =
-        let interfaces = NetworkInterface.GetAllNetworkInterfaces()
-        let usedSubnets =
-            interfaces
-            |> Array.choose (fun iface ->
-                try
-                    let props = iface.GetIPProperties()
-                    props.UnicastAddresses
-                    |> Seq.tryHead
-                    |> Option.map (fun addr -> addr.Address.ToString())
-                with ex ->
-                    Log.Debug(ex, "Impossible de récupérer l'adresse IP de l'interface {Interface}", iface.Name)
-                    None)
-            |> Set.ofArray
-        let candidates = [
-            "172.18.0.0/16"; "172.19.0.0/16"; "172.20.0.0/16"; "172.21.0.0/16"
-            "10.100.0.0/16"; "10.101.0.0/16"; "10.102.0.0/16"
-        ]
-        candidates |> List.tryFind (fun c ->
-            let baseIp = c.Split('/')[0]
-            let prefix = baseIp.Split('.') |> Array.take 2 |> String.concat "."
-            not (usedSubnets |> Set.exists (fun ip -> ip.StartsWith(prefix))))
-        |> Option.defaultValue "172.18.0.0/16"
+        let usedPrefixes = getUsedPrefixes ()
+        let config = loadConfig None
+        findAvailableSubnet config.SubnetCandidates usedPrefixes
 
     let getDefaultGateway (subnet: string) =
-        let parts = subnet.Split('/')
-        let ipParts = parts.[0].Split('.')
-        sprintf "%s.%s.%s.1" ipParts.[0] ipParts.[1] ipParts.[2]
+        deriveGateway subnet
 
     interface INetworkDriver with
         member _.DriverType = NetworkDriver.Bridge
