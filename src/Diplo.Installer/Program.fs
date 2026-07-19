@@ -88,6 +88,8 @@ let isLegacyContainerd () =
 
 let getSandboxImage () =
     let tag = getWindowsServerVersion ()
+    // Le sandbox image utilise Nano Server — léger (~175 Mo) et suffisant pour le namespace HCS
+    // La sandbox n'a pas besoin de services Windows ni du planificateur de tâches
     sprintf "mcr.microsoft.com/windows/nanoserver:%s" tag
 
 // ─── Téléchargement ──────────────────────────────────────────────────────
@@ -169,6 +171,9 @@ let downloadCniPlugins () = task {
 }
 
 // ─── Installation des services Windows ───────────────────────────────────
+// Note: sc.exe create/start/stop fonctionne sur Server Core et Nano Server.
+// Le planificateur de tâches (schtasks) n'est PAS disponible sur Nano Server —
+// si des automatisations via le planificateur sont nécessaires, utiliser Server Core.
 
 let serviceDllPath (serviceName: string) =
     Path.Combine(installDir, serviceName, sprintf "%s.exe" serviceName)
