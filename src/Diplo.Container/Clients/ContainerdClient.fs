@@ -1,59 +1,27 @@
 namespace Diplo.Container.Clients
 
 open System
-open System.Diagnostics
 open System.Text.Json
 open Serilog
 open Diplo.Abstractions.Interfaces
 
-type ContainerdClient(containerdSocket: string) =
+type ContainerdClient(runner: IProcessRunner) =
 
     let runCtr args =
-        let psi = ProcessStartInfo()
-        psi.FileName <- "ctr"
-        psi.Arguments <- args
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        let proc = Process.Start(psi)
-        let stdout = proc.StandardOutput.ReadToEnd()
-        let stderr = proc.StandardError.ReadToEnd()
-        proc.WaitForExit()
-        if proc.ExitCode <> 0 then
-            failwithf "ctr a échoué (code %d): %s" proc.ExitCode stderr
-        stdout
+        runner.Run("ctr", args)
 
     let parseJson (text: string) =
         use doc = JsonDocument.Parse(text)
-        doc.RootElement
+        doc.RootElement.Clone()
 
     interface IContainerdClient with
-        member _.GetVersion() =
-            try
-                let output = runCtr "version"
-                let json = parseJson output
-                let version = json.GetProperty("Version").GetString()
-                let revision = json.GetProperty("Revision").GetString()
-                sprintf "%s (revision: %s)" version revision
-            with ex ->
-                sprintf "Erreur ctr: %s" ex.Message
-
-        member _.ListNamespaces() =
-            try
-                let output = runCtr "namespace list --quiet"
-                output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
-                |> Array.toList
-            with ex ->
-                [ sprintf "Erreur: %s" ex.Message ]
-
         member _.CreateContainer(namespaceName, id, image, labels) =
             let labelArgs =
                 labels
                 |> Map.toList
                 |> List.map (fun (k, v) -> sprintf "--label %s=%s" k v)
                 |> String.concat " "
-            let args = sprintf "container create %s --namespace %s %s %s" namespaceName id image labelArgs
+            let args = sprintf "container create --namespace %s %s %s %s" namespaceName id image labelArgs
             let output = runCtr args
             output.Trim()
 
@@ -114,13 +82,22 @@ type ContainerdClient(containerdSocket: string) =
             with ex ->
                 Log.Warning(ex, "Erreur lors de la récupération des informations de tâche {ContainerId}", id)
                 use doc = JsonDocument.Parse("{}")
-                doc.RootElement
+                doc.RootElement.Clone()
 
         member _.Version() =
-            let output = runCtr "version"
-            parseJson output
+            try
+                let output = runCtr "version"
+                let json = parseJson output
+                let version = json.GetProperty("Version").GetString()
+                let revision = json.GetProperty("Revision").GetString()
+                sprintf "%s (revision: %s)" version revision
+            with ex ->
+                sprintf "Erreur ctr: %s" ex.Message
 
         member _.Namespaces() =
-            let output = runCtr "namespace list --quiet"
-            output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
-            |> Array.toList
+            try
+                let output = runCtr "namespace list --quiet"
+                output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+                |> Array.toList
+            with ex ->
+                [ sprintf "Erreur: %s" ex.Message ]

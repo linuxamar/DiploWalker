@@ -29,10 +29,10 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
             let driverType = request.Driver
             let driver = getDriver driverType |> Option.defaultValue (defaultDriver ())
             let result = driver.Create(name, request.Subnet, request.Gateway, request.IpRange, Map.empty, Map.empty)
-            let errorMsg = match result with Ok _ -> "" | Error msg -> msg
-            if result.IsError then
-                raise (RpcException(Status(StatusCode.Internal, sprintf "Échec de la création du réseau: %s" errorMsg)))
-            let info = match result with Ok v -> v | Error _ -> failwith "impossible"
+            let info =
+                match result with
+                | Ok v -> v
+                | Error msg -> raise (RpcException(Status(StatusCode.Internal, sprintf "Échec de la création du réseau: %s" msg)))
             let response = CreateNetworkResponse()
             response.Id <- info.Id
             response.Name <- info.Name
@@ -115,7 +115,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
             if String.IsNullOrEmpty(request.NetworkId) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
             if String.IsNullOrEmpty(request.ContainerId) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requise")))
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let driverType =
                 let mutable found = None
                 for kvp in drivers do
@@ -144,7 +144,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
             if String.IsNullOrEmpty(request.NetworkId) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
             if String.IsNullOrEmpty(request.ContainerId) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requise")))
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let mutable foundDriver = None
             for kvp in drivers do
                 match kvp.Value.Inspect(request.NetworkId) with
@@ -196,7 +196,8 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     psi.RedirectStandardError <- true
                     psi.UseShellExecute <- false
                     psi.CreateNoWindow <- true
-                    let proc = System.Diagnostics.Process.Start(psi)
+                    use proc = System.Diagnostics.Process.Start(psi)
+                    if proc |> isNull then failwithf "Impossible de démarrer le plugin CNI: %s" pluginPath
                     proc.StandardInput.Write(configJson)
                     proc.StandardInput.Close()
                     let stdout = proc.StandardOutput.ReadToEnd()
@@ -207,32 +208,10 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     let mutable gw = ""
                     let msg = if proc.ExitCode = 0 then stdout else stderr
                     if proc.ExitCode = 0 then
-                        try
-                            let doc = JsonDocument.Parse(stdout)
-                            let root = doc.RootElement
-                            let mutable tv = Unchecked.defaultof<JsonElement>
-                            if root.TryGetProperty("interfaces", &tv) then
-                                let interfaces = root.GetProperty("interfaces")
-                                if interfaces.GetArrayLength() > 0 then
-                                    let iface = interfaces.[0]
-                                    let mutable iv = Unchecked.defaultof<JsonElement>
-                                    if iface.TryGetProperty("name", &iv) then
-                                        ifname <- iv.GetString()
-                                    if iface.TryGetProperty("ips", &iv) && iface.GetProperty("ips").GetArrayLength() > 0 then
-                                        let ipInfo = iface.GetProperty("ips").[0]
-                                        let mutable av = Unchecked.defaultof<JsonElement>
-                                        if ipInfo.TryGetProperty("address", &av) then
-                                            ipv4Addr <- ipInfo.GetProperty("address").GetString()
-                            let mutable dv = Unchecked.defaultof<JsonElement>
-                            if root.TryGetProperty("dns", &dv) then
-                                let dns = root.GetProperty("dns")
-                                let mutable nsv = Unchecked.defaultof<JsonElement>
-                                if dns.TryGetProperty("nameservers", &nsv) then
-                                    let ns = dns.GetProperty("nameservers")
-                                    if ns.GetArrayLength() > 0 then
-                                        gw <- ns.[0].GetString()
-                        with ex ->
-                            Log.Warning(ex, "Erreur lors du parsing du résultat CNI")
+                        let (parsedIfname, parsedIpv4, parsedGw) = CniParsing.parseCniResult stdout
+                        ifname <- parsedIfname
+                        ipv4Addr <- parsedIpv4
+                        gw <- parsedGw
                     let response = RunCniPluginResponse()
                     response.Success <- (proc.ExitCode = 0)
                     response.Ifname <- ifname

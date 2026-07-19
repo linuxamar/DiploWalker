@@ -19,7 +19,8 @@ type BridgeNetworkDriver() =
         psi.RedirectStandardError <- true
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
-        let proc = Process.Start(psi)
+        use proc = Process.Start(psi)
+        if proc |> isNull then failwithf "Impossible de démarrer netsh"
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
         proc.WaitForExit()
@@ -35,7 +36,8 @@ type BridgeNetworkDriver() =
         psi.RedirectStandardError <- true
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
-        let proc = Process.Start(psi)
+        use proc = Process.Start(psi)
+        if proc |> isNull then failwithf "Impossible de démarrer PowerShell"
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
         proc.WaitForExit()

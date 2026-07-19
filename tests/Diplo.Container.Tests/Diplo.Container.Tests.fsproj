@@ -7,7 +7,9 @@
 
   <ItemGroup>
     <Compile Include="MockContainerdClient.fs" />
+    <Compile Include="MockProcessRunner.fs" />
     <Compile Include="Placeholder.fs" />
+    <Compile Include="ContainerdClientTests.fs" />
     <Compile Include="ContainerServiceImplTests.fs" />
   </ItemGroup>
 

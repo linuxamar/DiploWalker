@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Clients\ProcessRunner.fs" />
     <Compile Include="Clients\ContainerdClient.fs" />
     <Compile Include="Services\ContainerServiceImpl.fs" />
     <Compile Include="Program.fs" />

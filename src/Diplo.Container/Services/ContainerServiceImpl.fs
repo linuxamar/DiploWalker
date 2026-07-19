@@ -11,13 +11,16 @@ open Diplo.Abstractions.Interfaces
 type ContainerServiceImpl(client: IContainerdClient) =
     inherit ContainerService.ContainerServiceBase()
 
+    [<Literal>]
+    static let DefaultNamespace = "default"
+
     override _.CreateContainer(request, context) =
         task {
             if String.IsNullOrEmpty(request.Image) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'image du conteneur est requise")))
             let name = if String.IsNullOrEmpty(request.Name) then Guid.NewGuid().ToString("N") else request.Name
             let labels = request.Labels |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
-            let id = client.CreateContainer("default", name, request.Image, labels)
+            let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels)
             return CreateContainerResponse(
                 Id = id,
                 Name = request.Name,
@@ -30,7 +33,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
         task {
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-            client.StartContainer("default", request.Id)
+            client.StartContainer(DefaultNamespace, request.Id)
             return StartContainerResponse(State = ContainerState.Running, Message = "Conteneur démarré")
         }
 
@@ -39,7 +42,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let timeout = if request.TimeoutSeconds > 0 then request.TimeoutSeconds else 10
-            client.StopContainer("default", request.Id, timeout)
+            client.StopContainer(DefaultNamespace, request.Id, timeout)
             return StopContainerResponse(State = ContainerState.Stopped, Message = "Conteneur arrêté")
         }
 
@@ -47,7 +50,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
         task {
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-            client.DeleteContainer("default", request.Id, request.Force)
+            client.DeleteContainer(DefaultNamespace, request.Id, request.Force)
             return DeleteContainerResponse(Success = true, Message = "Conteneur supprimé")
         }
 
@@ -55,8 +58,8 @@ type ContainerServiceImpl(client: IContainerdClient) =
         task {
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-            let info = client.InspectContainer("default", request.Id)
-            let taskInfo = client.TaskInfo("default", request.Id)
+            let info = client.InspectContainer(DefaultNamespace, request.Id)
+            let taskInfo = client.TaskInfo(DefaultNamespace, request.Id)
             let response = InspectContainerResponse()
             response.Id <- request.Id
             try
@@ -101,7 +104,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
 
     override _.ListContainers(request, context) =
         task {
-            let ids = client.ListContainers("default", request.All)
+            let ids = client.ListContainers(DefaultNamespace, request.All)
             let response = ListContainersResponse()
             for id in ids do
                 let ci = ContainerInfo()
@@ -115,7 +118,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let tail = if request.Tail > 0 then request.Tail else 100
-            let logs = client.GetContainerLogs("default", request.Id, tail)
+            let logs = client.GetContainerLogs(DefaultNamespace, request.Id, tail)
             for line in logs do
                 let entry = ContainerLogEntry(
                     Timestamp = DateTime.UtcNow.ToString("o"),
@@ -133,7 +136,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
             if request.Command.Count = 0 then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "Au moins une commande est requise")))
             let command = request.Command |> Seq.toArray
-            let result = client.ExecInContainer("default", request.Id, command)
+            let result = client.ExecInContainer(DefaultNamespace, request.Id, command)
             let output = ExecOutput(Stream = "stdout", Data = Google.Protobuf.ByteString.CopyFromUtf8(result))
             do! responseStream.WriteAsync(output)
             return ()
@@ -141,15 +144,9 @@ type ContainerServiceImpl(client: IContainerdClient) =
 
     override _.GetVersion(request, context) =
         task {
-            let info = client.Version()
+            let version = client.Version()
             let response = GetVersionResponse()
-            try
-                let mutable v = Unchecked.defaultof<JsonElement>
-                if info.TryGetProperty("Version", &v) then response.Version <- v.GetString()
-                if info.TryGetProperty("Revision", &v) then response.Revision <- v.GetString()
-            with ex ->
-                Log.Warning(ex, "Erreur lors du parsing de la version containerd")
-                response.Version <- "unknown"
+            response.Version <- version
             return response
         }
 

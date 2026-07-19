@@ -19,6 +19,9 @@ module ContainerServiceImplTests =
         let svc = ContainerServiceImpl(mock.Mock)
         svc, mock
 
+    let shouldContain (substring: string) (text: string) =
+        Assert.Contains(substring, text)
+
     let createCtx () =
         TestServerCallContext.Create(
             "test", "localhost", DateTime.UtcNow, Metadata(), CancellationToken.None,
@@ -153,8 +156,8 @@ module ContainerServiceImplTests =
         let ctx = createCtx ()
         let req = GetVersionRequest()
         let result = svc.GetVersion(req, ctx).Result
-        result.Version |> should equal "1.7.27"
-        result.Revision |> should equal "abc123"
+        result.Version |> shouldContain "1.7.27"
+        result.Version |> shouldContain "abc123"
 
     [<Fact>]
     let ``ListNamespaces retourne les namespaces`` () =

@@ -1,25 +1,29 @@
+open System
 open System.Collections.Generic
-open System.IO
-open System.Net
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Server.Kestrel.Core
-open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Serilog
 open Serilog.Extensions.Hosting
+open Diplo.Abstractions.ServerConfig
 open Diplo.Grpc.Network
 open Diplo.Network.Plugins
 open Diplo.Network.Services
 
 [<EntryPoint>]
 let main args =
-    Log.Logger <- LoggerConfiguration()
-        .WriteTo.Console()
-        .WriteTo.EventLog(logName = "Diplo.Network", source = "Diplo.Network", manageEventSource = true)
-        .WriteTo.File("logs/diplo-network-.log", rollingInterval = RollingInterval.Day)
-        .CreateLogger()
+    Log.Logger <-
+        let baseConfig =
+            LoggerConfiguration()
+                .WriteTo.Console()
+                .WriteTo.File("logs/diplo-network-.log", rollingInterval = RollingInterval.Day)
+        let loggerConfig =
+            if OperatingSystem.IsWindows() then
+                baseConfig.WriteTo.EventLog(logName = "Diplo.Network", source = "Diplo.Network", manageEventSource = true)
+            else
+                baseConfig
+        loggerConfig.CreateLogger()
 
     try
         Log.Information("Démarrage du service Diplo.Network")
@@ -36,21 +40,8 @@ let main args =
         builder.Services.AddSingleton<IReadOnlyDictionary<NetworkDriver, INetworkDriver>>(drivers :> IReadOnlyDictionary<_, _>) |> ignore
         builder.Services.AddSingleton<NetworkServiceImpl>() |> ignore
 
-        builder.WebHost.ConfigureKestrel(fun (ctx: WebHostBuilderContext) (opts: KestrelServerOptions) ->
-            let config = ctx.Configuration
-            let grpcPort = config.GetValue<int>("ServiceSettings:GrpcPort")
-            let pipeName = config.GetValue<string>("ServiceSettings:NamedPipeName")
-            let useTcp = config.GetValue<bool>("ServiceSettings:UseTcp")
-            let usePipes = config.GetValue<bool>("ServiceSettings:UseNamedPipes")
-
-            if useTcp then
-                Log.Information("Écoute TCP sur localhost:{Port}", grpcPort)
-                opts.Listen(IPAddress.Loopback, grpcPort, fun listenOpts ->
-                    listenOpts.Protocols <- HttpProtocols.Http2) |> ignore
-            if usePipes then
-                Log.Information("Écoute Named Pipe: {PipeName}", pipeName)
-                opts.ListenNamedPipe(pipeName, fun listenOpts ->
-                    listenOpts.Protocols <- HttpProtocols.Http2) |> ignore
+        builder.WebHost.ConfigureKestrel(fun ctx opts ->
+            configureKestrel ctx.Configuration opts
         ) |> ignore
 
         let app = builder.Build()

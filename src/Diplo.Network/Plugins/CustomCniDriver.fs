@@ -18,44 +18,12 @@ type CustomCniDriver() =
         psi.RedirectStandardError <- true
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
-        let proc = Process.Start(psi)
+        use proc = Process.Start(psi)
+        if proc |> isNull then failwithf "Impossible de démarrer %s" fileName
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
         proc.WaitForExit()
         (proc.ExitCode, stdout, stderr)
-
-    let parseCniResult (json: string) =
-        try
-            let doc = JsonDocument.Parse(json)
-            let root = doc.RootElement
-            let mutable ifname = ""
-            let mutable ipv4 = ""
-            let mutable gw = ""
-            let mutable tv = Unchecked.defaultof<JsonElement>
-            if root.TryGetProperty("interfaces", &tv) then
-                let interfaces = root.GetProperty("interfaces")
-                if interfaces.GetArrayLength() > 0 then
-                    let iface = interfaces.[0]
-                    let mutable iv = Unchecked.defaultof<JsonElement>
-                    if iface.TryGetProperty("name", &iv) then
-                        ifname <- iv.GetString()
-                    if iface.TryGetProperty("ips", &iv) && iface.GetProperty("ips").GetArrayLength() > 0 then
-                        let ipInfo = iface.GetProperty("ips").[0]
-                        let mutable av = Unchecked.defaultof<JsonElement>
-                        if ipInfo.TryGetProperty("address", &av) then
-                            ipv4 <- ipInfo.GetProperty("address").GetString()
-            let mutable dv = Unchecked.defaultof<JsonElement>
-            if root.TryGetProperty("dns", &dv) then
-                let dns = root.GetProperty("dns")
-                let mutable nsv = Unchecked.defaultof<JsonElement>
-                if dns.TryGetProperty("nameservers", &nsv) then
-                    let ns = dns.GetProperty("nameservers")
-                    if ns.GetArrayLength() > 0 then
-                        gw <- ns.[0].GetString()
-            (ifname, ipv4, gw)
-        with ex ->
-            Log.Warning(ex, "Erreur lors du parsing du résultat CNI")
-            ("", "", "")
 
     member _.GetAvailableSubnet() =
         let candidates = [
@@ -71,8 +39,12 @@ type CustomCniDriver() =
         member _.Create(name, subnet, gateway, ipRange, options, labels) =
             try
                 let actualSubnet = if String.IsNullOrEmpty(subnet) then
-                                       let driver = CustomCniDriver()
-                                       driver.GetAvailableSubnet()
+                                       let candidates = [
+                                           "10.244.0.0/16"; "10.245.0.0/16"; "10.246.0.0/16"
+                                           "172.30.0.0/16"; "172.31.0.0/16"
+                                       ]
+                                       let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
+                                       candidates |> List.tryFind (fun c -> not (existing.Contains c)) |> Option.defaultValue "10.244.0.0/16"
                                    else subnet
                 let actualGateway = if String.IsNullOrEmpty(gateway) then
                                         let parts = actualSubnet.Split('/')
@@ -139,8 +111,9 @@ type CustomCniDriver() =
                         psi.RedirectStandardError <- true
                         psi.UseShellExecute <- false
                         psi.CreateNoWindow <- true
-                        let proc = Process.Start(psi)
-                        proc.StandardInput.Write(configJson)
+                        use proc = Process.Start(psi)
+                        if proc |> isNull then failwithf "Impossible de démarrer le plugin CNI"
+                        proc.StandardInput.Write(configJson : string)
                         proc.StandardInput.Close()
                         let stdout = proc.StandardOutput.ReadToEnd()
                         proc.WaitForExit()
@@ -160,9 +133,7 @@ type CustomCniDriver() =
         member _.Disconnect(networkId, _containerId, endpointId, _force) =
             match networks.TryGetValue(networkId) with
             | false, _ -> Error (sprintf "Réseau CNI '%s' introuvable" networkId)
-            | true, _ ->
-                match networks.TryGetValue(networkId) with
-                | true, netInfo ->
+            | true, netInfo ->
                     match netInfo.Options |> Map.tryFind "plugin_path" with
                     | Some pluginPath when not (String.IsNullOrEmpty(pluginPath)) ->
                         try
@@ -173,10 +144,10 @@ type CustomCniDriver() =
                             psi.RedirectStandardError <- true
                             psi.UseShellExecute <- false
                             psi.CreateNoWindow <- true
-                            let proc = Process.Start(psi)
+                            use proc = Process.Start(psi)
+                            if proc |> isNull then failwithf "Impossible de démarrer le plugin CNI"
                             proc.WaitForExit()
                             if proc.ExitCode = 0 then Ok ()
                             else Error (sprintf "Échec de la déconnexion CNI (code %d)" proc.ExitCode)
                         with ex -> Error (sprintf "Erreur de déconnexion CNI: %s" ex.Message)
                     | _ -> Ok ()
-                | false, _ -> Error (sprintf "Réseau CNI '%s' introuvable" networkId)

@@ -75,10 +75,16 @@ let getWindowsServerYear () =
     | "ltsc2025" -> "2025"
     | _ -> "2022"
 
+let isWs2016 () =
+    Environment.OSVersion.Version.Build <= 14393
+
 let getMinContainerdVersion () =
-    let build = Environment.OSVersion.Version.Build
-    if build <= 14393 then "1.6.36" // LTS pour WS2016
+    if isWs2016 () then "1.6.36" // LTS pour WS2016
     else "1.7.27"
+
+let isLegacyContainerd () =
+    let v = getMinContainerdVersion ()
+    v.StartsWith("1.6.")
 
 let getSandboxImage () =
     let tag = getWindowsServerVersion ()
@@ -198,10 +204,15 @@ let removeWindowsService (serviceName: string) = task {
 // ─── Configuration containerd ─────────────────────────────────────────────
 
 let buildContainerdConfigToml () =
+    let legacy = isLegacyContainerd ()
     let sb = System.Text.StringBuilder()
     let line (s: string) = sb.AppendLine(s) |> ignore
     line "# configuration containerd Diplo"
     line "# Genere par Diplo.Installer"
+    if legacy then
+        line "# containerd 1.6.x (LTS — Windows Server 2016)"
+    else
+        line "# containerd 1.7.x (Windows Server 2019+)"
     line ""
     line "# --- Repertoires de travail ---"
     line (sprintf "root = \"%s\"" containerdRootDir)
@@ -216,13 +227,15 @@ let buildContainerdConfigToml () =
     line "# --- Metriques ---"
     line "[metrics]"
     line "  address = \"127.0.0.1:1338\""
-    line "  grpc_histogram = false"
+    if not legacy then
+        line "  grpc_histogram = false"
     line ""
-    line "# --- Evenements ---"
-    line "[events]"
-    line "  address = \"127.0.0.1:1339\""
-    line "  brokers = []"
-    line ""
+    if not legacy then
+        line "# --- Evenements ---"
+        line "[events]"
+        line "  address = \"127.0.0.1:1339\""
+        line "  brokers = []"
+        line ""
     line "# --- Plugins ---"
     line ""
     line "# Content store"
@@ -256,10 +269,11 @@ let buildContainerdConfigToml () =
     line "  no_pigz = false"
     line "  uncompressed_layers = false"
     line ""
-    line "# Transfer service"
-    line "[plugins.\"io.containerd.transfer.v1.local\"]"
-    line "  max_concurrent_layer_downloads = 3"
-    line ""
+    if not legacy then
+        line "# Transfer service"
+        line "[plugins.\"io.containerd.transfer.v1.local\"]"
+        line "  max_concurrent_layer_downloads = 3"
+        line ""
     line "# --- CRI (Container Runtime Interface) ---"
     line ""
     line "[plugins.\"io.containerd.grpc.v1.cri\"]"
@@ -417,6 +431,17 @@ let installAll () = task {
         printfn "[ERREUR] L'installation nécessite les droits administrateur."
         printfn "  Exécutez: Diplo.Installer.exe install --elevated"
     else
+        let osVersion = getWindowsServerVersion ()
+        let osYear = getWindowsServerYear ()
+        printfn "=== Détection du système ==="
+        printfn "  Windows Server %s (build %d)" osYear Environment.OSVersion.Version.Build
+        if isWs2016 () then
+            printfn ""
+            printfn "  [!] ATTENTION: Windows Server 2016 détecté"
+            printfn "      - Containerd 1.6.x (LTS) sera installé"
+            printfn "      - Isolation process uniquement (pas de Hyper-V requis)"
+            printfn "      - Certaines fonctionnalités 1.7.x ne seront pas disponibles"
+            printfn ""
         createDirectories ()
         do! installContainerd ()
         do! downloadCniPlugins ()
@@ -425,6 +450,7 @@ let installAll () = task {
             do! installWindowsService service
         printfn ""
         printfn "=== Installation terminée ==="
+        printfn "  Système: Windows Server %s (build %d)" osYear Environment.OSVersion.Version.Build
         printfn "  Répertoire: %s" installDir
         printfn "  Services: %d installés" services.Length
         printfn "  Containerd: %s (isolation process)" downloadContainerdVersion

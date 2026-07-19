@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Include="Plugins\INetworkDriver.fs" />
+    <Compile Include="Plugins\CniParsing.fs" />
     <Compile Include="Plugins\BridgeDriver.fs" />
     <Compile Include="Plugins\CustomCniDriver.fs" />
     <Compile Include="Plugins\NoneDriver.fs" />

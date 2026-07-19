@@ -27,10 +27,6 @@ type MockContainerdClient() =
         doc.RootElement
 
     interface IContainerdClient with
-        member _.GetVersion() = "containerd 1.7.27 (revision: abc123)"
-
-        member _.ListNamespaces() = [ "default"; "moby" ]
-
         member _.CreateContainer(_namespaceName, id, image, _labels) =
             containers <- containers |> Map.add id (Map.ofList [ "image", image; "id", id ])
             id
@@ -70,8 +66,7 @@ type MockContainerdClient() =
             sprintf "Output of: %s" (command |> String.concat " ")
 
         member _.Version() =
-            let doc = JsonDocument.Parse("""{"Version":"1.7.27","Revision":"abc123","Go":"go1.22.5","OS":"windows","Arch":"amd64"}""") |> keepDoc
-            doc.RootElement
+            "1.7.27 (revision: abc123)"
 
         member _.Namespaces() = [ "default"; "moby" ]
 
