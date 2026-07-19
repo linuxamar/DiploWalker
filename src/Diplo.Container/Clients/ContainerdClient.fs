@@ -84,6 +84,11 @@ type ContainerdClient(runner: IProcessRunner) =
                 use doc = JsonDocument.Parse("{}")
                 doc.RootElement.Clone()
 
+        member _.PullImage(image) =
+            let args = sprintf "image pull %s" image
+            let output = runCtr args
+            output.Trim()
+
         member _.Version() =
             try
                 let output = runCtr "version"

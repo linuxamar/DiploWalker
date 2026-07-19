@@ -142,6 +142,14 @@ type ContainerServiceImpl(client: IContainerdClient) =
             return ()
         }
 
+    override _.PullImage(request, context) =
+        task {
+            if String.IsNullOrEmpty(request.Image) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'image à télécharger est requise")))
+            let result = client.PullImage(request.Image)
+            return PullImageResponse(Image = request.Image, Message = result)
+        }
+
     override _.GetVersion(request, context) =
         task {
             let version = client.Version()

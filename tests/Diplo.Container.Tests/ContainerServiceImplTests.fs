@@ -195,3 +195,29 @@ module ContainerServiceImplTests =
         writer.Items.Count |> should equal 1
         writer.Items.[0].Stream |> should equal "stdout"
         writer.Items.[0].Data.ToStringUtf8() |> should equal "Output of: echo hello"
+
+    [<Fact>]
+    let ``PullImage avec image valide retourne succes`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        let req = PullImageRequest(Image = "mcr.microsoft.com/dotnet/runtime:10.0")
+        let result = svc.PullImage(req, ctx).Result
+        result.Image |> should equal "mcr.microsoft.com/dotnet/runtime:10.0"
+        result.Message |> shouldContain "image pulled"
+        mock.PulledImages |> should contain "mcr.microsoft.com/dotnet/runtime:10.0"
+
+    [<Fact>]
+    let ``PullImage avec image vide leve InvalidArgument`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = PullImageRequest(Image = "")
+        Assert.ThrowsAsync<RpcException>(fun () -> svc.PullImage(req, ctx)) |> ignore
+
+    [<Fact>]
+    let ``PullImage avec image servercore fonctionne`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        let req = PullImageRequest(Image = "mcr.microsoft.com/windows/servercore:ltsc2022")
+        let result = svc.PullImage(req, ctx).Result
+        result.Image |> should equal "mcr.microsoft.com/windows/servercore:ltsc2022"
+        mock.PulledImages |> should contain "mcr.microsoft.com/windows/servercore:ltsc2022"

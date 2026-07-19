@@ -10,6 +10,7 @@ type MockContainerdClient() =
     let mutable startedContainers = Set.empty<string>
     let mutable deletedContainers = Set.empty<string>
     let mutable stopCalled = Map.empty<string, int>
+    let mutable pulledImages = Set.empty<string>
     let ownedDocs = System.Collections.Generic.List<JsonDocument>()
 
     let keepDoc (doc: JsonDocument) =
@@ -68,9 +69,14 @@ type MockContainerdClient() =
         member _.Version() =
             "1.7.27 (revision: abc123)"
 
+        member _.PullImage(image) =
+            pulledImages <- pulledImages |> Set.add image
+            sprintf "image pulled: %s" image
+
         member _.Namespaces() = [ "default"; "moby" ]
 
     member this.Mock : IContainerdClient = this :> IContainerdClient
     member _.StopCalled = stopCalled
     member _.DeletedContainers = deletedContainers
     member _.StartedContainers = startedContainers
+    member _.PulledImages = pulledImages

@@ -13,6 +13,7 @@ service ContainerService {
   rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
   rpc GetContainerLogs(GetContainerLogsRequest) returns (stream ContainerLogEntry);
   rpc ExecInContainer(ExecInContainerRequest) returns (stream ExecOutput);
+  rpc PullImage(PullImageRequest) returns (PullImageResponse);
   rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
   rpc ListNamespaces(ListNamespacesRequest) returns (ListNamespacesResponse);
 }
@@ -134,6 +135,15 @@ message ExecInContainerRequest {
 message ExecOutput {
   string stream = 1;
   bytes data = 2;
+}
+
+message PullImageRequest {
+  string image = 1;
+}
+
+message PullImageResponse {
+  string image = 1;
+  string message = 2;
 }
 
 message GetVersionRequest {}

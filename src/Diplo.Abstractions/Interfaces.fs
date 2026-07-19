@@ -20,6 +20,7 @@ module Interfaces =
         abstract member ListContainers: namespaceName: string * all: bool -> string list
         abstract member GetContainerLogs: namespaceName: string * id: string * tail: int -> string list
         abstract member ExecInContainer: namespaceName: string * id: string * command: string array -> string
+        abstract member PullImage: image: string -> string
         abstract member Version: unit -> string
         abstract member Namespaces: unit -> string list
 
