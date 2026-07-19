@@ -27,8 +27,22 @@ param(
 #   -DoTests -DoPublish  → tests d'abord, puis publication si tests réussis
 #   -DoTests             → tests uniquement
 #   -DoPublish           → publication uniquement
+#   (aucun flag)         → rien, affiche l'aide
 
 $ErrorActionPreference = "Stop"
+
+if (-not $DoTests -and -not $DoPublish -and -not $Clean -and -not $Restore) {
+    Write-Host "Usage : .\publish.ps1 [-Clean] [-Restore] [-DoTests] [-DoPublish] [-Platform x64|x86]" -ForegroundColor Yellow
+    Write-Host "  -Clean      supprime bin/ obj/ avant publication"
+    Write-Host "  -Restore    restaure les packages NuGet en 1er"
+    Write-Host "  -DoTests    lance les tests unitaires uniquement"
+    Write-Host "  -DoPublish  lance la publication uniquement"
+    Write-Host ""
+    Write-Host "  Exemples :"
+    Write-Host "    .\publish.ps1 -DoTests -DoPublish   # tests puis publication"
+    Write-Host "    .\publish.ps1 -Clean -Restore -DoPublish  # nettoyage, restauration, publication"
+    exit 0
+}
 
 # --- Configuration --------------------------------------------------------
 
@@ -98,8 +112,8 @@ $timer = [System.Diagnostics.Stopwatch]::StartNew()
 
 # --- Calcul total étapes pour progression ----------------------------------
 
-$runTests   = $DoTests   -or (-not $DoPublish)
-$runPublish = $DoPublish -or (-not $DoTests)
+$runTests   = $DoTests.IsPresent
+$runPublish = $DoPublish.IsPresent
 
 $testProjects = @(
     "Diplo.Container.Tests",
