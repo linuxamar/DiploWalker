@@ -11,9 +11,11 @@ type ProcessRunner() =
         if proc |> isNull then failwithf "Impossible de démarrer %s" psi.FileName
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
-        proc.WaitForExit()
+        if not (proc.WaitForExit(60_000)) then
+            try proc.Kill(true) with _ -> ()
+            failwithf "Délai d'attente dépassé pour %s (60s)" psi.FileName
         if proc.ExitCode <> 0 then
-            failwithf "%s a échoué (code %d): %s" psi.FileName proc.ExitCode stderr
+            failwithf "%s a échoué (code %d)" psi.FileName proc.ExitCode
         stdout
 
     interface IProcessRunner with

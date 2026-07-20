@@ -208,7 +208,9 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     proc.StandardInput.Close()
                     let stdout = proc.StandardOutput.ReadToEnd()
                     let stderr = proc.StandardError.ReadToEnd()
-                    proc.WaitForExit()
+                    if not (proc.WaitForExit(60_000)) then
+                        try proc.Kill(true) with _ -> ()
+                        failwith "Délai d'attente dépassé pour le plugin CNI (60s)"
                     let mutable ifname = ""
                     let mutable ipv4Addr = ""
                     let mutable gw = ""
@@ -226,8 +228,9 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     response.Message <- msg
                     return response
                 with ex ->
+                    Log.Error(ex, "Erreur lors de l'exécution du plugin CNI {PluginPath}", pluginPath)
                     let r = RunCniPluginResponse()
                     r.Success <- false
-                    r.Message <- sprintf "Erreur: %s" ex.Message
+                    r.Message <- "Erreur lors de l'exécution du plugin CNI"
                     return r
         }

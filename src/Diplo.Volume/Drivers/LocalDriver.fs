@@ -3,6 +3,7 @@ namespace Diplo.Volume.Drivers
 open System
 open System.IO
 open System.Text.Json
+open Serilog
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -47,14 +48,17 @@ type LocalVolumeDriver(dataRoot: string) =
     member _.RemoveVolume(id: string, force: bool) =
         SecurityValidation.validateId id "L'identifiant du volume"
         let dir = Path.Combine(volumesDir, id)
-        if Directory.Exists(dir) then
-            let mountFile = Path.Combine(mountsDir, id)
-            if Directory.Exists(mountFile) && not force then
-                failwith "Le volume est monté. Utilisez force=true pour forcer la suppression."
-            Directory.Delete(dir, true)
-            if Directory.Exists(mountFile) then Directory.Delete(mountFile, true)
-            true
-        else false
+        let mountFile = Path.Combine(mountsDir, id)
+        if Directory.Exists(mountFile) && not force then
+            failwith "Le volume est monté. Utilisez force=true pour forcer la suppression."
+        let dirExisted = Directory.Exists(dir)
+        try if dirExisted then Directory.Delete(dir, true)
+        with :? System.IO.DirectoryNotFoundException ->
+            Log.Warning("Répertoire de volume déjà supprimé: {VolumeId}", id)
+        try if Directory.Exists(mountFile) then Directory.Delete(mountFile, true)
+        with :? System.IO.DirectoryNotFoundException ->
+            Log.Warning("Répertoire de montage déjà supprimé: {VolumeId}", id)
+        dirExisted
 
     member _.InspectVolume(id: string) =
         SecurityValidation.validateId id "L'identifiant du volume"

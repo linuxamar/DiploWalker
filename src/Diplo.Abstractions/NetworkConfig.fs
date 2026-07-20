@@ -158,21 +158,18 @@ let resolveAll (configPath: string option) =
 // ─── Génération du conflist CNI ─────────────────────────────────────────
 
 let generateCniConflistJson (config: CniNatConfig) (subnet: string) (gateway: string) =
-    sprintf """{
-    "cniVersion": "%s",
-    "name": "%s",
-    "type": "%s",
-    "master": "%s",
-    "ipam": {
-        "subnet": "%s",
-        "routes": [
-            {
-                "gateway": "%s"
-            }
-        ]
-    },
-    "capabilities": {
-        "portMappings": %b,
-        "dns": %b
-    }
-}""" config.CniVersion config.NatName config.NatName config.MasterInterface subnet gateway config.PortMappings config.Dns
+    let conflist = dict [
+        "cniVersion", config.CniVersion :> obj
+        "name", config.NatName :> obj
+        "type", config.NatName :> obj
+        "master", config.MasterInterface :> obj
+        "ipam", dict [
+            "subnet", subnet :> obj
+            "routes", [| dict [ "gateway", gateway :> obj ] |] :> obj
+        ] :> obj
+        "capabilities", dict [
+            "portMappings", config.PortMappings :> obj
+            "dns", config.Dns :> obj
+        ] :> obj
+    ]
+    JsonSerializer.Serialize(conflist, JsonSerializerOptions(WriteIndented = true))

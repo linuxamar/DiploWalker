@@ -71,7 +71,8 @@ type ContainerdClient(runner: IProcessRunner) =
                 output.Split('\n')
                 |> Array.toList
             with ex ->
-                [ sprintf "Erreur lors de la récupération des logs: %s" ex.Message ]
+                Log.Error(ex, "Erreur lors de la récupération des logs du conteneur {ContainerId}", id)
+                [ "Erreur lors de la récupération des logs" ]
 
         member _.ExecInContainer(namespaceName, id, command) =
             SecurityValidation.validateId namespaceName "Le namespace"
@@ -84,7 +85,8 @@ type ContainerdClient(runner: IProcessRunner) =
                 let output = runCtr args
                 output
             with ex ->
-                sprintf "Erreur d'exécution: %s" ex.Message
+                Log.Error(ex, "Erreur lors de l'exécution dans le conteneur {ContainerId}", id)
+                "Erreur d'exécution dans le conteneur"
 
         member _.TaskInfo(namespaceName, id) =
             SecurityValidation.validateId namespaceName "Le namespace"
@@ -110,7 +112,8 @@ type ContainerdClient(runner: IProcessRunner) =
                 let revision = json.GetProperty("Revision").GetString()
                 sprintf "%s (revision: %s)" version revision
             with ex ->
-                sprintf "Erreur ctr: %s" ex.Message
+                Log.Error(ex, "Erreur lors de la récupération de la version ctr")
+                "Version inconnue"
 
         member _.Namespaces() =
             try
@@ -118,4 +121,5 @@ type ContainerdClient(runner: IProcessRunner) =
                 output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                 |> Array.toList
             with ex ->
-                [ sprintf "Erreur: %s" ex.Message ]
+                Log.Error(ex, "Erreur lors de la récupération des namespaces")
+                [ "Erreur lors de la récupération des namespaces" ]

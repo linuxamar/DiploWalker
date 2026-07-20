@@ -25,7 +25,9 @@ type CustomCniDriver() =
         if proc |> isNull then failwithf "Impossible de démarrer %s" fileName
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
-        proc.WaitForExit()
+        if not (proc.WaitForExit(60_000)) then
+            try proc.Kill(true) with _ -> ()
+            failwithf "Délai d'attente dépassé pour %s (60s)" fileName
         (proc.ExitCode, stdout, stderr)
 
     member _.GetAvailableSubnet() =
@@ -65,7 +67,8 @@ type CustomCniDriver() =
                 networks.TryAdd(id, info) |> ignore
                 Ok info
             with ex ->
-                Error (sprintf "Erreur lors de la création du réseau CNI: %s" ex.Message)
+                Log.Error(ex, "Erreur lors de la création du réseau CNI {Name}", name)
+                Error "Erreur lors de la création du réseau CNI"
 
         member _.Remove(id, _force) =
             match networks.TryRemove(id) with
@@ -118,7 +121,8 @@ type CustomCniDriver() =
                         Message = sprintf "Connecté au réseau CNI '%s'" netInfo.Name
                     }
                 with ex ->
-                    Error (sprintf "Erreur de connexion CNI: %s" ex.Message)
+                    Log.Error(ex, "Erreur de connexion CNI {NetworkId}", networkId)
+                    Error "Erreur de connexion CNI"
 
         member _.Disconnect(networkId, _containerId, endpointId, _force) =
             match networks.TryGetValue(networkId) with
@@ -133,5 +137,7 @@ type CustomCniDriver() =
                                 runProcess pluginPath [ "DEL"; "--container-id"; endpointId; "--netns"; sprintf "/proc/%s/ns/net" endpointId ]
                             if _exitCode = 0 then Ok ()
                             else Error (sprintf "Échec de la déconnexion CNI (code %d)" _exitCode)
-                        with ex -> Error (sprintf "Erreur de déconnexion CNI: %s" ex.Message)
+                        with ex ->
+                            Log.Error(ex, "Erreur de déconnexion CNI {NetworkId}", networkId)
+                            Error "Erreur de déconnexion CNI"
                     | _ -> Ok ()

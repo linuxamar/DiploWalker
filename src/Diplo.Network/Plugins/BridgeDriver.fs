@@ -36,9 +36,11 @@ type BridgeNetworkDriver() =
         if proc |> isNull then failwithf "Impossible de démarrer PowerShell"
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
-        proc.WaitForExit()
+        if not (proc.WaitForExit(60_000)) then
+            try proc.Kill(true) with _ -> ()
+            failwith "Délai d'attente dépassé pour PowerShell (60s)"
         if proc.ExitCode <> 0 then
-            failwithf "PowerShell a échoué (code %d): %s" proc.ExitCode stderr
+            failwithf "PowerShell a échoué (code %d)" proc.ExitCode
         stdout
 
     let runPowershellScript (scriptBody: string) (parameters: (string * string) list) =
@@ -62,9 +64,11 @@ type BridgeNetworkDriver() =
         if proc |> isNull then failwithf "Impossible de démarrer PowerShell"
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
-        proc.WaitForExit()
+        if not (proc.WaitForExit(60_000)) then
+            try proc.Kill(true) with _ -> ()
+            failwith "Délai d'attente dépassé pour PowerShell (60s)"
         if proc.ExitCode <> 0 then
-            failwithf "PowerShell a échoué (code %d): %s" proc.ExitCode stderr
+            failwithf "PowerShell a échoué (code %d)" proc.ExitCode
         stdout
 
     let getAvailableSubnet () =
@@ -106,7 +110,8 @@ type BridgeNetworkDriver() =
                 networks.TryAdd(id, info) |> ignore
                 Ok info
             with ex ->
-                Error (sprintf "Erreur lors de la création du bridge: %s" ex.Message)
+                Log.Error(ex, "Erreur lors de la création du bridge {Name}", name)
+                Error "Erreur lors de la création du bridge"
 
         member _.Remove(id, _force) =
             match networks.TryGetValue(id) with
@@ -120,7 +125,8 @@ type BridgeNetworkDriver() =
                     networks.TryRemove(id) |> ignore
                     Ok ()
                 with ex ->
-                    Error (sprintf "Erreur lors de la suppression du bridge: %s" ex.Message)
+                    Log.Error(ex, "Erreur lors de la suppression du bridge {Id}", id)
+                    Error "Erreur lors de la suppression du bridge"
             | false, _ -> Error (sprintf "Bridge '%s' introuvable" id)
 
         member _.Inspect(id) =
@@ -164,7 +170,8 @@ type BridgeNetworkDriver() =
                         Message = sprintf "Connecté au bridge '%s'" netInfo.Name
                     }
                 with ex ->
-                    Error (sprintf "Erreur de connexion au bridge: %s" ex.Message)
+                    Log.Error(ex, "Erreur de connexion au bridge {NetworkId} pour le conteneur {ContainerId}", networkId, containerId)
+                    Error "Erreur de connexion au bridge"
 
         member _.Disconnect(networkId, containerId, endpointId, _force) =
             match networks.TryGetValue(networkId) with
@@ -180,4 +187,5 @@ type BridgeNetworkDriver() =
                         [ "-Name", adapterName; "-ManagementOS", "$true" ] |> ignore
                     Ok ()
                 with ex ->
-                    Error (sprintf "Erreur de déconnexion du bridge: %s" ex.Message)
+                    Log.Error(ex, "Erreur de déconnexion du bridge {NetworkId}", networkId)
+                    Error "Erreur de déconnexion du bridge"

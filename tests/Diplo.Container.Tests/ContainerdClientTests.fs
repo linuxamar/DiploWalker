@@ -155,5 +155,4 @@ type ContainerdClientTests() =
         runner.SetFail("ctr n'est pas installé")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
         let result = client.Version()
-        result |> shouldContain "Erreur ctr"
-        result |> shouldContain "ctr n'est pas installé"
+        result |> shouldContain "Version inconnue"

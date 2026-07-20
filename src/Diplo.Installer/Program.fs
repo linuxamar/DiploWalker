@@ -38,7 +38,9 @@ let runCommand (exe: string) (args: string) : int =
     use proc = Process.Start(psi)
     let stdout = proc.StandardOutput.ReadToEnd()
     let stderr = proc.StandardError.ReadToEnd()
-    proc.WaitForExit()
+    if not (proc.WaitForExit(60_000)) then
+        try proc.Kill(true) with _ -> ()
+        failwithf "Délai d'attente dépassé pour %s (60s)" exe
     if stdout.Length > 0 then printfn "%s" stdout
     if stderr.Length > 0 then eprintfn "%s" stderr
     proc.ExitCode
@@ -54,7 +56,9 @@ let runCommandWithArgs (exe: string) (args: string list) : int =
     use proc = Process.Start(psi)
     let stdout = proc.StandardOutput.ReadToEnd()
     let stderr = proc.StandardError.ReadToEnd()
-    proc.WaitForExit()
+    if not (proc.WaitForExit(60_000)) then
+        try proc.Kill(true) with _ -> ()
+        failwithf "Délai d'attente dépassé pour %s (60s)" exe
     if stdout.Length > 0 then printfn "%s" stdout
     if stderr.Length > 0 then eprintfn "%s" stderr
     proc.ExitCode
@@ -161,13 +165,15 @@ let extractZip (archive: string) (destination: string) =
 
 // ─── Installation containerd + CNI ───────────────────────────────────────
 
+let archiveSuffix = Guid.NewGuid().ToString("N")
+
 let installContainerd () = task {
     printfn "=== Installation de containerd %s ===" downloadContainerdVersion
     ensureDirectory containerdDir
     ensureDirectory containerdRootDir
     ensureDirectory containerdStateDir
 
-    let archivePath = Path.Combine(Path.GetTempPath(), containerdArchive)
+    let archivePath = Path.Combine(Path.GetTempPath(), sprintf "%s_%s" archiveSuffix containerdArchive)
 
     printfn "  [*] Téléchargement depuis GitHub..."
     do! downloadFile containerdUrl archivePath
@@ -190,7 +196,7 @@ let downloadCniPlugins () = task {
     printfn "  [*] Téléchargement des plugins Microsoft CNI v%s..." winCniVersion
     let winCniArchive = sprintf "windows-container-networking-cni-amd64-v%s.zip" winCniVersion
     let winCniUrl = sprintf "https://github.com/microsoft/windows-container-networking/releases/download/v%s/%s" winCniVersion winCniArchive
-    let winCniTemp = Path.Combine(Path.GetTempPath(), winCniArchive)
+    let winCniTemp = Path.Combine(Path.GetTempPath(), sprintf "%s_%s" archiveSuffix winCniArchive)
     do! downloadFile winCniUrl winCniTemp
     verifyChecksum winCniTemp None
     extractZip winCniTemp cniBinDir
@@ -200,7 +206,7 @@ let downloadCniPlugins () = task {
     printfn "  [*] Téléchargement des plugins CNI standards v%s..." cniPluginsVersion
     let cniArchive = sprintf "cni-plugins-windows-amd64-%s.tgz" cniPluginsVersion
     let cniUrl = sprintf "https://github.com/containernetworking/plugins/releases/download/v%s/%s" cniPluginsVersion cniArchive
-    let cniTemp = Path.Combine(Path.GetTempPath(), cniArchive)
+    let cniTemp = Path.Combine(Path.GetTempPath(), sprintf "%s_%s" archiveSuffix cniArchive)
     do! downloadFile cniUrl cniTemp
     do! extractTarGz cniTemp cniBinDir
     File.Delete(cniTemp)

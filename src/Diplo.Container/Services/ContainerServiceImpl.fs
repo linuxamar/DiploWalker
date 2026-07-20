@@ -75,8 +75,15 @@ type ContainerServiceImpl(client: IContainerdClient) =
                     for prop in labelsValue.EnumerateObject() do
                         response.Labels[prop.Name] <- prop.Value.GetString()
                 if info.TryGetProperty("env", &labelsValue) then
+                    let safeEnvVars =
+                        set [ "PATH"; "USERNAME"; "USERDOMAIN"; "TEMP"; "TMP"
+                              "HOMEDRIVE"; "HOMEPATH"; "SYSTEMROOT"; "OS"
+                              "PROCESSOR_ARCHITECTURE"; "NUMBER_OF_PROCESSORS"
+                              "ASPNETCORE_ENVIRONMENT"; "DOTNET_ENVIRONMENT"
+                              "DOTNET_CLI_TELEMETRY_OPTOUT" ]
                     for prop in labelsValue.EnumerateObject() do
-                        response.Env[prop.Name] <- prop.Value.GetString()
+                        if safeEnvVars |> Set.contains prop.Name then
+                            response.Env[prop.Name] <- prop.Value.GetString()
                 if info.TryGetProperty("exit_code", &temp) then
                     response.ExitCode <- temp.GetInt64()
             with ex ->
@@ -117,7 +124,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
         task {
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-            let tail = if request.Tail > 0 then request.Tail else 100
+            let tail = if request.Tail > 0 then min request.Tail 10_000 else 100
             let logs = client.GetContainerLogs(DefaultNamespace, request.Id, tail)
             for line in logs do
                 let entry = ContainerLogEntry(

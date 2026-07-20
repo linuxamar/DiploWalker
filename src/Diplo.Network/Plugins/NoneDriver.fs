@@ -1,7 +1,9 @@
 namespace Diplo.Network.Plugins
 
 open System
+open Serilog
 open Diplo.Grpc.Network
+open Diplo.Abstractions
 
 type NoneDriver() =
 
@@ -12,6 +14,9 @@ type NoneDriver() =
 
         member _.Create(name, _subnet, _gateway, _ipRange, options, labels) =
             try
+                SecurityValidation.validateName name "Le nom du réseau"
+                for kvp in labels do
+                    SecurityValidation.validateLabel kvp.Key kvp.Value
                 let id = Guid.NewGuid().ToString("N")
                 let info = {
                     Id = id
@@ -26,7 +31,8 @@ type NoneDriver() =
                 networks.TryAdd(id, info) |> ignore
                 Ok info
             with ex ->
-                Error (sprintf "Erreur lors de la création du réseau None: %s" ex.Message)
+                Log.Error(ex, "Erreur lors de la création du réseau None {Name}", name)
+                Error "Erreur lors de la création du réseau"
 
         member _.Remove(id, _force) =
             match networks.TryRemove(id) with
