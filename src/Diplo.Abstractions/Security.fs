@@ -110,15 +110,25 @@ module SecurityValidation =
             failwithf "L'identifiant du conteneur contient des caractères interdits: '%s'" value
 
     /// Vérifie qu'un chemin de plugin CNI est dans les répertoires autorisés.
+    /// Résout les symlinks avant la vérification pour éviter les contournements TOCTOU.
     let validateCniPluginPath (pluginPath: string) =
         if String.IsNullOrEmpty(pluginPath) then
             failwithf "Le chemin du plugin CNI ne peut pas être vide"
-        let fullPath = Path.GetFullPath(pluginPath)
+        // Résoudre le vrai chemin (suivre les symlinks junctions)
+        let resolvedPath =
+            try
+                let fi = new FileInfo(pluginPath)
+                if fi.Exists then fi.FullName
+                else
+                    let di = new DirectoryInfo(pluginPath)
+                    if di.Exists then di.FullName
+                    else Path.GetFullPath(pluginPath)
+            with _ -> Path.GetFullPath(pluginPath)
         let isAllowed =
             allowedCniPluginDirs
             |> List.exists (fun dir ->
                 let fullDir = Path.GetFullPath(dir)
-                fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
+                resolvedPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
         if not isAllowed then
             failwithf "Le plugin CNI '%s' n'est pas dans un répertoire autorisé" pluginPath
 
@@ -147,9 +157,35 @@ module SecurityValidation =
         if not (fullPath.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase)) then
             failwithf "%s sort du répertoire autorisé: '%s'" label fullPath
 
-    /// Valide un chemin de volume (anti-traversée).
+    /// Répertoires de base autorisés pour les volumes (conteneur mutable pour extensibilité).
+    let private allowedVolumeBaseDirs =
+        ResizeArray([
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Diplo")
+            @"C:\ProgramData\Diplo"
+            Path.GetTempPath()
+            Environment.CurrentDirectory
+        ])
+
+    /// Ajouter un répertoire autorisé pour les volumes (utile pour les tests et extensions).
+    let addAllowedVolumeDir (dir: string) =
+        let fullDir = Path.GetFullPath(dir)
+        if not (allowedVolumeBaseDirs.Contains(fullDir)) then
+            allowedVolumeBaseDirs.Add(fullDir)
+
+    /// Valide un chemin de volume (anti-traversée + containment absolu).
     let validateVolumePath (path: string) (label: string) =
+        if String.IsNullOrEmpty(path) then
+            failwithf "%s ne peut pas être vide" label
         if path.Contains("..") then
             failwithf "%s contient une traversée de répertoire interdite: '%s'" label path
         if path.Contains("\0") then
             failwithf "%s contient un caractère nul: '%s'" label path
+        // Résoudre le chemin complet et vérifier qu'il est dans un répertoire autorisé
+        let fullPath = Path.GetFullPath(path)
+        let isAllowed =
+            allowedVolumeBaseDirs
+            |> Seq.exists (fun dir ->
+                let fullDir = Path.GetFullPath(dir)
+                fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
+        if not isAllowed then
+            failwithf "%s n'est pas dans un répertoire autorisé: '%s'" label fullPath

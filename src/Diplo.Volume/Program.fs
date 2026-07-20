@@ -42,6 +42,10 @@ let main args =
             configureKestrel ctx.Configuration opts
         ) |> ignore
 
+        builder.WebHost.UseNamedPipes(fun opts ->
+            configureNamedPipeSecurity opts
+        ) |> ignore
+
         let app = builder.Build()
         app.MapGrpcService<VolumeServiceImpl>() |> ignore
         app.Run()

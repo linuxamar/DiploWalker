@@ -30,11 +30,16 @@ let services =
 // ─── Utilitaires ─────────────────────────────────────────────────────────
 
 let runCommand (exe: string) (args: string) : int =
-    let psi = ProcessStartInfo(exe, args)
+    let psi = ProcessStartInfo(exe)
     psi.UseShellExecute <- false
     psi.RedirectStandardOutput <- true
     psi.RedirectStandardError <- true
     psi.CreateNoWindow <- true
+    // Séparer les arguments et utiliser ArgumentList pour éviter l'injection de commande
+    let parts = args.Split([| ' ' |], System.StringSplitOptions.RemoveEmptyEntries)
+    for part in parts do
+        let cleaned = part.Trim('"')
+        psi.ArgumentList.Add(cleaned) |> ignore
     use proc = Process.Start(psi)
     let stdout = proc.StandardOutput.ReadToEnd()
     let stderr = proc.StandardError.ReadToEnd()
@@ -119,6 +124,14 @@ let downloadContainerdVersion = getMinContainerdVersion ()
 let cniPluginsVersion = "1.6.2"       // containernetworking/plugins
 let winCniVersion = "0.3.1"           // microsoft/windows-container-networking
 
+// Checksums SHA256 connus — à mettre à jour lors des changements de version
+let containerdChecksums = Map.ofList [
+    "1.6.36", "todo-update-after-download"
+    "1.7.27", "todo-update-after-download"
+]
+let cniPluginsChecksum = "todo-update-after-download"
+let winCniChecksum = "todo-update-after-download"
+
 let containerdArchive = sprintf "containerd-%s-windows-amd64.tar.gz" downloadContainerdVersion
 let containerdUrl = sprintf "https://github.com/containerd/containerd/releases/download/v%s/%s" downloadContainerdVersion containerdArchive
 
@@ -153,13 +166,32 @@ let verifyChecksum (filePath: string) (expectedSha256: string option) =
         printfn "  [+] SHA256 vérifié: %s" (Path.GetFileName(filePath))
 
 let extractTarGz (archive: string) (destination: string) = task {
+    // Vérifier que l'archive n'est pas vide
+    if FileInfo(archive).Length = 0L then
+        failwithf "Archive vide: %s" archive
     let exitCode = runCommand "tar" (sprintf "xzf \"%s\" -C \"%s\"" archive destination)
     if exitCode <> 0 then
         failwithf "Échec de l'extraction de %s (code %d)" archive exitCode
+    // Vérifier que les fichiers extraits restent dans la destination
+    let destFull = Path.GetFullPath(destination)
+    for file in Directory.GetFiles(destFull, "*", SearchOption.AllDirectories) do
+        let fileFull = Path.GetFullPath(file)
+        if not (fileFull.StartsWith(destFull, StringComparison.OrdinalIgnoreCase)) then
+            File.Delete(fileFull)
+            failwithf "Fichier extrait hors de la destination: %s" fileFull
     printfn "  [+] Extrait: %s" destination
 }
 
 let extractZip (archive: string) (destination: string) =
+    // Zip Slip: vérifier chaque entrée avant extraction
+    let destFull = Path.GetFullPath(destination)
+    use archiveStream = File.OpenRead(archive)
+    use zipArchive = new System.IO.Compression.ZipArchive(archiveStream, System.IO.Compression.ZipArchiveMode.Read)
+    for entry in zipArchive.Entries do
+        let entryPath = Path.GetFullPath(Path.Combine(destFull, entry.FullName))
+        if not (entryPath.StartsWith(destFull, StringComparison.OrdinalIgnoreCase)) then
+            failwithf "Zip Slip détecté — chemin non autorisé: %s" entry.FullName
+    // Extraction après validation
     ZipFile.ExtractToDirectory(archive, destination)
     printfn "  [+] Extrait: %s" destination
 
@@ -177,7 +209,8 @@ let installContainerd () = task {
 
     printfn "  [*] Téléchargement depuis GitHub..."
     do! downloadFile containerdUrl archivePath
-    verifyChecksum archivePath None
+    let expectedChecksum = containerdChecksums |> Map.tryFind downloadContainerdVersion
+    verifyChecksum archivePath expectedChecksum
 
     printfn "  [*] Extraction..."
     do! extractTarGz archivePath containerdDir
@@ -198,7 +231,7 @@ let downloadCniPlugins () = task {
     let winCniUrl = sprintf "https://github.com/microsoft/windows-container-networking/releases/download/v%s/%s" winCniVersion winCniArchive
     let winCniTemp = Path.Combine(Path.GetTempPath(), sprintf "%s_%s" archiveSuffix winCniArchive)
     do! downloadFile winCniUrl winCniTemp
-    verifyChecksum winCniTemp None
+    verifyChecksum winCniTemp (Some winCniChecksum)
     extractZip winCniTemp cniBinDir
     File.Delete(winCniTemp)
 

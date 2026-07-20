@@ -91,11 +91,32 @@ type BridgeNetworkDriver() =
                     SecurityValidation.validateIp gateway "La passerelle"
                 let actualSubnet = if String.IsNullOrEmpty(subnet) then getAvailableSubnet () else subnet
                 let actualGateway = if String.IsNullOrEmpty(gateway) then getDefaultGateway actualSubnet else gateway
-                runPowershellWithArgs "New-VMSwitch"
-                    [ "-Name", name; "-SwitchType", "Internal"; "-AllowManagementOS", "$true" ] |> ignore
+                // Idempotence : vérifier si le switch existe déjà avant de le créer
+                let existingSwitch =
+                    try
+                        let result =
+                            runPowershellWithArgs "Get-VMSwitch"
+                                [ "-Name", name; "-ErrorAction", "SilentlyContinue" ]
+                        not (String.IsNullOrWhiteSpace(result))
+                    with _ -> false
+                if not existingSwitch then
+                    runPowershellWithArgs "New-VMSwitch"
+                        [ "-Name", name; "-SwitchType", "Internal"; "-AllowManagementOS", "$true" ]
+                    |> ignore
                 if not (String.IsNullOrEmpty(actualSubnet)) then
-                    runPowershellWithArgs "New-NetNat"
-                        [ "-Name", sprintf "%sNat" name; "-InternalIPInterfaceAddressPrefix", actualSubnet ] |> ignore
+                    // Idempotence : vérifier si le NAT existe déjà
+                    let natName = sprintf "%sNat" name
+                    let existingNat =
+                        try
+                            let result =
+                                runPowershellWithArgs "Get-NetNat"
+                                    [ "-Name", natName; "-ErrorAction", "SilentlyContinue" ]
+                            not (String.IsNullOrWhiteSpace(result))
+                        with _ -> false
+                    if not existingNat then
+                        runPowershellWithArgs "New-NetNat"
+                            [ "-Name", natName; "-InternalIPInterfaceAddressPrefix", actualSubnet ]
+                        |> ignore
                 let id = Guid.NewGuid().ToString("N")
                 let info = {
                     Id = id

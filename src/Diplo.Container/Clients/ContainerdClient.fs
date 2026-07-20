@@ -38,7 +38,8 @@ type ContainerdClient(runner: IProcessRunner) =
             SecurityValidation.validateContainerId id
             runCtr [ "task"; "kill"; "--namespace"; namespaceName; "--signal"; "SIGTERM"; id ] |> ignore
             if timeoutSeconds > 0 then
-                System.Threading.Thread.Sleep(timeoutSeconds * 1000)
+                let capped = min timeoutSeconds 300
+                System.Threading.Thread.Sleep(capped * 1000)
 
         member _.DeleteContainer(namespaceName, id, force) =
             SecurityValidation.validateId namespaceName "Le namespace"

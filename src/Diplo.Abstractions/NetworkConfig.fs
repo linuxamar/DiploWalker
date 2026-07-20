@@ -67,6 +67,7 @@ let private jsonOptions = JsonSerializerOptions()
 do jsonOptions.PropertyNamingPolicy <- JsonNamingPolicy.SnakeCaseLower
 do jsonOptions.DefaultIgnoreCondition <- JsonIgnoreCondition.WhenWritingNull
 do jsonOptions.WriteIndented <- true
+do jsonOptions.MaxDepth <- 64
 
 let serializeConfig (config: CniNatConfig) : string =
     JsonSerializer.Serialize(config, jsonOptions)
@@ -103,7 +104,14 @@ let saveConfig (configPath: string option) (config: CniNatConfig) =
     let dir = Path.GetDirectoryName(path)
     if not (Directory.Exists(dir)) then
         Directory.CreateDirectory(dir) |> ignore
-    File.WriteAllText(path, serializeConfig config)
+    // Écriture atomique : fichier temp + renommage pour éviter la corruption
+    let tempPath = path + ".tmp." + Guid.NewGuid().ToString("N")
+    try
+        File.WriteAllText(tempPath, serializeConfig config)
+        File.Move(tempPath, path, true)
+    with ex ->
+        if File.Exists(tempPath) then File.Delete(tempPath)
+        reraise()
 
 // ─── Détection automatique de sous-réseau ────────────────────────────────
 
@@ -130,6 +138,7 @@ let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) =
 let deriveGateway (subnet: string) =
     let ipPart = subnet.Split('/') |> Array.head
     let parts = ipPart.Split('.')
+    if parts.Length < 3 then failwithf "Sous-réseau invalide pour dériver la passerelle: '%s'" subnet
     sprintf "%s.%s.%s.1" parts.[0] parts.[1] parts.[2]
 
 // ─── Résolution de la configuration finale ───────────────────────────────
