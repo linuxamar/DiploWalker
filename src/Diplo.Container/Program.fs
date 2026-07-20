@@ -6,6 +6,8 @@ open Microsoft.Extensions.Hosting
 open Serilog
 open Serilog.Extensions.Hosting
 open Diplo.Abstractions.ServerConfig
+open Diplo.Abstractions.AuthToken
+open Diplo.Abstractions.TokenAuthMiddleware
 open Diplo.Abstractions.Interfaces
 open Diplo.Container.Clients
 open Diplo.Container.Services
@@ -46,6 +48,7 @@ let main args =
         ) |> ignore
 
         let app = builder.Build()
+        app.UseMiddleware<TokenAuthMiddleware>() |> ignore
         app.MapGrpcService<ContainerServiceImpl>() |> ignore
         app.Run()
         0

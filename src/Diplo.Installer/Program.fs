@@ -454,6 +454,15 @@ let createConfigFiles () =
     // config CNI par défaut
     createCniConfig ()
 
+    // token d'authentification gRPC
+    let tokenPath = Diplo.Abstractions.AuthToken.authTokenPath
+    if not (File.Exists(tokenPath)) then
+        let token = Diplo.Abstractions.AuthToken.generateToken ()
+        Diplo.Abstractions.AuthToken.saveToken token
+        printfn "  [+] auth-token.json (token gRPC généré)"
+    else
+        printfn "  [=] auth-token.json existe déjà, ignoré"
+
     // appsettings pour chaque service
     for (serviceName, _, port) in services do
         let pipeName = serviceName.ToLowerInvariant().Replace(".", "-")
