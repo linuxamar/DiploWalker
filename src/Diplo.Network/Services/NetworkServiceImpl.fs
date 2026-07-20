@@ -7,6 +7,7 @@ open System.Text.Json
 open System.Threading.Tasks
 open Grpc.Core
 open Serilog
+open Diplo.Abstractions
 open Diplo.Grpc.Network
 open Diplo.Network.Plugins
 
@@ -174,6 +175,10 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                 return r
             else
                 try
+                    SecurityValidation.validateCniPluginPath pluginPath
+                    let command =
+                        if String.IsNullOrEmpty(request.Command) then "ADD"
+                        else request.Command
                     let configJson =
                         if request.Config |> isNull |> not then
                             let config = {|
@@ -190,7 +195,8 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                         else "{}"
                     let psi = ProcessStartInfo()
                     psi.FileName <- pluginPath
-                    psi.Arguments <- sprintf "%s --config <&0" request.Command
+                    psi.ArgumentList.Add(command) |> ignore
+                    psi.ArgumentList.Add("--config") |> ignore
                     psi.RedirectStandardInput <- true
                     psi.RedirectStandardOutput <- true
                     psi.RedirectStandardError <- true

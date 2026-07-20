@@ -4,6 +4,7 @@ open System
 open System.Diagnostics
 open System.Text.Json
 open Serilog
+open Diplo.Abstractions
 open Diplo.Abstractions.NetworkConfig
 open Diplo.Grpc.Network
 
@@ -11,14 +12,15 @@ type CustomCniDriver() =
 
     let networks = System.Collections.Concurrent.ConcurrentDictionary<string, NetworkDriverInfo>()
 
-    let runProcess (fileName: string) (args: string) =
+    let runProcess (fileName: string) (args: string list) =
         let psi = ProcessStartInfo()
         psi.FileName <- fileName
-        psi.Arguments <- args
         psi.RedirectStandardOutput <- true
         psi.RedirectStandardError <- true
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
+        for arg in args do
+            psi.ArgumentList.Add(arg) |> ignore
         use proc = Process.Start(psi)
         if proc |> isNull then failwithf "Impossible de démarrer %s" fileName
         let stdout = proc.StandardOutput.ReadToEnd()
@@ -36,6 +38,11 @@ type CustomCniDriver() =
 
         member _.Create(name, subnet, gateway, ipRange, options, labels) =
             try
+                SecurityValidation.validateName name "Le nom du réseau CNI"
+                if not (String.IsNullOrEmpty(subnet)) then
+                    SecurityValidation.validateCidr subnet "Le sous-réseau"
+                if not (String.IsNullOrEmpty(gateway)) then
+                    SecurityValidation.validateIp gateway "La passerelle"
                 let actualSubnet = if String.IsNullOrEmpty(subnet) then
                                        let config = loadConfig None
                                        let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
@@ -78,6 +85,7 @@ type CustomCniDriver() =
             | false, _ -> Error (sprintf "Réseau CNI '%s' introuvable" networkId)
             | true, netInfo ->
                 try
+                    SecurityValidation.validateContainerId containerId
                     let actualEndpointId = if String.IsNullOrEmpty(endpointId) then
                                                Guid.NewGuid().ToString("N")
                                            else endpointId
@@ -85,6 +93,7 @@ type CustomCniDriver() =
                     let mutable mac = ""
                     match options |> Map.tryFind "plugin_path" with
                     | Some pluginPath when not (String.IsNullOrEmpty(pluginPath)) ->
+                        SecurityValidation.validateCniPluginPath pluginPath
                         let config = {|
                             cniVersion = "1.0.0"
                             name = netInfo.Name
@@ -96,21 +105,9 @@ type CustomCniDriver() =
                             |}
                         |}
                         let configJson = JsonSerializer.Serialize(config)
-                        let psi = ProcessStartInfo()
-                        psi.FileName <- pluginPath
-                        psi.Arguments <- sprintf "ADD --container-id %s --netns /proc/%s/ns/net" containerId containerId
-                        psi.RedirectStandardInput <- true
-                        psi.RedirectStandardOutput <- true
-                        psi.RedirectStandardError <- true
-                        psi.UseShellExecute <- false
-                        psi.CreateNoWindow <- true
-                        use proc = Process.Start(psi)
-                        if proc |> isNull then failwithf "Impossible de démarrer le plugin CNI"
-                        proc.StandardInput.Write(configJson : string)
-                        proc.StandardInput.Close()
-                        let stdout = proc.StandardOutput.ReadToEnd()
-                        proc.WaitForExit()
-                        if proc.ExitCode = 0 then
+                        let (_exitCode, stdout, _stderr) =
+                            runProcess pluginPath [ "ADD"; "--container-id"; containerId; "--netns"; sprintf "/proc/%s/ns/net" containerId ]
+                        if _exitCode = 0 then
                             let (ifname, ipv4, gw) = parseCniResult stdout
                             if not (String.IsNullOrEmpty(ifname)) then assignedIp <- ipv4
                     | _ -> ()
@@ -130,17 +127,11 @@ type CustomCniDriver() =
                     match netInfo.Options |> Map.tryFind "plugin_path" with
                     | Some pluginPath when not (String.IsNullOrEmpty(pluginPath)) ->
                         try
-                            let psi = ProcessStartInfo()
-                            psi.FileName <- pluginPath
-                            psi.Arguments <- sprintf "DEL --container-id %s --netns /proc/%s/ns/net" endpointId endpointId
-                            psi.RedirectStandardOutput <- true
-                            psi.RedirectStandardError <- true
-                            psi.UseShellExecute <- false
-                            psi.CreateNoWindow <- true
-                            use proc = Process.Start(psi)
-                            if proc |> isNull then failwithf "Impossible de démarrer le plugin CNI"
-                            proc.WaitForExit()
-                            if proc.ExitCode = 0 then Ok ()
-                            else Error (sprintf "Échec de la déconnexion CNI (code %d)" proc.ExitCode)
+                            SecurityValidation.validateCniPluginPath pluginPath
+                            SecurityValidation.validateContainerId endpointId
+                            let (_exitCode, _stdout, _stderr) =
+                                runProcess pluginPath [ "DEL"; "--container-id"; endpointId; "--netns"; sprintf "/proc/%s/ns/net" endpointId ]
+                            if _exitCode = 0 then Ok ()
+                            else Error (sprintf "Échec de la déconnexion CNI (code %d)" _exitCode)
                         with ex -> Error (sprintf "Erreur de déconnexion CNI: %s" ex.Message)
                     | _ -> Ok ()

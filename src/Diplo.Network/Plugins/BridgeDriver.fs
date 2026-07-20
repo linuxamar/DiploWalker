@@ -5,6 +5,7 @@ open System.Diagnostics
 open System.Net.NetworkInformation
 open System.Collections.Concurrent
 open Serilog
+open Diplo.Abstractions
 open Diplo.Abstractions.NetworkConfig
 open Diplo.Grpc.Network
 
@@ -27,6 +28,34 @@ type BridgeNetworkDriver() =
         proc.WaitForExit()
         if proc.ExitCode <> 0 then
             failwithf "netsh a échoué (code %d): %s" proc.ExitCode stderr
+        stdout
+
+    let runPowershellWithArgs (cmdlet: string) (parameters: (string * string) list) =
+        let psi = ProcessStartInfo()
+        psi.FileName <- "powershell"
+        psi.RedirectStandardOutput <- true
+        psi.RedirectStandardError <- true
+        psi.UseShellExecute <- false
+        psi.CreateNoWindow <- true
+        psi.ArgumentList.Add("-NoProfile") |> ignore
+        psi.ArgumentList.Add("-NonInteractive") |> ignore
+        psi.ArgumentList.Add("-Command") |> ignore
+        // Utiliser un script paramétré pour éviter l'injection
+        let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
+        let paramValues = parameters |> List.map snd
+        let paramDecl = paramNames |> String.concat ", "
+        let body = sprintf "%s -%s" cmdlet (parameters |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i]) |> String.concat " -")
+        let script = sprintf "{ param(%s) %s }" paramDecl body
+        psi.ArgumentList.Add(script) |> ignore
+        for value in paramValues do
+            psi.ArgumentList.Add(value) |> ignore
+        use proc = Process.Start(psi)
+        if proc |> isNull then failwithf "Impossible de démarrer PowerShell"
+        let stdout = proc.StandardOutput.ReadToEnd()
+        let stderr = proc.StandardError.ReadToEnd()
+        proc.WaitForExit()
+        if proc.ExitCode <> 0 then
+            failwithf "PowerShell a échoué (code %d): %s" proc.ExitCode stderr
         stdout
 
     let runPowershell args =
@@ -59,13 +88,18 @@ type BridgeNetworkDriver() =
 
         member _.Create(name, subnet, gateway, _ipRange, _options, labels) =
             try
+                SecurityValidation.validateName name "Le nom du réseau"
+                if not (String.IsNullOrEmpty(subnet)) then
+                    SecurityValidation.validateCidr subnet "Le sous-réseau"
+                if not (String.IsNullOrEmpty(gateway)) then
+                    SecurityValidation.validateIp gateway "La passerelle"
                 let actualSubnet = if String.IsNullOrEmpty(subnet) then getAvailableSubnet () else subnet
                 let actualGateway = if String.IsNullOrEmpty(gateway) then getDefaultGateway actualSubnet else gateway
-                let createArgs = sprintf "New-VMSwitch -Name '%s' -SwitchType Internal -AllowManagementOS $true" name
-                runPowershell createArgs |> ignore
+                runPowershellWithArgs "New-VMSwitch"
+                    [ "-Name", name; "-SwitchType", "Internal"; "-AllowManagementOS", "$true" ] |> ignore
                 if not (String.IsNullOrEmpty(actualSubnet)) then
-                    let natArgs = sprintf "New-NetNat -Name '%sNat' -InternalIPInterfaceAddressPrefix '%s'" name actualSubnet
-                    runPowershell natArgs |> ignore
+                    runPowershellWithArgs "New-NetNat"
+                        [ "-Name", sprintf "%sNat" name; "-InternalIPInterfaceAddressPrefix", actualSubnet ] |> ignore
                 let id = Guid.NewGuid().ToString("N")
                 let info = {
                     Id = id
@@ -86,10 +120,10 @@ type BridgeNetworkDriver() =
             match networks.TryGetValue(id) with
             | true, netInfo ->
                 try
-                    let args = sprintf "Remove-VMSwitch -Name '%s' -Force" netInfo.Name
-                    runPowershell args |> ignore
-                    let natArgs = sprintf "Remove-NetNat -Name '%sNat' -Confirm:$false" netInfo.Name
-                    try runPowershell natArgs |> ignore
+                    runPowershellWithArgs "Remove-VMSwitch"
+                        [ "-Name", netInfo.Name; "-Force", "$true" ] |> ignore
+                    try runPowershellWithArgs "Remove-NetNat"
+                            [ "-Name", sprintf "%sNat" netInfo.Name; "-Confirm", "$false" ] |> ignore
                     with ex -> Log.Warning(ex, "Erreur lors de la suppression du NAT {NatName}", netInfo.Name + "Nat")
                     networks.TryRemove(id) |> ignore
                     Ok ()
@@ -110,21 +144,23 @@ type BridgeNetworkDriver() =
             | false, _ -> Error (sprintf "Bridge '%s' introuvable" networkId)
             | true, netInfo ->
                 try
+                    SecurityValidation.validateContainerId containerId
                     let actualEndpointId = if String.IsNullOrEmpty(endpointId) then
                                                Guid.NewGuid().ToString("N")
                                            else endpointId
-                    let adapterName = sprintf "vEthernet (%s-%s)" netInfo.Name (containerId.Substring(0, min 8 containerId.Length))
-                    let args = sprintf "Add-VMNetworkAdapter -SwitchName '%s' -Name '%s' -ManagementOS" netInfo.Name adapterName
-                    runPowershell args |> ignore
+                    let shortId = containerId.Substring(0, min 8 containerId.Length)
+                    let adapterName = sprintf "vEthernet (%s-%s)" netInfo.Name shortId
+                    runPowershellWithArgs "Add-VMNetworkAdapter"
+                        [ "-SwitchName", netInfo.Name; "-Name", adapterName; "-ManagementOS", "$true" ] |> ignore
                     let mutable assignedIp = ""
                     match ipv4Address with
                     | Some ip when not (String.IsNullOrEmpty(ip)) ->
-                        let assignArgs = sprintf "New-NetIPAddress -InterfaceAlias '%s' -IPAddress '%s'" adapterName ip
-                        runPowershell assignArgs |> ignore
+                        SecurityValidation.validateIp ip "L'adresse IP"
+                        runPowershellWithArgs "New-NetIPAddress"
+                            [ "-InterfaceAlias", adapterName; "-IPAddress", ip ] |> ignore
                         assignedIp <- ip
                     | _ -> assignedIp <- "DHCP"
-                    let macArgs = sprintf "Get-VMNetworkAdapter -Name '%s' | Select-Object -ExpandProperty MacAddress" adapterName
-                    let mac = runPowershell(macArgs).Trim()
+                    let mac = (runPowershell (sprintf "Get-VMNetworkAdapter -Name '%s' | Select-Object -ExpandProperty MacAddress" adapterName)).Trim()
                     Ok {
                         EndpointId = actualEndpointId
                         Ipv4Address = assignedIp
@@ -139,11 +175,13 @@ type BridgeNetworkDriver() =
             | false, _ -> Error (sprintf "Bridge '%s' introuvable" networkId)
             | true, netInfo ->
                 try
+                    SecurityValidation.validateContainerId containerId
                     let adapterName = if String.IsNullOrEmpty(endpointId) then
-                                          sprintf "vEthernet (%s-%s)" netInfo.Name (containerId.Substring(0, min 8 containerId.Length))
+                                          let shortId = containerId.Substring(0, min 8 containerId.Length)
+                                          sprintf "vEthernet (%s-%s)" netInfo.Name shortId
                                       else endpointId
-                    let args = sprintf "Remove-VMNetworkAdapter -Name '%s' -ManagementOS" adapterName
-                    runPowershell args |> ignore
+                    runPowershellWithArgs "Remove-VMNetworkAdapter"
+                        [ "-Name", adapterName; "-ManagementOS", "$true" ] |> ignore
                     Ok ()
                 with ex ->
                     Error (sprintf "Erreur de déconnexion du bridge: %s" ex.Message)

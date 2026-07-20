@@ -3,12 +3,13 @@ namespace Diplo.Container.Clients
 open System
 open System.Text.Json
 open Serilog
+open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
 type ContainerdClient(runner: IProcessRunner) =
 
-    let runCtr args =
-        runner.Run("ctr", args)
+    let runCtr (args: string list) =
+        runner.RunWithArgs("ctr", args)
 
     let parseJson (text: string) =
         use doc = JsonDocument.Parse(text)
@@ -16,58 +17,69 @@ type ContainerdClient(runner: IProcessRunner) =
 
     interface IContainerdClient with
         member _.CreateContainer(namespaceName, id, image, labels) =
-            let labelArgs =
-                labels
-                |> Map.toList
-                |> List.map (fun (k, v) -> sprintf "--label %s=%s" k v)
-                |> String.concat " "
-            let args = sprintf "container create --namespace %s %s %s %s" namespaceName id image labelArgs
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            SecurityValidation.validateImage image
+            let mutable args =
+                [ "container"; "create"; "--namespace"; namespaceName; id; image ]
+            for (k, v) in labels |> Map.toList do
+                SecurityValidation.validateLabel k v
+                args <- args @ [ "--label"; sprintf "%s=%s" k v ]
             let output = runCtr args
             output.Trim()
 
         member _.StartContainer(namespaceName, id) =
-            let args = sprintf "task start --namespace %s %s" namespaceName id
-            runCtr args |> ignore
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            runCtr [ "task"; "start"; "--namespace"; namespaceName; id ] |> ignore
 
         member _.StopContainer(namespaceName, id, timeoutSeconds) =
-            let args = sprintf "task kill --namespace %s --signal SIGTERM %s" namespaceName id
-            runCtr args |> ignore
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            runCtr [ "task"; "kill"; "--namespace"; namespaceName; "--signal"; "SIGTERM"; id ] |> ignore
             if timeoutSeconds > 0 then
                 System.Threading.Thread.Sleep(timeoutSeconds * 1000)
 
         member _.DeleteContainer(namespaceName, id, force) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
             if force then
-                let killArgs = sprintf "task kill --namespace %s --signal SIGKILL %s" namespaceName id
-                try runCtr killArgs |> ignore
+                try runCtr [ "task"; "kill"; "--namespace"; namespaceName; "--signal"; "SIGKILL"; id ] |> ignore
                 with ex -> Log.Warning(ex, "Erreur lors de l'arrêt forcé du conteneur {ContainerId}", id)
-            let args = sprintf "container delete --namespace %s %s" namespaceName id
-            runCtr args |> ignore
+            runCtr [ "container"; "delete"; "--namespace"; namespaceName; id ] |> ignore
 
         member _.InspectContainer(namespaceName, id) =
-            let args = sprintf "container info --namespace %s %s" namespaceName id
-            let output = runCtr args
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            let output = runCtr [ "container"; "info"; "--namespace"; namespaceName; id ]
             parseJson output
 
         member _.ListContainers(namespaceName, all) =
+            SecurityValidation.validateId namespaceName "Le namespace"
             let args =
-                if all then sprintf "container list --namespace %s --quiet" namespaceName
-                else sprintf "container list --namespace %s --running --quiet" namespaceName
+                if all then [ "container"; "list"; "--namespace"; namespaceName; "--quiet" ]
+                else [ "container"; "list"; "--namespace"; namespaceName; "--running"; "--quiet" ]
             let output = runCtr args
             output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
             |> Array.toList
 
         member _.GetContainerLogs(namespaceName, id, tail) =
-            let args = sprintf "task logs --namespace %s --tail %d %s" namespaceName tail id
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            let output = runCtr [ "task"; "logs"; "--namespace"; namespaceName; "--tail"; tail.ToString(); id ]
             try
-                let output = runCtr args
                 output.Split('\n')
                 |> Array.toList
             with ex ->
                 [ sprintf "Erreur lors de la récupération des logs: %s" ex.Message ]
 
         member _.ExecInContainer(namespaceName, id, command) =
-            let cmdStr = command |> String.concat " "
-            let args = sprintf "exec --namespace %s --exec-id exec-%s %s %s" namespaceName (Guid.NewGuid().ToString("N")) id cmdStr
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            SecurityValidation.validateCommand command
+            let args =
+                [ "exec"; "--namespace"; namespaceName; "--exec-id"; sprintf "exec-%s" (Guid.NewGuid().ToString("N")); id ]
+                @ (command |> Array.toList)
             try
                 let output = runCtr args
                 output
@@ -75,9 +87,10 @@ type ContainerdClient(runner: IProcessRunner) =
                 sprintf "Erreur d'exécution: %s" ex.Message
 
         member _.TaskInfo(namespaceName, id) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
             try
-                let args = sprintf "task info --namespace %s %s" namespaceName id
-                let output = runCtr args
+                let output = runCtr [ "task"; "info"; "--namespace"; namespaceName; id ]
                 parseJson output
             with ex ->
                 Log.Warning(ex, "Erreur lors de la récupération des informations de tâche {ContainerId}", id)
@@ -85,13 +98,13 @@ type ContainerdClient(runner: IProcessRunner) =
                 doc.RootElement.Clone()
 
         member _.PullImage(image) =
-            let args = sprintf "image pull %s" image
-            let output = runCtr args
+            SecurityValidation.validateImage image
+            let output = runCtr [ "image"; "pull"; image ]
             output.Trim()
 
         member _.Version() =
             try
-                let output = runCtr "version"
+                let output = runCtr [ "version" ]
                 let json = parseJson output
                 let version = json.GetProperty("Version").GetString()
                 let revision = json.GetProperty("Revision").GetString()
@@ -101,7 +114,7 @@ type ContainerdClient(runner: IProcessRunner) =
 
         member _.Namespaces() =
             try
-                let output = runCtr "namespace list --quiet"
+                let output = runCtr [ "namespace"; "list"; "--quiet" ]
                 output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                 |> Array.toList
             with ex ->

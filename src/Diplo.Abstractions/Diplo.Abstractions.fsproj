@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <Compile Include="Interfaces.fs" />
+    <Compile Include="Security.fs" />
     <Compile Include="ServerConfig.fs" />
     <Compile Include="NetworkConfig.fs" />
   </ItemGroup>
