@@ -17,16 +17,6 @@ type ProcessRunner() =
         stdout
 
     interface IProcessRunner with
-        member _.Run(fileName, arguments) =
-            let psi = ProcessStartInfo()
-            psi.FileName <- fileName
-            psi.Arguments <- arguments
-            psi.RedirectStandardOutput <- true
-            psi.RedirectStandardError <- true
-            psi.UseShellExecute <- false
-            psi.CreateNoWindow <- true
-            runProcess psi
-
         member _.RunWithArgs(fileName, args) =
             let psi = ProcessStartInfo()
             psi.FileName <- fileName

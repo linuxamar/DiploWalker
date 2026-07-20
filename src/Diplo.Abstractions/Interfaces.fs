@@ -7,7 +7,6 @@ module Interfaces =
 
     /// Exécuteur de processus (abstraction pour le test)
     type IProcessRunner =
-        abstract member Run: fileName: string * arguments: string -> string
         abstract member RunWithArgs: fileName: string * args: string list -> string
 
     /// Client pour interagir avec containerd

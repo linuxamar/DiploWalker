@@ -13,23 +13,6 @@ type BridgeNetworkDriver() =
 
     let networks = ConcurrentDictionary<string, NetworkDriverInfo>()
 
-    let runNetsh args =
-        let psi = ProcessStartInfo()
-        psi.FileName <- "netsh"
-        psi.Arguments <- args
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        use proc = Process.Start(psi)
-        if proc |> isNull then failwithf "Impossible de démarrer netsh"
-        let stdout = proc.StandardOutput.ReadToEnd()
-        let stderr = proc.StandardError.ReadToEnd()
-        proc.WaitForExit()
-        if proc.ExitCode <> 0 then
-            failwithf "netsh a échoué (code %d): %s" proc.ExitCode stderr
-        stdout
-
     let runPowershellWithArgs (cmdlet: string) (parameters: (string * string) list) =
         let psi = ProcessStartInfo()
         psi.FileName <- "powershell"
@@ -58,14 +41,23 @@ type BridgeNetworkDriver() =
             failwithf "PowerShell a échoué (code %d): %s" proc.ExitCode stderr
         stdout
 
-    let runPowershell args =
+    let runPowershellScript (scriptBody: string) (parameters: (string * string) list) =
         let psi = ProcessStartInfo()
         psi.FileName <- "powershell"
-        psi.Arguments <- "-NoProfile -NonInteractive -Command " + args
         psi.RedirectStandardOutput <- true
         psi.RedirectStandardError <- true
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
+        psi.ArgumentList.Add("-NoProfile") |> ignore
+        psi.ArgumentList.Add("-NonInteractive") |> ignore
+        psi.ArgumentList.Add("-Command") |> ignore
+        let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
+        let paramValues = parameters |> List.map snd
+        let paramDecl = paramNames |> String.concat ", "
+        let script = sprintf "{ param(%s) %s }" paramDecl scriptBody
+        psi.ArgumentList.Add(script) |> ignore
+        for value in paramValues do
+            psi.ArgumentList.Add(value) |> ignore
         use proc = Process.Start(psi)
         if proc |> isNull then failwithf "Impossible de démarrer PowerShell"
         let stdout = proc.StandardOutput.ReadToEnd()
@@ -160,7 +152,11 @@ type BridgeNetworkDriver() =
                             [ "-InterfaceAlias", adapterName; "-IPAddress", ip ] |> ignore
                         assignedIp <- ip
                     | _ -> assignedIp <- "DHCP"
-                    let mac = (runPowershell (sprintf "Get-VMNetworkAdapter -Name '%s' | Select-Object -ExpandProperty MacAddress" adapterName)).Trim()
+                    let mac =
+                        runPowershellScript
+                            "Get-VMNetworkAdapter -Name $p0 | Select-Object -ExpandProperty MacAddress"
+                            [ "Name", adapterName ]
+                        |> fun s -> s.Trim()
                     Ok {
                         EndpointId = actualEndpointId
                         Ipv4Address = assignedIp
