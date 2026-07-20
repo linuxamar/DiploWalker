@@ -19,14 +19,11 @@ module SecurityValidation =
     /// Regex pour les images Docker — alphanumériques, slashes, tirets, points, deux-points, @.
     let private imagePattern = Regex(@"^[a-zA-Z0-9][a-zA-Z0-9._/\-:@]{0,511}$", RegexOptions.Compiled)
 
-    /// Regex pour les sous-réseaux CIDR.
-    let private cidrPattern = Regex(@"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(/\d{1,2})?$", RegexOptions.Compiled)
-
-    /// Regex pour les adresses IP.
-    let private ipPattern = Regex(@"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", RegexOptions.Compiled)
-
     /// Regex pour les labels (clés et valeurs) — alphanumériques, tirets, points, underscores.
     let private labelPattern = Regex(@"^[a-zA-Z0-9][a-zA-Z0-9._\-]{0,63}$", RegexOptions.Compiled)
+
+    /// Caractères interdits dans les commandes exécutées dans les conteneurs.
+    let private dangerousChars = [| ';'; '|'; '&'; '`'; '$'; ' '; '\t'; '\n'; '\r' |]
 
     /// Répertoires autorisés pour les plugins CNI.
     let private allowedCniPluginDirs =
@@ -63,17 +60,38 @@ module SecurityValidation =
         if not (imagePattern.IsMatch(value)) then
             failwithf "Le nom de l'image contient des caractères interdits: '%s'" value
 
-    /// Vérifie qu'un sous-réseau CIDR est valide.
-    let validateCidr (value: string) (label: string) =
-        if String.IsNullOrEmpty(value) then () // vide = auto-détection
-        elif not (cidrPattern.IsMatch(value)) then
-            failwithf "%s n'est pas un sous-réseau CIDR valide: '%s'" label value
+    /// Valide qu'un octet IP est dans la plage 0-255.
+    let private validateOctet (value: string) (label: string) =
+        match Int32.TryParse(value) with
+        | true, n when n >= 0 && n <= 255 -> ()
+        | _ -> failwithf "%s contient un octet invalide: '%s'" label value
 
-    /// Vérifie qu'une adresse IP est valide.
+    /// Vérifie qu'un sous-réseau CIDR est valide (octets 0-255, masque 0-32).
+    let validateCidr (value: string) (label: string) =
+        if String.IsNullOrEmpty(value) then ()
+        else
+            let parts = value.Split('/')
+            if parts.Length < 1 || parts.Length > 2 then
+                failwithf "%s n'est pas un sous-réseau CIDR valide: '%s'" label value
+            let ipParts = parts.[0].Split('.')
+            if ipParts.Length <> 4 then
+                failwithf "%s n'est pas une adresse IP valide: '%s'" label value
+            for part in ipParts do
+                validateOctet part label
+            if parts.Length = 2 then
+                match Int32.TryParse(parts.[1]) with
+                | true, n when n >= 0 && n <= 32 -> ()
+                | _ -> failwithf "%s a un masque CIDR invalide (doit être 0-32): '%s'" label value
+
+    /// Vérifie qu'une adresse IP est valide (octets 0-255).
     let validateIp (value: string) (label: string) =
-        if String.IsNullOrEmpty(value) then () // vide = DHCP
-        elif not (ipPattern.IsMatch(value)) then
-            failwithf "%s n'est pas une adresse IP valide: '%s'" label value
+        if String.IsNullOrEmpty(value) then ()
+        else
+            let parts = value.Split('.')
+            if parts.Length <> 4 then
+                failwithf "%s n'est pas une adresse IP valide: '%s'" label value
+            for part in parts do
+                validateOctet part label
 
     /// Vérifie qu'une clé et une valeur de label sont valides.
     let validateLabel (key: string) (value: string) =
@@ -111,5 +129,27 @@ module SecurityValidation =
         if command.Length > 64 then
             failwithf "La commande ne peut pas contenir plus de 64 arguments"
         for arg in command do
-            if String.IsNullOrEmpty(arg) |> not && arg.Length > 1024 then
-                failwithf "Un argument de commande dépasse 1024 caractères"
+            if String.IsNullOrEmpty(arg) |> not then
+                if arg.Length > 1024 then
+                    failwithf "Un argument de commande dépasse 1024 caractères"
+                for c in arg do
+                    if Array.exists (fun dc -> dc = c) dangerousChars then
+                        failwithf "L'argument de commande contient un caractère interdit: '%c' dans '%s'" c arg
+
+    /// Vérifie qu'un chemin est sûr (pas de traversée via ..).
+    let validatePath (path: string) (baseDir: string) (label: string) =
+        if String.IsNullOrEmpty(path) then
+            failwithf "%s ne peut pas être vide" label
+        if path.Contains("..") then
+            failwithf "%s contient une traversée de répertoire interdite: '%s'" label path
+        let fullPath = Path.GetFullPath(Path.Combine(baseDir, path))
+        let fullBase = Path.GetFullPath(baseDir)
+        if not (fullPath.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase)) then
+            failwithf "%s sort du répertoire autorisé: '%s'" label fullPath
+
+    /// Valide un chemin de volume (anti-traversée).
+    let validateVolumePath (path: string) (label: string) =
+        if path.Contains("..") then
+            failwithf "%s contient une traversée de répertoire interdite: '%s'" label path
+        if path.Contains("\0") then
+            failwithf "%s contient un caractère nul: '%s'" label path

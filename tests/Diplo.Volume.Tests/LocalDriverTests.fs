@@ -113,7 +113,7 @@ module LocalDriverTests =
             let driver = LocalVolumeDriver(tempRoot)
             let (id, mountpoint) = driver.CreateVolume("mount-test", Map.empty, Map.empty)
             File.WriteAllText(Path.Combine(mountpoint, "test.txt"), "contenu")
-            let (success, mountDir) = driver.MountVolume(id, "/target", "")
+            let (success, mountDir) = driver.MountVolume(id, "target", "")
             success |> should equal true
             Directory.Exists(mountDir) |> should equal true
             File.ReadAllText(Path.Combine(mountDir, "test.txt")) |> should equal "contenu"
@@ -126,9 +126,9 @@ module LocalDriverTests =
             let driver = LocalVolumeDriver(tempRoot)
             let (id, mountpoint) = driver.CreateVolume("unmount-test", Map.empty, Map.empty)
             File.WriteAllText(Path.Combine(mountpoint, "file.txt"), "data")
-            let (_, mountDir) = driver.MountVolume(id, "/target", "")
+            let (_, mountDir) = driver.MountVolume(id, "target", "")
             Directory.Exists(mountDir) |> should equal true
-            let (success, msg) = driver.UnmountVolume(id, "/target")
+            let (success, msg) = driver.UnmountVolume(id, "target")
             success |> should equal true
             msg |> should equal "Démonté"
         finally cleanupDir tempRoot

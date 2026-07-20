@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Grpc.Core
 open Serilog
 open Diplo.Grpc.Volume
+open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
 type VolumeServiceImpl(driver: IVolumeDriver) =
@@ -14,8 +15,11 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
     override _.CreateVolume(request, context) =
         task {
             let name = if String.IsNullOrEmpty(request.Name) then Guid.NewGuid().ToString("N") else request.Name
+            SecurityValidation.validateName name "Le nom du volume"
             let driverOpts = request.DriverOpts |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
             let labels = request.Labels |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
+            for kv in labels do
+                SecurityValidation.validateLabel kv.Key kv.Value
             let (id, mountpoint) = driver.CreateVolume(name, driverOpts, labels)
             return CreateVolumeResponse(
                 Id = id,
@@ -30,6 +34,7 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
         task {
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
+            SecurityValidation.validateId request.Id "L'identifiant du volume"
             try
                 let success = driver.RemoveVolume(request.Id, request.Force)
                 if not success then
@@ -43,6 +48,7 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
         task {
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
+            SecurityValidation.validateId request.Id "L'identifiant du volume"
             let volResult = driver.InspectVolume(request.Id)
             if volResult.IsNone then
                 raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" request.Id)))
@@ -85,6 +91,8 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
             if String.IsNullOrEmpty(request.TargetPath) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin cible est requis")))
+            SecurityValidation.validateId request.Id "L'identifiant du volume"
+            SecurityValidation.validateVolumePath request.TargetPath "Le chemin cible"
             try
                 let options = request.Options |> Seq.map (fun kv -> kv.Key + "=" + kv.Value) |> String.concat ";"
                 let (_, mountpoint) = driver.MountVolume(request.Id, request.TargetPath, options)
@@ -103,6 +111,8 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
             if String.IsNullOrEmpty(request.TargetPath) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin cible est requis")))
+            SecurityValidation.validateId request.Id "L'identifiant du volume"
+            SecurityValidation.validateVolumePath request.TargetPath "Le chemin cible"
             try
                 let (_, message) = driver.UnmountVolume(request.Id, request.TargetPath)
                 return UnmountVolumeResponse(State = MountState.Unmounted, Message = message)

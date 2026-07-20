@@ -6,6 +6,7 @@ open System.IO
 open System.IO.Compression
 open System.Net.Http
 open System.Runtime.InteropServices
+open System.Security.Cryptography
 open System.ServiceProcess
 
 // ─── Configuration ───────────────────────────────────────────────────────
@@ -34,6 +35,22 @@ let runCommand (exe: string) (args: string) : int =
     psi.RedirectStandardOutput <- true
     psi.RedirectStandardError <- true
     psi.CreateNoWindow <- true
+    use proc = Process.Start(psi)
+    let stdout = proc.StandardOutput.ReadToEnd()
+    let stderr = proc.StandardError.ReadToEnd()
+    proc.WaitForExit()
+    if stdout.Length > 0 then printfn "%s" stdout
+    if stderr.Length > 0 then eprintfn "%s" stderr
+    proc.ExitCode
+
+let runCommandWithArgs (exe: string) (args: string list) : int =
+    let psi = ProcessStartInfo(exe)
+    psi.UseShellExecute <- false
+    psi.RedirectStandardOutput <- true
+    psi.RedirectStandardError <- true
+    psi.CreateNoWindow <- true
+    for arg in args do
+        psi.ArgumentList.Add(arg) |> ignore
     use proc = Process.Start(psi)
     let stdout = proc.StandardOutput.ReadToEnd()
     let stderr = proc.StandardError.ReadToEnd()
@@ -112,6 +129,25 @@ let downloadFile (url: string) (dest: string) = task {
     printfn "  [+] Téléchargé: %s" (Path.GetFileName(dest))
 }
 
+/// Calcule le hash SHA256 d'un fichier.
+let computeSha256 (filePath: string) =
+    use sha = SHA256.Create()
+    use stream = File.OpenRead(filePath)
+    sha.ComputeHash(stream)
+    |> Array.map (fun b -> b.ToString("x2"))
+    |> String.concat ""
+
+/// Vérifie le hash SHA256 d'un fichier téléchargé. Lève une exception si non concordant.
+let verifyChecksum (filePath: string) (expectedSha256: string option) =
+    match expectedSha256 with
+    | None ->
+        printfn "  [!] Avertissement: aucun checksum fourni pour %s" (Path.GetFileName(filePath))
+    | Some expected ->
+        let actual = computeSha256 filePath
+        if actual <> expected then
+            failwithf "Échec de la vérification d'intégrité de %s\n  Attendu: %s\n  Obtenu:  %s" (Path.GetFileName(filePath)) expected actual
+        printfn "  [+] SHA256 vérifié: %s" (Path.GetFileName(filePath))
+
 let extractTarGz (archive: string) (destination: string) = task {
     let exitCode = runCommand "tar" (sprintf "xzf \"%s\" -C \"%s\"" archive destination)
     if exitCode <> 0 then
@@ -135,6 +171,7 @@ let installContainerd () = task {
 
     printfn "  [*] Téléchargement depuis GitHub..."
     do! downloadFile containerdUrl archivePath
+    verifyChecksum archivePath None
 
     printfn "  [*] Extraction..."
     do! extractTarGz archivePath containerdDir
@@ -155,6 +192,7 @@ let downloadCniPlugins () = task {
     let winCniUrl = sprintf "https://github.com/microsoft/windows-container-networking/releases/download/v%s/%s" winCniVersion winCniArchive
     let winCniTemp = Path.Combine(Path.GetTempPath(), winCniArchive)
     do! downloadFile winCniUrl winCniTemp
+    verifyChecksum winCniTemp None
     extractZip winCniTemp cniBinDir
     File.Delete(winCniTemp)
 
@@ -186,8 +224,8 @@ let installWindowsService (serviceName: string, displayName: string, port: int) 
         printfn "  [!] EXE non trouvé: %s" exePath
         printfn "  [!] Assurez-vous que le build a copié l'exécutable dans %s" (Path.GetDirectoryName(exePath))
     else
-        let scArgs = sprintf "create \"%s\" binPath= \"%s\" start= auto DisplayName= \"%s\"" serviceName exePath displayName
-        let exitCode = runCommand "sc.exe" scArgs
+        let scArgs = [ "create"; serviceName; sprintf "binPath= %s" exePath; "start= auto"; sprintf "DisplayName= %s" displayName ]
+        let exitCode = runCommandWithArgs "sc.exe" scArgs
         if exitCode = 0 then
             printfn "  [✓] Service %s créé" serviceName
         else
@@ -196,10 +234,10 @@ let installWindowsService (serviceName: string, displayName: string, port: int) 
 
 let removeWindowsService (serviceName: string) = task {
     printfn "=== Suppression du service %s ===" serviceName
-    let exitCode = runCommand "sc.exe" (sprintf "stop \"%s\"" serviceName)
+    let exitCode = runCommandWithArgs "sc.exe" [ "stop"; serviceName ]
     if exitCode = 0 then
         printfn "  [+] Service %s arrêté" serviceName
-    let exitCode = runCommand "sc.exe" (sprintf "delete \"%s\"" serviceName)
+    let exitCode = runCommandWithArgs "sc.exe" [ "delete"; serviceName ]
     if exitCode = 0 then
         printfn "  [✓] Service %s supprimé" serviceName
     else

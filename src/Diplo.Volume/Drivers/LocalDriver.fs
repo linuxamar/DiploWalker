@@ -3,6 +3,7 @@ namespace Diplo.Volume.Drivers
 open System
 open System.IO
 open System.Text.Json
+open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
 type LocalVolumeDriver(dataRoot: string) =
@@ -44,6 +45,7 @@ type LocalVolumeDriver(dataRoot: string) =
         (id, meta.mountpoint)
 
     member _.RemoveVolume(id: string, force: bool) =
+        SecurityValidation.validateId id "L'identifiant du volume"
         let dir = Path.Combine(volumesDir, id)
         if Directory.Exists(dir) then
             let mountFile = Path.Combine(mountsDir, id)
@@ -55,6 +57,7 @@ type LocalVolumeDriver(dataRoot: string) =
         else false
 
     member _.InspectVolume(id: string) =
+        SecurityValidation.validateId id "L'identifiant du volume"
         let file = metaPath id
         if File.Exists(file) then
             let content = File.ReadAllText(file)
@@ -76,10 +79,13 @@ type LocalVolumeDriver(dataRoot: string) =
             |> Array.toList
 
     member _.MountVolume(id: string, targetPath: string, options: string) =
+        SecurityValidation.validateId id "L'identifiant du volume"
+        SecurityValidation.validateVolumePath targetPath "Le chemin cible"
         let src = dataPath id
         if not (Directory.Exists(src)) then
             failwithf "Volume %s introuvable" id
         let mountDir = mountPath id targetPath
+        SecurityValidation.validatePath mountDir mountsDir "Le chemin de montage"
         Directory.CreateDirectory(mountDir) |> ignore
         // Sur Windows, on simule le mount en copiant les fichiers
         if Directory.Exists(src) then
@@ -89,12 +95,15 @@ type LocalVolumeDriver(dataRoot: string) =
         (true, mountDir)
 
     member _.UnmountVolume(id: string, targetPath: string) =
+        SecurityValidation.validateId id "L'identifiant du volume"
+        SecurityValidation.validateVolumePath targetPath "Le chemin cible"
         let mountDir = mountPath id targetPath
         if Directory.Exists(mountDir) then
             Directory.Delete(mountDir, true)
         (true, "Démonté")
 
     member _.GetVolumeSize(id: string) =
+        SecurityValidation.validateId id "L'identifiant du volume"
         let dir = dataPath id
         if Directory.Exists(dir) then
             Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
