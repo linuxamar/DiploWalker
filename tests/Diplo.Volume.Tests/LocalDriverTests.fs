@@ -7,6 +7,11 @@ module LocalDriverTests =
     open Xunit
     open FsUnit.Xunit
     open Diplo.Volume.Drivers
+    open Diplo.Abstractions.SecurityValidation
+
+    do addAllowedVolumeDir(Path.GetTempPath())
+
+    let ensureCwdAllowed () = addAllowedVolumeDir(Directory.GetCurrentDirectory())
 
     let createTempDir () =
         let dir = Path.Combine(Path.GetTempPath(), "diplo-vol-test-" + Guid.NewGuid().ToString("N"))
@@ -108,6 +113,7 @@ module LocalDriverTests =
 
     [<Fact>]
     let ``MountVolume cree un repertoire de montage et copie les fichiers`` () =
+        ensureCwdAllowed ()
         let tempRoot = createTempDir ()
         try
             let driver = LocalVolumeDriver(tempRoot)
@@ -121,6 +127,7 @@ module LocalDriverTests =
 
     [<Fact>]
     let ``UnmountVolume supprime le repertoire de montage`` () =
+        ensureCwdAllowed ()
         let tempRoot = createTempDir ()
         try
             let driver = LocalVolumeDriver(tempRoot)

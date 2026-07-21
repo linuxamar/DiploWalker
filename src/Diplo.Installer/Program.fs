@@ -154,12 +154,14 @@ let computeSha256 (filePath: string) =
     |> Array.map (fun b -> b.ToString("x2"))
     |> String.concat ""
 
-/// Vérifie le hash SHA256 d'un fichier téléchargé. Lève une exception si non concordant.
+/// Vérifie le hash SHA256 d'un fichier téléchargé. Lève une exception si non concordant ou manquant.
 let verifyChecksum (filePath: string) (expectedSha256: string option) =
     match expectedSha256 with
-    | None ->
-        printfn "  [!] Avertissement: aucun checksum fourni pour %s" (Path.GetFileName(filePath))
+    | None | Some null ->
+        failwithf "Aucun checksum fourni pour %s — vérification d'intégrité requise" (Path.GetFileName(filePath))
     | Some expected ->
+        if expected.StartsWith("todo", StringComparison.OrdinalIgnoreCase) then
+            failwithf "Checksum placeholder non mis à jour pour %s — vérification d'intégrité requise" (Path.GetFileName(filePath))
         let actual = computeSha256 filePath
         if actual <> expected then
             failwithf "Échec de la vérification d'intégrité de %s\n  Attendu: %s\n  Obtenu:  %s" (Path.GetFileName(filePath)) expected actual

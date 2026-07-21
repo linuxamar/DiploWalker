@@ -7,6 +7,7 @@ open Grpc.Core
 open Serilog
 open Diplo.Grpc.Container
 open Diplo.Abstractions.Interfaces
+open Diplo.Abstractions
 
 type ContainerServiceImpl(client: IContainerdClient) =
     inherit ContainerService.ContainerServiceBase()
@@ -19,7 +20,14 @@ type ContainerServiceImpl(client: IContainerdClient) =
             if String.IsNullOrEmpty(request.Image) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'image du conteneur est requise")))
             let name = if String.IsNullOrEmpty(request.Name) then Guid.NewGuid().ToString("N") else request.Name
+            SecurityValidation.validateName name "Le nom du conteneur"
+            SecurityValidation.validateImage request.Image
             let labels = request.Labels |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
+            for kv in labels do
+                SecurityValidation.validateLabel kv.Key kv.Value
+            if request.MemoryLimit > 0L || request.CpuShares > 0L || request.PidLimit > 0u then
+                Log.Warning("Limites de ressources demandées (mémoire={MemoryLimit}, cpu={CpuShares}, pid={PidLimit}) mais non implémentées dans le pilote actuel",
+                    request.MemoryLimit, request.CpuShares, request.PidLimit)
             let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels)
             return CreateContainerResponse(
                 Id = id,

@@ -23,7 +23,13 @@ module SecurityValidation =
     let private labelPattern = Regex(@"^[a-zA-Z0-9][a-zA-Z0-9._\-]{0,63}$", RegexOptions.Compiled)
 
     /// Caractères interdits dans les commandes exécutées dans les conteneurs.
-    let private dangerousChars = [| ';'; '|'; '&'; '`'; '$'; ' '; '\t'; '\n'; '\r' |]
+    let private dangerousChars = [| ';'; '|'; '&'; '`'; '$'; ' '; '\t'; '\n'; '\r'; '<'; '>'; '('; ')' |]
+
+    /// Préfixes dangereux interdits dans les commandes (contournements shell Windows).
+    let private dangerousPrefixes = [| "\\\\"; "//" |]
+
+    /// Chaîtes de substitution d'environnement interdites.
+    let private dangerousEnvPatterns = [| "%PATH%"; "%SYSTEMROOT%"; "%WINDIR%"; "%TEMP%"; "%TMP%" |]
 
     /// Répertoires autorisés pour les plugins CNI.
     let private allowedCniPluginDirs =
@@ -138,10 +144,21 @@ module SecurityValidation =
             failwithf "La commande ne peut pas être vide"
         if command.Length > 64 then
             failwithf "La commande ne peut pas contenir plus de 64 arguments"
+        // Le premier argument (l'exécutable) ne doit pas contenir de slash ou de traversée
+        if command.Length > 0 && not (String.IsNullOrEmpty(command.[0])) then
+            if command.[0].Contains("/") || command.[0].Contains("\\") then
+                failwithf "L'exécutable ne doit pas contenir de chemin: '%s'" command.[0]
         for arg in command do
             if String.IsNullOrEmpty(arg) |> not then
                 if arg.Length > 1024 then
                     failwithf "Un argument de commande dépasse 1024 caractères"
+                let upperArg = arg.ToUpperInvariant()
+                for pattern in dangerousEnvPatterns do
+                    if upperArg.Contains(pattern) then
+                        failwithf "L'argument de commande contient une variable d'environnement interdite: '%s'" pattern
+                for prefix in dangerousPrefixes do
+                    if arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
+                        failwithf "L'argument de commande contient un préfixe interdit: '%s'" arg
                 for c in arg do
                     if Array.exists (fun dc -> dc = c) dangerousChars then
                         failwithf "L'argument de commande contient un caractère interdit: '%c' dans '%s'" c arg
@@ -157,20 +174,18 @@ module SecurityValidation =
         if not (fullPath.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase)) then
             failwithf "%s sort du répertoire autorisé: '%s'" label fullPath
 
-    /// Répertoires de base autorisés pour les volumes (conteneur mutable pour extensibilité).
+    /// Répertoires de base autorisés pour les volumes (conteneur mutable thread-safe pour extensibilité).
     let private allowedVolumeBaseDirs =
-        ResizeArray([
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Diplo")
-            @"C:\ProgramData\Diplo"
-            Path.GetTempPath()
-            Environment.CurrentDirectory
-        ])
+        let dict = System.Collections.Concurrent.ConcurrentDictionary<string, byte>()
+        dict.TryAdd(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Diplo"), byte 0) |> ignore
+        dict.TryAdd(@"C:\ProgramData\Diplo", byte 0) |> ignore
+        dict.TryAdd(Path.GetTempPath(), byte 0) |> ignore
+        dict
 
     /// Ajouter un répertoire autorisé pour les volumes (utile pour les tests et extensions).
     let addAllowedVolumeDir (dir: string) =
         let fullDir = Path.GetFullPath(dir)
-        if not (allowedVolumeBaseDirs.Contains(fullDir)) then
-            allowedVolumeBaseDirs.Add(fullDir)
+        (allowedVolumeBaseDirs : System.Collections.Concurrent.ConcurrentDictionary<string, byte>).TryAdd(fullDir, byte 0) |> ignore
 
     /// Valide un chemin de volume (anti-traversée + containment absolu).
     let validateVolumePath (path: string) (label: string) =
@@ -183,7 +198,7 @@ module SecurityValidation =
         // Résoudre le chemin complet et vérifier qu'il est dans un répertoire autorisé
         let fullPath = Path.GetFullPath(path)
         let isAllowed =
-            allowedVolumeBaseDirs
+            allowedVolumeBaseDirs.Keys
             |> Seq.exists (fun dir ->
                 let fullDir = Path.GetFullPath(dir)
                 fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))

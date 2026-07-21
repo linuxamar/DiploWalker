@@ -51,7 +51,7 @@ module TokenAuthMiddlewareTests =
                 if File.Exists(path) then File.Delete(path)
 
     [<Fact>]
-    let ``middleware sans fichier token laisse passer la requete`` () =
+    let ``middleware sans fichier token retourne 401 (fail-closed)`` () =
         let next = NextHandler()
         let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
         let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
@@ -62,8 +62,8 @@ module TokenAuthMiddlewareTests =
             if File.Exists(path) then File.Delete(path)
             let ctx = createHttpContext ()
             mw.Invoke(ctx).Wait()
-            next.Called |> should equal true
-            ctx.Response.StatusCode |> should equal 200
+            next.Called |> should equal false
+            ctx.Response.StatusCode |> should equal 401
         finally
             match backup with
             | Some c -> File.WriteAllText(path, c)

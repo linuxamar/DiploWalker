@@ -164,6 +164,7 @@ type BridgeNetworkDriver() =
             | true, netInfo ->
                 try
                     SecurityValidation.validateContainerId containerId
+                    SecurityValidation.validateName netInfo.Name "Le nom du bridge"
                     let actualEndpointId = if String.IsNullOrEmpty(endpointId) then
                                                Guid.NewGuid().ToString("N")
                                            else endpointId
@@ -204,6 +205,7 @@ type BridgeNetworkDriver() =
                                           let shortId = containerId.Substring(0, min 8 containerId.Length)
                                           sprintf "vEthernet (%s-%s)" netInfo.Name shortId
                                       else endpointId
+                    SecurityValidation.validateName adapterName "Le nom de l'adaptateur"
                     runPowershellWithArgs "Remove-VMNetworkAdapter"
                         [ "-Name", adapterName; "-ManagementOS", "$true" ] |> ignore
                     Ok ()

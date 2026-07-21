@@ -11,8 +11,9 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
     member _.Invoke(context: HttpContext) : Task =
         match loadToken() with
         | None ->
-            logger.LogWarning("Fichier auth-token.json intrusif — authentification désactivée")
-            next.Invoke(context)
+            logger.LogWarning("Fichier auth-token.json introuvable — accès refusé (fail-closed)")
+            context.Response.StatusCode <- 401
+            context.Response.WriteAsync("Fichier auth-token.json introuvable")
         | Some _ ->
             match context.Request.Headers.TryGetValue("authorization") with
             | true, values when values.Count > 0 ->

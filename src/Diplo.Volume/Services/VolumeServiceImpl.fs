@@ -41,7 +41,8 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                     raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" request.Id)))
                 return RemoveVolumeResponse(Success = true, Message = "Volume supprimé")
             with ex when not (ex :? RpcException) ->
-                return RemoveVolumeResponse(Success = false, Message = ex.Message)
+                Log.Warning(ex, "Erreur lors de la suppression du volume {VolumeId}", request.Id)
+                return RemoveVolumeResponse(Success = false, Message = "Erreur interne lors de la suppression du volume")
         }
 
     override _.InspectVolume(request, context) =
@@ -102,7 +103,8 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                     Message = "Volume monté"
                 )
             with ex ->
-                return MountVolumeResponse(State = MountState.Error, Message = ex.Message)
+                Log.Warning(ex, "Erreur lors du montage du volume {VolumeId}", request.Id)
+                return MountVolumeResponse(State = MountState.Error, Message = "Erreur interne lors du montage du volume")
         }
 
     override _.UnmountVolume(request, context) =
@@ -117,5 +119,6 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 let (_, message) = driver.UnmountVolume(request.Id, request.TargetPath)
                 return UnmountVolumeResponse(State = MountState.Unmounted, Message = message)
             with ex ->
-                return UnmountVolumeResponse(State = MountState.Error, Message = ex.Message)
+                Log.Warning(ex, "Erreur lors du démontage du volume {VolumeId}", request.Id)
+                return UnmountVolumeResponse(State = MountState.Error, Message = "Erreur interne lors du démontage du volume")
         }

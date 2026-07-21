@@ -3,6 +3,7 @@ namespace Diplo.Volume.Tests
 module VolumeServiceImplTests =
 
     open System
+    open System.IO
     open System.Collections.Generic
     open System.Threading
     open System.Threading.Tasks
@@ -12,6 +13,10 @@ module VolumeServiceImplTests =
     open Grpc.Core.Testing
     open Diplo.Grpc.Volume
     open Diplo.Volume.Services
+    open Diplo.Abstractions.SecurityValidation
+
+    do addAllowedVolumeDir(Path.GetTempPath())
+    do addAllowedVolumeDir(Directory.GetCurrentDirectory())
 
     let createService () =
         let mock = MockVolumeDriver()
@@ -128,7 +133,8 @@ module VolumeServiceImplTests =
         let ctx = createCtx ()
         let createReq = CreateVolumeRequest(Name = "vol-mount", Driver = StorageDriverType.Local)
         let createResult = svc.CreateVolume(createReq, ctx).Result
-        let req = MountVolumeRequest(Id = createResult.Id, TargetPath = "app/data")
+        let targetPath = Path.Combine(Path.GetTempPath(), "diplo-mount-test")
+        let req = MountVolumeRequest(Id = createResult.Id, TargetPath = targetPath)
         let result = svc.MountVolume(req, ctx).Result
         result.State |> should equal MountState.Mounted
         String.IsNullOrEmpty(result.Mountpoint) |> should equal false
@@ -140,9 +146,10 @@ module VolumeServiceImplTests =
         let ctx = createCtx ()
         let createReq = CreateVolumeRequest(Name = "vol-unmount", Driver = StorageDriverType.Local)
         let createResult = svc.CreateVolume(createReq, ctx).Result
-        let mountReq = MountVolumeRequest(Id = createResult.Id, TargetPath = "app/data")
+        let targetPath = Path.Combine(Path.GetTempPath(), "diplo-unmount-test")
+        let mountReq = MountVolumeRequest(Id = createResult.Id, TargetPath = targetPath)
         svc.MountVolume(mountReq, ctx).Result |> ignore
-        let req = UnmountVolumeRequest(Id = createResult.Id, TargetPath = "app/data")
+        let req = UnmountVolumeRequest(Id = createResult.Id, TargetPath = targetPath)
         let result = svc.UnmountVolume(req, ctx).Result
         result.State |> should equal MountState.Unmounted
         result.Message |> should equal "Démonté"
