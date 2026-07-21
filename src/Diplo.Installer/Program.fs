@@ -548,6 +548,18 @@ let uninstallAll () = task {
     else
         for (serviceName, _, _) in services do
             do! removeWindowsService serviceName
+        // Supprimer le fichier d'authentification token
+        let tokenPath = Diplo.Abstractions.AuthToken.authTokenPath
+        if File.Exists(tokenPath) then
+            try File.Delete(tokenPath) with _ -> ()
+            printfn "  [+] auth-token.json supprimé"
+        let tokenDir = Diplo.Abstractions.AuthToken.authTokenDir
+        if Directory.Exists(tokenDir) then
+            try
+                if Directory.GetFiles(tokenDir).Length = 0 && Directory.GetDirectories(tokenDir).Length = 0 then
+                    Directory.Delete(tokenDir)
+                    printfn "  [+] Répertoire %s supprimé" tokenDir
+            with _ -> ()
         printfn ""
         printfn "=== Désinstallation des services terminée ==="
         printfn "  Les fichiers dans %s n'ont pas été supprimés." installDir
