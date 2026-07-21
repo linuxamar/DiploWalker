@@ -1,5 +1,5 @@
 ﻿# ---------------------------------------------------------------------------
-#  publish.ps1  –  Publication self-contained (Release) des services Diplo
+#  pipeline.ps1  –  Build, tests et publication self-contained (Release)
 # ---------------------------------------------------------------------------
 #  Structure de sortie :
 #    ./publish/WindowsServices/<platform>/<projet>/
@@ -116,6 +116,7 @@ $runTests   = $DoTests.IsPresent
 $runPublish = $DoPublish.IsPresent
 
 $testProjects = @(
+    "Diplo.Abstractions.Tests",
     "Diplo.Container.Tests",
     "Diplo.Volume.Tests",
     "Diplo.Network.Tests"
