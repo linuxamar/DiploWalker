@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="NoneDriverTests.fs" />
+    <Compile Include="PodDriverTests.fs" />
     <Compile Include="CustomCniDriverTests.fs" />
     <Compile Include="MockNetworkDriver.fs" />
     <Compile Include="NetworkServiceImplTests.fs" />

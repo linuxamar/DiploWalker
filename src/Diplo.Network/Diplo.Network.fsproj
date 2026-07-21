@@ -13,6 +13,7 @@
     <Compile Include="Plugins\BridgeDriver.fs" />
     <Compile Include="Plugins\CustomCniDriver.fs" />
     <Compile Include="Plugins\NoneDriver.fs" />
+    <Compile Include="Plugins\PodDriver.fs" />
     <Compile Include="Services\NetworkServiceImpl.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
