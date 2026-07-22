@@ -262,6 +262,7 @@ let downloadCniPlugins () = task {
     do! downloadFile cniUrl cniTemp
     verifyChecksum cniTemp (Some cniPluginsChecksum)
     do! extractTarGz cniTemp cniBinDir
+
     File.Delete(cniTemp)
 
     printfn "  [✓] Plugins CNI installés dans %s" cniBinDir
