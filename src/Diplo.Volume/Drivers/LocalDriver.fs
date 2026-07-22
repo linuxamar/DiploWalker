@@ -70,7 +70,7 @@ type LocalVolumeDriver(dataRoot: string) =
         let file = metaPath id
         if File.Exists(file) then
             let content = File.ReadAllText(file)
-            JsonSerializer.Deserialize<JsonElement>(content)
+            JsonSerializer.Deserialize<JsonElement>(content, JsonSerializerOptions(MaxDepth = 32))
             |> Some
         else None
 
@@ -82,7 +82,7 @@ type LocalVolumeDriver(dataRoot: string) =
                 let metaFile = Path.Combine(dir, "meta.json")
                 if File.Exists(metaFile) then
                     let content = File.ReadAllText(metaFile)
-                    let elem = JsonSerializer.Deserialize<JsonElement>(content)
+                    let elem = JsonSerializer.Deserialize<JsonElement>(content, JsonSerializerOptions(MaxDepth = 32))
                     Some elem
                 else None)
             |> Array.toList

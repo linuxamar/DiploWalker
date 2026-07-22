@@ -175,10 +175,11 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                 return r
             else
                 try
-                    SecurityValidation.validateCniPluginPath pluginPath
+                    let resolvedPluginPath = SecurityValidation.validateCniPluginPath pluginPath
                     let command =
                         if String.IsNullOrEmpty(request.Command) then "ADD"
                         else request.Command
+                    SecurityValidation.validateCniCommand command
                     let configJson =
                         if request.Config |> isNull |> not then
                             let config = {|
@@ -194,7 +195,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                             JsonSerializer.Serialize(config)
                         else "{}"
                     let psi = ProcessStartInfo()
-                    psi.FileName <- pluginPath
+                    psi.FileName <- resolvedPluginPath
                     psi.ArgumentList.Add(command) |> ignore
                     psi.ArgumentList.Add("--config") |> ignore
                     psi.RedirectStandardInput <- true

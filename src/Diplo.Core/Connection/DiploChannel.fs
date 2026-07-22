@@ -2,6 +2,7 @@ namespace Diplo.Core.Connection
 
 open Grpc.Core
 open Grpc.Net.Client
+open Diplo.Abstractions
 
 [<RequireQualifiedAccess>]
 module DiploChannel =
@@ -16,7 +17,8 @@ module DiploChannel =
     let private DefaultNetworkPort = 5003
 
     let private create (address: string) =
-        let callCredentials = Diplo.Abstractions.TokenInterceptor.createTokenCredentials()
+        SecurityValidation.validateGrpcAddress address
+        let callCredentials = TokenInterceptor.createTokenCredentials()
         let channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
         let options = GrpcChannelOptions()
         options.Credentials <- channelCredentials

@@ -9,7 +9,7 @@ type SpectreOutputPort() =
     interface Diplo.Core.Output.IOutputPort with
 
         member _.WriteLine(text: string) =
-            AnsiConsole.WriteLine(text)
+            AnsiConsole.WriteLine(Markup.Escape(text))
 
         member _.WriteError(text: string) =
             AnsiConsole.MarkupLine("[red]" + Markup.Escape(text) + "[/]")

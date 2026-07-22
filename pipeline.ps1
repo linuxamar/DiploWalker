@@ -5,12 +5,12 @@
 #    ./publish/WindowsServices/<platform>/<projet>/
 #
 #  Usage :
-#    .\publish.ps1                  # publie x64 + x86
-#    .\publish.ps1 -Platform x64   # publie x64 uniquement
-#    .\publish.ps1 -Restore         # restaure les packages NuGet en 1er
-#    .\publish.ps1 -Clean           # supprime bin/ obj/ avant publication
-#    .\publish.ps1 -DoTests         # lance uniquement les tests
-#    .\publish.ps1 -DoPublish       # publie uniquement (sans tests)
+#    .\pipeline.ps1                  # publie x64 + x86
+#    .\pipeline.ps1 -Platform x64   # publie x64 uniquement
+#    .\pipeline.ps1 -Restore         # restaure les packages NuGet en 1er
+#    .\pipeline.ps1 -Clean           # supprime bin/ obj/ avant publication
+#    .\pipeline.ps1 -DoTests         # lance uniquement les tests
+#    .\pipeline.ps1 -DoPublish       # publie uniquement (sans tests)
 # ---------------------------------------------------------------------------
 
 [CmdletBinding()]
@@ -32,15 +32,15 @@ param(
 $ErrorActionPreference = "Stop"
 
 if (-not $DoTests -and -not $DoPublish -and -not $Clean -and -not $Restore) {
-    Write-Host "Usage : .\publish.ps1 [-Clean] [-Restore] [-DoTests] [-DoPublish] [-Platform x64|x86]" -ForegroundColor Yellow
+    Write-Host "Usage : .\pipeline.ps1 [-Clean] [-Restore] [-DoTests] [-DoPublish] [-Platform x64|x86]" -ForegroundColor Yellow
     Write-Host "  -Clean      supprime bin/ obj/ avant publication"
     Write-Host "  -Restore    restaure les packages NuGet en 1er"
     Write-Host "  -DoTests    lance les tests unitaires uniquement"
     Write-Host "  -DoPublish  lance la publication uniquement"
     Write-Host ""
     Write-Host "  Exemples :"
-    Write-Host "    .\publish.ps1 -DoTests -DoPublish   # tests puis publication"
-    Write-Host "    .\publish.ps1 -Clean -Restore -DoPublish  # nettoyage, restauration, publication"
+    Write-Host "    .\pipeline.ps1 -DoTests -DoPublish   # tests puis publication"
+    Write-Host "    .\pipeline.ps1 -Clean -Restore -DoPublish  # nettoyage, restauration, publication"
     exit 0
 }
 
@@ -122,7 +122,8 @@ $testProjects = @(
     "Diplo.Container.Tests",
     "Diplo.Volume.Tests",
     "Diplo.Network.Tests",
-    "Diplo.Cli.Tests"
+    "Diplo.Cli.Tests",
+    "Diplo.Gui.Tests"
 )
 
 $totalSteps = 0

@@ -96,7 +96,7 @@ type CustomCniDriver() =
                     let mutable mac = ""
                     match options |> Map.tryFind "plugin_path" with
                     | Some pluginPath when not (String.IsNullOrEmpty(pluginPath)) ->
-                        SecurityValidation.validateCniPluginPath pluginPath
+                        let resolvedPluginPath = SecurityValidation.validateCniPluginPath pluginPath
                         let config = {|
                             cniVersion = "1.0.0"
                             name = netInfo.Name
@@ -109,7 +109,7 @@ type CustomCniDriver() =
                         |}
                         let configJson = JsonSerializer.Serialize(config)
                         let (_exitCode, stdout, _stderr) =
-                            runProcess pluginPath [ "ADD"; "--container-id"; containerId; "--netns"; sprintf "/proc/%s/ns/net" containerId ]
+                            runProcess resolvedPluginPath [ "ADD"; "--container-id"; containerId; "--netns"; sprintf "/proc/%s/ns/net" containerId ]
                         if _exitCode = 0 then
                             let (ifname, ipv4, gw) = parseCniResult stdout
                             if not (String.IsNullOrEmpty(ifname)) then assignedIp <- ipv4
@@ -131,10 +131,10 @@ type CustomCniDriver() =
                     match netInfo.Options |> Map.tryFind "plugin_path" with
                     | Some pluginPath when not (String.IsNullOrEmpty(pluginPath)) ->
                         try
-                            SecurityValidation.validateCniPluginPath pluginPath
+                            let resolvedPluginPath = SecurityValidation.validateCniPluginPath pluginPath
                             SecurityValidation.validateContainerId endpointId
                             let (_exitCode, _stdout, _stderr) =
-                                runProcess pluginPath [ "DEL"; "--container-id"; endpointId; "--netns"; sprintf "/proc/%s/ns/net" endpointId ]
+                                runProcess resolvedPluginPath [ "DEL"; "--container-id"; endpointId; "--netns"; sprintf "/proc/%s/ns/net" endpointId ]
                             if _exitCode = 0 then Ok ()
                             else Error (sprintf "Échec de la déconnexion CNI (code %d)" _exitCode)
                         with ex ->

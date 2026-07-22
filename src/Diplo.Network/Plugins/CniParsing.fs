@@ -8,7 +8,7 @@ module CniParsing =
 
     let parseCniResult (json: string) =
         try
-            let doc = JsonDocument.Parse(json)
+            let doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
             let root = doc.RootElement
             let mutable ifname = ""
             let mutable ipv4 = ""

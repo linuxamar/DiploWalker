@@ -43,7 +43,8 @@ type HnsPowerShellProvider() =
             try proc.Kill(true) with _ -> ()
             failwith "Délai d'attente dépassé pour PowerShell (60s)"
         if proc.ExitCode <> 0 then
-            failwithf "PowerShell a échoué (code %d): %s" proc.ExitCode stderr
+            Log.Warning("PowerShell stderr: {Stderr}", stderr)
+            failwithf "PowerShell a échoué (code %d)" proc.ExitCode
         stdout
 
     interface IHnsProvider with

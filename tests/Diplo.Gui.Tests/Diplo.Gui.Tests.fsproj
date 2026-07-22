@@ -6,10 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="MockContainerdClient.fs" />
-    <Compile Include="MockProcessRunner.fs" />
-    <Compile Include="ContainerdClientTests.fs" />
-    <Compile Include="ContainerServiceImplTests.fs" />
+    <Compile Include="ViewModelBaseTests.fs" />
+    <Compile Include="AvaloniaOutputPortTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,13 +18,10 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FsUnit.xUnit" Version="7.1.1" />
-    <PackageReference Include="Grpc.Core.Testing" Version="2.46.6" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
-    <ProjectReference Include="..\..\src\Diplo.Container\Diplo.Container.fsproj" />
-    <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Diplo.Gui\Diplo.Gui.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -5,6 +5,7 @@ open System.IO
 open System.Net.NetworkInformation
 open System.Text.Json
 open System.Text.Json.Serialization
+open Serilog
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ let loadConfig (configPath: string option) : CniNatConfig =
                     else loaded.SubnetCandidates
             }
         with ex ->
-            fprintfn stderr "Erreur lors du chargement de %s: %s" path ex.Message
+            Log.Warning(ex, "Erreur lors du chargement de {Path}: {Message}", path, ex.Message)
             defaultConfig
     else
         defaultConfig

@@ -12,9 +12,9 @@ Chaque microservice (Container, Volume, Network) utilise un token partagé pour 
 
 ### Comportement sans fichier token
 
-Si `auth-token.json` n'existe pas, l'authentification est **désactivée** (bypass). Les requêtes passent directement. Ceci est utile lors du développement local.
+Si `auth-token.json` n'existe pas, l'authentification est **refusée** (fail-closed). Le middleware retourne un code HTTP 401 et aucune requête n'est autorisée. Cette stratégie garantit qu'une configuration incomplète ne compromet jamais la sécurité.
 
-> **En production, le fichier token doit toujours être présent.**
+> **En développement local, créez un fichier token vide ou générez-le avec `AuthToken.createTokenFile()`.**
 
 ## Rotation du token
 

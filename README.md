@@ -13,13 +13,18 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 | **Diplo.Network** | 5003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge) |
 | **Diplo.Installer** | — | Installation et configuration de l'ensemble du système |
 
+### Clients
+
+- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes et réseaux
+- **GUI** : `Diplo.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
+
 ## Stack technique
 
 - **Runtime** : .NET 10, F#
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (86 tests)
+- **Tests** : xUnit (263 tests)
 
 ## Compatibilité Windows Server
 
@@ -119,15 +124,23 @@ Options disponibles :
 ```
 Diplo/
 ├── src/
-│   ├── Diplo.Abstractions/     # Interfaces partagées (IContainerdClient, IProcessRunner)
+│   ├── Diplo.Abstractions/     # Interfaces partagées, validation, sécurité
 │   ├── Diplo.Container/        # Service gRPC de gestion des conteneurs
 │   ├── Diplo.Volume/           # Service gRPC de gestion des volumes
 │   ├── Diplo.Network/          # Service gRPC de gestion des réseaux
-│   └── Diplo.Installer/        # Outil d'installation Windows
+│   ├── Diplo.Installer/        # Outil d'installation Windows
+│   ├── Diplo.Grpc/             # Proto definitions et code généré C#
+│   ├── Diplo.Contracts/        # Types partagés entre services
+│   ├── Diplo.Core/             # Clients gRPC, abstraction IOutputPort
+│   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
+│   └── Diplo.Gui/              # Interface graphique Avalonia
 ├── tests/
+│   ├── Diplo.Abstractions.Tests/
 │   ├── Diplo.Container.Tests/
 │   ├── Diplo.Network.Tests/
-│   └── Diplo.Volume.Tests/
+│   ├── Diplo.Volume.Tests/
+│   ├── Diplo.Cli.Tests/
+│   └── Diplo.Gui.Tests/
 ├── pipeline.ps1                # Pipeline de build et déploiement
 └── README.md
 ```

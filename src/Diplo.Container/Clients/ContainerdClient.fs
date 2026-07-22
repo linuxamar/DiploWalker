@@ -12,7 +12,7 @@ type ContainerdClient(runner: IProcessRunner) =
         runner.RunWithArgs("ctr", args)
 
     let parseJson (text: string) =
-        use doc = JsonDocument.Parse(text)
+        use doc = JsonDocument.Parse(text, JsonDocumentOptions(MaxDepth = 32))
         doc.RootElement.Clone()
 
     interface IContainerdClient with

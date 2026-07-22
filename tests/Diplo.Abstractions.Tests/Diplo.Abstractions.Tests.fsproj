@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="AuthTokenTests.fs" />
     <Compile Include="TokenAuthMiddlewareTests.fs" />
+    <Compile Include="SecurityValidationTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

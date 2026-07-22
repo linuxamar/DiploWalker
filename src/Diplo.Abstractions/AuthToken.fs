@@ -12,7 +12,7 @@ let authTokenDir = @"C:\ProgramData\Diplo"
 
 let authTokenPath = Path.Combine(authTokenDir, "auth-token.json")
 
-let private jsonOptions = JsonSerializerOptions(WriteIndented = true, PropertyNameCaseInsensitive = true)
+let private jsonOptions = JsonSerializerOptions(WriteIndented = true, PropertyNameCaseInsensitive = true, MaxDepth = 32)
 
 type AuthTokenFile =
     { Token: string
@@ -42,28 +42,55 @@ let saveToken (token: string) =
         acl.AddAccessRule(rule)
         fileInfo.SetAccessControl(acl)
     with ex ->
-        Log.Warning(ex, "Impossible de définir les ACL NTFS sur {Path}" , authTokenPath)
+        Log.Error(ex, "Impossible de définir les ACL NTFS sur {Path}" , authTokenPath)
+        failwithf "Sécurité du token compromise: impossible de protéger %s" authTokenPath
+
+/// Cache du token avec TTL pour éviter les lectures disque répétées.
+/// Le token est rechargé uniquement quand le cache expire ou que le fichier change.
+type private TokenCache() =
+    let mutable cachedToken: string option = None
+    let mutable lastWriteUtc: DateTime = DateTime.MinValue
+    let mutable lastLoadUtc: DateTime = DateTime.MinValue
+    let cacheTtl = TimeSpan.FromSeconds(5.0)
+    let lockObj = obj()
+
+    let loadFromDisk () =
+        try
+            if File.Exists(authTokenPath) then
+                let fileInfo = new FileInfo(authTokenPath)
+                let writeTimeUtc = fileInfo.LastWriteTimeUtc
+                let now = DateTime.UtcNow
+                // Recharger si premier accès, TTL expiré, ou fichier modifié
+                if cachedToken.IsNone || (now - lastLoadUtc) > cacheTtl || writeTimeUtc > lastWriteUtc then
+                    let json = File.ReadAllText(authTokenPath)
+                    let doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
+                    let root = doc.RootElement
+                    let token = root.GetProperty("Token").GetString()
+                    let mutable expiresElement = Unchecked.defaultof<JsonElement>
+                    if root.TryGetProperty("expiresAt", &expiresElement) then
+                        let expiresAt = expiresElement.GetDateTime()
+                        if DateTime.UtcNow > expiresAt then
+                            Log.Warning("Token expiré le {ExpiresAt}", expiresAt)
+                            cachedToken <- None
+                        else
+                            cachedToken <- Some token
+                    else
+                        cachedToken <- Some token
+                    lastWriteUtc <- writeTimeUtc
+                    lastLoadUtc <- now
+            else
+                cachedToken <- None
+        with _ -> cachedToken <- None
+
+    member _.GetToken() : string option =
+        lock lockObj (fun () ->
+            loadFromDisk ()
+            cachedToken)
+
+let private tokenCache = TokenCache()
 
 let loadToken () : string option =
-    try
-        if File.Exists(authTokenPath) then
-            let json = File.ReadAllText(authTokenPath)
-            let doc = JsonDocument.Parse(json)
-            let root = doc.RootElement
-            let token = root.GetProperty("Token").GetString()
-            let mutable expiresElement = Unchecked.defaultof<JsonElement>
-            if root.TryGetProperty("expiresAt", &expiresElement) then
-                let expiresAt = expiresElement.GetDateTime()
-                if DateTime.UtcNow > expiresAt then
-                    Log.Warning("Token expiré le {ExpiresAt}", expiresAt)
-                    None
-                else
-                    Some token
-            else
-                Some token
-        else
-            None
-    with _ -> None
+    tokenCache.GetToken()
 
 let verifyToken (provided: string) : bool =
     match loadToken() with

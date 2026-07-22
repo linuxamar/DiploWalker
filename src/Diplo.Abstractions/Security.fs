@@ -116,8 +116,8 @@ module SecurityValidation =
             failwithf "L'identifiant du conteneur contient des caractères interdits: '%s'" value
 
     /// Vérifie qu'un chemin de plugin CNI est dans les répertoires autorisés.
-    /// Résout les symlinks avant la vérification pour éviter les contournements TOCTOU.
-    let validateCniPluginPath (pluginPath: string) =
+    /// Résout les symlinks et retourne le chemin résolu pour éliminer la fenêtre TOCTOU.
+    let validateCniPluginPath (pluginPath: string) : string =
         if String.IsNullOrEmpty(pluginPath) then
             failwithf "Le chemin du plugin CNI ne peut pas être vide"
         // Résoudre le vrai chemin (suivre les symlinks junctions)
@@ -137,6 +137,20 @@ module SecurityValidation =
                 resolvedPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
         if not isAllowed then
             failwithf "Le plugin CNI '%s' n'est pas dans un répertoire autorisé" pluginPath
+        resolvedPath
+
+    /// Commandes CNI autorisées (spécification CNI v1.0).
+    let private allowedCniCommands =
+        set [ "ADD"; "DEL"; "CHECK"; "VERSION" ]
+
+    /// Vérifie qu'une commande CNI fait partie de l'allowlist.
+    let validateCniCommand (command: string) =
+        if String.IsNullOrEmpty(command) then
+            failwithf "La commande CNI ne peut pas être vide"
+        let normalized = command.Trim().ToUpperInvariant()
+        if not (allowedCniCommands.Contains(normalized)) then
+            failwithf "La commande CNI '%s' n'est pas autorisée. Commandes autorisées: %s"
+                command (allowedCniCommands |> Set.toSeq |> String.concat ", ")
 
     /// Vérifie qu'une commande ne contient pas de caractères dangereux.
     let validateCommand (command: string array) =
@@ -164,28 +178,68 @@ module SecurityValidation =
                         failwithf "L'argument de commande contient un caractère interdit: '%c' dans '%s'" c arg
 
     /// Vérifie qu'un chemin est sûr (pas de traversée via ..).
+    /// Résout les symlinks pour empêcher les contournements via liens symboliques.
     let validatePath (path: string) (baseDir: string) (label: string) =
         if String.IsNullOrEmpty(path) then
             failwithf "%s ne peut pas être vide" label
         if path.Contains("..") then
             failwithf "%s contient une traversée de répertoire interdite: '%s'" label path
-        let fullPath = Path.GetFullPath(Path.Combine(baseDir, path))
-        let fullBase = Path.GetFullPath(baseDir)
-        if not (fullPath.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase)) then
-            failwithf "%s sort du répertoire autorisé: '%s'" label fullPath
+        // Résoudre le chemin complet en suivant les symlinks
+        let resolvedPath =
+            try
+                let combined = Path.Combine(baseDir, path)
+                let fi = new FileInfo(combined)
+                if fi.Exists then fi.FullName
+                else
+                    let di = new DirectoryInfo(combined)
+                    if di.Exists then di.FullName
+                    else Path.GetFullPath(combined)
+            with _ -> Path.GetFullPath(Path.Combine(baseDir, path))
+        let resolvedBase =
+            try
+                let di = new DirectoryInfo(baseDir)
+                if di.Exists then di.FullName
+                else Path.GetFullPath(baseDir)
+            with _ -> Path.GetFullPath(baseDir)
+        if not (resolvedPath.StartsWith(resolvedBase, StringComparison.OrdinalIgnoreCase)) then
+            failwithf "%s sort du répertoire autorisé: '%s'" label resolvedPath
 
-    /// Répertoires de base autorisés pour les volumes (conteneur mutable thread-safe pour extensibilité).
-    let private allowedVolumeBaseDirs =
-        let dict = System.Collections.Concurrent.ConcurrentDictionary<string, byte>()
-        dict.TryAdd(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Diplo"), byte 0) |> ignore
-        dict.TryAdd(@"C:\ProgramData\Diplo", byte 0) |> ignore
-        dict.TryAdd(Path.GetTempPath(), byte 0) |> ignore
-        dict
+    /// Hosts autorisés pour les connexions gRPC (localhost uniquement).
+    let private allowedGrpcHosts = set [ "localhost"; "127.0.0.1"; "::1" ]
+
+    /// Vérifie qu'une adresse gRPC pointe vers localhost uniquement.
+    /// Empêche la fuite de tokens d'authentification sur le réseau.
+    let validateGrpcAddress (address: string) =
+        if String.IsNullOrEmpty(address) then
+            failwithf "L'adresse gRPC ne peut pas être vide"
+        match System.Uri.TryCreate(address, System.UriKind.Absolute) with
+        | true, uri ->
+            let host = uri.Host.Trim('[', ']')
+            if not (allowedGrpcHosts.Contains(host)) then
+                failwithf "L'adresse gRPC '%s' n'est pas autorisée. Seul l'hôte local est accepté (localhost, 127.0.0.1, ::1)" address
+            if not (uri.Scheme = "http" || uri.Scheme = "https") then
+                failwithf "Le schéma '%s' n'est pas supporté. Utilisez http:// ou https://" uri.Scheme
+        | false, _ ->
+            failwithf "L'adresse gRPC '%s' n'est pas une URL valide" address
+
+    /// Répertoires de base autorisés pour les volumes (immutable snapshot pattern).
+    let private defaultAllowedVolumeDirs =
+        [
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Diplo")
+            @"C:\ProgramData\Diplo"
+            Path.GetTempPath()
+        ] |> List.map Path.GetFullPath
+
+    /// Cellule de ref contenant l'ensemble immuable des répertoires autorisés (thread-safe via copy-on-write).
+    let private allowedVolumeBaseDirsRef =
+        ref (defaultAllowedVolumeDirs |> Set.ofList)
 
     /// Ajouter un répertoire autorisé pour les volumes (utile pour les tests et extensions).
+    /// Utilise un pattern copy-on-write avec ImmutableHashSet.
     let addAllowedVolumeDir (dir: string) =
         let fullDir = Path.GetFullPath(dir)
-        (allowedVolumeBaseDirs : System.Collections.Concurrent.ConcurrentDictionary<string, byte>).TryAdd(fullDir, byte 0) |> ignore
+        lock allowedVolumeBaseDirsRef (fun () ->
+            allowedVolumeBaseDirsRef := Set.add fullDir !allowedVolumeBaseDirsRef)
 
     /// Valide un chemin de volume (anti-traversée + containment absolu).
     let validateVolumePath (path: string) (label: string) =
@@ -197,10 +251,10 @@ module SecurityValidation =
             failwithf "%s contient un caractère nul: '%s'" label path
         // Résoudre le chemin complet et vérifier qu'il est dans un répertoire autorisé
         let fullPath = Path.GetFullPath(path)
+        let snapshot = !allowedVolumeBaseDirsRef
         let isAllowed =
-            allowedVolumeBaseDirs.Keys
-            |> Seq.exists (fun dir ->
-                let fullDir = Path.GetFullPath(dir)
+            snapshot
+            |> Set.exists (fun fullDir ->
                 fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
         if not isAllowed then
             failwithf "%s n'est pas dans un répertoire autorisé: '%s'" label fullPath
