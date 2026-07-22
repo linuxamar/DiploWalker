@@ -126,11 +126,11 @@ let winCniVersion = "0.3.1"           // microsoft/windows-container-networking
 
 // Checksums SHA256 connus — à mettre à jour lors des changements de version
 let containerdChecksums = Map.ofList [
-    "1.6.36", "todo-update-after-download"
-    "1.7.27", "todo-update-after-download"
+    "1.6.36", "74EEC7B76EBFF2A68DD478413B1ED03D435E03A4DB3244F36E92C8B80AD90C71"
+    "1.7.27", "2C51135531ED9EEC3D414CC40E0BF1F0203ABBE48F449BE3CF04BB47F31C7FA5"
 ]
-let cniPluginsChecksum = "todo-update-after-download"
-let winCniChecksum = "todo-update-after-download"
+let cniPluginsChecksum = "7D1A7FBB0C8B272801E7E64CC1CAD6939E0E7AD0F52644EE9F8801D61DAD5849"
+let winCniChecksum = "4F36EE6905ADA238CA2A9E1BFB8A1FB2912C2D88C4B6E5AF4C41A42DB70D7D68"
 
 let containerdArchive = sprintf "containerd-%s-windows-amd64.tar.gz" downloadContainerdVersion
 let containerdUrl = sprintf "https://github.com/containerd/containerd/releases/download/v%s/%s" downloadContainerdVersion containerdArchive
@@ -171,17 +171,34 @@ let extractTarGz (archive: string) (destination: string) = task {
     // Vérifier que l'archive n'est pas vide
     if FileInfo(archive).Length = 0L then
         failwithf "Archive vide: %s" archive
-    let exitCode = runCommand "tar" (sprintf "xzf \"%s\" -C \"%s\"" archive destination)
-    if exitCode <> 0 then
-        failwithf "Échec de l'extraction de %s (code %d)" archive exitCode
-    // Vérifier que les fichiers extraits restent dans la destination
-    let destFull = Path.GetFullPath(destination)
-    for file in Directory.GetFiles(destFull, "*", SearchOption.AllDirectories) do
-        let fileFull = Path.GetFullPath(file)
-        if not (fileFull.StartsWith(destFull, StringComparison.OrdinalIgnoreCase)) then
-            File.Delete(fileFull)
-            failwithf "Fichier extrait hors de la destination: %s" fileFull
-    printfn "  [+] Extrait: %s" destination
+    // Extraire dans un sous-dossier temporaire pour validation préalable
+    let tempDir = Path.Combine(destination, sprintf "_tmp_extract_%s" (Guid.NewGuid().ToString("N")))
+    Directory.CreateDirectory(tempDir) |> ignore
+    try
+        let exitCode = runCommand "tar" (sprintf "xzf \"%s\" -C \"%s\"" archive tempDir)
+        if exitCode <> 0 then
+            failwithf "Échec de l'extraction de %s (code %d)" archive exitCode
+        // Valider que tous les fichiers restent dans la destination AVANT déplacement
+        let tempFull = Path.GetFullPath(tempDir)
+        for file in Directory.GetFiles(tempFull, "*", SearchOption.AllDirectories) do
+            let fileFull = Path.GetFullPath(file)
+            if not (fileFull.StartsWith(tempFull, StringComparison.OrdinalIgnoreCase)) then
+                failwithf "Fichier extrait hors de la destination: %s" fileFull
+        // Déplacer les fichiers validés vers la destination finale
+        for file in Directory.GetFiles(tempFull, "*", SearchOption.AllDirectories) do
+            let relPath = file.Substring(tempFull.Length).TrimStart(Path.DirectorySeparatorChar)
+            let destFile = Path.Combine(destination, relPath)
+            Directory.CreateDirectory(Path.GetDirectoryName(destFile)) |> ignore
+            File.Move(file, destFile, overwrite = true)
+        for dir in Directory.GetDirectories(tempFull, "*", SearchOption.AllDirectories) |> Array.sortDescending do
+            let relPath = dir.Substring(tempFull.Length).TrimStart(Path.DirectorySeparatorChar)
+            let destDir = Path.Combine(destination, relPath)
+            if Directory.Exists(destDir) && Directory.GetFileSystemEntries(destDir).Length = 0 then
+                Directory.Delete(destDir)
+        printfn "  [+] Extrait: %s" destination
+    finally
+        if Directory.Exists(tempDir) then
+            Directory.Delete(tempDir, recursive = true)
 }
 
 let extractZip (archive: string) (destination: string) =
@@ -243,6 +260,7 @@ let downloadCniPlugins () = task {
     let cniUrl = sprintf "https://github.com/containernetworking/plugins/releases/download/v%s/%s" cniPluginsVersion cniArchive
     let cniTemp = Path.Combine(Path.GetTempPath(), sprintf "%s_%s" archiveSuffix cniArchive)
     do! downloadFile cniUrl cniTemp
+    verifyChecksum cniTemp (Some cniPluginsChecksum)
     do! extractTarGz cniTemp cniBinDir
     File.Delete(cniTemp)
 
