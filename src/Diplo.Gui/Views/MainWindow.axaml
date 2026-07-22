@@ -1,0 +1,190 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Diplo.Gui.ViewModels"
+        Title="Diplo — Gestion Docker"
+        Width="960" Height="720"
+        WindowStartupLocation="CenterScreen">
+
+    <DockPanel>
+        <!-- Barre de menus -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Fichier">
+                <MenuItem Header="_Quitter" Command="{Binding QuitCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Aide">
+                <MenuItem Header="_À propos" Command="{Binding AboutCommand}" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Panneau de logs en bas -->
+        <Border DockPanel.Dock="Bottom" Height="200" Background="#1e1e1e" BorderBrush="#333" BorderThickness="1" Margin="0,4,0,0">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Journal" FontWeight="Bold" Foreground="#aaa"
+                           Margin="8,4,0,2" />
+                <ScrollViewer>
+                    <TextBlock Text="{Binding LogOutput}"
+                               Foreground="#0f0" FontFamily="Cascadia Mono,Consolas"
+                               TextWrapping="Wrap" Margin="8,0" />
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- Contenu principal -->
+        <TabControl Margin="4">
+            <!-- ONGLET CONTENEURS -->
+            <TabItem Header="Conteneurs">
+                <DockPanel>
+                    <!-- Barre d'actions -->
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
+                        <Button Content="🔄 Lister" Command="{Binding ListContainersCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding InspectContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="▶ Démarrer" Command="{Binding StartContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="⏹ Arrêter" Command="{Binding StopContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding DeleteContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="📥 Télécharger image" Command="{Binding PullImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="ℹ Version" Command="{Binding VersionCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <!-- Champs de saisie -->
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerIdInput}" Width="200" Margin="0,0,12,0"
+                                 Watermark="identifiant du conteneur" />
+                        <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerNameInput}" Width="160" Margin="0,0,12,0"
+                                 Watermark="nom (optionnel)" />
+                        <TextBlock Text="Image:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerImageInput}" Width="200" Margin="0,0,12,0"
+                                 Watermark="nom:tag" />
+                        <TextBlock Text="Espace:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerNamespace}" Width="140" Margin="0,0,12,0"
+                                 Watermark="namespace (optionnel)" />
+                        <TextBlock Text="Timeout:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <NumericUpDown Value="{Binding ContainerTimeout}" Minimum="1" Maximum="300"
+                                       Width="80" />
+                        <CheckBox Content="Tous" IsChecked="{Binding ContainerAll}" Margin="12,0,0,0"
+                                  VerticalAlignment="Center" />
+                        <CheckBox Content="Forcer" IsChecked="{Binding ContainerForce}" Margin="8,0,0,0"
+                                  VerticalAlignment="Center" />
+                    </WrapPanel>
+
+                    <!-- Grille -->
+                    <DataGrid ItemsSource="{Binding Containers}" AutoGenerateColumns="False"
+                              IsReadOnly="True" GridLinesVisibility="Horizontal"
+                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
+                              CanUserResizeColumns="True" CanUserSortColumns="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
+                            <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="160" />
+                            <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="200" />
+                            <DataGridTextColumn Header="État" Binding="{Binding État}" Width="80" />
+                            <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
+            <!-- ONGLET VOLUMES -->
+            <TabItem Header="Volumes">
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
+                        <Button Content="🔄 Lister" Command="{Binding ListVolumesCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding InspectVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding CreateVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding RemoveVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="📁 Monter" Command="{Binding MountVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="📂 Démonter" Command="{Binding UnmountVolumeCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding VolumeIdInput}" Width="200" Margin="0,0,12,0"
+                                 Watermark="identifiant du volume" />
+                        <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding VolumeNameInput}" Width="160" Margin="0,0,12,0"
+                                 Watermark="nom du volume" />
+                        <TextBlock Text="Driver:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding VolumeDriver}" Width="100" Margin="0,0,12,0"
+                                 Watermark="local" />
+                        <TextBlock Text="Cible:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding VolumeTargetPath}" Width="200" Margin="0,0,12,0"
+                                 Watermark="chemin de montage" />
+                        <CheckBox Content="Forcer" IsChecked="{Binding VolumeForce}" Margin="12,0,0,0"
+                                  VerticalAlignment="Center" />
+                    </WrapPanel>
+
+                    <DataGrid ItemsSource="{Binding Volumes}" AutoGenerateColumns="False"
+                              IsReadOnly="True" GridLinesVisibility="Horizontal"
+                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
+                            <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="160" />
+                            <DataGridTextColumn Header="Driver" Binding="{Binding Driver}" Width="80" />
+                            <DataGridTextColumn Header="Point de montage" Binding="{Binding PointDeMontage}" Width="240" />
+                            <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="100" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
+            <!-- ONGLET RÉSEAUX -->
+            <TabItem Header="Réseaux">
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
+                        <Button Content="🔄 Lister" Command="{Binding ListNetworksCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding InspectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding CreateNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding RemoveNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔗 Connecter" Command="{Binding ConnectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔌 Déconnecter" Command="{Binding DisconnectNetworkCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkIdInput}" Width="180" Margin="0,0,12,0"
+                                 Watermark="identifiant réseau" />
+                        <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkNameInput}" Width="140" Margin="0,0,12,0"
+                                 Watermark="nom du réseau" />
+                        <TextBlock Text="Driver:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkDriver}" Width="100" Margin="0,0,12,0"
+                                 Watermark="bridge" />
+                        <TextBlock Text="Sous-réseau:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkSubnet}" Width="140" Margin="0,0,12,0"
+                                 Watermark="172.20.0.0/16" />
+                        <TextBlock Text="Passerelle:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkGateway}" Width="140" Margin="0,0,12,0"
+                                 Watermark="172.20.0.1" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Endpoint:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkEndpointId}" Width="180" Margin="0,0,12,0"
+                                 Watermark="ID endpoint (connect/déconnect)" />
+                        <TextBlock Text="Conteneur:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkContainerId}" Width="180" Margin="0,0,12,0"
+                                 Watermark="ID conteneur" />
+                        <TextBlock Text="IPv4:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkIpv4}" Width="140" Margin="0,0,12,0"
+                                 Watermark="172.20.0.2/16" />
+                        <CheckBox Content="Forcer" IsChecked="{Binding NetworkForce}" Margin="12,0,0,0"
+                                  VerticalAlignment="Center" />
+                    </WrapPanel>
+
+                    <DataGrid ItemsSource="{Binding Networks}" AutoGenerateColumns="False"
+                              IsReadOnly="True" GridLinesVisibility="Horizontal"
+                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
+                            <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="140" />
+                            <DataGridTextColumn Header="Driver" Binding="{Binding Driver}" Width="80" />
+                            <DataGridTextColumn Header="Sous-réseau" Binding="{Binding SousReseau}" Width="140" />
+                            <DataGridTextColumn Header="Passerelle" Binding="{Binding Passerelle}" Width="120" />
+                            <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

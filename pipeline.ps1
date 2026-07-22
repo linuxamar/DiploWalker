@@ -53,7 +53,9 @@ $Projects = @(
     "Diplo.Installer",
     "Diplo.Abstractions",
     "Diplo.Contracts",
-    "Diplo.Grpc"
+    "Diplo.Grpc",
+    "Diplo.Cli",
+    "Diplo.Gui"
 )
 
 $Platforms = if ($Platform) { @($Platform) } else { @("x64", "x86") }
@@ -119,7 +121,8 @@ $testProjects = @(
     "Diplo.Abstractions.Tests",
     "Diplo.Container.Tests",
     "Diplo.Volume.Tests",
-    "Diplo.Network.Tests"
+    "Diplo.Network.Tests",
+    "Diplo.Cli.Tests"
 )
 
 $totalSteps = 0

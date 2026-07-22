@@ -5,11 +5,19 @@
     <Project Path="src/Diplo.Contracts/Diplo.Contracts.fsproj" />
     <Project Path="src/Diplo.Network/Diplo.Network.fsproj" />
     <Project Path="src/Diplo.Volume/Diplo.Volume.fsproj" />
+    <Project Path="src/Diplo.Gui/Diplo.Gui.fsproj">
+      <Platform Project="x64" />
+    </Project>
     <Project Path="src/Diplo.Installer/Diplo.Installer.fsproj" />
     <Project Path="src/Diplo.Grpc/Diplo.Grpc.csproj" />
+    <Project Path="src/Diplo.Core/Diplo.Core.fsproj" />
+    <Project Path="src/Diplo.Cli/Diplo.Cli.fsproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Diplo.Abstractions.Tests/Diplo.Abstractions.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/Diplo.Cli.Tests/Diplo.Cli.Tests.fsproj">
       <Platform Project="x64" />
     </Project>
     <Project Path="tests/Diplo.Container.Tests/Diplo.Container.Tests.fsproj" />
