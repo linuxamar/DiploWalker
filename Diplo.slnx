@@ -26,5 +26,6 @@
     <Project Path="tests/Diplo.Gui.Tests/Diplo.Gui.Tests.fsproj">
       <Platform Project="x64" />
     </Project>
+    <Project Path="tests/Diplo.Installer.Tests/Diplo.Installer.Tests.fsproj" />
   </Folder>
 </Solution>

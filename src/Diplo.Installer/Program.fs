@@ -8,6 +8,8 @@ open System.Net.Http
 open System.Runtime.InteropServices
 open System.Security.Cryptography
 open System.ServiceProcess
+open System.Text.Json
+open System.Text.Json.Nodes
 
 // ─── Configuration ───────────────────────────────────────────────────────
 
@@ -440,25 +442,28 @@ let createCniConfig () =
 // ─── Configuration services ───────────────────────────────────────────────
 
 let buildAppSettingsJson (grpcPort: int) (pipeName: string) (isolationType: string option) =
-    let sb = System.Text.StringBuilder()
-    sb.AppendLine("{") |> ignore
-    sb.AppendLine("  \"ServiceSettings\": {") |> ignore
-    sb.AppendLine(sprintf "    \"GrpcPort\": %d," grpcPort) |> ignore
-    sb.AppendLine(sprintf "    \"NamedPipeName\": \"%s\"," pipeName) |> ignore
-    sb.AppendLine("    \"UseTcp\": true,") |> ignore
-    sb.AppendLine("    \"UseNamedPipes\": true") |> ignore
-    sb.AppendLine("  },") |> ignore
+    let serviceSettings = JsonObject()
+    serviceSettings.["GrpcPort"] <- JsonValue.Create(grpcPort)
+    serviceSettings.["NamedPipeName"] <- JsonValue.Create(pipeName)
+    serviceSettings.["UseTcp"] <- JsonValue.Create(true)
+    serviceSettings.["UseNamedPipes"] <- JsonValue.Create(true)
+
+    let logLevel = JsonObject()
+    logLevel.["Default"] <- JsonValue.Create("Information")
+    logLevel.["Microsoft.Hosting.Lifetime"] <- JsonValue.Create("Information")
+
+    let logging = JsonObject()
+    logging.["LogLevel"] <- logLevel
+
+    let root = JsonObject()
+    root.["ServiceSettings"] <- serviceSettings
     match isolationType with
-    | Some iso -> sb.AppendLine(sprintf "  \"IsolationType\": \"%s\"," iso) |> ignore
+    | Some iso -> root.["IsolationType"] <- JsonValue.Create(iso)
     | None -> ()
-    sb.AppendLine("  \"Logging\": {") |> ignore
-    sb.AppendLine("    \"LogLevel\": {") |> ignore
-    sb.AppendLine("      \"Default\": \"Information\",") |> ignore
-    sb.AppendLine("      \"Microsoft.Hosting.Lifetime\": \"Information\"") |> ignore
-    sb.AppendLine("    }") |> ignore
-    sb.AppendLine("  }") |> ignore
-    sb.Append("}") |> ignore
-    sb.ToString()
+    root.["Logging"] <- logging
+
+    let options = JsonSerializerOptions(WriteIndented = true)
+    root.ToJsonString(options)
 
 let createConfigFiles () =
     printfn "=== Création de la configuration ==="
@@ -500,9 +505,10 @@ let createConfigFiles () =
     // Ajouter le socket containerd au service Container
     let containerSettingsPath = Path.Combine(configDir, "Diplo.Container.appsettings.json")
     let content = File.ReadAllText(containerSettingsPath)
-    let containerSocket = "\"ContainerdSocket\": \"npipe:////./pipe/containerd-containerd\""
-    let content = content.Replace("}", sprintf ", %s }" containerSocket)
-    File.WriteAllText(containerSettingsPath, content)
+    let doc = JsonNode.Parse(content) :?> JsonObject
+    doc.["ContainerdSocket"] <- JsonValue.Create("npipe:////./pipe/containerd-containerd")
+    let options = JsonSerializerOptions(WriteIndented = true)
+    File.WriteAllText(containerSettingsPath, doc.ToJsonString(options))
 
     printfn "  [✓] Configuration créée dans %s" configDir
 
