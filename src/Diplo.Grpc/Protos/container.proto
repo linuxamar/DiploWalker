@@ -16,6 +16,9 @@ service ContainerService {
   rpc PullImage(PullImageRequest) returns (PullImageResponse);
   rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
   rpc ListNamespaces(ListNamespacesRequest) returns (ListNamespacesResponse);
+  rpc RenameContainer(RenameContainerRequest) returns (RenameContainerResponse);
+  rpc TopContainer(TopContainerRequest) returns (TopContainerResponse);
+  rpc GetContainerStats(GetContainerStatsRequest) returns (GetContainerStatsResponse);
 }
 
 enum ContainerState {
@@ -158,4 +161,46 @@ message GetVersionResponse {
 message ListNamespacesRequest {}
 message ListNamespacesResponse {
   repeated string namespaces = 1;
+}
+
+message RenameContainerRequest {
+  string id = 1;
+  string new_name = 2;
+}
+
+message RenameContainerResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message TopContainerRequest {
+  string id = 1;
+}
+
+message TopContainerResponse {
+  repeated ProcessInfo processes = 1;
+}
+
+message ProcessInfo {
+  int64 pid = 1;
+  string user = 2;
+  string command = 3;
+  string cpu_percent = 4;
+  string mem_percent = 5;
+  int64 rss = 6;
+}
+
+message GetContainerStatsRequest {
+  string id = 1;
+}
+
+message GetContainerStatsResponse {
+  int64 cpu_usage = 1;
+  int64 memory_usage = 2;
+  int64 memory_limit = 3;
+  int64 network_rx = 4;
+  int64 network_tx = 5;
+  int64 disk_read = 6;
+  int64 disk_write = 7;
+  double pids = 8;
 }

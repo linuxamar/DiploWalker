@@ -60,6 +60,9 @@ type MockNetworkDriver() =
                 endpoints <- endpoints |> Map.remove endpointId
                 Ok ()
 
+        member _.Prune() =
+            Ok (networks |> Map.keys |> Seq.toList)
+
     member this.Mock : INetworkDriver = this :> INetworkDriver
     member _.Networks = networks
     member _.Endpoints = endpoints

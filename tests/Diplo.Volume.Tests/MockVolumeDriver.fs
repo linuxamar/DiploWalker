@@ -63,6 +63,8 @@ type MockVolumeDriver() =
         member _.GetVolumeSize(id) =
             if volumes |> Map.containsKey id then 1024L else 0L
 
+        member _.PruneVolumes() = []
+
     member this.Mock : IVolumeDriver = this :> IVolumeDriver
     member _.Volumes = volumes
     member _.MountedVolumes = mountedVolumes

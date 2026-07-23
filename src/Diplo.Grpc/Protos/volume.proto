@@ -11,6 +11,7 @@ service VolumeService {
   rpc ListVolumes(ListVolumesRequest) returns (ListVolumesResponse);
   rpc MountVolume(MountVolumeRequest) returns (MountVolumeResponse);
   rpc UnmountVolume(UnmountVolumeRequest) returns (UnmountVolumeResponse);
+  rpc PruneVolumes(PruneVolumesRequest) returns (PruneVolumesResponse);
 }
 
 enum StorageDriverType {
@@ -107,4 +108,12 @@ message UnmountVolumeRequest {
 message UnmountVolumeResponse {
   MountState state = 1;
   string message = 2;
+}
+
+message PruneVolumesRequest {}
+
+message PruneVolumesResponse {
+  repeated string volumes_deleted = 1;
+  int32 count = 2;
+  string message = 3;
 }

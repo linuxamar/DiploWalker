@@ -182,3 +182,30 @@ type ContainerdClient(runner: IProcessRunner) =
             with ex ->
                 Log.Error(ex, "Erreur lors de la récupération des namespaces")
                 [ "Erreur lors de la récupération des namespaces" ]
+
+        member _.RenameContainer(namespaceName, id, newName) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            SecurityValidation.validateName newName "Le nouveau nom"
+            runCtr [ "container"; "rename"; "--namespace"; namespaceName; id; newName ] |> ignore
+
+        member _.TopContainer(namespaceName, id) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            try
+                let output = runCtr [ "task"; "ps"; "--namespace"; namespaceName; id ]
+                output
+            with ex ->
+                Log.Error(ex, "Erreur lors de la récupération des processus du conteneur {ContainerId}", id)
+                "Erreur lors de la récupération des processus"
+
+        member _.GetContainerStats(namespaceName, id) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            try
+                let output = runCtr [ "task"; "metrics"; "--namespace"; namespaceName; id ]
+                parseJson output
+            with ex ->
+                Log.Error(ex, "Erreur lors de la récupération des métriques du conteneur {ContainerId}", id)
+                use doc = JsonDocument.Parse("{}")
+                doc.RootElement.Clone()

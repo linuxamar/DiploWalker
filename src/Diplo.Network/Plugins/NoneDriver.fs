@@ -58,3 +58,7 @@ type NoneDriver() =
 
         member _.Disconnect(_networkId, _containerId, _endpointId, _force) =
             Ok ()
+
+        member _.Prune() =
+            let ids = networks.Keys |> Seq.toList
+            Ok ids

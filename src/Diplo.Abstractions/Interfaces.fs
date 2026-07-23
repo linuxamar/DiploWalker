@@ -23,6 +23,9 @@ module Interfaces =
         abstract member PullImage: image: string -> string
         abstract member Version: unit -> string
         abstract member Namespaces: unit -> string list
+        abstract member RenameContainer: namespaceName: string * id: string * newName: string -> unit
+        abstract member TopContainer: namespaceName: string * id: string -> string
+        abstract member GetContainerStats: namespaceName: string * id: string -> JsonElement
 
     /// Driver de volumes pour la gestion du stockage
     type IVolumeDriver =
@@ -33,6 +36,7 @@ module Interfaces =
         abstract member MountVolume: id: string * targetPath: string * options: string -> bool * string
         abstract member UnmountVolume: id: string * targetPath: string -> bool * string
         abstract member GetVolumeSize: id: string -> int64
+        abstract member PruneVolumes: unit -> string list
 
     /// Plugin CNI pour la gestion réseau
     type ICniPlugin =

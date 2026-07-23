@@ -37,6 +37,9 @@ let main argv =
             addCmd<ExecContainerCommand> c "exec"
             addCmd<NamespacesCommand> c "namespaces"
             addCmd<VersionCommand> c "version"
+            addCmd<RenameContainerCommand> c "rename"
+            addCmd<TopContainerCommand> c "top"
+            addCmd<StatsContainerCommand> c "stats"
         ) |> ignore
 
         config.AddBranch("volume", fun (c: IConfigurator<CommandSettings>) ->
@@ -46,6 +49,7 @@ let main argv =
             addCmd<RemoveVolumeCommand> c "remove"
             addCmd<MountVolumeCommand> c "mount"
             addCmd<UnmountVolumeCommand> c "unmount"
+            addCmd<PruneVolumesCommand> c "prune"
         ) |> ignore
 
         config.AddBranch("network", fun (c: IConfigurator<CommandSettings>) ->
@@ -56,6 +60,15 @@ let main argv =
             addCmd<ConnectCommand> c "connect"
             addCmd<DisconnectCommand> c "disconnect"
             addCmd<RunCniPluginCommand> c "run-cni-plugin"
+            addCmd<PruneNetworksCommand> c "prune"
+        ) |> ignore
+
+        config.AddBranch("status", fun (c: IConfigurator<CommandSettings>) ->
+            addCmd<StatusCommand> c "check"
+        ) |> ignore
+
+        config.AddBranch("config", fun (c: IConfigurator<CommandSettings>) ->
+            addCmd<InitConfigCommand> c "init"
         ) |> ignore
     ) |> ignore
     app.Run(argv)

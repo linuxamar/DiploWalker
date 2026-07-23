@@ -69,6 +69,13 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
+    member _.PruneVolumesAsync(?ct: CancellationToken) =
+        task {
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.PruneVolumesAsync(PruneVolumesRequest(), cancellationToken = ct).ResponseAsync
+            return response
+        }
+
     interface IDisposable with
         member _.Dispose() =
             if ownsChannel then channel.Dispose()

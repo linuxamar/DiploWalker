@@ -143,6 +143,25 @@ type LocalVolumeDriver(dataRoot: string) =
             else 0L
         )
 
+    member _.PruneVolumes() =
+        lock lockObj (fun () ->
+            if not (Directory.Exists(volumesDir)) then []
+            else
+                let removed = ResizeArray<string>()
+                for dir in Directory.GetDirectories(volumesDir) do
+                    let mountFile = Path.Combine(mountsDir, Path.GetFileName(dir))
+                    if Directory.Exists(mountFile) then ()
+                    else
+                        let metaFile = Path.Combine(dir, "meta.json")
+                        if File.Exists(metaFile) then
+                            try
+                                Directory.Delete(dir, true)
+                                removed.Add(Path.GetFileName(dir))
+                            with ex ->
+                                Log.Warning(ex, "Erreur lors du nettoyage du volume {VolumeId}", Path.GetFileName(dir))
+                removed |> Seq.toList
+        )
+
     interface IVolumeDriver with
         member this.CreateVolume(name, driverOpts, labels) = this.CreateVolume(name, driverOpts, labels)
         member this.RemoveVolume(id, force) = this.RemoveVolume(id, force)
@@ -151,3 +170,4 @@ type LocalVolumeDriver(dataRoot: string) =
         member this.MountVolume(id, targetPath, options) = this.MountVolume(id, targetPath, options)
         member this.UnmountVolume(id, targetPath) = this.UnmountVolume(id, targetPath)
         member this.GetVolumeSize(id) = this.GetVolumeSize(id)
+        member this.PruneVolumes() = this.PruneVolumes()

@@ -122,3 +122,14 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 Log.Warning(ex, "Erreur lors du démontage du volume {VolumeId}", request.Id)
                 return UnmountVolumeResponse(State = MountState.Error, Message = "Erreur interne lors du démontage du volume")
         }
+
+    override _.PruneVolumes(request, context) =
+        task {
+            let removed = driver.PruneVolumes()
+            let response = PruneVolumesResponse()
+            response.VolumesDeleted.AddRange(removed)
+            let count = removed |> List.length
+            response.Count <- count
+            response.Message <- sprintf "%d volume(s) supprimé(s)" count
+            return response
+        }

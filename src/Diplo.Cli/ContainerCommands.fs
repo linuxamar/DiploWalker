@@ -267,3 +267,71 @@ type VersionCommand(output: IOutputPort) =
             output.WriteLine(sprintf "  Arch      : %s" v.Arch)
             return 0
         }
+
+// ── rename ────────────────────────────────────────────────────────
+type RenameContainerSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+    [<CommandArgument(1, "<NEW_NAME>")>] member val NewName: string = null with get, set
+
+type RenameContainerCommand(output: IOutputPort) =
+    inherit AsyncCommand<RenameContainerSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let! response = client.RenameContainerAsync(settings.Id, settings.NewName)
+            if response.Success then
+                output.WriteSuccess(response.Message)
+            else
+                output.WriteError(response.Message)
+            return 0
+        }
+
+// ── top ───────────────────────────────────────────────────────────
+type TopContainerSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+
+type TopContainerCommand(output: IOutputPort) =
+    inherit AsyncCommand<TopContainerSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let! response = client.TopContainerAsync(settings.Id)
+            if response.Processes.Count = 0 then
+                output.WriteWarning("Aucun processus trouvé dans le conteneur.")
+            else
+                output.WriteTable(
+                    response.Processes,
+                    [| "PID"; "Utilisateur"; "Commande" |],
+                    fun p ->
+                        [| string p.Pid
+                           p.User
+                           p.Command |])
+            return 0
+        }
+
+// ── stats ─────────────────────────────────────────────────────────
+type StatsContainerSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+
+type StatsContainerCommand(output: IOutputPort) =
+    inherit AsyncCommand<StatsContainerSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let! response = client.GetContainerStatsAsync(settings.Id)
+            output.WriteSuccess(sprintf "Métriques du conteneur %s" settings.Id)
+            output.WriteLine(sprintf "  CPU       : %d" response.CpuUsage)
+            output.WriteLine(sprintf "  Mémoire   : %d / %d octets" response.MemoryUsage response.MemoryLimit)
+            output.WriteLine(sprintf "  Réseau rx : %d octets" response.NetworkRx)
+            output.WriteLine(sprintf "  Réseau tx : %d octets" response.NetworkTx)
+            output.WriteLine(sprintf "  Disque r  : %d octets" response.DiskRead)
+            output.WriteLine(sprintf "  Disque w  : %d octets" response.DiskWrite)
+            output.WriteLine(sprintf "  PIDs      : %.0f" response.Pids)
+            return 0
+        }

@@ -217,3 +217,20 @@ type RunCniPluginCommand(output: IOutputPort) =
                 output.WriteError(sprintf "Échec du plugin CNI: %s" response.Message)
             return 0
         }
+
+// ── prune ─────────────────────────────────────────────────────────
+type PruneNetworksCommand(output: IOutputPort) =
+    inherit AsyncCommand<CommandSettings>()
+
+    override _.ExecuteAsync(_ctx, _settings, _ct) =
+        task {
+            use client = new NetworkClient()
+            let! response = client.PruneNetworksAsync()
+            if response.Count > 0 then
+                output.WriteSuccess(response.Message)
+                for id in response.NetworksDeleted do
+                    output.WriteLine(sprintf "  - %s" id)
+            else
+                output.WriteWarning("Aucun réseau à supprimer.")
+            return 0
+        }

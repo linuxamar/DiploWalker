@@ -235,3 +235,17 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     r.Message <- "Erreur lors de l'exécution du plugin CNI"
                     return r
         }
+
+    override _.PruneNetworks(request, context) =
+        task {
+            let deleted = ResizeArray<string>()
+            for kvp in drivers do
+                match kvp.Value.Prune() with
+                | Ok ids -> deleted.AddRange(ids)
+                | Error msg -> Log.Warning("Erreur lors du nettoyage des réseaux du pilote {Driver}: {Error}", kvp.Key, msg)
+            let response = PruneNetworksResponse()
+            response.NetworksDeleted.AddRange(deleted)
+            response.Count <- deleted.Count
+            response.Message <- sprintf "%d réseau(x) supprimé(s)" deleted.Count
+            return response
+        }

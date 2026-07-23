@@ -28,3 +28,4 @@ type INetworkDriver =
     abstract member List: unit -> Result<NetworkDriverInfo list, string>
     abstract member Connect: networkId: string * containerId: string * endpointId: string * ipv4Address: string option * options: Map<string, string> -> Result<EndpointInfo, string>
     abstract member Disconnect: networkId: string * containerId: string * endpointId: string * force: bool -> Result<unit, string>
+    abstract member Prune: unit -> Result<string list, string>

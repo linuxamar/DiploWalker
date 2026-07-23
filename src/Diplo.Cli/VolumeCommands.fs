@@ -136,3 +136,20 @@ type UnmountVolumeCommand(output: IOutputPort) =
             output.WriteSuccess(sprintf "Volume %s démonté de %s" settings.Id settings.Target)
             return 0
         }
+
+// ── prune ─────────────────────────────────────────────────────────
+type PruneVolumesCommand(output: IOutputPort) =
+    inherit AsyncCommand<CommandSettings>()
+
+    override _.ExecuteAsync(_ctx, _settings, _ct) =
+        task {
+            use client = new VolumeClient()
+            let! response = client.PruneVolumesAsync()
+            if response.Count > 0 then
+                output.WriteSuccess(response.Message)
+                for id in response.VolumesDeleted do
+                    output.WriteLine(sprintf "  - %s" id)
+            else
+                output.WriteWarning("Aucun volume à supprimer.")
+            return 0
+        }

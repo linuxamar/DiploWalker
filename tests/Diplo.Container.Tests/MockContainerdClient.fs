@@ -75,6 +75,15 @@ type MockContainerdClient() =
 
         member _.Namespaces() = [ "default"; "moby" ]
 
+        member _.RenameContainer(_namespaceName, id, _newName) =
+            ()
+
+        member _.TopContainer(_namespaceName, _id) =
+            "PID USER COMMAND\n1234 root dotnet app.dll"
+
+        member _.GetContainerStats(_namespaceName, _id) =
+            JsonDocument.Parse("""{"cpu":{"usage":123456},"memory":{"usage":1048576,"limit":536870912},"pids":{"current":3}}""").RootElement
+
     member this.Mock : IContainerdClient = this :> IContainerdClient
     member _.StopCalled = stopCalled
     member _.DeletedContainers = deletedContainers

@@ -212,3 +212,7 @@ type BridgeNetworkDriver() =
                 with ex ->
                     Log.Error(ex, "Erreur de déconnexion du bridge {NetworkId}", networkId)
                     Error "Erreur de déconnexion du bridge"
+
+        member _.Prune() =
+            let ids = networks.Keys |> Seq.toList
+            Ok ids

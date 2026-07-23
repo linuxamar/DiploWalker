@@ -182,3 +182,52 @@ type ContainerServiceImpl(client: IContainerdClient) =
             response.Namespaces.AddRange(namespaces)
             return response
         }
+
+    override _.RenameContainer(request, context) =
+        task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            if String.IsNullOrEmpty(request.NewName) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "Le nouveau nom est requis")))
+            client.RenameContainer(DefaultNamespace, request.Id, request.NewName)
+            return RenameContainerResponse(Success = true, Message = sprintf "Conteneur renommé en '%s'" request.NewName)
+        }
+
+    override _.TopContainer(request, context) =
+        task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            let output = client.TopContainer(DefaultNamespace, request.Id)
+            let response = TopContainerResponse()
+            let lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+            for line in lines do
+                let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                if parts.Length >= 3 then
+                    let mutable pid = 0L
+                    Int64.TryParse(parts[0], &pid) |> ignore
+                    let user = if parts.Length > 1 then parts[1] else ""
+                    let cmd = if parts.Length > 2 then String.concat " " (Array.skip 2 parts) else ""
+                    let info = ProcessInfo(Pid = pid, User = user, Command = cmd)
+                    response.Processes.Add(info)
+            return response
+        }
+
+    override _.GetContainerStats(request, context) =
+        task {
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            let json = client.GetContainerStats(DefaultNamespace, request.Id)
+            let response = GetContainerStatsResponse()
+            try
+                let mutable temp = Unchecked.defaultof<JsonElement>
+                if json.TryGetProperty("cpu", &temp) then
+                    if temp.TryGetProperty("usage", &temp) then response.CpuUsage <- temp.GetInt64()
+                if json.TryGetProperty("memory", &temp) then
+                    if temp.TryGetProperty("usage", &temp) then response.MemoryUsage <- temp.GetInt64()
+                    if temp.TryGetProperty("limit", &temp) then response.MemoryLimit <- temp.GetInt64()
+                if json.TryGetProperty("pids", &temp) then
+                    if temp.TryGetProperty("current", &temp) then response.Pids <- temp.GetDouble()
+            with ex ->
+                Log.Warning(ex, "Erreur lors du parsing des métriques du conteneur {ContainerId}", request.Id)
+            return response
+        }

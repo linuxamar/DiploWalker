@@ -11,6 +11,8 @@
     <Compile Include="ContainerCommands.fs" />
     <Compile Include="VolumeCommands.fs" />
     <Compile Include="NetworkCommands.fs" />
+    <Compile Include="StatusCommand.fs" />
+    <Compile Include="ConfigCommands.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

@@ -120,6 +120,27 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
+    member _.RenameContainerAsync(id: string, newName: string, ?ct: CancellationToken) =
+        task {
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.RenameContainerAsync(RenameContainerRequest(Id = id, NewName = newName), cancellationToken = ct).ResponseAsync
+            return response
+        }
+
+    member _.TopContainerAsync(id: string, ?ct: CancellationToken) =
+        task {
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.TopContainerAsync(TopContainerRequest(Id = id), cancellationToken = ct).ResponseAsync
+            return response
+        }
+
+    member _.GetContainerStatsAsync(id: string, ?ct: CancellationToken) =
+        task {
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.GetContainerStatsAsync(GetContainerStatsRequest(Id = id), cancellationToken = ct).ResponseAsync
+            return response
+        }
+
     interface IDisposable with
         member _.Dispose() =
             if ownsChannel then channel.Dispose()

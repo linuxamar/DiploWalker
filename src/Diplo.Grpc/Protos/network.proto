@@ -12,6 +12,7 @@ service NetworkService {
   rpc ConnectContainer(ConnectContainerRequest) returns (ConnectContainerResponse);
   rpc DisconnectContainer(DisconnectContainerRequest) returns (DisconnectContainerResponse);
   rpc RunCniPlugin(RunCniPluginRequest) returns (RunCniPluginResponse);
+  rpc PruneNetworks(PruneNetworksRequest) returns (PruneNetworksResponse);
 }
 
 enum NetworkDriver {
@@ -151,4 +152,12 @@ message RunCniPluginResponse {
   string ipv4_address = 3;
   string gateway = 4;
   string message = 5;
+}
+
+message PruneNetworksRequest {}
+
+message PruneNetworksResponse {
+  repeated string networks_deleted = 1;
+  int32 count = 2;
+  string message = 3;
 }

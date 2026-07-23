@@ -234,3 +234,7 @@ type PodDriver(hns: IHnsProvider) =
                 with ex ->
                     Log.Error(ex, "Erreur de déconnexion du Pod {NetworkId}", networkId)
                     Error "Erreur de déconnexion du Pod"
+
+        member _.Prune() =
+            let ids = networks.Keys |> Seq.toList
+            Ok ids

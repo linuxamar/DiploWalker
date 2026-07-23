@@ -141,3 +141,7 @@ type CustomCniDriver() =
                             Log.Error(ex, "Erreur de déconnexion CNI {NetworkId}", networkId)
                             Error "Erreur de déconnexion CNI"
                     | _ -> Ok ()
+
+        member _.Prune() =
+            let ids = networks.Keys |> Seq.toList
+            Ok ids
