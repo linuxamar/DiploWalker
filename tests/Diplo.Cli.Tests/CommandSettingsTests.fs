@@ -100,6 +100,33 @@ module ``Vérification de la structure des commandes CLI`` =
         typeof<DisconnectCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<DisconnectSettings>>)
         |> should be True
 
+    // --- New container commands ---
+    [<Fact>]
+    let ``CreateContainerCommand hérite de AsyncCommand<CreateContainerSettings>`` () =
+        typeof<CreateContainerCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<CreateContainerSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``LogsContainerCommand hérite de AsyncCommand<LogsContainerSettings>`` () =
+        typeof<LogsContainerCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<LogsContainerSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ExecContainerCommand hérite de AsyncCommand<ExecContainerSettings>`` () =
+        typeof<ExecContainerCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ExecContainerSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``NamespacesCommand hérite de AsyncCommand<CommandSettings>`` () =
+        typeof<NamespacesCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+        |> should be True
+
+    // --- New network command ---
+    [<Fact>]
+    let ``RunCniPluginCommand hérite de AsyncCommand<RunCniPluginSettings>`` () =
+        typeof<RunCniPluginCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<RunCniPluginSettings>>)
+        |> should be True
+
 module ``Vérification des paramètres des commandes`` =
 
     open Diplo.Cli.Container
@@ -152,6 +179,26 @@ module ``Vérification des paramètres des commandes`` =
     let ``DisconnectSettings.Force est false par défaut`` () =
         let settings = DisconnectSettings()
         settings.Force |> should equal false
+
+    [<Fact>]
+    let ``LogsContainerSettings.Follow est false par défaut`` () =
+        let settings = LogsContainerSettings()
+        settings.Follow |> should equal false
+
+    [<Fact>]
+    let ``LogsContainerSettings.Tail est 100 par défaut`` () =
+        let settings = LogsContainerSettings()
+        settings.Tail |> should equal 100
+
+    [<Fact>]
+    let ``ExecContainerSettings.Command est vide par défaut`` () =
+        let settings = ExecContainerSettings()
+        settings.Command.Length |> should equal 0
+
+    [<Fact>]
+    let ``RunCniPluginSettings.ConfigType est null par défaut`` () =
+        let settings = RunCniPluginSettings()
+        settings.ConfigType |> should be Null
 
 module ``Vérification du MockOutputPort`` =
 

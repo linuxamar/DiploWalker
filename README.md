@@ -24,7 +24,8 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (263 tests)
+- **Tests** : xUnit (352 tests)
+- **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
 
@@ -124,7 +125,7 @@ Options disponibles :
 ```
 Diplo/
 ├── src/
-│   ├── Diplo.Abstractions/     # Interfaces partagées, validation, sécurité
+│   ├── Diplo.Abstractions/     # Interfaces partagées, validation, sécurité, ServerConfig
 │   ├── Diplo.Container/        # Service gRPC de gestion des conteneurs
 │   ├── Diplo.Volume/           # Service gRPC de gestion des volumes
 │   ├── Diplo.Network/          # Service gRPC de gestion des réseaux
@@ -136,7 +137,10 @@ Diplo/
 │   └── Diplo.Gui/              # Interface graphique Avalonia
 ├── tests/
 │   ├── Diplo.Abstractions.Tests/
+│   ├── Diplo.Contracts.Tests/
+│   ├── Diplo.Core.Tests/
 │   ├── Diplo.Container.Tests/
+│   ├── Diplo.Installer.Tests/
 │   ├── Diplo.Network.Tests/
 │   ├── Diplo.Volume.Tests/
 │   ├── Diplo.Cli.Tests/

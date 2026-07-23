@@ -12,6 +12,8 @@ open Microsoft.AspNetCore.Server.Kestrel.Transport.NamedPipes
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
+open Grpc.AspNetCore.HealthChecks
+open Microsoft.Extensions.Diagnostics.HealthChecks
 open Serilog
 open Serilog.Extensions.Hosting
 open Diplo.Abstractions.TokenAuthMiddleware
@@ -65,12 +67,22 @@ let runGrpcHost (serviceName: string) (args: string[]) (configureServices: WebAp
         let builder = WebApplication.CreateBuilder(args)
         builder.Services.AddWindowsService(fun opts -> opts.ServiceName <- serviceName) |> ignore
         builder.Services.AddSerilog() |> ignore
+        builder.Services.AddGrpcHealthChecks() |> ignore
+        builder.Services.AddHealthChecks() |> ignore
         configureServices builder
         builder.WebHost.ConfigureKestrel(fun ctx opts -> configureKestrel ctx.Configuration opts) |> ignore
         builder.WebHost.UseNamedPipes(fun opts -> configureNamedPipeSecurity opts) |> ignore
         let app = builder.Build()
         app.UseMiddleware<TokenAuthMiddleware>() |> ignore
         mapGrpcService app
+        app.MapGrpcHealthChecksService() |> ignore
+        app.MapHealthChecks("/healthz") |> ignore
+
+        let lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>()
+        lifetime.ApplicationStarted.Register(fun () -> Log.Information("Service {ServiceName} démarré", serviceName)) |> ignore
+        lifetime.ApplicationStopping.Register(fun () -> Log.Information("Service {ServiceName} arrêt en cours...", serviceName)) |> ignore
+        lifetime.ApplicationStopped.Register(fun () -> Log.Information("Service {ServiceName} arrêté", serviceName)) |> ignore
+
         app.Run()
         0
     with ex ->

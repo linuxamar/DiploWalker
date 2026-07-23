@@ -170,3 +170,50 @@ type DisconnectCommand(output: IOutputPort) =
                 output.WriteError(response.Message)
             return 0
         }
+
+// ── run-cni-plugin ────────────────────────────────────────────────
+type RunCniPluginSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<PLUGIN_PATH>")>] member val PluginPath: string = null with get, set
+    [<CommandArgument(1, "<COMMAND>")>] member val CniCommand: string = null with get, set
+    [<CommandArgument(2, "<CONTAINER_ID>")>] member val ContainerId: string = null with get, set
+    [<CommandArgument(3, "<NETNS_PATH>")>] member val NetnsPath: string = null with get, set
+    [<CommandOption("--config-name")>] member val ConfigName: string = null with get, set
+    [<CommandOption("--config-type")>] member val ConfigType: string = null with get, set
+    [<CommandOption("--config-subnet")>] member val ConfigSubnet: string = null with get, set
+    [<CommandOption("--config-gateway")>] member val ConfigGateway: string = null with get, set
+
+type RunCniPluginCommand(output: IOutputPort) =
+    inherit AsyncCommand<RunCniPluginSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new NetworkClient()
+            let config =
+                if isNull settings.ConfigType then
+                    None
+                else
+                    Some (CniConfiguration(
+                        Name = (if isNull settings.ConfigName then "" else settings.ConfigName),
+                        Type = settings.ConfigType,
+                        Subnet = (if isNull settings.ConfigSubnet then "" else settings.ConfigSubnet),
+                        Gateway = (if isNull settings.ConfigGateway then "" else settings.ConfigGateway)))
+            let! response =
+                client.RunCniPluginAsync(
+                    pluginPath = settings.PluginPath,
+                    command = settings.CniCommand,
+                    containerId = settings.ContainerId,
+                    netnsPath = settings.NetnsPath,
+                    ?config = config)
+
+            if response.Success then
+                output.WriteSuccess("Plugin CNI exécuté avec succès")
+                output.WriteLine(sprintf "  Interface : %s" response.Ifname)
+                output.WriteLine(sprintf "  IPv4      : %s" response.Ipv4Address)
+                output.WriteLine(sprintf "  Passerelle: %s" response.Gateway)
+                if not (System.String.IsNullOrEmpty(response.Message)) then
+                    output.WriteLine(sprintf "  Message   : %s" response.Message)
+            else
+                output.WriteError(sprintf "Échec du plugin CNI: %s" response.Message)
+            return 0
+        }

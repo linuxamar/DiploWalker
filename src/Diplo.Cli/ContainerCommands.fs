@@ -1,5 +1,6 @@
 namespace Diplo.Cli.Container
 
+open System.Collections.Generic
 open System.Threading
 open Diplo.Core.Clients
 open Diplo.Core.Output
@@ -126,6 +127,127 @@ type PullImageCommand(output: IOutputPort) =
             use client = new ContainerClient()
             let! response = client.PullImageAsync(settings.Image)
             output.WriteSuccess(response.Message)
+            return 0
+        }
+
+// ── create ────────────────────────────────────────────────────────
+type CreateContainerSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<IMAGE>")>] member val Image: string = null with get, set
+    [<CommandArgument(1, "<NAME>")>] member val Name: string = null with get, set
+    [<CommandOption("--env")>] member val Env: string[] = [||] with get, set
+    [<CommandOption("--command")>] member val Command: string[] = [||] with get, set
+    [<CommandOption("--label")>] member val Labels: string[] = [||] with get, set
+    [<CommandOption("--pid-limit")>] member val PidLimit = 0u with get, set
+    [<CommandOption("--memory-limit")>] member val MemoryLimit = 0L with get, set
+    [<CommandOption("--cpu-shares")>] member val CpuShares = 0L with get, set
+
+type CreateContainerCommand(output: IOutputPort) =
+    inherit AsyncCommand<CreateContainerSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let env =
+                settings.Env
+                |> Array.choose (fun e ->
+                    match e.Split('=', 2) with
+                    | [| k; v |] -> Some (k, v)
+                    | _ -> None)
+                |> dict
+            let labels =
+                settings.Labels
+                |> Array.choose (fun l ->
+                    match l.Split('=', 2) with
+                    | [| k; v |] -> Some (k, v)
+                    | _ -> None)
+                |> dict
+            let command = settings.Command |> Array.toList
+            let args = [] : string list
+            let! response =
+                client.CreateAsync(
+                    name = settings.Name,
+                    image = settings.Image,
+                    ?env = (if env.Count > 0 then Some (env :> IDictionary<string, string>) else None),
+                    ?command = (if command.IsEmpty then None else Some command),
+                    ?args = (if args.IsEmpty then None else Some args),
+                    ?labels = (if labels.Count > 0 then Some (labels :> IDictionary<string, string>) else None),
+                    ?pidLimit = (if settings.PidLimit > 0u then Some settings.PidLimit else None),
+                    ?memoryLimit = (if settings.MemoryLimit > 0L then Some settings.MemoryLimit else None),
+                    ?cpuShares = (if settings.CpuShares > 0L then Some settings.CpuShares else None))
+            output.WriteSuccess(sprintf "Conteneur %s créé (%s)" response.Name (response.State.ToString()))
+            output.WriteLine(sprintf "  ID      : %s" response.Id)
+            output.WriteLine(sprintf "  Créé    : %s" response.CreatedAt)
+            return 0
+        }
+
+// ── logs ──────────────────────────────────────────────────────────
+type LogsContainerSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+    [<CommandOption("-f|--follow")>] member val Follow = false with get, set
+    [<CommandOption("-n|--tail")>] member val Tail = 100 with get, set
+    [<CommandOption("--since")>] member val Since: string = null with get, set
+
+type LogsContainerCommand(output: IOutputPort) =
+    inherit AsyncCommand<LogsContainerSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let since = if isNull settings.Since then "" else settings.Since
+            let stream = client.GetLogs(settings.Id, follow = settings.Follow, tail = settings.Tail, since = since)
+            let mutable running = true
+            while running do
+                let! hasMore = stream.MoveNext(_ct)
+                running <- hasMore
+                if hasMore then
+                    let entry = stream.Current
+                    output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
+            return 0
+        }
+
+// ── exec ──────────────────────────────────────────────────────────
+type ExecContainerSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+    [<CommandArgument(1, "<COMMAND>")>] member val Command: string[] = [||] with get, set
+
+type ExecContainerCommand(output: IOutputPort) =
+    inherit AsyncCommand<ExecContainerSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            if settings.Command.Length = 0 then
+                output.WriteError("Au moins une commande est requise")
+                return 1
+            else
+                let stream = client.Exec(settings.Id, settings.Command :> seq<string>)
+                let mutable running = true
+                while running do
+                    let! hasMore = stream.MoveNext(_ct)
+                    running <- hasMore
+                    if hasMore then
+                        let entry = stream.Current
+                        output.WriteLine(entry.Data.ToStringUtf8())
+                return 0
+        }
+
+// ── namespaces ────────────────────────────────────────────────────
+type NamespacesCommand(output: IOutputPort) =
+    inherit AsyncCommand<CommandSettings>()
+
+    override _.ExecuteAsync(_ctx, _settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let! response = client.ListNamespacesAsync()
+            if response.Namespaces.Count = 0 then
+                output.WriteWarning("Aucun namespace trouvé.")
+            else
+                output.WriteSuccess("Namespaces disponibles :")
+                for ns in response.Namespaces do
+                    output.WriteLine(sprintf "  - %s" ns)
             return 0
         }
 

@@ -32,6 +32,10 @@ let main argv =
             addCmd<StopContainerCommand> c "stop"
             addCmd<DeleteContainerCommand> c "delete"
             addCmd<PullImageCommand> c "pull"
+            addCmd<CreateContainerCommand> c "create"
+            addCmd<LogsContainerCommand> c "logs"
+            addCmd<ExecContainerCommand> c "exec"
+            addCmd<NamespacesCommand> c "namespaces"
             addCmd<VersionCommand> c "version"
         ) |> ignore
 
@@ -51,6 +55,7 @@ let main argv =
             addCmd<RemoveNetworkCommand> c "remove"
             addCmd<ConnectCommand> c "connect"
             addCmd<DisconnectCommand> c "disconnect"
+            addCmd<RunCniPluginCommand> c "run-cni-plugin"
         ) |> ignore
     ) |> ignore
     app.Run(argv)
