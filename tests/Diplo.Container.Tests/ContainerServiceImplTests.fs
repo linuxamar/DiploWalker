@@ -64,7 +64,7 @@ module ContainerServiceImplTests =
     let ``StartContainer retourne Running`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let req = StartContainerRequest(Id = "c1")
         let result = svc.StartContainer(req, ctx).Result
         result.State |> should equal ContainerState.Running
@@ -74,7 +74,7 @@ module ContainerServiceImplTests =
     let ``StopContainer avec timeout par defaut utilise 10`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let req = StopContainerRequest(Id = "c1", TimeoutSeconds = 0)
         let result = svc.StopContainer(req, ctx).Result
         result.State |> should equal ContainerState.Stopped
@@ -85,7 +85,7 @@ module ContainerServiceImplTests =
     let ``StopContainer avec timeout personnalise`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let req = StopContainerRequest(Id = "c1", TimeoutSeconds = 30)
         let result = svc.StopContainer(req, ctx).Result
         result.State |> should equal ContainerState.Stopped
@@ -95,7 +95,7 @@ module ContainerServiceImplTests =
     let ``DeleteContainer retourne success`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let req = DeleteContainerRequest(Id = "c1", Force = false)
         let result = svc.DeleteContainer(req, ctx).Result
         result.Success |> should equal true
@@ -106,7 +106,7 @@ module ContainerServiceImplTests =
     let ``InspectContainer retourne les metadonnees du conteneur`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "my-app", "nginx", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "my-app", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         mock.Mock.StartContainer("default", "my-app")
         let req = InspectContainerRequest(Id = "my-app")
         let result = svc.InspectContainer(req, ctx).Result
@@ -124,7 +124,7 @@ module ContainerServiceImplTests =
     let ``InspectContainer sans demarrage retourne status created`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "stopped-app", "nginx", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "stopped-app", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let req = InspectContainerRequest(Id = "stopped-app")
         let result = svc.InspectContainer(req, ctx).Result
         result.State |> should equal ContainerState.Created
@@ -134,8 +134,8 @@ module ContainerServiceImplTests =
     let ``ListContainers retourne les conteneurs crees`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "app-1", "nginx", Map.empty) |> ignore
-        mock.Mock.CreateContainer("default", "app-2", "redis", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "app-1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
+        mock.Mock.CreateContainer("default", "app-2", "redis", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let req = ListContainersRequest(All = true)
         let result = svc.ListContainers(req, ctx).Result
         result.Containers.Count |> should equal 2
@@ -173,7 +173,7 @@ module ContainerServiceImplTests =
     let ``GetContainerLogs ecrit les lignes dans le stream`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let writer = MockServerStreamWriter<ContainerLogEntry>()
         let req = GetContainerLogsRequest(Id = "c1", Tail = 10)
         svc.GetContainerLogs(req, writer, ctx).Wait()
@@ -186,7 +186,7 @@ module ContainerServiceImplTests =
     let ``ExecInContainer ecrit la sortie dans le stream`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty) |> ignore
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let writer = MockServerStreamWriter<ExecOutput>()
         let req = ExecInContainerRequest(Id = "c1")
         req.Command.Add("echo")

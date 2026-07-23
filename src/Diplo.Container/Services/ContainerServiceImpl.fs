@@ -25,10 +25,10 @@ type ContainerServiceImpl(client: IContainerdClient) =
             let labels = request.Labels |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
             for kv in labels do
                 SecurityValidation.validateLabel kv.Key kv.Value
-            if request.MemoryLimit > 0L || request.CpuShares > 0L || request.PidLimit > 0u then
-                Log.Warning("Limites de ressources demandées (mémoire={MemoryLimit}, cpu={CpuShares}, pid={PidLimit}) mais non implémentées dans le pilote actuel",
-                    request.MemoryLimit, request.CpuShares, request.PidLimit)
-            let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels)
+            let env = request.Env |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
+            let command = request.Command |> Seq.toArray
+            let args = request.Args |> Seq.toArray
+            let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels, env, command, args, request.MemoryLimit, request.CpuShares, request.PidLimit)
             return CreateContainerResponse(
                 Id = id,
                 Name = request.Name,
@@ -133,7 +133,9 @@ type ContainerServiceImpl(client: IContainerdClient) =
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let tail = if request.Tail > 0 then min request.Tail 10_000 else 100
-            let logs = client.GetContainerLogs(DefaultNamespace, request.Id, tail)
+            let follow = request.Follow
+            let since = if String.IsNullOrEmpty(request.Since) then "" else request.Since
+            let logs = client.GetContainerLogs(DefaultNamespace, request.Id, tail, follow, since)
             for line in logs do
                 let entry = ContainerLogEntry(
                     Timestamp = DateTime.UtcNow.ToString("o"),

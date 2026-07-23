@@ -37,7 +37,7 @@ type ContainerdClientTests() =
         let runner = createRunner ()
         runner.OnCommand("container create", "abc123")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
-        let result = client.CreateContainer("default", "test-123", "mcr.microsoft.com/dotnet/runtime:10.0", Map.empty)
+        let result = client.CreateContainer("default", "test-123", "mcr.microsoft.com/dotnet/runtime:10.0", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u)
         result |> should equal "abc123"
         let cmd = runner.SecureCommands |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains("container create"))
         cmd.IsSome |> should be True
@@ -52,7 +52,7 @@ type ContainerdClientTests() =
         runner.OnCommand("container create", "xyz")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
         let labels = Map.ofList [ "app", "web"; "env", "prod" ]
-        client.CreateContainer("moby", "c-1", "nginx:latest", labels) |> ignore
+        client.CreateContainer("moby", "c-1", "nginx:latest", labels, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         let (_, args) = runner.SecureCommands |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("container create"))
         let joined = args |> String.concat " "
         joined |> shouldContain "--label app=web"
@@ -134,7 +134,7 @@ type ContainerdClientTests() =
         let runner = createRunner ()
         runner.OnCommand("task logs", "line1\nline2\nline3")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
-        let result = client.GetContainerLogs("default", "c-1", 100)
+        let result = client.GetContainerLogs("default", "c-1", 100, false, "")
         result |> should haveLength 3
 
     [<Fact>]

@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-10 projets source (.NET 10, F#) + 5 projets de test :
+10 projets source (.NET 10, F#) + 9 projets de test :
 
 | Projet | Rôle |
 |--------|------|

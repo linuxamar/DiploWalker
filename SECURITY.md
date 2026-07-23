@@ -41,8 +41,43 @@ let invoker = channel.Intercept(TokenInterceptor.createTokenCredentials())
 
 Si le fichier token n'existe pas côté client, aucune en-tête n'est ajoutée.
 
+## Validation et injection
+
+Toutes les entrées utilisateur sont validées avant traitement :
+
+- **Noms de conteneurs** : `SecurityValidation.validateName` — caractères alphanumériques, tirets et points uniquement.
+- **Identifiants conteneur** : `SecurityValidation.validateContainerId` — alphanumériques, tirets et underscores uniquement.
+- **Images** : `SecurityValidation.validateImage` — format `registry/repo:tag` validé, interdiction des caractères dangereux.
+- **Labels** : `SecurityValidation.validateLabel` — clé et valeur validées individuellement.
+- **Commandes** : `SecurityValidation.validateCommand` — chaque argument est validé, interdiction des caractères d'injection shell (`;`, `|`, `&&`, `$(`, backticks).
+- **Noms de volume** : `SecurityValidation.validateVolumeName` — alphanumériques, tirets et underscores uniquement.
+- **Chemins de montage** : `SecurityValidation.validateMountPath` — pas de `..`, pas de chemins absolus, séparateurs de chemin interdits.
+- **Noms de réseau** : `SecurityValidation.validateNetworkName` — alphanumériques, tirets et underscores uniquement.
+- **CIDR** : `SecurityValidation.validateCidr` — format IPv4/CIDR validé avec regex stricte.
+
+### Interdiction d'injection
+
+`SecurityValidation.containsShellInjection` bloque les caractères dangereux : `;`, `|`, `&&`, `$(`, `` ` ``, `$(`, `>`, `<`. Ceci empêche toute injection de commandes shell à travers les paramètres utilisateur.
+
+## Limites de conteneurs
+
+Les ressources des conteneurs (mémoire, CPU, PID) sont transmises à containerd via un spec OCI généré dynamiquement. Les limites sont appliquées au niveau du kernel Windows :
+
+- **Mémoire** : `linux.resources.memory.limit` — limite en octets.
+- **CPU** : `linux.resources.cpu.shares` — poids relatif de CPU.
+- **PID** : `linux.resources.pids.limit` — nombre maximum de processus.
+
+## Sécurité des logs
+
+Les logs des conteneurs ne transmettent pas d'informations sensibles :
+
+- Les variables d'environnement filtrées dans `InspectContainer` se limitent à un ensemble prédéfini (PATH, ASPNETCORE_ENVIRONMENT, etc.).
+- Les secrets et tokens ne doivent jamais être passés via les variables d'environnement — utiliser Key Vault ou des fichiers secrets à la place.
+
 ## Recommandations
 
-- Ne jamais commitler `auth-token.json` dans un dépôt git.
+- Ne jamais committer `auth-token.json` dans un dépôt git.
 - Utiliser des permissions NTFS restrictives sur `C:\ProgramData\Diplo\`.
 - Rotation du token régulière en production.
+- Utiliser des images de conteneurs signées et provenant de registries fiables.
+- Limiter les ressources des conteneurs en production pour éviter les dénis de service.

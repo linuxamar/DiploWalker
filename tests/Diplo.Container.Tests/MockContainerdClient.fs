@@ -28,7 +28,7 @@ type MockContainerdClient() =
         doc.RootElement
 
     interface IContainerdClient with
-        member _.CreateContainer(_namespaceName, id, image, _labels) =
+        member _.CreateContainer(_namespaceName, id, image, _labels, _env, _command, _args, _memoryLimit, _cpuShares, _pidLimit) =
             containers <- containers |> Map.add id (Map.ofList [ "image", image; "id", id ])
             id
 
@@ -59,7 +59,7 @@ type MockContainerdClient() =
         member _.ListContainers(_namespaceName, _all) =
             containers |> Map.toList |> List.map fst
 
-        member _.GetContainerLogs(_namespaceName, _id, _tail) =
+        member _.GetContainerLogs(_namespaceName, _id, _tail, _follow, _since) =
             [ "2025-01-15T10:30:01Z Application started"
               "2025-01-15T10:30:02Z Listening on port 8080" ]
 

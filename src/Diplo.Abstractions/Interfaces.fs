@@ -11,14 +11,14 @@ module Interfaces =
 
     /// Client pour interagir avec containerd
     type IContainerdClient =
-        abstract member CreateContainer: namespaceName: string * id: string * image: string * labels: Map<string, string> -> string
+        abstract member CreateContainer: namespaceName: string * id: string * image: string * labels: Map<string, string> * env: Map<string, string> * command: string array * args: string array * memoryLimit: int64 * cpuShares: int64 * pidLimit: uint32 -> string
         abstract member StartContainer: namespaceName: string * id: string -> unit
         abstract member StopContainer: namespaceName: string * id: string * timeoutSeconds: int -> unit
         abstract member DeleteContainer: namespaceName: string * id: string * force: bool -> unit
         abstract member InspectContainer: namespaceName: string * id: string -> JsonElement
         abstract member TaskInfo: namespaceName: string * id: string -> JsonElement
         abstract member ListContainers: namespaceName: string * all: bool -> string list
-        abstract member GetContainerLogs: namespaceName: string * id: string * tail: int -> string list
+        abstract member GetContainerLogs: namespaceName: string * id: string * tail: int * follow: bool * since: string -> string list
         abstract member ExecInContainer: namespaceName: string * id: string * command: string array -> string
         abstract member PullImage: image: string -> string
         abstract member Version: unit -> string

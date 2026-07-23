@@ -1,6 +1,7 @@
 namespace Diplo.Container.Clients
 
 open System
+open System.IO
 open System.Text.Json
 open Serilog
 open Diplo.Abstractions
@@ -15,18 +16,68 @@ type ContainerdClient(runner: IProcessRunner) =
         use doc = JsonDocument.Parse(text, JsonDocumentOptions(MaxDepth = 32))
         doc.RootElement.Clone()
 
+    let buildOciSpecJson (env: Map<string, string>) (command: string array) (args: string array) (memoryLimit: int64) (cpuShares: int64) (pidLimit: uint32) =
+        let envArray = env |> Map.toList |> List.map (fun (k, v) -> sprintf "%s=%s" k v)
+        let processObj =
+            let argsValue =
+                if command.Length > 0 || args.Length > 0 then
+                    let allArgs = Array.append command args
+                    Some allArgs
+                else None
+            match argsValue with
+            | Some a ->
+                sprintf """{"args":["%s"],"env":["%s"]}"""
+                    (a |> String.concat "\",\"")
+                    (envArray |> String.concat "\",\"")
+            | None ->
+                if envArray.IsEmpty then "{}"
+                else sprintf """{"env":["%s"]}""" (envArray |> String.concat "\",\"")
+        let resourcesParts = ResizeArray<string>()
+        if memoryLimit > 0L then
+            resourcesParts.Add(sprintf """{"memory":{"limit":%d}}""" memoryLimit)
+        if cpuShares > 0L then
+            resourcesParts.Add(sprintf """{"cpu":{"shares":%d}}""" cpuShares)
+        if pidLimit > 0u then
+            resourcesParts.Add(sprintf """{"pids":{"limit":%d}}""" pidLimit)
+        if resourcesParts.Count > 0 then
+            let linuxResources = resourcesParts |> String.concat ","
+            sprintf """{"process":%s,"linux":{"resources":{%s}}}""" processObj linuxResources
+        else
+            sprintf """{"process":%s}""" processObj
+
     interface IContainerdClient with
-        member _.CreateContainer(namespaceName, id, image, labels) =
+        member _.CreateContainer(namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
             SecurityValidation.validateImage image
-            let mutable args =
-                [ "container"; "create"; "--namespace"; namespaceName; id; image ]
+            let mutable ctrArgs =
+                [ "container"; "create"; "--namespace"; namespaceName ]
             for (k, v) in labels |> Map.toList do
                 SecurityValidation.validateLabel k v
-                args <- args @ [ "--label"; sprintf "%s=%s" k v ]
-            let output = runCtr args
-            output.Trim()
+                ctrArgs <- ctrArgs @ [ "--label"; sprintf "%s=%s" k v ]
+            for (k, v) in env |> Map.toList do
+                ctrArgs <- ctrArgs @ [ "--env"; sprintf "%s=%s" k v ]
+            let hasSpecContent =
+                command.Length > 0 || args.Length > 0 ||
+                memoryLimit > 0L || cpuShares > 0L || pidLimit > 0u
+            let specPath =
+                if hasSpecContent then
+                    let json = buildOciSpecJson env command args memoryLimit cpuShares pidLimit
+                    let tempFile = Path.Combine(Path.GetTempPath(), sprintf "diplo-spec-%s.json" (Guid.NewGuid().ToString("N")))
+                    File.WriteAllText(tempFile, json)
+                    Some tempFile
+                else None
+            try
+                match specPath with
+                | Some p -> ctrArgs <- ctrArgs @ [ "--spec"; p ]
+                | None -> ()
+                ctrArgs <- ctrArgs @ [ id; image ]
+                let output = runCtr ctrArgs
+                output.Trim()
+            finally
+                match specPath with
+                | Some p -> try File.Delete(p) with _ -> ()
+                | None -> ()
 
         member _.StartContainer(namespaceName, id) =
             SecurityValidation.validateId namespaceName "Le namespace"
@@ -64,11 +115,18 @@ type ContainerdClient(runner: IProcessRunner) =
             output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
             |> Array.toList
 
-        member _.GetContainerLogs(namespaceName, id, tail) =
+        member _.GetContainerLogs(namespaceName, id, tail, follow, since) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
-            let output = runCtr [ "task"; "logs"; "--namespace"; namespaceName; "--tail"; tail.ToString(); id ]
+            let mutable logArgs =
+                [ "task"; "logs"; "--namespace"; namespaceName; "--tail"; tail.ToString() ]
+            if follow then
+                logArgs <- logArgs @ [ "--follow" ]
+            if not (String.IsNullOrEmpty(since)) then
+                logArgs <- logArgs @ [ "--since"; since ]
+            logArgs <- logArgs @ [ id ]
             try
+                let output = runCtr logArgs
                 output.Split('\n')
                 |> Array.toList
             with ex ->
