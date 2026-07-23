@@ -21,6 +21,8 @@
       <Platform Project="x64" />
     </Project>
     <Project Path="tests/Diplo.Container.Tests/Diplo.Container.Tests.fsproj" />
+    <Project Path="tests/Diplo.Core.Tests/Diplo.Core.Tests.fsproj" />
+    <Project Path="tests/Diplo.Contracts.Tests/Diplo.Contracts.Tests.fsproj" />
     <Project Path="tests/Diplo.Network.Tests/Diplo.Network.Tests.fsproj" />
     <Project Path="tests/Diplo.Volume.Tests/Diplo.Volume.Tests.fsproj" />
     <Project Path="tests/Diplo.Gui.Tests/Diplo.Gui.Tests.fsproj">

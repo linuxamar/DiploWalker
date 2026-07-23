@@ -14,9 +14,9 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     new(port: int) =
         let ch = DiploChannel.forContainer port
-        ContainerClient(ch, true)
+        new ContainerClient(ch, true)
 
-    new() = ContainerClient(5001)
+    new() = new ContainerClient(5001)
 
     member _.CreateAsync
         ( name: string,

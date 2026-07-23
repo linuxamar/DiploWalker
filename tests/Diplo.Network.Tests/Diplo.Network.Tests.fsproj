@@ -9,6 +9,8 @@
     <Compile Include="NoneDriverTests.fs" />
     <Compile Include="PodDriverTests.fs" />
     <Compile Include="CustomCniDriverTests.fs" />
+    <Compile Include="BridgeDriverTests.fs" />
+    <Compile Include="CniParsingTests.fs" />
     <Compile Include="MockNetworkDriver.fs" />
     <Compile Include="NetworkServiceImplTests.fs" />
     <Compile Include="NetworkConfigTests.fs" />

@@ -14,9 +14,9 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
 
     new(port: int) =
         let ch = DiploChannel.forVolume port
-        VolumeClient(ch, true)
+        new VolumeClient(ch, true)
 
-    new() = VolumeClient(5002)
+    new() = new VolumeClient(5002)
 
     member _.CreateAsync(name: string, ?driver: StorageDriverType, ?driverOpts: IDictionary<string, string>, ?labels: IDictionary<string, string>, ?ct: CancellationToken) =
         task {

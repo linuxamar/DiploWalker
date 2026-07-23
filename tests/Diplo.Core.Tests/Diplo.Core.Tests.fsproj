@@ -6,14 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="AuthTokenTests.fs" />
-    <Compile Include="TokenInterceptorTests.fs" />
-    <Compile Include="TokenAuthMiddlewareTests.fs" />
-    <Compile Include="SecurityValidationTests.fs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="DiploChannelTests.fs" />
+    <Compile Include="ContainerClientTests.fs" />
+    <Compile Include="VolumeClientTests.fs" />
+    <Compile Include="NetworkClientTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,10 +20,14 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FsUnit.xUnit" Version="7.1.1" />
+    <PackageReference Include="Grpc.Core.Testing" Version="2.46.6" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.80.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\src\Diplo.Core\Diplo.Core.fsproj" />
+    <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.csproj" />
   </ItemGroup>
 
 </Project>

@@ -6,14 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="AuthTokenTests.fs" />
-    <Compile Include="TokenInterceptorTests.fs" />
-    <Compile Include="TokenAuthMiddlewareTests.fs" />
-    <Compile Include="SecurityValidationTests.fs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="TypesTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\src\Diplo.Contracts\Diplo.Contracts.fsproj" />
   </ItemGroup>
 
 </Project>

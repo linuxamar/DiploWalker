@@ -14,9 +14,9 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
 
     new(port: int) =
         let ch = DiploChannel.forNetwork port
-        NetworkClient(ch, true)
+        new NetworkClient(ch, true)
 
-    new() = NetworkClient(5003)
+    new() = new NetworkClient(5003)
 
     member _.CreateAsync
         ( name: string,
