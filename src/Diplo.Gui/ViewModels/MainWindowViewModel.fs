@@ -9,6 +9,7 @@ open Diplo.Core.Connection
 open Diplo.Core.Output
 open Diplo.Gui.Services
 open Diplo.Grpc.Volume
+open Diplo.Grpc.Network
 
 type ContainerInfo = {
     mutable Id: string
@@ -35,6 +36,13 @@ type NetworkInfo = {
     mutable CrééLe: string
 }
 
+type ImageInfo = {
+    mutable Référentiel: string
+    mutable Tag: string
+    mutable Taille: string
+    mutable CrééLe: string
+}
+
 type MainWindowViewModel() as this =
     inherit ViewModelBase()
 
@@ -42,6 +50,7 @@ type MainWindowViewModel() as this =
     let containers = ObservableCollection<ContainerInfo>()
     let volumes = ObservableCollection<VolumeInfo>()
     let networks = ObservableCollection<NetworkInfo>()
+    let images = ObservableCollection<ImageInfo>()
     let logText = System.Text.StringBuilder()
 
     let mutable containerIdInput = ""
@@ -51,6 +60,9 @@ type MainWindowViewModel() as this =
     let mutable containerAll = false
     let mutable containerTimeout = 10
     let mutable containerForce = false
+    let mutable containerNewName = ""
+    let mutable containerImageRef = ""
+    let mutable containerImageTarget = ""
 
     let mutable volumeIdInput = ""
     let mutable volumeNameInput = ""
@@ -67,6 +79,9 @@ type MainWindowViewModel() as this =
     let mutable networkContainerId = ""
     let mutable networkIpv4 = ""
     let mutable networkForce = false
+    let mutable networkCniPluginPath = ""
+    let mutable networkCniCommand = "ADD"
+    let mutable networkNetnsPath = ""
 
     let updateLog () =
         logText.Clear() |> ignore
@@ -81,6 +96,7 @@ type MainWindowViewModel() as this =
     member _.Containers = containers
     member _.Volumes = volumes
     member _.Networks = networks
+    member _.Images = images
 
     member _.LogOutput = logText.ToString()
 
@@ -92,6 +108,10 @@ type MainWindowViewModel() as this =
     member _.ContainerAll with get () = containerAll and set v = containerAll <- v; this.OnPropertyChanged()
     member _.ContainerTimeout with get () = containerTimeout and set v = containerTimeout <- v; this.OnPropertyChanged()
     member _.ContainerForce with get () = containerForce and set v = containerForce <- v; this.OnPropertyChanged()
+
+    member _.ContainerNewName with get () = containerNewName and set v = containerNewName <- v; this.OnPropertyChanged()
+    member _.ContainerImageRef with get () = containerImageRef and set v = containerImageRef <- v; this.OnPropertyChanged()
+    member _.ContainerImageTarget with get () = containerImageTarget and set v = containerImageTarget <- v; this.OnPropertyChanged()
 
     // --- Volume inputs ---
     member _.VolumeIdInput with get () = volumeIdInput and set v = volumeIdInput <- v; this.OnPropertyChanged()
@@ -111,6 +131,10 @@ type MainWindowViewModel() as this =
     member _.NetworkIpv4 with get () = networkIpv4 and set v = networkIpv4 <- v; this.OnPropertyChanged()
     member _.NetworkForce with get () = networkForce and set v = networkForce <- v; this.OnPropertyChanged()
 
+    member _.NetworkCniPluginPath with get () = networkCniPluginPath and set v = networkCniPluginPath <- v; this.OnPropertyChanged()
+    member _.NetworkCniCommand with get () = networkCniCommand and set v = networkCniCommand <- v; this.OnPropertyChanged()
+    member _.NetworkNetnsPath with get () = networkNetnsPath and set v = networkNetnsPath <- v; this.OnPropertyChanged()
+
     // --- Container commands ---
     member _.ListContainersCommand = RelayCommand(Action(fun () -> this.ListContainers() |> Async.Start))
     member _.InspectContainerCommand = RelayCommand(Action(fun () -> this.InspectContainer() |> Async.Start))
@@ -119,6 +143,13 @@ type MainWindowViewModel() as this =
     member _.DeleteContainerCommand = RelayCommand(Action(fun () -> this.DeleteContainer() |> Async.Start))
     member _.PullImageCommand = RelayCommand(Action(fun () -> this.PullImage() |> Async.Start))
     member _.VersionCommand = RelayCommand(Action(fun () -> this.GetVersion() |> Async.Start))
+    member _.RenameContainerCommand = RelayCommand(Action(fun () -> this.RenameContainer() |> Async.Start))
+    member _.TopContainerCommand = RelayCommand(Action(fun () -> this.TopContainer() |> Async.Start))
+    member _.StatsContainerCommand = RelayCommand(Action(fun () -> this.GetContainerStats() |> Async.Start))
+    member _.ListImagesCommand = RelayCommand(Action(fun () -> this.ListImages() |> Async.Start))
+    member _.InspectImageCommand = RelayCommand(Action(fun () -> this.InspectImage() |> Async.Start))
+    member _.RemoveImageCommand = RelayCommand(Action(fun () -> this.RemoveImage() |> Async.Start))
+    member _.TagImageCommand = RelayCommand(Action(fun () -> this.TagImage() |> Async.Start))
 
     // --- Volume commands ---
     member _.ListVolumesCommand = RelayCommand(Action(fun () -> this.ListVolumes() |> Async.Start))
@@ -127,6 +158,7 @@ type MainWindowViewModel() as this =
     member _.RemoveVolumeCommand = RelayCommand(Action(fun () -> this.RemoveVolume() |> Async.Start))
     member _.MountVolumeCommand = RelayCommand(Action(fun () -> this.MountVolume() |> Async.Start))
     member _.UnmountVolumeCommand = RelayCommand(Action(fun () -> this.UnmountVolume() |> Async.Start))
+    member _.PruneVolumesCommand = RelayCommand(Action(fun () -> this.PruneVolumes() |> Async.Start))
 
     // --- Network commands ---
     member _.ListNetworksCommand = RelayCommand(Action(fun () -> this.ListNetworks() |> Async.Start))
@@ -135,6 +167,8 @@ type MainWindowViewModel() as this =
     member _.RemoveNetworkCommand = RelayCommand(Action(fun () -> this.RemoveNetwork() |> Async.Start))
     member _.ConnectNetworkCommand = RelayCommand(Action(fun () -> this.ConnectContainer() |> Async.Start))
     member _.DisconnectNetworkCommand = RelayCommand(Action(fun () -> this.DisconnectContainer() |> Async.Start))
+    member _.RunCniPluginCommand = RelayCommand(Action(fun () -> this.RunCniPlugin() |> Async.Start))
+    member _.PruneNetworksCommand = RelayCommand(Action(fun () -> this.PruneNetworks() |> Async.Start))
 
     // --- Menu commands ---
     member _.QuitCommand = RelayCommand(Action(fun () ->
@@ -240,6 +274,97 @@ type MainWindowViewModel() as this =
             with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
         }
 
+    member private this.RenameContainer() =
+        async {
+            try
+                let client = new ContainerClient()
+                let! response = client.RenameContainerAsync(id = this.ContainerIdInput, newName = this.ContainerNewName) |> Async.AwaitTask
+                (outputPort :> IOutputPort).WriteSuccess(sprintf "Conteneur %s renommé en %s" this.ContainerIdInput this.ContainerNewName)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.TopContainer() =
+        async {
+            try
+                let client = new ContainerClient()
+                let! response = client.TopContainerAsync(id = this.ContainerIdInput) |> Async.AwaitTask
+                (outputPort :> IOutputPort).WriteLine(sprintf "Processus du conteneur %s:" this.ContainerIdInput)
+                for proc in response.Processes do
+                    (outputPort :> IOutputPort).WriteLine(sprintf "  PID: %d  CMD: %s" proc.Pid proc.Command)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.GetContainerStats() =
+        async {
+            try
+                let client = new ContainerClient()
+                let! response = client.GetContainerStatsAsync(id = this.ContainerIdInput) |> Async.AwaitTask
+                (outputPort :> IOutputPort).WriteLine(sprintf "Métriques du conteneur %s:" this.ContainerIdInput)
+                (outputPort :> IOutputPort).WriteLine(sprintf "  CPU: %d  Mémoire: %d" response.CpuUsage response.MemoryUsage)
+                (outputPort :> IOutputPort).WriteLine(sprintf "  Réseau RX: %d  TX: %d" response.NetworkRx response.NetworkTx)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.ListImages() =
+        async {
+            try
+                let client = new ContainerClient()
+                let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
+                let! response = client.ListImagesAsync(?namespaceName = ns) |> Async.AwaitTask
+                Dispatcher.UIThread.Post(fun () ->
+                    images.Clear()
+                    for img in response.Images do
+                        images.Add({
+                            Référentiel = img.Ref
+                            Tag = img.Tag
+                            Taille = sprintf "%d octets" img.Size
+                            CrééLe = img.CreatedAt
+                        })
+                )
+                (outputPort :> IOutputPort).WriteSuccess(sprintf "%d image(s) trouvée(s)" response.Images.Count)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.InspectImage() =
+        async {
+            try
+                let client = new ContainerClient()
+                let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
+                let! response = client.InspectImageAsync(ref = this.ContainerImageRef, ?namespaceName = ns) |> Async.AwaitTask
+                (outputPort :> IOutputPort).WriteLine(sprintf "Référentiel: %s" response.Ref)
+                (outputPort :> IOutputPort).WriteLine(sprintf "Tag: %s" response.Tag)
+                (outputPort :> IOutputPort).WriteLine(sprintf "Taille: %d octets" response.Size)
+                (outputPort :> IOutputPort).WriteLine(sprintf "Créé le: %s" response.CreatedAt)
+                if response.Labels.Count > 0 then
+                    (outputPort :> IOutputPort).WriteLine("Labels:")
+                    for kvp in response.Labels do
+                        (outputPort :> IOutputPort).WriteLine(sprintf "  %s = %s" kvp.Key kvp.Value)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.RemoveImage() =
+        async {
+            try
+                let client = new ContainerClient()
+                let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
+                let! response = client.RemoveImageAsync(ref = this.ContainerImageRef, ?namespaceName = ns) |> Async.AwaitTask
+                if response.Success then
+                    (outputPort :> IOutputPort).WriteSuccess(sprintf "Image %s supprimée" this.ContainerImageRef)
+                else
+                    (outputPort :> IOutputPort).WriteWarning(response.Message)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.TagImage() =
+        async {
+            try
+                let client = new ContainerClient()
+                let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
+                let! response = client.TagImageAsync(source = this.ContainerImageRef, target = this.ContainerImageTarget, ?namespaceName = ns) |> Async.AwaitTask
+                (outputPort :> IOutputPort).WriteSuccess(sprintf "Image %s étiquetée en %s - %s" this.ContainerImageRef this.ContainerImageTarget response.Message)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
     // --- Volume operations ---
     member private this.ListVolumes() =
         async {
@@ -312,6 +437,15 @@ type MainWindowViewModel() as this =
                 let client = new VolumeClient()
                 let! response = client.UnmountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath) |> Async.AwaitTask
                 (outputPort :> IOutputPort).WriteSuccess(sprintf "Volume %s démonté de %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.PruneVolumes() =
+        async {
+            try
+                let client = new VolumeClient()
+                let! response = client.PruneVolumesAsync() |> Async.AwaitTask
+                (outputPort :> IOutputPort).WriteSuccess(sprintf "Volumes nettoyés - %s" response.Message)
             with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
         }
 
@@ -398,5 +532,26 @@ type MainWindowViewModel() as this =
                     (outputPort :> IOutputPort).WriteSuccess(sprintf "Conteneur %s déconnecté du réseau %s" this.NetworkContainerId this.NetworkIdInput)
                 else
                     (outputPort :> IOutputPort).WriteWarning(response.Message)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.RunCniPlugin() =
+        async {
+            try
+                let client = new NetworkClient()
+                let! response = client.RunCniPluginAsync(pluginPath = this.NetworkCniPluginPath, command = this.NetworkCniCommand, containerId = this.NetworkContainerId, netnsPath = this.NetworkNetnsPath) |> Async.AwaitTask
+                if response.Success then
+                    (outputPort :> IOutputPort).WriteSuccess(sprintf "Plugin CNI exécuté - %s" response.Message)
+                else
+                    (outputPort :> IOutputPort).WriteWarning(response.Message)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.PruneNetworks() =
+        async {
+            try
+                let client = new NetworkClient()
+                let! response = client.PruneNetworksAsync() |> Async.AwaitTask
+                (outputPort :> IOutputPort).WriteSuccess(sprintf "Réseaux nettoyés - %s" response.Message)
             with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
         }

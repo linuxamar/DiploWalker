@@ -41,7 +41,10 @@
                         <Button Content="▶ Démarrer" Command="{Binding StartContainerCommand}" Margin="0,0,4,0" />
                         <Button Content="⏹ Arrêter" Command="{Binding StopContainerCommand}" Margin="0,0,4,0" />
                         <Button Content="🗑 Supprimer" Command="{Binding DeleteContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="📥 Télécharger image" Command="{Binding PullImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="✏ Renommer" Command="{Binding RenameContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="⚙ Processus" Command="{Binding TopContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="📊 Métriques" Command="{Binding StatsContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="📥 Télécharger" Command="{Binding PullImageCommand}" Margin="0,0,4,0" />
                         <Button Content="ℹ Version" Command="{Binding VersionCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
@@ -65,10 +68,27 @@
                         <CheckBox Content="Tous" IsChecked="{Binding ContainerAll}" Margin="12,0,0,0"
                                   VerticalAlignment="Center" />
                         <CheckBox Content="Forcer" IsChecked="{Binding ContainerForce}" Margin="8,0,0,0"
-                                  VerticalAlignment="Center" />
+                                   VerticalAlignment="Center" />
                     </WrapPanel>
 
-                    <!-- Grille -->
+                    <!-- Champs images -->
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Nouveau nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerNewName}" Width="140" Margin="0,0,12,0"
+                                 Watermark="renommer" />
+                        <TextBlock Text="Réf. image:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerImageRef}" Width="200" Margin="0,0,12,0"
+                                 Watermark="image:tag (inspect/remove/tag)" />
+                        <TextBlock Text="Cible:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerImageTarget}" Width="200" Margin="0,0,12,0"
+                                 Watermark="nouveau:tag (tag)" />
+                        <Button Content="📋 Lister images" Command="{Binding ListImagesCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter img" Command="{Binding InspectImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer img" Command="{Binding RemoveImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🏷 Étiqueter" Command="{Binding TagImageCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <!-- Grille conteneurs -->
                     <DataGrid ItemsSource="{Binding Containers}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"
                               Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
@@ -78,6 +98,19 @@
                             <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="160" />
                             <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="200" />
                             <DataGridTextColumn Header="État" Binding="{Binding État}" Width="80" />
+                            <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Grille images -->
+                    <DataGrid ItemsSource="{Binding Images}" AutoGenerateColumns="False"
+                              IsReadOnly="True" GridLinesVisibility="Horizontal"
+                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
+                              CanUserResizeColumns="True" CanUserSortColumns="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
+                            <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
+                            <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
                             <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
                         </DataGrid.Columns>
                     </DataGrid>
@@ -94,6 +127,7 @@
                         <Button Content="🗑 Supprimer" Command="{Binding RemoveVolumeCommand}" Margin="0,0,4,0" />
                         <Button Content="📁 Monter" Command="{Binding MountVolumeCommand}" Margin="0,0,4,0" />
                         <Button Content="📂 Démonter" Command="{Binding UnmountVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding PruneVolumesCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -137,6 +171,8 @@
                         <Button Content="🗑 Supprimer" Command="{Binding RemoveNetworkCommand}" Margin="0,0,4,0" />
                         <Button Content="🔗 Connecter" Command="{Binding ConnectNetworkCommand}" Margin="0,0,4,0" />
                         <Button Content="🔌 Déconnecter" Command="{Binding DisconnectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="⚙ Exécuter CNI" Command="{Binding RunCniPluginCommand}" Margin="0,0,4,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding PruneNetworksCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -168,7 +204,20 @@
                         <TextBox Text="{Binding NetworkIpv4}" Width="140" Margin="0,0,12,0"
                                  Watermark="172.20.0.2/16" />
                         <CheckBox Content="Forcer" IsChecked="{Binding NetworkForce}" Margin="12,0,0,0"
-                                  VerticalAlignment="Center" />
+                                   VerticalAlignment="Center" />
+                    </WrapPanel>
+
+                    <!-- Champs CNI -->
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Plugin CNI:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkCniPluginPath}" Width="200" Margin="0,0,12,0"
+                                 Watermark="chemin vers plugin CNI" />
+                        <TextBlock Text="Commande:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkCniCommand}" Width="80" Margin="0,0,12,0"
+                                 Watermark="ADD/DEL/CHECK" />
+                        <TextBlock Text="NetNS:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding NetworkNetnsPath}" Width="200" Margin="0,0,12,0"
+                                 Watermark="chemin namespace réseau" />
                     </WrapPanel>
 
                     <DataGrid ItemsSource="{Binding Networks}" AutoGenerateColumns="False"
