@@ -79,6 +79,11 @@ type MainWindowViewModel() as this =
     let mutable networkContainerId = ""
     let mutable networkIpv4 = ""
     let mutable networkForce = false
+    let mutable containerFollow = false
+    let mutable containerTail = 100
+    let mutable containerSince = ""
+    let mutable containerExecCommand = ""
+
     let mutable networkCniPluginPath = ""
     let mutable networkCniCommand = "ADD"
     let mutable networkNetnsPath = ""
@@ -112,6 +117,10 @@ type MainWindowViewModel() as this =
     member _.ContainerNewName with get () = containerNewName and set v = containerNewName <- v; this.OnPropertyChanged()
     member _.ContainerImageRef with get () = containerImageRef and set v = containerImageRef <- v; this.OnPropertyChanged()
     member _.ContainerImageTarget with get () = containerImageTarget and set v = containerImageTarget <- v; this.OnPropertyChanged()
+    member _.ContainerFollow with get () = containerFollow and set v = containerFollow <- v; this.OnPropertyChanged()
+    member _.ContainerTail with get () = containerTail and set v = containerTail <- v; this.OnPropertyChanged()
+    member _.ContainerSince with get () = containerSince and set v = containerSince <- v; this.OnPropertyChanged()
+    member _.ContainerExecCommand with get () = containerExecCommand and set v = containerExecCommand <- v; this.OnPropertyChanged()
 
     // --- Volume inputs ---
     member _.VolumeIdInput with get () = volumeIdInput and set v = volumeIdInput <- v; this.OnPropertyChanged()
@@ -150,6 +159,10 @@ type MainWindowViewModel() as this =
     member _.InspectImageCommand = RelayCommand(Action(fun () -> this.InspectImage() |> Async.Start))
     member _.RemoveImageCommand = RelayCommand(Action(fun () -> this.RemoveImage() |> Async.Start))
     member _.TagImageCommand = RelayCommand(Action(fun () -> this.TagImage() |> Async.Start))
+    member _.CreateContainerCommand = RelayCommand(Action(fun () -> this.CreateContainer() |> Async.Start))
+    member _.GetContainerLogsCommand = RelayCommand(Action(fun () -> this.GetContainerLogs() |> Async.Start))
+    member _.ExecInContainerCommand = RelayCommand(Action(fun () -> this.ExecInContainer() |> Async.Start))
+    member _.ListNamespacesCommand = RelayCommand(Action(fun () -> this.ListNamespaces() |> Async.Start))
 
     // --- Volume commands ---
     member _.ListVolumesCommand = RelayCommand(Action(fun () -> this.ListVolumes() |> Async.Start))
@@ -362,6 +375,50 @@ type MainWindowViewModel() as this =
                 let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
                 let! response = client.TagImageAsync(source = this.ContainerImageRef, target = this.ContainerImageTarget, ?namespaceName = ns) |> Async.AwaitTask
                 (outputPort :> IOutputPort).WriteSuccess(sprintf "Image %s étiquetée en %s - %s" this.ContainerImageRef this.ContainerImageTarget response.Message)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.CreateContainer() =
+        async {
+            try
+                let client = new ContainerClient()
+                let! response = client.CreateAsync(name = this.ContainerNameInput, image = this.ContainerImageInput) |> Async.AwaitTask
+                (outputPort :> IOutputPort).WriteSuccess(sprintf "Conteneur créé : %s (ID: %s)" response.Name response.Id)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.GetContainerLogs() =
+        async {
+            try
+                let client = new ContainerClient()
+                let stream = client.GetLogs(id = this.ContainerIdInput, follow = this.ContainerFollow, tail = this.ContainerTail, since = this.ContainerSince)
+                let sb = System.Text.StringBuilder()
+                while stream.MoveNext(System.Threading.CancellationToken.None) |> Async.AwaitTask |> Async.RunSynchronously do
+                    sb.AppendLine(sprintf "[%s] %s" stream.Current.Timestamp stream.Current.Log) |> ignore
+                (outputPort :> IOutputPort).WriteSuccess(sb.ToString())
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.ExecInContainer() =
+        async {
+            try
+                let client = new ContainerClient()
+                let parts = this.ContainerExecCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                let stream = client.Exec(id = this.ContainerIdInput, command = parts)
+                let sb = System.Text.StringBuilder()
+                while stream.MoveNext(System.Threading.CancellationToken.None) |> Async.AwaitTask |> Async.RunSynchronously do
+                    sb.Append(stream.Current.Data.ToStringUtf8()) |> ignore
+                (outputPort :> IOutputPort).WriteSuccess(sb.ToString())
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.ListNamespaces() =
+        async {
+            try
+                let client = new ContainerClient()
+                let! response = client.ListNamespacesAsync() |> Async.AwaitTask
+                let nsList = String.Join(", ", response.Namespaces)
+                (outputPort :> IOutputPort).WriteSuccess(sprintf "Namespaces: %s" nsList)
             with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
         }
 

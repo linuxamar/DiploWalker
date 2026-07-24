@@ -44,6 +44,7 @@
                         <Button Content="✏ Renommer" Command="{Binding RenameContainerCommand}" Margin="0,0,4,0" />
                         <Button Content="⚙ Processus" Command="{Binding TopContainerCommand}" Margin="0,0,4,0" />
                         <Button Content="📊 Métriques" Command="{Binding StatsContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding CreateContainerCommand}" Margin="0,0,4,0" />
                         <Button Content="📥 Télécharger" Command="{Binding PullImageCommand}" Margin="0,0,4,0" />
                         <Button Content="ℹ Version" Command="{Binding VersionCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
@@ -86,6 +87,20 @@
                         <Button Content="🔍 Inspecter img" Command="{Binding InspectImageCommand}" Margin="0,0,4,0" />
                         <Button Content="🗑 Supprimer img" Command="{Binding RemoveImageCommand}" Margin="0,0,4,0" />
                         <Button Content="🏷 Étiqueter" Command="{Binding TagImageCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <!-- Journaux / Exec / Espaces -->
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button Content="📜 Journaux" Command="{Binding GetContainerLogsCommand}" Margin="0,0,4,0" />
+                        <CheckBox Content="Suivre" IsChecked="{Binding ContainerFollow}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Lignes:" VerticalAlignment="Center" Margin="8,0,4,0" />
+                        <NumericUpDown Value="{Binding ContainerTail}" Minimum="10" Maximum="10000" Width="80" />
+                        <TextBlock Text="Depuis:" VerticalAlignment="Center" Margin="8,0,4,0" />
+                        <TextBox Text="{Binding ContainerSince}" Width="140" Margin="0,0,12,0" Watermark="ISO date (optionnel)" />
+                        <Button Content="⚡ Exécuter" Command="{Binding ExecInContainerCommand}" Margin="0,0,4,0" />
+                        <TextBlock Text="Cmd:" VerticalAlignment="Center" Margin="8,0,4,0" />
+                        <TextBox Text="{Binding ContainerExecCommand}" Width="200" Margin="0,0,12,0" Watermark="commande à exécuter" />
+                        <Button Content="📁 Espaces" Command="{Binding ListNamespacesCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <!-- Grille conteneurs -->
