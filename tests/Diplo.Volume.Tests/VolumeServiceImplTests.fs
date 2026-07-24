@@ -154,6 +154,131 @@ module VolumeServiceImplTests =
         result.State |> should equal MountState.Unmounted
         result.Message |> should equal "Démonté"
 
+    // --- Sécurité : CreateVolume ---
+    [<Fact>]
+    let ``CreateVolume avec nom injection lance exception`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = CreateVolumeRequest(Name = "test; rm -rf /", Driver = StorageDriverType.Local)
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.CreateVolume(req, ctx).Result |> ignore)
+        ex.InnerException.Message |> should haveSubstring "Le nom du volume"
+
+    [<Fact>]
+    let ``CreateVolume avec label clé invalide lance exception`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = CreateVolumeRequest(Name = "vol-ok", Driver = StorageDriverType.Local)
+        req.Labels.Add("bad;key", "val")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.CreateVolume(req, ctx).Result |> ignore)
+        ex.InnerException.Message |> should haveSubstring "La clé du label"
+
+    [<Fact>]
+    let ``CreateVolume avec label valeur invalide lance exception`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = CreateVolumeRequest(Name = "vol-ok", Driver = StorageDriverType.Local)
+        req.Labels.Add("env", "bad|value")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.CreateVolume(req, ctx).Result |> ignore)
+        ex.InnerException.Message |> should haveSubstring "La valeur du label"
+
+    // --- Sécurité : RemoveVolume ---
+    [<Fact>]
+    let ``RemoveVolume avec id vide lance RpcException`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = RemoveVolumeRequest(Id = "", Force = false)
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveVolume(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``RemoveVolume avec id injection lance exception`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = RemoveVolumeRequest(Id = "id; rm -rf /", Force = false)
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveVolume(req, ctx).Result |> ignore)
+        ex.InnerException.Message |> should haveSubstring "L'identifiant du volume"
+
+    // --- Sécurité : InspectVolume ---
+    [<Fact>]
+    let ``InspectVolume avec id vide lance RpcException`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = InspectVolumeRequest(Id = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectVolume(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``InspectVolume avec id injection lance exception`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = InspectVolumeRequest(Id = "`whoami`")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectVolume(req, ctx).Result |> ignore)
+        ex.InnerException.Message |> should haveSubstring "L'identifiant du volume"
+
+    // --- Sécurité : MountVolume ---
+    [<Fact>]
+    let ``MountVolume avec id vide lance RpcException`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = MountVolumeRequest(Id = "", TargetPath = Path.Combine(Path.GetTempPath(), "test"))
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.MountVolume(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``MountVolume avec target vide lance RpcException`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = MountVolumeRequest(Id = "vol123", TargetPath = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.MountVolume(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``MountVolume avec chemin traversal lance exception`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = MountVolumeRequest(Id = "vol123", TargetPath = "/etc/../etc/passwd")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.MountVolume(req, ctx).Result |> ignore)
+        ex.InnerException.Message |> should haveSubstring "Le chemin cible"
+
+    [<Fact>]
+    let ``MountVolume avec chemin non autorise lance exception`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = MountVolumeRequest(Id = "vol123", TargetPath = @"C:\Windows\System32\evil")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.MountVolume(req, ctx).Result |> ignore)
+        ex.InnerException.Message |> should haveSubstring "Le chemin cible"
+
+    // --- Sécurité : UnmountVolume ---
+    [<Fact>]
+    let ``UnmountVolume avec id vide lance RpcException`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = UnmountVolumeRequest(Id = "", TargetPath = Path.Combine(Path.GetTempPath(), "test"))
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.UnmountVolume(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``UnmountVolume avec target vide lance RpcException`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = UnmountVolumeRequest(Id = "vol123", TargetPath = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.UnmountVolume(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``UnmountVolume avec chemin traversal lance exception`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = UnmountVolumeRequest(Id = "vol123", TargetPath = @"C:\tmp\..\..\Windows\System32")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.UnmountVolume(req, ctx).Result |> ignore)
+        ex.InnerException.Message |> should haveSubstring "Le chemin cible"
+
     // --- PruneVolumes ---
     [<Fact>]
     let ``PruneVolumes retourne vide quand aucun volume a supprimer`` () =

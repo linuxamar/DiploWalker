@@ -24,12 +24,17 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.CreateNetwork(request, context) =
         task {
-            if String.IsNullOrEmpty(request.Name) |> not && request.Name.Length > 63 then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom du réseau ne doit pas dépasser 63 caractères")))
             let name = if String.IsNullOrEmpty(request.Name) then Guid.NewGuid().ToString("N") else request.Name
+            SecurityValidation.validateName name "Le nom du réseau"
+            SecurityValidation.validateCidr request.Subnet "Le sous-réseau"
+            SecurityValidation.validateIp request.Gateway "La passerelle"
+            SecurityValidation.validateIp request.IpRange "La plage IP"
+            let labels = request.Labels |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
+            for kv in labels do
+                SecurityValidation.validateLabel kv.Key kv.Value
             let driverType = request.Driver
             let driver = getDriver driverType |> Option.defaultValue (defaultDriver ())
-            let result = driver.Create(name, request.Subnet, request.Gateway, request.IpRange, Map.empty, Map.empty)
+            let result = driver.Create(name, request.Subnet, request.Gateway, request.IpRange, Map.empty, labels)
             let info =
                 match result with
                 | Ok v -> v
@@ -46,8 +51,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.RemoveNetwork(request, context) =
         task {
-            if String.IsNullOrEmpty(request.Id) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
+            SecurityValidation.validateId request.Id "L'identifiant du réseau"
             let mutable foundDriver = None
             for kvp in drivers do
                 match kvp.Value.Inspect(request.Id) with
@@ -72,8 +76,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.InspectNetwork(request, context) =
         task {
-            if String.IsNullOrEmpty(request.Id) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
+            SecurityValidation.validateId request.Id "L'identifiant du réseau"
             let mutable result = None
             for kvp in drivers do
                 if result.IsNone then
@@ -113,10 +116,11 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.ConnectContainer(request, context) =
         task {
-            if String.IsNullOrEmpty(request.NetworkId) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
-            if String.IsNullOrEmpty(request.ContainerId) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            SecurityValidation.validateId request.NetworkId "L'identifiant du réseau"
+            SecurityValidation.validateContainerId request.ContainerId
+            if String.IsNullOrEmpty(request.EndpointId) |> not then
+                SecurityValidation.validateId request.EndpointId "L'identifiant de l'endpoint"
+            SecurityValidation.validateIp request.Ipv4Address "L'adresse IPv4"
             let driverType =
                 let mutable found = None
                 for kvp in drivers do
@@ -142,10 +146,10 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.DisconnectContainer(request, context) =
         task {
-            if String.IsNullOrEmpty(request.NetworkId) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du réseau est requis")))
-            if String.IsNullOrEmpty(request.ContainerId) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            SecurityValidation.validateId request.NetworkId "L'identifiant du réseau"
+            SecurityValidation.validateContainerId request.ContainerId
+            if String.IsNullOrEmpty(request.EndpointId) |> not then
+                SecurityValidation.validateId request.EndpointId "L'identifiant de l'endpoint"
             let mutable foundDriver = None
             for kvp in drivers do
                 match kvp.Value.Inspect(request.NetworkId) with
@@ -167,6 +171,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
     override _.RunCniPlugin(request, context) =
         task {
+            SecurityValidation.validateContainerId request.ContainerId
             let pluginPath = request.PluginPath
             if String.IsNullOrEmpty(pluginPath) then
                 let r = RunCniPluginResponse()
@@ -182,6 +187,8 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     SecurityValidation.validateCniCommand command
                     let configJson =
                         if request.Config |> isNull |> not then
+                            SecurityValidation.validateCidr request.Config.Subnet "Le sous-réseau CNI"
+                            SecurityValidation.validateIp request.Config.Gateway "La passerelle CNI"
                             let config = {|
                                 cniVersion = "1.0.0"
                                 name = request.Config.Name
