@@ -72,6 +72,11 @@ module ``Vérification de la structure des commandes CLI`` =
         typeof<UnmountVolumeCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<UnmountSettings>>)
         |> should be True
 
+    [<Fact>]
+    let ``PruneVolumesCommand hérite de AsyncCommand<CommandSettings>`` () =
+        typeof<PruneVolumesCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+        |> should be True
+
     // --- Network commands ---
     open Diplo.Cli.Network
 
@@ -121,10 +126,33 @@ module ``Vérification de la structure des commandes CLI`` =
         typeof<NamespacesCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
         |> should be True
 
-    // --- New network command ---
+    // --- New network commands ---
     [<Fact>]
     let ``RunCniPluginCommand hérite de AsyncCommand<RunCniPluginSettings>`` () =
         typeof<RunCniPluginCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<RunCniPluginSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``PruneNetworksCommand hérite de AsyncCommand<CommandSettings>`` () =
+        typeof<PruneNetworksCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+        |> should be True
+
+    // --- Status / Config commands ---
+    open Diplo.Cli
+
+    [<Fact>]
+    let ``StatusCommand hérite de AsyncCommand<CommandSettings>`` () =
+        typeof<StatusCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``InitConfigSettings hérite de CommandSettings`` () =
+        typeof<InitConfigSettings>.IsSubclassOf(typeof<Spectre.Console.Cli.CommandSettings>)
+        |> should be True
+
+    [<Fact>]
+    let ``InitConfigCommand hérite de Command<InitConfigSettings>`` () =
+        typeof<InitConfigCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.Command<InitConfigSettings>>)
         |> should be True
 
 module ``Vérification des paramètres des commandes`` =
@@ -180,6 +208,13 @@ module ``Vérification des paramètres des commandes`` =
         let settings = DisconnectSettings()
         settings.Force |> should equal false
 
+    open Diplo.Cli
+
+    [<Fact>]
+    let ``InitConfigSettings.Path est vide par défaut`` () =
+        let settings = InitConfigSettings()
+        settings.Path |> should equal ""
+
     [<Fact>]
     let ``LogsContainerSettings.Follow est false par défaut`` () =
         let settings = LogsContainerSettings()
@@ -199,6 +234,24 @@ module ``Vérification des paramètres des commandes`` =
     let ``RunCniPluginSettings.ConfigType est null par défaut`` () =
         let settings = RunCniPluginSettings()
         settings.ConfigType |> should be Null
+
+    // --- New container commands ---
+    open Diplo.Cli.Container
+
+    [<Fact>]
+    let ``RenameContainerSettings hérite de CommandSettings`` () =
+        typeof<RenameContainerSettings>.IsSubclassOf(typeof<Spectre.Console.Cli.CommandSettings>)
+        |> should be True
+
+    [<Fact>]
+    let ``TopContainerSettings hérite de CommandSettings`` () =
+        typeof<TopContainerSettings>.IsSubclassOf(typeof<Spectre.Console.Cli.CommandSettings>)
+        |> should be True
+
+    [<Fact>]
+    let ``StatsContainerSettings hérite de CommandSettings`` () =
+        typeof<StatsContainerSettings>.IsSubclassOf(typeof<Spectre.Console.Cli.CommandSettings>)
+        |> should be True
 
 module ``Vérification du MockOutputPort`` =
 

@@ -8,6 +8,7 @@ type MockVolumeDriver() =
 
     let mutable volumes = Map.empty<string, string * string * Map<string, string> * Map<string, string>>
     let mutable mountedVolumes = Set.empty<string>
+    let mutable pruneResult: string list = []
     let ownedDocs = System.Collections.Generic.List<JsonDocument>()
 
     let keepDoc (doc: JsonDocument) =
@@ -60,11 +61,13 @@ type MockVolumeDriver() =
             mountedVolumes <- mountedVolumes |> Set.remove id
             (true, "Démonté")
 
+        member _.PruneVolumes() = pruneResult
         member _.GetVolumeSize(id) =
             if volumes |> Map.containsKey id then 1024L else 0L
-
-        member _.PruneVolumes() = []
 
     member this.Mock : IVolumeDriver = this :> IVolumeDriver
     member _.Volumes = volumes
     member _.MountedVolumes = mountedVolumes
+    member _.PruneResult
+        with get() = pruneResult
+        and set(value) = pruneResult <- value

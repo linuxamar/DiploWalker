@@ -153,3 +153,28 @@ module VolumeServiceImplTests =
         let result = svc.UnmountVolume(req, ctx).Result
         result.State |> should equal MountState.Unmounted
         result.Message |> should equal "Démonté"
+
+    // --- PruneVolumes ---
+    [<Fact>]
+    let ``PruneVolumes retourne vide quand aucun volume a supprimer`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = PruneVolumesRequest()
+        let result = svc.PruneVolumes(req, ctx).Result
+        result.Count |> should equal 0
+        result.VolumesDeleted.Count |> should equal 0
+        result.Message |> should equal "0 volume(s) supprimé(s)"
+
+    [<Fact>]
+    let ``PruneVolumes retourne les ids supprimes`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        mock.PruneResult <- [ "vol-1"; "vol-2"; "vol-3" ]
+        let req = PruneVolumesRequest()
+        let result = svc.PruneVolumes(req, ctx).Result
+        result.Count |> should equal 3
+        result.VolumesDeleted.Count |> should equal 3
+        result.VolumesDeleted |> should contain "vol-1"
+        result.VolumesDeleted |> should contain "vol-2"
+        result.VolumesDeleted |> should contain "vol-3"
+        result.Message |> should equal "3 volume(s) supprimé(s)"

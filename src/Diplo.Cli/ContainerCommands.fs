@@ -168,10 +168,10 @@ type CreateContainerCommand(output: IOutputPort) =
                 client.CreateAsync(
                     name = settings.Name,
                     image = settings.Image,
-                    ?env = (if env.Count > 0 then Some (env :> IDictionary<string, string>) else None),
+                    ?env = (if env.Count > 0 then Some env else None),
                     ?command = (if command.IsEmpty then None else Some command),
                     ?args = (if args.IsEmpty then None else Some args),
-                    ?labels = (if labels.Count > 0 then Some (labels :> IDictionary<string, string>) else None),
+                    ?labels = (if labels.Count > 0 then Some labels else None),
                     ?pidLimit = (if settings.PidLimit > 0u then Some settings.PidLimit else None),
                     ?memoryLimit = (if settings.MemoryLimit > 0L then Some settings.MemoryLimit else None),
                     ?cpuShares = (if settings.CpuShares > 0L then Some settings.CpuShares else None))

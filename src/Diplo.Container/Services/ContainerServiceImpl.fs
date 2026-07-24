@@ -223,8 +223,9 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 if json.TryGetProperty("cpu", &temp) then
                     if temp.TryGetProperty("usage", &temp) then response.CpuUsage <- temp.GetInt64()
                 if json.TryGetProperty("memory", &temp) then
-                    if temp.TryGetProperty("usage", &temp) then response.MemoryUsage <- temp.GetInt64()
-                    if temp.TryGetProperty("limit", &temp) then response.MemoryLimit <- temp.GetInt64()
+                    let memObj = temp
+                    if memObj.TryGetProperty("usage", &temp) then response.MemoryUsage <- temp.GetInt64()
+                    if memObj.TryGetProperty("limit", &temp) then response.MemoryLimit <- temp.GetInt64()
                 if json.TryGetProperty("pids", &temp) then
                     if temp.TryGetProperty("current", &temp) then response.Pids <- temp.GetDouble()
             with ex ->

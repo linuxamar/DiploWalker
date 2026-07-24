@@ -16,8 +16,8 @@ type StatusCommand(output: IOutputPort) =
             let! containerStatus =
                 task {
                     try
-                        use client = ContainerClient()
-                        let! v = client.GetVersionAsync()
+                        use _client = new ContainerClient()
+                        let! v = _client.GetVersionAsync()
                         return (true, sprintf "v%s (%s/%s)" v.Version v.Os v.Arch)
                     with ex ->
                         return (false, ex.Message)
@@ -26,8 +26,8 @@ type StatusCommand(output: IOutputPort) =
             let! volumeStatus =
                 task {
                     try
-                        use client = VolumeClient()
-                        let! v = client.ListAsync()
+                        use _client = new VolumeClient()
+                        let! v = _client.ListAsync()
                         return (true, sprintf "%d volume(s)" v.Volumes.Count)
                     with ex ->
                         return (false, ex.Message)
@@ -36,8 +36,8 @@ type StatusCommand(output: IOutputPort) =
             let! networkStatus =
                 task {
                     try
-                        use client = NetworkClient()
-                        let! n = client.ListAsync()
+                        use _client = new NetworkClient()
+                        let! n = _client.ListAsync()
                         return (true, sprintf "%d réseau(x)" n.Networks.Count)
                     with ex ->
                         return (false, ex.Message)

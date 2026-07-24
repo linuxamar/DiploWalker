@@ -221,3 +221,78 @@ module ContainerServiceImplTests =
         let result = svc.PullImage(req, ctx).Result
         result.Image |> should equal "mcr.microsoft.com/windows/servercore:ltsc2022"
         mock.PulledImages |> should contain "mcr.microsoft.com/windows/servercore:ltsc2022"
+
+    // --- RenameContainer ---
+    [<Fact>]
+    let ``RenameContainer avec id et nom retourne success`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
+        let req = RenameContainerRequest(Id = "c1", NewName = "nouveau-nom")
+        let result = svc.RenameContainer(req, ctx).Result
+        result.Success |> should equal true
+        result.Message |> shouldContain "nouveau-nom"
+
+    [<Fact>]
+    let ``RenameContainer avec id vide leve InvalidArgument`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = RenameContainerRequest(Id = "", NewName = "nom")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.RenameContainer(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``RenameContainer avec nom vide leve InvalidArgument`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
+        let req = RenameContainerRequest(Id = "c1", NewName = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.RenameContainer(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // --- TopContainer ---
+    [<Fact>]
+    let ``TopContainer retourne les processus`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
+        mock.Mock.StartContainer("default", "c1")
+        let req = TopContainerRequest(Id = "c1")
+        let result = svc.TopContainer(req, ctx).Result
+        result.Processes.Count |> should equal 1
+        result.Processes.[0].Pid |> should equal 1234L
+        result.Processes.[0].User |> should equal "root"
+        result.Processes.[0].Command |> should equal "dotnet app.dll"
+
+    [<Fact>]
+    let ``TopContainer avec id vide leve InvalidArgument`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = TopContainerRequest(Id = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.TopContainer(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // --- GetContainerStats ---
+    [<Fact>]
+    let ``GetContainerStats retourne les metriques`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
+        let req = GetContainerStatsRequest(Id = "c1")
+        let result = svc.GetContainerStats(req, ctx).Result
+        result.CpuUsage |> should equal 123456L
+        result.MemoryUsage |> should equal 1048576L
+        result.MemoryLimit |> should equal 536870912L
+        result.Pids |> should equal 3.0
+
+    [<Fact>]
+    let ``GetContainerStats avec id vide leve InvalidArgument`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = GetContainerStatsRequest(Id = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.GetContainerStats(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument

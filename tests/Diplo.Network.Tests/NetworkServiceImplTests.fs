@@ -181,3 +181,29 @@ module NetworkServiceImplTests =
         let result = svc.DisconnectContainer(req, ctx).Result
         result.Success |> should equal false
         result.Message.Contains("introuvable") |> should equal true
+
+    // --- PruneNetworks ---
+    [<Fact>]
+    let ``PruneNetworks retourne vide quand aucun reseau`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = PruneNetworksRequest()
+        let result = svc.PruneNetworks(req, ctx).Result
+        result.Count |> should equal 0
+        result.NetworksDeleted.Count |> should equal 0
+        result.Message |> should equal "0 réseau(x) supprimé(s)"
+
+    [<Fact>]
+    let ``PruneNetworks supprime tous les reseaux existants`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        let req1 = CreateNetworkRequest(Name = "net-prune-1", Driver = NetworkDriver.Bridge)
+        let req2 = CreateNetworkRequest(Name = "net-prune-2", Driver = NetworkDriver.Bridge)
+        let r1 = svc.CreateNetwork(req1, ctx).Result
+        let r2 = svc.CreateNetwork(req2, ctx).Result
+        let req = PruneNetworksRequest()
+        let result = svc.PruneNetworks(req, ctx).Result
+        result.Count |> should equal 2
+        result.NetworksDeleted.Count |> should equal 2
+        result.NetworksDeleted |> should contain r1.Id
+        result.NetworksDeleted |> should contain r2.Id
