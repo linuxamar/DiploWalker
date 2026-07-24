@@ -209,3 +209,49 @@ type ContainerdClient(runner: IProcessRunner) =
                 Log.Error(ex, "Erreur lors de la récupération des métriques du conteneur {ContainerId}", id)
                 use doc = JsonDocument.Parse("{}")
                 doc.RootElement.Clone()
+
+        member _.ListImages(namespaceName) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            try
+                let output = runCtr [ "image"; "list"; "--namespace"; namespaceName ]
+                let lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+                lines
+                |> Array.map (fun line ->
+                    let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                    let json =
+                        if parts.Length >= 2 then
+                            sprintf """{"id":"%s","repository":"%s","ref":"%s"}""" parts[0] parts[0] parts[0]
+                        else
+                            sprintf """{"id":"%s","repository":"%s","ref":"%s"}""" line line line
+                    parseJson json)
+                |> Array.toList
+            with ex ->
+                Log.Error(ex, "Erreur lors de la récupération des images")
+                []
+
+        member _.InspectImage(namespaceName, imageRef) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateImage imageRef
+            try
+                let output = runCtr [ "image"; "info"; "--namespace"; namespaceName; imageRef ]
+                parseJson output
+            with ex ->
+                Log.Error(ex, "Erreur lors de l'inspection de l'image {ImageRef}", imageRef)
+                use doc = JsonDocument.Parse("{}")
+                doc.RootElement.Clone()
+
+        member _.RemoveImage(namespaceName, imageRef) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateImage imageRef
+            try
+                runCtr [ "image"; "remove"; "--namespace"; namespaceName; imageRef ] |> ignore
+                sprintf "Image %s supprimée" imageRef
+            with ex ->
+                Log.Error(ex, "Erreur lors de la suppression de l'image {ImageRef}", imageRef)
+                sprintf "Erreur lors de la suppression de l'image %s" imageRef
+
+        member _.TagImage(namespaceName, source, target) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateImage source
+            SecurityValidation.validateImage target
+            runCtr [ "image"; "tag"; "--namespace"; namespaceName; source; target ] |> ignore

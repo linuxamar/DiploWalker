@@ -141,6 +141,50 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
+    member _.ListImagesAsync(?namespaceName: string, ?ct: CancellationToken) =
+        task {
+            let ns = defaultArg namespaceName ""
+            let ct = defaultArg ct CancellationToken.None
+            let request = ListImagesRequest()
+            if not (System.String.IsNullOrEmpty(ns)) then
+                request.NamespaceName <- ns
+            let! response = client.ListImagesAsync(request, cancellationToken = ct).ResponseAsync
+            return response
+        }
+
+    member _.InspectImageAsync(ref: string, ?namespaceName: string, ?ct: CancellationToken) =
+        task {
+            let ns = defaultArg namespaceName ""
+            let ct = defaultArg ct CancellationToken.None
+            let request = InspectImageRequest(Ref = ref)
+            if not (System.String.IsNullOrEmpty(ns)) then
+                request.NamespaceName <- ns
+            let! response = client.InspectImageAsync(request, cancellationToken = ct).ResponseAsync
+            return response
+        }
+
+    member _.RemoveImageAsync(ref: string, ?namespaceName: string, ?ct: CancellationToken) =
+        task {
+            let ns = defaultArg namespaceName ""
+            let ct = defaultArg ct CancellationToken.None
+            let request = RemoveImageRequest(Ref = ref)
+            if not (System.String.IsNullOrEmpty(ns)) then
+                request.NamespaceName <- ns
+            let! response = client.RemoveImageAsync(request, cancellationToken = ct).ResponseAsync
+            return response
+        }
+
+    member _.TagImageAsync(source: string, target: string, ?namespaceName: string, ?ct: CancellationToken) =
+        task {
+            let ns = defaultArg namespaceName ""
+            let ct = defaultArg ct CancellationToken.None
+            let request = TagImageRequest(Source = source, Target = target)
+            if not (System.String.IsNullOrEmpty(ns)) then
+                request.NamespaceName <- ns
+            let! response = client.TagImageAsync(request, cancellationToken = ct).ResponseAsync
+            return response
+        }
+
     interface IDisposable with
         member _.Dispose() =
             if ownsChannel then channel.Dispose()

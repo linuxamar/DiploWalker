@@ -335,3 +335,97 @@ type StatsContainerCommand(output: IOutputPort) =
             output.WriteLine(sprintf "  PIDs      : %.0f" response.Pids)
             return 0
         }
+
+// ── image list ────────────────────────────────────────────────────
+type ImageListSettings() =
+    inherit CommandSettings()
+    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+type ImageListCommand(output: IOutputPort) =
+    inherit AsyncCommand<ImageListSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let ns = if isNull settings.Namespace then "" else settings.Namespace
+            let! response = client.ListImagesAsync(ns)
+            if response.Images.Count = 0 then
+                output.WriteWarning("Aucune image trouvée.")
+            else
+                output.WriteTable(
+                    response.Images,
+                    [| "ID"; "Référentiel"; "Tag"; "Taille"; "Créé" |],
+                    fun img ->
+                        [| img.Id
+                           img.Repository
+                           img.Tag
+                           string img.Size
+                           img.CreatedAt |])
+            return 0
+        }
+
+// ── image inspect ─────────────────────────────────────────────────
+type ImageInspectSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<REF>")>] member val Ref: string = null with get, set
+    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+type ImageInspectCommand(output: IOutputPort) =
+    inherit AsyncCommand<ImageInspectSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let ns = if isNull settings.Namespace then "" else settings.Namespace
+            let! response = client.InspectImageAsync(settings.Ref, ns)
+            output.WriteSuccess(sprintf "Image %s" response.Ref)
+            output.WriteLine(sprintf "  ID           : %s" response.Id)
+            output.WriteLine(sprintf "  Référentiel : %s" response.Repository)
+            output.WriteLine(sprintf "  Tag          : %s" response.Tag)
+            output.WriteLine(sprintf "  Taille       : %d octets" response.Size)
+            output.WriteLine(sprintf "  Créé         : %s" response.CreatedAt)
+            if response.Labels.Count > 0 then
+                for kv in response.Labels do
+                    output.WriteLine(sprintf "  Label        : %s=%s" kv.Key kv.Value)
+            return 0
+        }
+
+// ── image remove ──────────────────────────────────────────────────
+type ImageRemoveSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<REF>")>] member val Ref: string = null with get, set
+    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+type ImageRemoveCommand(output: IOutputPort) =
+    inherit AsyncCommand<ImageRemoveSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let ns = if isNull settings.Namespace then "" else settings.Namespace
+            let! response = client.RemoveImageAsync(settings.Ref, ns)
+            if response.Success then
+                output.WriteSuccess(response.Message)
+            else
+                output.WriteError(response.Message)
+            return 0
+        }
+
+// ── image tag ─────────────────────────────────────────────────────
+type ImageTagSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<SOURCE>")>] member val Source: string = null with get, set
+    [<CommandArgument(1, "<TARGET>")>] member val Target: string = null with get, set
+    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+type ImageTagCommand(output: IOutputPort) =
+    inherit AsyncCommand<ImageTagSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            use client = new ContainerClient()
+            let ns = if isNull settings.Namespace then "" else settings.Namespace
+            let! response = client.TagImageAsync(settings.Source, settings.Target, ns)
+            output.WriteSuccess(response.Message)
+            return 0
+        }

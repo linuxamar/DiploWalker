@@ -40,6 +40,10 @@ let main argv =
             addCmd<RenameContainerCommand> c "rename"
             addCmd<TopContainerCommand> c "top"
             addCmd<StatsContainerCommand> c "stats"
+            addCmd<ImageListCommand> c "image-list"
+            addCmd<ImageInspectCommand> c "image-inspect"
+            addCmd<ImageRemoveCommand> c "image-remove"
+            addCmd<ImageTagCommand> c "image-tag"
         ) |> ignore
 
         config.AddBranch("volume", fun (c: IConfigurator<CommandSettings>) ->

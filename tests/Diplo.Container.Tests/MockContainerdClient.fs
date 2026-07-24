@@ -11,6 +11,7 @@ type MockContainerdClient() =
     let mutable deletedContainers = Set.empty<string>
     let mutable stopCalled = Map.empty<string, int>
     let mutable pulledImages = Set.empty<string>
+    let mutable removedImages = Set.empty<string>
     let ownedDocs = System.Collections.Generic.List<JsonDocument>()
 
     let keepDoc (doc: JsonDocument) =
@@ -84,8 +85,28 @@ type MockContainerdClient() =
         member _.GetContainerStats(_namespaceName, _id) =
             JsonDocument.Parse("""{"cpu":{"usage":123456},"memory":{"usage":1048576,"limit":536870912},"pids":{"current":3}}""").RootElement
 
+        member _.ListImages(_namespaceName) =
+            [
+                JsonDocument.Parse("""{"id":"nginx:latest","ref":"docker.io/library/nginx:latest","repository":"library/nginx","tag":"latest","size":18567432,"created_at":"2025-01-10T08:00:00Z"}""").RootElement
+                JsonDocument.Parse("""{"id":"redis:7","ref":"docker.io/library/redis:7","repository":"library/redis","tag":"7","size":138670845,"created_at":"2025-01-05T12:00:00Z"}""").RootElement
+            ]
+
+        member _.InspectImage(_namespaceName, imageRef) =
+            let repo = imageRef.Split([| ':' |]).[0]
+            let json = sprintf """{"id":"%s","ref":"%s","repository":"library/%s","tag":"latest","size":18567432,"created_at":"2025-01-10T08:00:00Z","labels":{"maintainer":"nginx"}}""" imageRef imageRef repo
+            let doc = JsonDocument.Parse(json) |> keepDoc
+            doc.RootElement
+
+        member _.RemoveImage(_namespaceName, imageRef) =
+            removedImages <- removedImages |> Set.add imageRef
+            sprintf "Image %s supprimée" imageRef
+
+        member _.TagImage(_namespaceName, _source, _target) =
+            ()
+
     member this.Mock : IContainerdClient = this :> IContainerdClient
     member _.StopCalled = stopCalled
     member _.DeletedContainers = deletedContainers
     member _.StartedContainers = startedContainers
     member _.PulledImages = pulledImages
+    member _.RemovedImages = removedImages

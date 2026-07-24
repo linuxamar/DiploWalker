@@ -26,6 +26,10 @@ module Interfaces =
         abstract member RenameContainer: namespaceName: string * id: string * newName: string -> unit
         abstract member TopContainer: namespaceName: string * id: string -> string
         abstract member GetContainerStats: namespaceName: string * id: string -> JsonElement
+        abstract member ListImages: namespaceName: string -> JsonElement list
+        abstract member InspectImage: namespaceName: string * ref: string -> JsonElement
+        abstract member RemoveImage: namespaceName: string * ref: string -> string
+        abstract member TagImage: namespaceName: string * source: string * target: string -> unit
 
     /// Driver de volumes pour la gestion du stockage
     type IVolumeDriver =

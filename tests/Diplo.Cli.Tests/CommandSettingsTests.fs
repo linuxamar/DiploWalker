@@ -235,6 +235,32 @@ module ``Vérification des paramètres des commandes`` =
         let settings = RunCniPluginSettings()
         settings.ConfigType |> should be Null
 
+    // --- Image settings ---
+    [<Fact>]
+    let ``ImageListSettings.Namespace est null par défaut`` () =
+        let settings = ImageListSettings()
+        settings.Namespace |> should be Null
+
+    [<Fact>]
+    let ``ImageInspectSettings.Ref est null par défaut`` () =
+        let settings = ImageInspectSettings()
+        settings.Ref |> should be Null
+
+    [<Fact>]
+    let ``ImageRemoveSettings.Ref est null par défaut`` () =
+        let settings = ImageRemoveSettings()
+        settings.Ref |> should be Null
+
+    [<Fact>]
+    let ``ImageTagSettings.Source est null par défaut`` () =
+        let settings = ImageTagSettings()
+        settings.Source |> should be Null
+
+    [<Fact>]
+    let ``ImageTagSettings.Target est null par défaut`` () =
+        let settings = ImageTagSettings()
+        settings.Target |> should be Null
+
     // --- New container commands ---
     open Diplo.Cli.Container
 
@@ -251,6 +277,27 @@ module ``Vérification des paramètres des commandes`` =
     [<Fact>]
     let ``StatsContainerSettings hérite de CommandSettings`` () =
         typeof<StatsContainerSettings>.IsSubclassOf(typeof<Spectre.Console.Cli.CommandSettings>)
+        |> should be True
+
+    // --- Image commands ---
+    [<Fact>]
+    let ``ImageListCommand hérite de AsyncCommand<ImageListSettings>`` () =
+        typeof<ImageListCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ImageListSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ImageInspectCommand hérite de AsyncCommand<ImageInspectSettings>`` () =
+        typeof<ImageInspectCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ImageInspectSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ImageRemoveCommand hérite de AsyncCommand<ImageRemoveSettings>`` () =
+        typeof<ImageRemoveCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ImageRemoveSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ImageTagCommand hérite de AsyncCommand<ImageTagSettings>`` () =
+        typeof<ImageTagCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ImageTagSettings>>)
         |> should be True
 
 module ``Vérification du MockOutputPort`` =

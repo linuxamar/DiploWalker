@@ -296,3 +296,89 @@ module ContainerServiceImplTests =
         let ex = Assert.Throws<AggregateException>(fun () -> svc.GetContainerStats(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // --- ListImages ---
+    [<Fact>]
+    let ``ListImages retourne les images disponibles`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = ListImagesRequest()
+        let result = svc.ListImages(req, ctx).Result
+        result.Images.Count |> should equal 2
+        result.Images |> Seq.exists (fun i -> i.Repository = "library/nginx") |> should equal true
+        result.Images |> Seq.exists (fun i -> i.Repository = "library/redis") |> should equal true
+
+    [<Fact>]
+    let ``ListImages avec namespace vide utilise le namespace par defaut`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = ListImagesRequest()
+        let result = svc.ListImages(req, ctx).Result
+        result.Images.Count |> should equal 2
+
+    // --- InspectImage ---
+    [<Fact>]
+    let ``InspectImage retourne les details de l'image`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = InspectImageRequest(Ref = "nginx:latest")
+        let result = svc.InspectImage(req, ctx).Result
+        result.Ref |> should equal "nginx:latest"
+        result.Repository |> should equal "library/nginx"
+        result.Labels.["maintainer"] |> should equal "nginx"
+
+    [<Fact>]
+    let ``InspectImage avec ref vide leve InvalidArgument`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = InspectImageRequest(Ref = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectImage(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // --- RemoveImage ---
+    [<Fact>]
+    let ``RemoveImage supprime l'image avec succes`` () =
+        let svc, mock = createService ()
+        let ctx = createCtx ()
+        let req = RemoveImageRequest(Ref = "nginx:latest")
+        let result = svc.RemoveImage(req, ctx).Result
+        result.Success |> should equal true
+        result.Message |> shouldContain "nginx:latest"
+
+    [<Fact>]
+    let ``RemoveImage avec ref vide leve InvalidArgument`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = RemoveImageRequest(Ref = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveImage(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // --- TagImage ---
+    [<Fact>]
+    let ``TagImage tag l'image avec succes`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = TagImageRequest(Source = "nginx:latest", Target = "myregistry.azurecr.io/nginx:v1")
+        let result = svc.TagImage(req, ctx).Result
+        result.Source |> should equal "nginx:latest"
+        result.Target |> should equal "myregistry.azurecr.io/nginx:v1"
+
+    [<Fact>]
+    let ``TagImage avec source vide leve InvalidArgument`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = TagImageRequest(Source = "", Target = "myregistry.azurecr.io/nginx:v1")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.TagImage(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``TagImage avec cible vide leve InvalidArgument`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+        let req = TagImageRequest(Source = "nginx:latest", Target = "")
+        let ex = Assert.Throws<AggregateException>(fun () -> svc.TagImage(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument

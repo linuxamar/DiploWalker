@@ -19,6 +19,10 @@ service ContainerService {
   rpc RenameContainer(RenameContainerRequest) returns (RenameContainerResponse);
   rpc TopContainer(TopContainerRequest) returns (TopContainerResponse);
   rpc GetContainerStats(GetContainerStatsRequest) returns (GetContainerStatsResponse);
+  rpc ListImages(ListImagesRequest) returns (ListImagesResponse);
+  rpc InspectImage(InspectImageRequest) returns (InspectImageResponse);
+  rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse);
+  rpc TagImage(TagImageRequest) returns (TagImageResponse);
 }
 
 enum ContainerState {
@@ -203,4 +207,58 @@ message GetContainerStatsResponse {
   int64 disk_read = 6;
   int64 disk_write = 7;
   double pids = 8;
+}
+
+message ListImagesRequest {
+  string namespace_name = 1;
+}
+
+message ImageInfo {
+  string ref = 1;
+  string id = 2;
+  string repository = 3;
+  string tag = 4;
+  int64 size = 5;
+  string created_at = 6;
+}
+
+message ListImagesResponse {
+  repeated ImageInfo images = 1;
+}
+
+message InspectImageRequest {
+  string ref = 1;
+  string namespace_name = 2;
+}
+
+message InspectImageResponse {
+  string ref = 1;
+  string id = 2;
+  string repository = 3;
+  string tag = 4;
+  int64 size = 5;
+  string created_at = 6;
+  map<string, string> labels = 7;
+}
+
+message RemoveImageRequest {
+  string ref = 1;
+  string namespace_name = 2;
+}
+
+message RemoveImageResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message TagImageRequest {
+  string source = 1;
+  string target = 2;
+  string namespace_name = 3;
+}
+
+message TagImageResponse {
+  string source = 1;
+  string target = 2;
+  string message = 3;
 }

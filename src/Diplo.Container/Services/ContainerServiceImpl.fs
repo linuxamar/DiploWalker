@@ -232,3 +232,62 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 Log.Warning(ex, "Erreur lors du parsing des métriques du conteneur {ContainerId}", request.Id)
             return response
         }
+
+    override _.ListImages(request, context) =
+        task {
+            let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
+            let images = client.ListImages(ns)
+            let response = ListImagesResponse()
+            for imgJson in images do
+                let info = ImageInfo()
+                let mutable temp = Unchecked.defaultof<JsonElement>
+                if imgJson.TryGetProperty("ref", &temp) then info.Ref <- temp.GetString()
+                if imgJson.TryGetProperty("id", &temp) then info.Id <- temp.GetString()
+                if imgJson.TryGetProperty("repository", &temp) then info.Repository <- temp.GetString()
+                if imgJson.TryGetProperty("tag", &temp) then info.Tag <- temp.GetString()
+                if imgJson.TryGetProperty("size", &temp) then info.Size <- temp.GetInt64()
+                if imgJson.TryGetProperty("created_at", &temp) then info.CreatedAt <- temp.GetString()
+                response.Images.Add(info)
+            return response
+        }
+
+    override _.InspectImage(request, context) =
+        task {
+            if String.IsNullOrEmpty(request.Ref) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
+            let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
+            let imgJson = client.InspectImage(ns, request.Ref)
+            let response = InspectImageResponse()
+            let mutable temp = Unchecked.defaultof<JsonElement>
+            if imgJson.TryGetProperty("ref", &temp) then response.Ref <- temp.GetString()
+            if imgJson.TryGetProperty("id", &temp) then response.Id <- temp.GetString()
+            if imgJson.TryGetProperty("repository", &temp) then response.Repository <- temp.GetString()
+            if imgJson.TryGetProperty("tag", &temp) then response.Tag <- temp.GetString()
+            if imgJson.TryGetProperty("size", &temp) then response.Size <- temp.GetInt64()
+            if imgJson.TryGetProperty("created_at", &temp) then response.CreatedAt <- temp.GetString()
+            let mutable labelsValue = Unchecked.defaultof<JsonElement>
+            if imgJson.TryGetProperty("labels", &labelsValue) then
+                for prop in labelsValue.EnumerateObject() do
+                    response.Labels[prop.Name] <- prop.Value.GetString()
+            return response
+        }
+
+    override _.RemoveImage(request, context) =
+        task {
+            if String.IsNullOrEmpty(request.Ref) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
+            let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
+            let message = client.RemoveImage(ns, request.Ref)
+            return RemoveImageResponse(Success = true, Message = message)
+        }
+
+    override _.TagImage(request, context) =
+        task {
+            if String.IsNullOrEmpty(request.Source) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "La source de l'image est requise")))
+            if String.IsNullOrEmpty(request.Target) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "La cible de l'image est requise")))
+            let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
+            client.TagImage(ns, request.Source, request.Target)
+            return TagImageResponse(Source = request.Source, Target = request.Target, Message = sprintf "Image marquée de '%s' vers '%s'" request.Source request.Target)
+        }
