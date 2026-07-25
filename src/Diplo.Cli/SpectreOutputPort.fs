@@ -20,11 +20,11 @@ type SpectreOutputPort() =
         member _.WriteWarning(text: string) =
             AnsiConsole.MarkupLine("[yellow]" + Markup.Escape(text) + "[/]")
 
-        member _.WriteTable(items: IReadOnlyList<'T>, columns: string[], selector: Func<'T, string[]>) =
+        member _.WriteTable(items: IReadOnlyList<'T>, columns: string[], selector: 'T -> string[]) =
             let table = Table().Border(TableBorder.Rounded)
             for col in columns do
                 table.AddColumn(col) |> ignore
             for item in items do
-                let cells = selector.Invoke(item)
+                let cells = selector item
                 table.AddRow(cells) |> ignore
             AnsiConsole.Write(table)

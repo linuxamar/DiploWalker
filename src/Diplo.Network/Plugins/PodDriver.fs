@@ -2,7 +2,6 @@ namespace Diplo.Network.Plugins
 
 open System
 open System.Collections.Concurrent
-open System.Diagnostics
 open Serilog
 open Diplo.Abstractions
 open Diplo.Abstractions.NetworkConfig
@@ -16,36 +15,6 @@ type IHnsProvider =
     abstract member RemoveNat: natName: string -> unit
 
 type HnsPowerShellProvider() =
-
-    let runPowershellWithArgs (cmdlet: string) (parameters: (string * string) list) =
-        let psi = ProcessStartInfo()
-        psi.FileName <- "powershell"
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        psi.ArgumentList.Add("-NoProfile") |> ignore
-        psi.ArgumentList.Add("-NonInteractive") |> ignore
-        psi.ArgumentList.Add("-Command") |> ignore
-        let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
-        let paramValues = parameters |> List.map snd
-        let paramDecl = paramNames |> String.concat ", "
-        let body = sprintf "%s -%s" cmdlet (parameters |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i]) |> String.concat " -")
-        let script = sprintf "{ param(%s) %s }" paramDecl body
-        psi.ArgumentList.Add(script) |> ignore
-        for value in paramValues do
-            psi.ArgumentList.Add(value) |> ignore
-        use proc = Process.Start(psi)
-        if proc |> isNull then failwithf "Impossible de démarrer PowerShell"
-        let stdout = proc.StandardOutput.ReadToEnd()
-        let stderr = proc.StandardError.ReadToEnd()
-        if not (proc.WaitForExit(60_000)) then
-            try proc.Kill(true) with _ -> ()
-            failwith "Délai d'attente dépassé pour PowerShell (60s)"
-        if proc.ExitCode <> 0 then
-            Log.Warning("PowerShell stderr: {Stderr}", stderr)
-            failwithf "PowerShell a échoué (code %d)" proc.ExitCode
-        stdout
 
     interface IHnsProvider with
         member _.CreateNetwork(name, subnet) =

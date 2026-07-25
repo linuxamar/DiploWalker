@@ -1,6 +1,5 @@
 namespace Diplo.Core.Output
 
-open System
 open System.Collections.Generic
 
 /// Abstraction de sortie pour decoupler l'affichage du metier.
@@ -10,4 +9,4 @@ type IOutputPort =
     abstract WriteError: text: string -> unit
     abstract WriteSuccess: text: string -> unit
     abstract WriteWarning: text: string -> unit
-    abstract WriteTable: items: IReadOnlyList<'T> * columns: string[] * selector: Func<'T, string[]> -> unit
+    abstract WriteTable: items: IReadOnlyList<'T> * columns: string[] * selector: ('T -> string[]) -> unit

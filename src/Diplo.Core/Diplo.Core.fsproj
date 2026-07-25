@@ -7,13 +7,14 @@
   <ItemGroup>
     <Compile Include="Output\IOutputPort.fs" />
     <Compile Include="Connection\DiploChannel.fs" />
+    <Compile Include="Clients\GrpcClientBase.fs" />
     <Compile Include="Clients\ContainerClient.fs" />
     <Compile Include="Clients\VolumeClient.fs" />
     <Compile Include="Clients\NetworkClient.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Grpc.Net.Client" Version="2.80.0" />
+    <PackageReference Include="Grpc.Net.Client"  />
   </ItemGroup>
 
   <ItemGroup>

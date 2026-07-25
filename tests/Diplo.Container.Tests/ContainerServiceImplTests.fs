@@ -48,7 +48,7 @@ module ContainerServiceImplTests =
         let result = svc.CreateContainer(req, ctx).Result
         result.Id |> should equal "mon-conteneur"
         result.Name |> should equal "mon-conteneur"
-        result.State |> should equal ContainerState.Running
+        result.State |> should equal ContainerState.Created
 
     [<Fact>]
     let ``CreateContainer sans nom genere un id automatiquement`` () =
@@ -58,7 +58,7 @@ module ContainerServiceImplTests =
         let result = svc.CreateContainer(req, ctx).Result
         String.IsNullOrEmpty(result.Id) |> should equal false
         result.Id.Length |> should equal 32
-        result.State |> should equal ContainerState.Running
+        result.State |> should equal ContainerState.Created
 
     [<Fact>]
     let ``StartContainer retourne Running`` () =

@@ -32,7 +32,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
             return CreateContainerResponse(
                 Id = id,
                 Name = request.Name,
-                State = ContainerState.Running,
+                State = ContainerState.Created,
                 CreatedAt = DateTime.UtcNow.ToString("o")
             )
         }
@@ -124,6 +124,23 @@ type ContainerServiceImpl(client: IContainerdClient) =
             for id in ids do
                 let ci = ContainerInfo()
                 ci.Id <- id
+                try
+                    let info = client.InspectContainer(DefaultNamespace, id)
+                    let mutable temp = Unchecked.defaultof<JsonElement>
+                    if info.TryGetProperty("image", &temp) then ci.Image <- temp.GetString()
+                    let mutable taskInfo = Unchecked.defaultof<JsonElement>
+                    let ti = client.TaskInfo(DefaultNamespace, id)
+                    if ti.TryGetProperty("status", &taskInfo) then
+                        ci.State <-
+                            match taskInfo.GetString().ToLowerInvariant() with
+                            | "running" -> ContainerState.Running
+                            | "created" -> ContainerState.Created
+                            | "paused" | "pausing" -> ContainerState.Paused
+                            | "stopped" | "deleted" -> ContainerState.Stopped
+                            | "dead" -> ContainerState.Failed
+                            | _ -> ContainerState.Unknown
+                with ex ->
+                    Log.Warning(ex, "Erreur lors de l'inspection du conteneur {ContainerId} pour ListContainers", id)
                 response.Containers.Add(ci)
             return response
         }

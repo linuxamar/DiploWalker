@@ -109,6 +109,8 @@ type CustomCniDriver() =
                         |}
                         let configJson = JsonSerializer.Serialize(config)
                         let (_exitCode, stdout, _stderr) =
+                            // REMARQUE : le chemin /proc/<pid>/ns/net est spécifique à Linux.
+                            // Sur Windows, le driver CNI doit utiliser un mécanisme différent (ex. HNSEndpoint).
                             runProcess resolvedPluginPath [ "ADD"; "--container-id"; containerId; "--netns"; sprintf "/proc/%s/ns/net" containerId ]
                         if _exitCode = 0 then
                             let (ifname, ipv4, gw) = parseCniResult stdout
@@ -134,6 +136,8 @@ type CustomCniDriver() =
                             let resolvedPluginPath = SecurityValidation.validateCniPluginPath pluginPath
                             SecurityValidation.validateContainerId endpointId
                             let (_exitCode, _stdout, _stderr) =
+                                // REMARQUE : le chemin /proc/<pid>/ns/net est spécifique à Linux.
+                                // Sur Windows, le driver CNI doit utiliser un mécanisme différent (ex. HNSEndpoint).
                                 runProcess resolvedPluginPath [ "DEL"; "--container-id"; endpointId; "--netns"; sprintf "/proc/%s/ns/net" endpointId ]
                             if _exitCode = 0 then Ok ()
                             else Error (sprintf "Échec de la déconnexion CNI (code %d)" _exitCode)

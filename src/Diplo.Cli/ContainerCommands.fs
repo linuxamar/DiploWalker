@@ -1,5 +1,6 @@
 namespace Diplo.Cli.Container
 
+open System
 open System.Collections.Generic
 open System.Threading
 open Diplo.Core.Clients
@@ -46,6 +47,8 @@ type InspectContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new ContainerClient()
             let! response = client.InspectAsync(settings.Id)
 
@@ -71,6 +74,8 @@ type StartContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new ContainerClient()
             let! response = client.StartAsync(settings.Id)
             output.WriteSuccess(sprintf "Conteneur %s démarré (%s)" settings.Id (response.State.ToString()))
@@ -88,6 +93,8 @@ type StopContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new ContainerClient()
             let! response = client.StopAsync(settings.Id, settings.Timeout)
             output.WriteSuccess(sprintf "Conteneur %s arrêté (%s)" settings.Id (response.State.ToString()))
@@ -105,6 +112,8 @@ type DeleteContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new ContainerClient()
             let! response = client.DeleteAsync(settings.Id, settings.Force)
             if response.Success then
@@ -124,6 +133,8 @@ type PullImageCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Image) then failwithf "L'image est requise"
+
             use client = new ContainerClient()
             let! response = client.PullImageAsync(settings.Image)
             output.WriteSuccess(response.Message)
@@ -147,6 +158,9 @@ type CreateContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Name) then failwithf "Le nom du conteneur est requis"
+            if String.IsNullOrEmpty(settings.Image) then failwithf "L'image est requise"
+
             use client = new ContainerClient()
             let env =
                 settings.Env
@@ -194,6 +208,8 @@ type LogsContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new ContainerClient()
             let since = if isNull settings.Since then "" else settings.Since
             let stream = client.GetLogs(settings.Id, follow = settings.Follow, tail = settings.Tail, since = since)
@@ -218,6 +234,8 @@ type ExecContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new ContainerClient()
             if settings.Command.Length = 0 then
                 output.WriteError("Au moins une commande est requise")
@@ -279,6 +297,9 @@ type RenameContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(settings.NewName) then failwithf "Le nouveau nom est requis"
+
             use client = new ContainerClient()
             let! response = client.RenameContainerAsync(settings.Id, settings.NewName)
             if response.Success then
@@ -298,6 +319,8 @@ type TopContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new ContainerClient()
             let! response = client.TopContainerAsync(settings.Id)
             if response.Processes.Count = 0 then
@@ -323,6 +346,8 @@ type StatsContainerCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new ContainerClient()
             let! response = client.GetContainerStatsAsync(settings.Id)
             output.WriteSuccess(sprintf "Métriques du conteneur %s" settings.Id)
@@ -375,6 +400,8 @@ type ImageInspectCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Ref) then failwithf "La référence de l'image est requise"
+
             use client = new ContainerClient()
             let ns = if isNull settings.Namespace then "" else settings.Namespace
             let! response = client.InspectImageAsync(settings.Ref, ns)
@@ -401,6 +428,8 @@ type ImageRemoveCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Ref) then failwithf "La référence de l'image est requise"
+
             use client = new ContainerClient()
             let ns = if isNull settings.Namespace then "" else settings.Namespace
             let! response = client.RemoveImageAsync(settings.Ref, ns)
@@ -423,6 +452,9 @@ type ImageTagCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Source) then failwithf "La référence source est requise"
+            if String.IsNullOrEmpty(settings.Target) then failwithf "La référence cible est requise"
+
             use client = new ContainerClient()
             let ns = if isNull settings.Namespace then "" else settings.Namespace
             let! response = client.TagImageAsync(settings.Source, settings.Target, ns)

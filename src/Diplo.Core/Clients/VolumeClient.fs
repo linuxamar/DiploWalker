@@ -3,12 +3,13 @@ namespace Diplo.Core.Clients
 open System
 open System.Collections.Generic
 open System.Threading
+open Diplo.Abstractions
 open Diplo.Core.Connection
 open Diplo.Grpc.Volume
 open Grpc.Net.Client
 
-[<Sealed>]
 type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
+    inherit GrpcClientBase(channel, ownsChannel)
 
     let client = VolumeService.VolumeServiceClient(channel)
 
@@ -20,6 +21,7 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.CreateAsync(name: string, ?driver: StorageDriverType, ?driverOpts: IDictionary<string, string>, ?labels: IDictionary<string, string>, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(name) then invalidArg (nameof name) "Le nom est requis"
             let d = defaultArg driver StorageDriverType.Local
             let ct = defaultArg ct CancellationToken.None
             let request = CreateVolumeRequest(Name = name, Driver = d)
@@ -31,6 +33,7 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.RemoveAsync(id: string, ?force: bool, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant est requis"
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
             let! response = client.RemoveVolumeAsync(RemoveVolumeRequest(Id = id, Force = f), cancellationToken = ct).ResponseAsync
@@ -39,6 +42,7 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.InspectAsync(id: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.InspectVolumeAsync(InspectVolumeRequest(Id = id), cancellationToken = ct).ResponseAsync
             return response
@@ -55,6 +59,8 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.MountAsync(id: string, targetPath: string, ?options: IDictionary<string, string>, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant est requis"
+            if String.IsNullOrEmpty(targetPath) then invalidArg (nameof targetPath) "Le chemin cible est requis"
             let ct = defaultArg ct CancellationToken.None
             let request = MountVolumeRequest(Id = id, TargetPath = targetPath)
             options |> Option.iter (fun o -> request.Options.Add(o))
@@ -64,6 +70,8 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.UnmountAsync(id: string, targetPath: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant est requis"
+            if String.IsNullOrEmpty(targetPath) then invalidArg (nameof targetPath) "Le chemin cible est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.UnmountVolumeAsync(UnmountVolumeRequest(Id = id, TargetPath = targetPath), cancellationToken = ct).ResponseAsync
             return response
@@ -76,6 +84,4 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
-    interface IDisposable with
-        member _.Dispose() =
-            if ownsChannel then channel.Dispose()
+

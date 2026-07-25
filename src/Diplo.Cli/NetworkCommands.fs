@@ -1,5 +1,6 @@
 namespace Diplo.Cli.Network
 
+open System
 open System.Threading
 open Diplo.Core.Clients
 open Diplo.Core.Output
@@ -44,6 +45,8 @@ type InspectNetworkCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du réseau est requis"
+
             use client = new NetworkClient()
             let! response = client.InspectAsync(settings.Id)
 
@@ -75,6 +78,8 @@ type CreateNetworkCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Name) then failwithf "Le nom du réseau est requis"
+
             let driver =
                 match settings.Driver.ToLowerInvariant() with
                 | "bridge" -> NetworkDriver.Bridge
@@ -106,6 +111,8 @@ type RemoveNetworkCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du réseau est requis"
+
             use client = new NetworkClient()
             let! response = client.RemoveAsync(settings.Id, settings.Force)
             if response.Success then
@@ -128,6 +135,9 @@ type ConnectCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.NetworkId) then failwithf "L'identifiant du réseau est requis"
+            if String.IsNullOrEmpty(settings.ContainerId) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new NetworkClient()
             let! response =
                 client.ConnectAsync(
@@ -156,6 +166,9 @@ type DisconnectCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.NetworkId) then failwithf "L'identifiant du réseau est requis"
+            if String.IsNullOrEmpty(settings.ContainerId) then failwithf "L'identifiant du conteneur est requis"
+
             use client = new NetworkClient()
             let! response =
                 client.DisconnectAsync(

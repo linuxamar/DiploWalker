@@ -99,9 +99,15 @@ type LocalVolumeDriver(dataRoot: string) =
             Directory.CreateDirectory(mountDir) |> ignore
             // Sur Windows, on simule le mount en copiant les fichiers
             if Directory.Exists(src) then
-                for file in Directory.GetFiles(src) do
-                    let destFile = Path.Combine(mountDir, Path.GetFileName(file))
-                    File.Copy(file, destFile, true)
+                let rec copyDir (source: string) (target: string) =
+                    Directory.CreateDirectory(target) |> ignore
+                    for file in Directory.GetFiles(source) do
+                        let destFile = Path.Combine(target, Path.GetFileName(file))
+                        File.Copy(file, destFile, true)
+                    for subdir in Directory.GetDirectories(source) do
+                        let destSub = Path.Combine(target, Path.GetFileName(subdir))
+                        copyDir subdir destSub
+                copyDir src mountDir
             (true, mountDir)
         )
 

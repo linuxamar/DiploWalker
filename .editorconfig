@@ -1,0 +1,32 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8-bom
+
+[*.{cs,fs}]
+indent_style = space
+indent_size = 4
+
+[*.{xml,props,targets,config}]
+indent_style = space
+indent_size = 2
+
+[*.json]
+indent_style = space
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.ps1]
+indent_style = space
+indent_size = 4
+
+[*.proto]
+indent_style = space
+indent_size = 2

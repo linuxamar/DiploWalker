@@ -1,5 +1,6 @@
 namespace Diplo.Cli.Volume
 
+open System
 open System.Threading
 open Diplo.Core.Clients
 open Diplo.Core.Output
@@ -43,6 +44,8 @@ type InspectVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du volume est requis"
+
             use client = new VolumeClient()
             let! response = client.InspectAsync(settings.Id)
 
@@ -67,6 +70,8 @@ type CreateVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Name) then failwithf "Le nom du volume est requis"
+
             let driverType =
                 match settings.Driver.ToLowerInvariant() with
                 | "local" -> StorageDriverType.Local
@@ -94,6 +99,8 @@ type RemoveVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du volume est requis"
+
             use client = new VolumeClient()
             let! response = client.RemoveAsync(settings.Id, settings.Force)
             if response.Success then
@@ -114,6 +121,8 @@ type MountVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du volume est requis"
+
             use client = new VolumeClient()
             let! response = client.MountAsync(settings.Id, settings.Target)
             output.WriteSuccess(sprintf "Volume %s monté sur %s (%s)" settings.Id settings.Target response.Mountpoint)
@@ -131,6 +140,8 @@ type UnmountVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
+            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du volume est requis"
+
             use client = new VolumeClient()
             let! response = client.UnmountAsync(settings.Id, settings.Target)
             output.WriteSuccess(sprintf "Volume %s démonté de %s" settings.Id settings.Target)

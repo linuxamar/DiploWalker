@@ -13,68 +13,10 @@ type BridgeNetworkDriver() =
 
     let networks = ConcurrentDictionary<string, NetworkDriverInfo>()
 
-    let runPowershellWithArgs (cmdlet: string) (parameters: (string * string) list) =
-        let psi = ProcessStartInfo()
-        psi.FileName <- "powershell"
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        psi.ArgumentList.Add("-NoProfile") |> ignore
-        psi.ArgumentList.Add("-NonInteractive") |> ignore
-        psi.ArgumentList.Add("-Command") |> ignore
-        // Utiliser un script paramétré pour éviter l'injection
-        let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
-        let paramValues = parameters |> List.map snd
-        let paramDecl = paramNames |> String.concat ", "
-        let body = sprintf "%s -%s" cmdlet (parameters |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i]) |> String.concat " -")
-        let script = sprintf "{ param(%s) %s }" paramDecl body
-        psi.ArgumentList.Add(script) |> ignore
-        for value in paramValues do
-            psi.ArgumentList.Add(value) |> ignore
-        use proc = Process.Start(psi)
-        if proc |> isNull then failwithf "Impossible de démarrer PowerShell"
-        let stdout = proc.StandardOutput.ReadToEnd()
-        let stderr = proc.StandardError.ReadToEnd()
-        if not (proc.WaitForExit(60_000)) then
-            try proc.Kill(true) with _ -> ()
-            failwith "Délai d'attente dépassé pour PowerShell (60s)"
-        if proc.ExitCode <> 0 then
-            failwithf "PowerShell a échoué (code %d)" proc.ExitCode
-        stdout
-
-    let runPowershellScript (scriptBody: string) (parameters: (string * string) list) =
-        let psi = ProcessStartInfo()
-        psi.FileName <- "powershell"
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        psi.ArgumentList.Add("-NoProfile") |> ignore
-        psi.ArgumentList.Add("-NonInteractive") |> ignore
-        psi.ArgumentList.Add("-Command") |> ignore
-        let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
-        let paramValues = parameters |> List.map snd
-        let paramDecl = paramNames |> String.concat ", "
-        let script = sprintf "{ param(%s) %s }" paramDecl scriptBody
-        psi.ArgumentList.Add(script) |> ignore
-        for value in paramValues do
-            psi.ArgumentList.Add(value) |> ignore
-        use proc = Process.Start(psi)
-        if proc |> isNull then failwithf "Impossible de démarrer PowerShell"
-        let stdout = proc.StandardOutput.ReadToEnd()
-        let stderr = proc.StandardError.ReadToEnd()
-        if not (proc.WaitForExit(60_000)) then
-            try proc.Kill(true) with _ -> ()
-            failwith "Délai d'attente dépassé pour PowerShell (60s)"
-        if proc.ExitCode <> 0 then
-            failwithf "PowerShell a échoué (code %d)" proc.ExitCode
-        stdout
-
     let getAvailableSubnet () =
-        let usedPrefixes = getUsedPrefixes ()
         let config = loadConfig None
-        findAvailableSubnet config.SubnetCandidates usedPrefixes
+        let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
+        findAvailableSubnet config.SubnetCandidates existing
 
     let getDefaultGateway (subnet: string) =
         deriveGateway subnet

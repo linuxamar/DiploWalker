@@ -3,12 +3,13 @@ namespace Diplo.Core.Clients
 open System
 open System.Collections.Generic
 open System.Threading
+open Diplo.Abstractions
 open Diplo.Core.Connection
 open Diplo.Grpc.Container
 open Grpc.Net.Client
 
-[<Sealed>]
 type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
+    inherit GrpcClientBase(channel, ownsChannel)
 
     let client = ContainerService.ContainerServiceClient(channel)
 
@@ -30,6 +31,8 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
           ?cpuShares: int64,
           ?ct: CancellationToken ) =
         task {
+            if String.IsNullOrEmpty(name) then invalidArg (nameof name) "Le nom du conteneur est requis"
+            if String.IsNullOrEmpty(image) then invalidArg (nameof image) "L'image est requise"
             let request = CreateContainerRequest(Name = name, Image = image)
             env |> Option.iter (fun e -> request.Env.Add(e))
             command |> Option.iter (fun c -> c |> List.iter request.Command.Add)
@@ -45,6 +48,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.StartAsync(id: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.StartContainerAsync(StartContainerRequest(Id = id), cancellationToken = ct).ResponseAsync
             return response
@@ -52,6 +56,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.StopAsync(id: string, ?timeoutSeconds: int, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
             let timeout = defaultArg timeoutSeconds 10
             let ct = defaultArg ct CancellationToken.None
             let! response = client.StopContainerAsync(StopContainerRequest(Id = id, TimeoutSeconds = timeout), cancellationToken = ct).ResponseAsync
@@ -60,6 +65,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.DeleteAsync(id: string, ?force: bool, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
             let! response = client.DeleteContainerAsync(DeleteContainerRequest(Id = id, Force = f), cancellationToken = ct).ResponseAsync
@@ -68,6 +74,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.InspectAsync(id: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.InspectContainerAsync(InspectContainerRequest(Id = id), cancellationToken = ct).ResponseAsync
             return response
@@ -84,6 +91,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
         }
 
     member _.GetLogs(id: string, ?follow: bool, ?tail: int, ?since: string, ?ct: CancellationToken) =
+        if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
         let f = defaultArg follow false
         let t = defaultArg tail 100
         let s = defaultArg since ""
@@ -92,6 +100,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
         client.GetContainerLogs(request, cancellationToken = ct).ResponseStream
 
     member _.Exec(id: string, command: IEnumerable<string>, ?attachStdout: bool, ?attachStderr: bool, ?ct: CancellationToken) =
+        if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
         let aOut = defaultArg attachStdout true
         let aErr = defaultArg attachStderr true
         let ct = defaultArg ct CancellationToken.None
@@ -101,6 +110,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.PullImageAsync(image: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(image) then invalidArg (nameof image) "L'image est requise"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.PullImageAsync(PullImageRequest(Image = image), cancellationToken = ct).ResponseAsync
             return response
@@ -122,6 +132,8 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.RenameContainerAsync(id: string, newName: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(newName) then invalidArg (nameof newName) "Le nouveau nom est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.RenameContainerAsync(RenameContainerRequest(Id = id, NewName = newName), cancellationToken = ct).ResponseAsync
             return response
@@ -129,6 +141,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.TopContainerAsync(id: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.TopContainerAsync(TopContainerRequest(Id = id), cancellationToken = ct).ResponseAsync
             return response
@@ -136,6 +149,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.GetContainerStatsAsync(id: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.GetContainerStatsAsync(GetContainerStatsRequest(Id = id), cancellationToken = ct).ResponseAsync
             return response
@@ -154,6 +168,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.InspectImageAsync(ref: string, ?namespaceName: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(ref) then invalidArg (nameof ref) "La référence de l'image est requise"
             let ns = defaultArg namespaceName ""
             let ct = defaultArg ct CancellationToken.None
             let request = InspectImageRequest(Ref = ref)
@@ -165,6 +180,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.RemoveImageAsync(ref: string, ?namespaceName: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(ref) then invalidArg (nameof ref) "La référence de l'image est requise"
             let ns = defaultArg namespaceName ""
             let ct = defaultArg ct CancellationToken.None
             let request = RemoveImageRequest(Ref = ref)
@@ -176,6 +192,8 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.TagImageAsync(source: string, target: string, ?namespaceName: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(source) then invalidArg (nameof source) "La source de l'image est requise"
+            if String.IsNullOrEmpty(target) then invalidArg (nameof target) "La cible de l'image est requise"
             let ns = defaultArg namespaceName ""
             let ct = defaultArg ct CancellationToken.None
             let request = TagImageRequest(Source = source, Target = target)
@@ -185,6 +203,4 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
-    interface IDisposable with
-        member _.Dispose() =
-            if ownsChannel then channel.Dispose()
+

@@ -54,5 +54,5 @@ type AvaloniaOutputPort() =
                 tableRows.Clear()
                 for col in columns do tableColumns.Add(col)
                 for item in items do
-                    let row = selector.Invoke(item)
+                    let row = selector item
                     tableRows.Add(row))

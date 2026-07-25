@@ -21,11 +21,11 @@ module CniParsing =
                     let mutable iv = Unchecked.defaultof<JsonElement>
                     if iface.TryGetProperty("name", &iv) then
                         ifname <- iv.GetString()
-                    if iface.TryGetProperty("ips", &iv) && iface.GetProperty("ips").GetArrayLength() > 0 then
-                        let ipInfo = iface.GetProperty("ips").[0]
+                    if iface.TryGetProperty("ips", &iv) && iv.GetArrayLength() > 0 then
+                        let ipInfo = iv.[0]
                         let mutable av = Unchecked.defaultof<JsonElement>
                         if ipInfo.TryGetProperty("address", &av) then
-                            ipv4 <- ipInfo.GetProperty("address").GetString()
+                            ipv4 <- av.GetString()
             let mutable dv = Unchecked.defaultof<JsonElement>
             if root.TryGetProperty("dns", &dv) then
                 let dns = root.GetProperty("dns")

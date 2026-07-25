@@ -1,7 +1,6 @@
 namespace Diplo.Contracts
 
 /// Types partagés entre les services Diplo.
-/// Ce module contient les types communs utilisés par tous les services.
 module Types =
 
     /// Identifiant unique d'un conteneur

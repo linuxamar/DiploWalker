@@ -19,44 +19,39 @@ type ContainerdClient(runner: IProcessRunner) =
     let buildOciSpecJson (env: Map<string, string>) (command: string array) (args: string array) (memoryLimit: int64) (cpuShares: int64) (pidLimit: uint32) =
         let envArray = env |> Map.toList |> List.map (fun (k, v) -> sprintf "%s=%s" k v)
         let processObj =
-            let argsValue =
-                if command.Length > 0 || args.Length > 0 then
-                    let allArgs = Array.append command args
-                    Some allArgs
-                else None
-            match argsValue with
-            | Some a ->
-                sprintf """{"args":["%s"],"env":["%s"]}"""
-                    (a |> String.concat "\",\"")
-                    (envArray |> String.concat "\",\"")
-            | None ->
-                if envArray.IsEmpty then "{}"
-                else sprintf """{"env":["%s"]}""" (envArray |> String.concat "\",\"")
-        let resourcesParts = ResizeArray<string>()
-        if memoryLimit > 0L then
-            resourcesParts.Add(sprintf """{"memory":{"limit":%d}}""" memoryLimit)
-        if cpuShares > 0L then
-            resourcesParts.Add(sprintf """{"cpu":{"shares":%d}}""" cpuShares)
-        if pidLimit > 0u then
-            resourcesParts.Add(sprintf """{"pids":{"limit":%d}}""" pidLimit)
-        if resourcesParts.Count > 0 then
-            let linuxResources = resourcesParts |> String.concat ","
-            sprintf """{"process":%s,"linux":{"resources":{%s}}}""" processObj linuxResources
-        else
-            sprintf """{"process":%s}""" processObj
+            let allArgs = if command.Length > 0 || args.Length > 0 then Array.append command args |> Some else None
+            let envList = if envArray.IsEmpty then null else envArray |> List.toArray
+            let proc = {| args = allArgs; env = envList |}
+            JsonSerializer.Serialize(proc)
+        let resources = {|
+            memory = if memoryLimit > 0L then Some {| limit = memoryLimit |} else None
+            cpu = if cpuShares > 0L then Some {| shares = cpuShares |} else None
+            pids = if pidLimit > 0u then Some {| limit = int pidLimit |} else None
+        |}
+        let linux = {|
+            resources = {|
+                memory = resources.memory
+                cpu = resources.cpu
+                pids = resources.pids
+            |}
+        |}
+        let spec = {| process = processObj; linux = linux |}
+        JsonSerializer.Serialize(spec)
 
     interface IContainerdClient with
         member _.CreateContainer(namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
             SecurityValidation.validateImage image
-            let mutable ctrArgs =
-                [ "container"; "create"; "--namespace"; namespaceName ]
+            let ctrArgs = ResizeArray()
+            ctrArgs.AddRange([ "container"; "create"; "--namespace"; namespaceName ])
             for (k, v) in labels |> Map.toList do
                 SecurityValidation.validateLabel k v
-                ctrArgs <- ctrArgs @ [ "--label"; sprintf "%s=%s" k v ]
+                ctrArgs.Add("--label")
+                ctrArgs.Add(sprintf "%s=%s" k v)
             for (k, v) in env |> Map.toList do
-                ctrArgs <- ctrArgs @ [ "--env"; sprintf "%s=%s" k v ]
+                ctrArgs.Add("--env")
+                ctrArgs.Add(sprintf "%s=%s" k v)
             let hasSpecContent =
                 command.Length > 0 || args.Length > 0 ||
                 memoryLimit > 0L || cpuShares > 0L || pidLimit > 0u
@@ -69,10 +64,11 @@ type ContainerdClient(runner: IProcessRunner) =
                 else None
             try
                 match specPath with
-                | Some p -> ctrArgs <- ctrArgs @ [ "--spec"; p ]
+                | Some p -> ctrArgs.Add("--spec"); ctrArgs.Add(p)
                 | None -> ()
-                ctrArgs <- ctrArgs @ [ id; image ]
-                let output = runCtr ctrArgs
+                ctrArgs.Add(id)
+                ctrArgs.Add(image)
+                let output = runCtr (ctrArgs |> Seq.toList)
                 output.Trim()
             finally
                 match specPath with

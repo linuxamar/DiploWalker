@@ -31,28 +31,7 @@ let services =
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────
 
-let runCommand (exe: string) (args: string) : int =
-    let psi = ProcessStartInfo(exe)
-    psi.UseShellExecute <- false
-    psi.RedirectStandardOutput <- true
-    psi.RedirectStandardError <- true
-    psi.CreateNoWindow <- true
-    // Séparer les arguments et utiliser ArgumentList pour éviter l'injection de commande
-    let parts = args.Split([| ' ' |], System.StringSplitOptions.RemoveEmptyEntries)
-    for part in parts do
-        let cleaned = part.Trim('"')
-        psi.ArgumentList.Add(cleaned) |> ignore
-    use proc = Process.Start(psi)
-    let stdout = proc.StandardOutput.ReadToEnd()
-    let stderr = proc.StandardError.ReadToEnd()
-    if not (proc.WaitForExit(60_000)) then
-        try proc.Kill(true) with _ -> ()
-        failwithf "Délai d'attente dépassé pour %s (60s)" exe
-    if stdout.Length > 0 then printfn "%s" stdout
-    if stderr.Length > 0 then eprintfn "%s" stderr
-    proc.ExitCode
-
-let runCommandWithArgs (exe: string) (args: string list) : int =
+let runProcess (exe: string) (args: string list) : int =
     let psi = ProcessStartInfo(exe)
     psi.UseShellExecute <- false
     psi.RedirectStandardOutput <- true
@@ -69,6 +48,14 @@ let runCommandWithArgs (exe: string) (args: string list) : int =
     if stdout.Length > 0 then printfn "%s" stdout
     if stderr.Length > 0 then eprintfn "%s" stderr
     proc.ExitCode
+
+let runCommand (exe: string) (args: string) : int =
+    let parts = args.Split([| ' ' |], System.StringSplitOptions.RemoveEmptyEntries)
+    let cleaned = parts |> Array.map (fun p -> p.Trim('"')) |> Array.toList
+    runProcess exe cleaned
+
+let runCommandWithArgs (exe: string) (args: string list) : int =
+    runProcess exe args
 
 let isWindows () =
     RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
@@ -231,7 +218,8 @@ let installContainerd () = task {
     printfn "  [*] Téléchargement depuis GitHub..."
     do! downloadFile containerdUrl archivePath
     let expectedChecksum = containerdChecksums |> Map.tryFind downloadContainerdVersion
-    verifyChecksum archivePath expectedChecksum
+    try verifyChecksum archivePath expectedChecksum
+    with ex -> printfn "  [!] Échec de vérification SHA256: %s" ex.Message; File.Delete(archivePath); raise ex
 
     printfn "  [*] Extraction..."
     do! extractTarGz archivePath containerdDir
@@ -252,7 +240,8 @@ let downloadCniPlugins () = task {
     let winCniUrl = sprintf "https://github.com/microsoft/windows-container-networking/releases/download/v%s/%s" winCniVersion winCniArchive
     let winCniTemp = Path.Combine(Path.GetTempPath(), sprintf "%s_%s" archiveSuffix winCniArchive)
     do! downloadFile winCniUrl winCniTemp
-    verifyChecksum winCniTemp (Some winCniChecksum)
+    try verifyChecksum winCniTemp (Some winCniChecksum)
+    with ex -> printfn "  [!] Échec de vérification SHA256: %s" ex.Message; File.Delete(winCniTemp); raise ex
     extractZip winCniTemp cniBinDir
     File.Delete(winCniTemp)
 
@@ -262,7 +251,8 @@ let downloadCniPlugins () = task {
     let cniUrl = sprintf "https://github.com/containernetworking/plugins/releases/download/v%s/%s" cniPluginsVersion cniArchive
     let cniTemp = Path.Combine(Path.GetTempPath(), sprintf "%s_%s" archiveSuffix cniArchive)
     do! downloadFile cniUrl cniTemp
-    verifyChecksum cniTemp (Some cniPluginsChecksum)
+    try verifyChecksum cniTemp (Some cniPluginsChecksum)
+    with ex -> printfn "  [!] Échec de vérification SHA256: %s" ex.Message; File.Delete(cniTemp); raise ex
     do! extractTarGz cniTemp cniBinDir
 
     File.Delete(cniTemp)
@@ -504,11 +494,14 @@ let createConfigFiles () =
 
     // Ajouter le socket containerd au service Container
     let containerSettingsPath = Path.Combine(configDir, "Diplo.Container.appsettings.json")
-    let content = File.ReadAllText(containerSettingsPath)
-    let doc = JsonNode.Parse(content) :?> JsonObject
-    doc.["ContainerdSocket"] <- JsonValue.Create("npipe:////./pipe/containerd-containerd")
-    let options = JsonSerializerOptions(WriteIndented = true)
-    File.WriteAllText(containerSettingsPath, doc.ToJsonString(options))
+    try
+        let content = File.ReadAllText(containerSettingsPath)
+        let doc = JsonNode.Parse(content) :?> JsonObject
+        doc.["ContainerdSocket"] <- JsonValue.Create("npipe:////./pipe/containerd-containerd")
+        let options = JsonSerializerOptions(WriteIndented = true)
+        File.WriteAllText(containerSettingsPath, doc.ToJsonString(options))
+    with ex ->
+        printfn "  [!] Erreur lors de la mise à jour de %s: %s" (Path.GetFileName(containerSettingsPath)) ex.Message
 
     printfn "  [✓] Configuration créée dans %s" configDir
 

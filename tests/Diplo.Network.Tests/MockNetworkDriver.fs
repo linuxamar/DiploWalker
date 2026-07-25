@@ -61,7 +61,7 @@ type MockNetworkDriver() =
                 Ok ()
 
         member _.Prune() =
-            Ok (networks |> Map.keys |> Seq.toList)
+            Ok (networks |> Map.toList |> List.map fst)
 
     member this.Mock : INetworkDriver = this :> INetworkDriver
     member _.Networks = networks

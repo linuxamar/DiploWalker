@@ -42,10 +42,4 @@ module Interfaces =
         abstract member GetVolumeSize: id: string -> int64
         abstract member PruneVolumes: unit -> string list
 
-    /// Plugin CNI pour la gestion réseau
-    type ICniPlugin =
-        abstract member Name: string
-        abstract member AddNetwork: configPath: string -> Result<string, string>
-        abstract member RemoveNetwork: configPath: string -> Result<unit, string>
-
 

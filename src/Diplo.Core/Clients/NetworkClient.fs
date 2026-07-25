@@ -3,12 +3,13 @@ namespace Diplo.Core.Clients
 open System
 open System.Collections.Generic
 open System.Threading
+open Diplo.Abstractions
 open Diplo.Core.Connection
 open Diplo.Grpc.Network
 open Grpc.Net.Client
 
-[<Sealed>]
 type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
+    inherit GrpcClientBase(channel, ownsChannel)
 
     let client = NetworkService.NetworkServiceClient(channel)
 
@@ -29,6 +30,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
           ?cniPluginPath: string,
           ?ct: CancellationToken ) =
         task {
+            if String.IsNullOrEmpty(name) then invalidArg (nameof name) "Le nom du réseau est requis"
             let d = defaultArg driver NetworkDriver.Bridge
             let s = defaultArg subnet ""
             let g = defaultArg gateway ""
@@ -44,6 +46,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.RemoveAsync(id: string, ?force: bool, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du réseau est requis"
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
             let! response = client.RemoveNetworkAsync(RemoveNetworkRequest(Id = id, Force = f), cancellationToken = ct).ResponseAsync
@@ -52,6 +55,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.InspectAsync(id: string, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du réseau est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.InspectNetworkAsync(InspectNetworkRequest(Id = id), cancellationToken = ct).ResponseAsync
             return response
@@ -68,6 +72,8 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.ConnectAsync(networkId: string, containerId: string, ?endpointId: string, ?ipv4Address: string, ?options: IDictionary<string, string>, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(networkId) then invalidArg (nameof networkId) "L'identifiant du réseau est requis"
+            if String.IsNullOrEmpty(containerId) then invalidArg (nameof containerId) "L'identifiant du conteneur est requis"
             let eId = defaultArg endpointId ""
             let ip = defaultArg ipv4Address ""
             let ct = defaultArg ct CancellationToken.None
@@ -79,6 +85,8 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.DisconnectAsync(networkId: string, containerId: string, ?endpointId: string, ?force: bool, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(networkId) then invalidArg (nameof networkId) "L'identifiant du réseau est requis"
+            if String.IsNullOrEmpty(containerId) then invalidArg (nameof containerId) "L'identifiant du conteneur est requis"
             let eId = defaultArg endpointId ""
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
@@ -88,6 +96,10 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
 
     member _.RunCniPluginAsync(pluginPath: string, command: string, containerId: string, netnsPath: string, ?config: CniConfiguration, ?ct: CancellationToken) =
         task {
+            if String.IsNullOrEmpty(pluginPath) then invalidArg (nameof pluginPath) "Le chemin du plugin est requis"
+            if String.IsNullOrEmpty(command) then invalidArg (nameof command) "La commande est requise"
+            if String.IsNullOrEmpty(containerId) then invalidArg (nameof containerId) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(netnsPath) then invalidArg (nameof netnsPath) "Le chemin netns est requis"
             let ct = defaultArg ct CancellationToken.None
             let request = RunCniPluginRequest(PluginPath = pluginPath, Command = command, ContainerId = containerId, NetnsPath = netnsPath)
             config |> Option.iter (fun c -> request.Config <- c)
@@ -102,6 +114,4 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
-    interface IDisposable with
-        member _.Dispose() =
-            if ownsChannel then channel.Dispose()
+

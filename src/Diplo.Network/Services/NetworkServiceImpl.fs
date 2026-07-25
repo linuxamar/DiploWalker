@@ -88,6 +88,10 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                         response.Driver <- info.Driver
                         response.Subnet <- info.Subnet
                         response.Gateway <- info.Gateway
+                        let ep = EndpointInfo()
+                        ep.EndpointId <- info.Id
+                        ep.Ipv4Address <- info.Gateway
+                        response.Endpoints.Add(ep)
                         result <- Some response
                     | Error _ -> ()
             if result.IsNone then
