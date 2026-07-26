@@ -37,6 +37,15 @@
     -->
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!--
+      Strong-name signing : toutes les assemblies Diplo sont signées avec la clé eng/Diplo.snk.
+    -->
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)eng\Diplo.snk</AssemblyOriginatorKeyFile>
+    <KeyFile>$(MSBuildThisFileDirectory)eng\Diplo.snk</KeyFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
