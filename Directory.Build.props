@@ -29,4 +29,16 @@
     <HighEntropyVA>true</HighEntropyVA>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!--
+      Forcer la résolution de la version transitive System.Security.Cryptography.Pkcs
+      (vulnérabilité GHSA-555c-2p6r-68mm dans la version 6.0.1, apportée par System.ServiceModel.Primitives).
+      La version est définie dans Directory.Packages.props.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+
 </Project>

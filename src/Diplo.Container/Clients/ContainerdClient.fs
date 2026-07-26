@@ -35,7 +35,7 @@ type ContainerdClient(runner: IProcessRunner) =
                 pids = resources.pids
             |}
         |}
-        let spec = {| process = processObj; linux = linux |}
+        let spec = {| ``process`` = processObj; linux = linux |}
         JsonSerializer.Serialize(spec)
 
     interface IContainerdClient with
