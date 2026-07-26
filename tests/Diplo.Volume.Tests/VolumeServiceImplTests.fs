@@ -11,6 +11,8 @@ module VolumeServiceImplTests =
     open FsUnit.Xunit
     open Grpc.Core
     open Grpc.Core.Testing
+    open ProtoBuf.Grpc
+    open Diplo.Grpc
     open Diplo.Grpc.Volume
     open Diplo.Volume.Services
     open Diplo.Abstractions.SecurityValidation
@@ -24,17 +26,19 @@ module VolumeServiceImplTests =
         svc, mock
 
     let createCtx () =
-        TestServerCallContext.Create(
-            "test", "localhost", DateTime.UtcNow, Metadata(), CancellationToken.None,
-            "peer", Unchecked.defaultof<AuthContext>, Unchecked.defaultof<ContextPropagationToken>,
-            Unchecked.defaultof<System.Func<Metadata,Task>>, Unchecked.defaultof<System.Func<WriteOptions>>, Unchecked.defaultof<System.Action<WriteOptions>>)
+        let ctx =
+            TestServerCallContext.Create(
+                "test", "localhost", DateTime.UtcNow, Metadata(), CancellationToken.None,
+                "peer", Unchecked.defaultof<AuthContext>, Unchecked.defaultof<ContextPropagationToken>,
+                Unchecked.defaultof<System.Func<Metadata,Task>>, Unchecked.defaultof<System.Func<WriteOptions>>, Unchecked.defaultof<System.Action<WriteOptions>>)
+        Unchecked.defaultof<CallContext>
 
     [<Fact>]
     let ``CreateVolume avec nom retourne le nom et le mountpoint`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let req = CreateVolumeRequest(Name = "mon-volume", Driver = StorageDriverType.Local)
-        let result = svc.CreateVolume(req, ctx).Result
+        let req = { Name = "mon-volume"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        let result = (svc :> IVolumeService).CreateVolume(req, ctx).Result
         String.IsNullOrEmpty(result.Id) |> should equal false
         result.Name |> should equal "mon-volume"
         result.Driver |> should equal StorageDriverType.Local
@@ -46,8 +50,8 @@ module VolumeServiceImplTests =
     let ``CreateVolume sans nom genere un id automatiquement`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = CreateVolumeRequest(Name = "", Driver = StorageDriverType.Local)
-        let result = svc.CreateVolume(req, ctx).Result
+        let req = { Name = ""; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        let result = (svc :> IVolumeService).CreateVolume(req, ctx).Result
         String.IsNullOrEmpty(result.Id) |> should equal false
         result.Id.Length |> should equal 32
 
@@ -55,10 +59,10 @@ module VolumeServiceImplTests =
     let ``CreateVolume avec labels retourne le nom`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let req = CreateVolumeRequest(Name = "vol-labels", Driver = StorageDriverType.Local)
+        let req = { Name = "vol-labels"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
         req.Labels.Add("env", "test")
         req.Labels.Add("app", "web")
-        let result = svc.CreateVolume(req, ctx).Result
+        let result = (svc :> IVolumeService).CreateVolume(req, ctx).Result
         result.Name |> should equal "vol-labels"
         mock.Volumes.Count |> should equal 1
 
@@ -66,10 +70,10 @@ module VolumeServiceImplTests =
     let ``RemoveVolume sur volume existant retourne success`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let createReq = CreateVolumeRequest(Name = "to-delete", Driver = StorageDriverType.Local)
-        let createResult = svc.CreateVolume(createReq, ctx).Result
-        let req = RemoveVolumeRequest(Id = createResult.Id, Force = false)
-        let result = svc.RemoveVolume(req, ctx).Result
+        let createReq = { Name = "to-delete"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        let createResult = (svc :> IVolumeService).CreateVolume(createReq, ctx).Result
+        let req = { Id = createResult.Id; Force = false }
+        let result = (svc :> IVolumeService).RemoveVolume(req, ctx).Result
         result.Success |> should equal true
         result.Message |> should equal "Volume supprimé"
 
@@ -77,8 +81,8 @@ module VolumeServiceImplTests =
     let ``RemoveVolume sur volume inexistant lance RpcException NotFound`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = RemoveVolumeRequest(Id = "nonexistent", Force = false)
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveVolume(req, ctx).Result |> ignore)
+        let req = { Id = "nonexistent"; Force = false }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).RemoveVolume(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.NotFound
 
@@ -86,10 +90,10 @@ module VolumeServiceImplTests =
     let ``InspectVolume retourne les metadonnees du volume`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let createReq = CreateVolumeRequest(Name = "vol-inspect", Driver = StorageDriverType.Local)
-        let createResult = svc.CreateVolume(createReq, ctx).Result
-        let req = InspectVolumeRequest(Id = createResult.Id)
-        let result = svc.InspectVolume(req, ctx).Result
+        let createReq = { Name = "vol-inspect"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        let createResult = (svc :> IVolumeService).CreateVolume(createReq, ctx).Result
+        let req = { Id = createResult.Id }
+        let result = (svc :> IVolumeService).InspectVolume(req, ctx).Result
         result.Id |> should equal createResult.Id
         result.Name |> should equal "vol-inspect"
         result.Driver |> should equal StorageDriverType.Local
@@ -100,8 +104,8 @@ module VolumeServiceImplTests =
     let ``InspectVolume sur volume inexistant lance RpcException NotFound`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = InspectVolumeRequest(Id = "nonexistent")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectVolume(req, ctx).Result |> ignore)
+        let req = { Id = "nonexistent" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).InspectVolume(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.NotFound
 
@@ -109,12 +113,12 @@ module VolumeServiceImplTests =
     let ``ListVolumes retourne les volumes crees`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let req1 = CreateVolumeRequest(Name = "vol-1", Driver = StorageDriverType.Local)
-        let req2 = CreateVolumeRequest(Name = "vol-2", Driver = StorageDriverType.Local)
-        svc.CreateVolume(req1, ctx).Result |> ignore
-        svc.CreateVolume(req2, ctx).Result |> ignore
-        let req = ListVolumesRequest()
-        let result = svc.ListVolumes(req, ctx).Result
+        let req1 = { Name = "vol-1"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        let req2 = { Name = "vol-2"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        (svc :> IVolumeService).CreateVolume(req1, ctx).Result |> ignore
+        (svc :> IVolumeService).CreateVolume(req2, ctx).Result |> ignore
+        let req = { Filters = Dictionary<string, string>() }
+        let result = (svc :> IVolumeService).ListVolumes(req, ctx).Result
         result.Volumes.Count |> should equal 2
         result.Volumes |> Seq.exists (fun v -> v.Name = "vol-1") |> should equal true
         result.Volumes |> Seq.exists (fun v -> v.Name = "vol-2") |> should equal true
@@ -123,19 +127,19 @@ module VolumeServiceImplTests =
     let ``ListVolumes retourne vide quand aucun volume`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = ListVolumesRequest()
-        let result = svc.ListVolumes(req, ctx).Result
+        let req = { Filters = Dictionary<string, string>() }
+        let result = (svc :> IVolumeService).ListVolumes(req, ctx).Result
         result.Volumes.Count |> should equal 0
 
     [<Fact>]
     let ``MountVolume retourne MountState Mounted`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let createReq = CreateVolumeRequest(Name = "vol-mount", Driver = StorageDriverType.Local)
-        let createResult = svc.CreateVolume(createReq, ctx).Result
+        let createReq = { Name = "vol-mount"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        let createResult = (svc :> IVolumeService).CreateVolume(createReq, ctx).Result
         let targetPath = Path.Combine(Path.GetTempPath(), "diplo-mount-test")
-        let req = MountVolumeRequest(Id = createResult.Id, TargetPath = targetPath)
-        let result = svc.MountVolume(req, ctx).Result
+        let req = { Id = createResult.Id; TargetPath = targetPath; Options = Dictionary<string, string>() }
+        let result = (svc :> IVolumeService).MountVolume(req, ctx).Result
         result.State |> should equal MountState.Mounted
         String.IsNullOrEmpty(result.Mountpoint) |> should equal false
         result.Message |> should equal "Volume monté"
@@ -144,13 +148,13 @@ module VolumeServiceImplTests =
     let ``UnmountVolume retourne MountState Unmounted`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let createReq = CreateVolumeRequest(Name = "vol-unmount", Driver = StorageDriverType.Local)
-        let createResult = svc.CreateVolume(createReq, ctx).Result
+        let createReq = { Name = "vol-unmount"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        let createResult = (svc :> IVolumeService).CreateVolume(createReq, ctx).Result
         let targetPath = Path.Combine(Path.GetTempPath(), "diplo-unmount-test")
-        let mountReq = MountVolumeRequest(Id = createResult.Id, TargetPath = targetPath)
-        svc.MountVolume(mountReq, ctx).Result |> ignore
-        let req = UnmountVolumeRequest(Id = createResult.Id, TargetPath = targetPath)
-        let result = svc.UnmountVolume(req, ctx).Result
+        let mountReq = { Id = createResult.Id; TargetPath = targetPath; Options = Dictionary<string, string>() }
+        (svc :> IVolumeService).MountVolume(mountReq, ctx).Result |> ignore
+        let req : UnmountVolumeRequest = { Id = createResult.Id; TargetPath = targetPath }
+        let result = (svc :> IVolumeService).UnmountVolume(req, ctx).Result
         result.State |> should equal MountState.Unmounted
         result.Message |> should equal "Démonté"
 
@@ -159,26 +163,26 @@ module VolumeServiceImplTests =
     let ``CreateVolume avec nom injection lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = CreateVolumeRequest(Name = "test; rm -rf /", Driver = StorageDriverType.Local)
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.CreateVolume(req, ctx).Result |> ignore)
+        let req = { Name = "test; rm -rf /"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).CreateVolume(req, ctx).Result |> ignore)
         ex.InnerException.Message |> should haveSubstring "Le nom du volume"
 
     [<Fact>]
     let ``CreateVolume avec label clé invalide lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = CreateVolumeRequest(Name = "vol-ok", Driver = StorageDriverType.Local)
+        let req = { Name = "vol-ok"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
         req.Labels.Add("bad;key", "val")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.CreateVolume(req, ctx).Result |> ignore)
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).CreateVolume(req, ctx).Result |> ignore)
         ex.InnerException.Message |> should haveSubstring "La clé du label"
 
     [<Fact>]
     let ``CreateVolume avec label valeur invalide lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = CreateVolumeRequest(Name = "vol-ok", Driver = StorageDriverType.Local)
+        let req = { Name = "vol-ok"; Driver = StorageDriverType.Local; DriverOpts = Dictionary<string, string>(); Labels = Dictionary<string, string>() }
         req.Labels.Add("env", "bad|value")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.CreateVolume(req, ctx).Result |> ignore)
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).CreateVolume(req, ctx).Result |> ignore)
         ex.InnerException.Message |> should haveSubstring "La valeur du label"
 
     // --- Sécurité : RemoveVolume ---
@@ -186,8 +190,8 @@ module VolumeServiceImplTests =
     let ``RemoveVolume avec id vide lance RpcException`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = RemoveVolumeRequest(Id = "", Force = false)
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveVolume(req, ctx).Result |> ignore)
+        let req = { Id = ""; Force = false }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).RemoveVolume(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -195,8 +199,8 @@ module VolumeServiceImplTests =
     let ``RemoveVolume avec id injection lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = RemoveVolumeRequest(Id = "id; rm -rf /", Force = false)
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveVolume(req, ctx).Result |> ignore)
+        let req = { Id = "id; rm -rf /"; Force = false }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).RemoveVolume(req, ctx).Result |> ignore)
         ex.InnerException.Message |> should haveSubstring "L'identifiant du volume"
 
     // --- Sécurité : InspectVolume ---
@@ -204,8 +208,8 @@ module VolumeServiceImplTests =
     let ``InspectVolume avec id vide lance RpcException`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = InspectVolumeRequest(Id = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectVolume(req, ctx).Result |> ignore)
+        let req = { Id = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).InspectVolume(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -213,8 +217,8 @@ module VolumeServiceImplTests =
     let ``InspectVolume avec id injection lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = InspectVolumeRequest(Id = "`whoami`")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectVolume(req, ctx).Result |> ignore)
+        let req = { Id = "`whoami`" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).InspectVolume(req, ctx).Result |> ignore)
         ex.InnerException.Message |> should haveSubstring "L'identifiant du volume"
 
     // --- Sécurité : MountVolume ---
@@ -222,8 +226,8 @@ module VolumeServiceImplTests =
     let ``MountVolume avec id vide lance RpcException`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = MountVolumeRequest(Id = "", TargetPath = Path.Combine(Path.GetTempPath(), "test"))
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.MountVolume(req, ctx).Result |> ignore)
+        let req : MountVolumeRequest = { Id = ""; TargetPath = Path.Combine(Path.GetTempPath(), "test"); Options = Dictionary<string, string>() }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).MountVolume(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -231,8 +235,8 @@ module VolumeServiceImplTests =
     let ``MountVolume avec target vide lance RpcException`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = MountVolumeRequest(Id = "vol123", TargetPath = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.MountVolume(req, ctx).Result |> ignore)
+        let req = { Id = "vol123"; TargetPath = ""; Options = Dictionary<string, string>() }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).MountVolume(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -240,16 +244,16 @@ module VolumeServiceImplTests =
     let ``MountVolume avec chemin traversal lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = MountVolumeRequest(Id = "vol123", TargetPath = "/etc/../etc/passwd")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.MountVolume(req, ctx).Result |> ignore)
+        let req = { Id = "vol123"; TargetPath = "/etc/../etc/passwd"; Options = Dictionary<string, string>() }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).MountVolume(req, ctx).Result |> ignore)
         ex.InnerException.Message |> should haveSubstring "Le chemin cible"
 
     [<Fact>]
     let ``MountVolume avec chemin non autorise lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = MountVolumeRequest(Id = "vol123", TargetPath = @"C:\Windows\System32\evil")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.MountVolume(req, ctx).Result |> ignore)
+        let req = { Id = "vol123"; TargetPath = @"C:\Windows\System32\evil"; Options = Dictionary<string, string>() }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).MountVolume(req, ctx).Result |> ignore)
         ex.InnerException.Message |> should haveSubstring "Le chemin cible"
 
     // --- Sécurité : UnmountVolume ---
@@ -257,8 +261,8 @@ module VolumeServiceImplTests =
     let ``UnmountVolume avec id vide lance RpcException`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = UnmountVolumeRequest(Id = "", TargetPath = Path.Combine(Path.GetTempPath(), "test"))
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.UnmountVolume(req, ctx).Result |> ignore)
+        let req = { Id = ""; TargetPath = Path.Combine(Path.GetTempPath(), "test") }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).UnmountVolume(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -266,8 +270,8 @@ module VolumeServiceImplTests =
     let ``UnmountVolume avec target vide lance RpcException`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = UnmountVolumeRequest(Id = "vol123", TargetPath = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.UnmountVolume(req, ctx).Result |> ignore)
+        let req = { Id = "vol123"; TargetPath = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).UnmountVolume(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -275,8 +279,8 @@ module VolumeServiceImplTests =
     let ``UnmountVolume avec chemin traversal lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = UnmountVolumeRequest(Id = "vol123", TargetPath = @"C:\tmp\..\..\Windows\System32")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.UnmountVolume(req, ctx).Result |> ignore)
+        let req = { Id = "vol123"; TargetPath = @"C:\tmp\..\..\Windows\System32" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).UnmountVolume(req, ctx).Result |> ignore)
         ex.InnerException.Message |> should haveSubstring "Le chemin cible"
 
     // --- PruneVolumes ---
@@ -284,8 +288,8 @@ module VolumeServiceImplTests =
     let ``PruneVolumes retourne vide quand aucun volume a supprimer`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = PruneVolumesRequest()
-        let result = svc.PruneVolumes(req, ctx).Result
+        let req = { Placeholder = false }
+        let result = (svc :> IVolumeService).PruneVolumes(req, ctx).Result
         result.Count |> should equal 0
         result.VolumesDeleted.Count |> should equal 0
         result.Message |> should equal "0 volume(s) supprimé(s)"
@@ -295,8 +299,8 @@ module VolumeServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.PruneResult <- [ "vol-1"; "vol-2"; "vol-3" ]
-        let req = PruneVolumesRequest()
-        let result = svc.PruneVolumes(req, ctx).Result
+        let req = { Placeholder = false }
+        let result = (svc :> IVolumeService).PruneVolumes(req, ctx).Result
         result.Count |> should equal 3
         result.VolumesDeleted.Count |> should equal 3
         result.VolumesDeleted |> should contain "vol-1"

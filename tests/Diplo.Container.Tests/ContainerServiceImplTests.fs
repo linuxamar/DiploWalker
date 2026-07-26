@@ -11,6 +11,8 @@ module ContainerServiceImplTests =
     open FsUnit.Xunit
     open Grpc.Core
     open Grpc.Core.Testing
+    open ProtoBuf.Grpc
+    open Diplo.Grpc
     open Diplo.Grpc.Container
     open Diplo.Container.Services
 
@@ -23,10 +25,12 @@ module ContainerServiceImplTests =
         Assert.Contains(substring, text)
 
     let createCtx () =
-        TestServerCallContext.Create(
-            "test", "localhost", DateTime.UtcNow, Metadata(), CancellationToken.None,
-            "peer", Unchecked.defaultof<AuthContext>, Unchecked.defaultof<ContextPropagationToken>,
-            Unchecked.defaultof<System.Func<Metadata,Task>>, Unchecked.defaultof<System.Func<WriteOptions>>, Unchecked.defaultof<System.Action<WriteOptions>>)
+        let ctx =
+            TestServerCallContext.Create(
+                "test", "localhost", DateTime.UtcNow, Metadata(), CancellationToken.None,
+                "peer", Unchecked.defaultof<AuthContext>, Unchecked.defaultof<ContextPropagationToken>,
+                Unchecked.defaultof<System.Func<Metadata,Task>>, Unchecked.defaultof<System.Func<WriteOptions>>, Unchecked.defaultof<System.Action<WriteOptions>>)
+        Unchecked.defaultof<CallContext>
 
     type MockServerStreamWriter<'T>() =
         let items = List<'T>()
@@ -44,8 +48,8 @@ module ContainerServiceImplTests =
     let ``CreateContainer avec nom retourne l'id et le nom`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = CreateContainerRequest(Name = "mon-conteneur", Image = "mcr.microsoft.com/dotnet/runtime:10.0")
-        let result = svc.CreateContainer(req, ctx).Result
+        let req = { Name = "mon-conteneur"; Image = "mcr.microsoft.com/dotnet/runtime:10.0"; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0 }
+        let result = (svc :> IContainerService).CreateContainer(req, ctx).Result
         result.Id |> should equal "mon-conteneur"
         result.Name |> should equal "mon-conteneur"
         result.State |> should equal ContainerState.Created
@@ -54,8 +58,8 @@ module ContainerServiceImplTests =
     let ``CreateContainer sans nom genere un id automatiquement`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = CreateContainerRequest(Name = "", Image = "nginx:latest")
-        let result = svc.CreateContainer(req, ctx).Result
+        let req = { Name = ""; Image = "nginx:latest"; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0 }
+        let result = (svc :> IContainerService).CreateContainer(req, ctx).Result
         String.IsNullOrEmpty(result.Id) |> should equal false
         result.Id.Length |> should equal 32
         result.State |> should equal ContainerState.Created
@@ -65,8 +69,8 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = StartContainerRequest(Id = "c1")
-        let result = svc.StartContainer(req, ctx).Result
+        let req : StartContainerRequest = { Id = "c1" }
+        let result = (svc :> IContainerService).StartContainer(req, ctx).Result
         result.State |> should equal ContainerState.Running
         result.Message |> should equal "Conteneur démarré"
 
@@ -75,8 +79,8 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = StopContainerRequest(Id = "c1", TimeoutSeconds = 0)
-        let result = svc.StopContainer(req, ctx).Result
+        let req = { Id = "c1"; TimeoutSeconds = 0 }
+        let result = (svc :> IContainerService).StopContainer(req, ctx).Result
         result.State |> should equal ContainerState.Stopped
         result.Message |> should equal "Conteneur arrêté"
         mock.StopCalled.["c1"] |> should equal 10
@@ -86,8 +90,8 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = StopContainerRequest(Id = "c1", TimeoutSeconds = 30)
-        let result = svc.StopContainer(req, ctx).Result
+        let req = { Id = "c1"; TimeoutSeconds = 30 }
+        let result = (svc :> IContainerService).StopContainer(req, ctx).Result
         result.State |> should equal ContainerState.Stopped
         mock.StopCalled.["c1"] |> should equal 30
 
@@ -96,8 +100,8 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = DeleteContainerRequest(Id = "c1", Force = false)
-        let result = svc.DeleteContainer(req, ctx).Result
+        let req = { Id = "c1"; Force = false }
+        let result = (svc :> IContainerService).DeleteContainer(req, ctx).Result
         result.Success |> should equal true
         result.Message |> should equal "Conteneur supprimé"
         mock.DeletedContainers |> should contain "c1"
@@ -108,13 +112,13 @@ module ContainerServiceImplTests =
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "my-app", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         mock.Mock.StartContainer("default", "my-app")
-        let req = InspectContainerRequest(Id = "my-app")
-        let result = svc.InspectContainer(req, ctx).Result
+        let req : InspectContainerRequest = { Id = "my-app" }
+        let result = (svc :> IContainerService).InspectContainer(req, ctx).Result
         result.Id |> should equal "my-app"
         result.Name |> should equal "my-app"
         result.Image |> should equal "mcr.microsoft.com/dotnet/runtime:10.0"
         result.State |> should equal ContainerState.Running
-        result.Pid |> should equal 1234L
+        result.Pid |> should equal 1234
         result.Labels.["app"] |> should equal "test"
         result.Labels.["env"] |> should equal "dev"
         result.Env.["ASPNETCORE_ENVIRONMENT"] |> should equal "Development"
@@ -125,10 +129,10 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "stopped-app", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = InspectContainerRequest(Id = "stopped-app")
-        let result = svc.InspectContainer(req, ctx).Result
+        let req : InspectContainerRequest = { Id = "stopped-app" }
+        let result = (svc :> IContainerService).InspectContainer(req, ctx).Result
         result.State |> should equal ContainerState.Created
-        result.Pid |> should equal 0L
+        result.Pid |> should equal 0
 
     [<Fact>]
     let ``ListContainers retourne les conteneurs crees`` () =
@@ -136,8 +140,8 @@ module ContainerServiceImplTests =
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "app-1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         mock.Mock.CreateContainer("default", "app-2", "redis", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = ListContainersRequest(All = true)
-        let result = svc.ListContainers(req, ctx).Result
+        let req = { All = true; Filters = Dictionary<string, string>() }
+        let result = (svc :> IContainerService).ListContainers(req, ctx).Result
         result.Containers.Count |> should equal 2
         result.Containers |> Seq.exists (fun c -> c.Id = "app-1") |> should equal true
         result.Containers |> Seq.exists (fun c -> c.Id = "app-2") |> should equal true
@@ -146,16 +150,16 @@ module ContainerServiceImplTests =
     let ``ListContainers retourne vide quand aucun conteneur`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = ListContainersRequest(All = false)
-        let result = svc.ListContainers(req, ctx).Result
+        let req = { All = false; Filters = Dictionary<string, string>() }
+        let result = (svc :> IContainerService).ListContainers(req, ctx).Result
         result.Containers.Count |> should equal 0
 
     [<Fact>]
     let ``GetVersion retourne la version containerd`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = GetVersionRequest()
-        let result = svc.GetVersion(req, ctx).Result
+        let req : GetVersionRequest = { Placeholder = false }
+        let result = (svc :> IContainerService).GetVersion(req, ctx).Result
         result.Version |> shouldContain "1.7.27"
         result.Version |> shouldContain "abc123"
 
@@ -163,8 +167,8 @@ module ContainerServiceImplTests =
     let ``ListNamespaces retourne les namespaces`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = ListNamespacesRequest()
-        let result = svc.ListNamespaces(req, ctx).Result
+        let req : ListNamespacesRequest = { Placeholder = false }
+        let result = (svc :> IContainerService).ListNamespaces(req, ctx).Result
         result.Namespaces.Count |> should equal 2
         result.Namespaces |> should contain "default"
         result.Namespaces |> should contain "moby"
@@ -174,34 +178,44 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let writer = MockServerStreamWriter<ContainerLogEntry>()
-        let req = GetContainerLogsRequest(Id = "c1", Tail = 10)
-        svc.GetContainerLogs(req, writer, ctx).Wait()
-        writer.Items.Count |> should equal 2
-        writer.Items.[0].Log |> should equal "2025-01-15T10:30:01Z Application started"
-        writer.Items.[1].Log |> should equal "2025-01-15T10:30:02Z Listening on port 8080"
-        writer.Items |> Seq.forall (fun e -> e.Stream = "stdout") |> should equal true
+        let req = { Id = "c1"; Tail = 10; Follow = false; Since = "" }
+        let enumerable = (svc :> IContainerService).GetContainerLogs(req, ctx)
+        let enumerator = enumerable.GetAsyncEnumerator(CancellationToken.None)
+        let items = List<ContainerLogEntry>()
+        let mutable hasNext = enumerator.MoveNextAsync().Result
+        while hasNext do
+            items.Add(enumerator.Current)
+            hasNext <- enumerator.MoveNextAsync().Result
+        items.Count |> should equal 2
+        items.[0].Log |> should equal "2025-01-15T10:30:01Z Application started"
+        items.[1].Log |> should equal "2025-01-15T10:30:02Z Listening on port 8080"
+        items |> Seq.forall (fun e -> e.Stream = "stdout") |> should equal true
 
     [<Fact>]
     let ``ExecInContainer ecrit la sortie dans le stream`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let writer = MockServerStreamWriter<ExecOutput>()
-        let req = ExecInContainerRequest(Id = "c1")
+        let req = { Id = "c1"; Command = ResizeArray<string>(); AttachStdin = false; AttachStdout = true; AttachStderr = true }
         req.Command.Add("echo")
         req.Command.Add("hello")
-        svc.ExecInContainer(req, writer, ctx).Wait()
-        writer.Items.Count |> should equal 1
-        writer.Items.[0].Stream |> should equal "stdout"
-        writer.Items.[0].Data.ToStringUtf8() |> should equal "Output of: echo hello"
+        let enumerable = (svc :> IContainerService).ExecInContainer(req, ctx)
+        let enumerator = enumerable.GetAsyncEnumerator(CancellationToken.None)
+        let items = List<ExecOutput>()
+        let mutable hasNext = enumerator.MoveNextAsync().Result
+        while hasNext do
+            items.Add(enumerator.Current)
+            hasNext <- enumerator.MoveNextAsync().Result
+        items.Count |> should equal 1
+        items.[0].Stream |> should equal "stdout"
+        System.Text.Encoding.UTF8.GetString(items.[0].Data) |> should equal "Output of: echo hello"
 
     [<Fact>]
     let ``PullImage avec image valide retourne succes`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let req = PullImageRequest(Image = "mcr.microsoft.com/dotnet/runtime:10.0")
-        let result = svc.PullImage(req, ctx).Result
+        let req = { Image = "mcr.microsoft.com/dotnet/runtime:10.0" }
+        let result = (svc :> IContainerService).PullImage(req, ctx).Result
         result.Image |> should equal "mcr.microsoft.com/dotnet/runtime:10.0"
         result.Message |> shouldContain "image pulled"
         mock.PulledImages |> should contain "mcr.microsoft.com/dotnet/runtime:10.0"
@@ -210,15 +224,15 @@ module ContainerServiceImplTests =
     let ``PullImage avec image vide leve InvalidArgument`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = PullImageRequest(Image = "")
-        Assert.ThrowsAsync<RpcException>(fun () -> svc.PullImage(req, ctx)) |> ignore
+        let req = { Image = "" }
+        Assert.ThrowsAsync<RpcException>(fun () -> (svc :> IContainerService).PullImage(req, ctx)) |> ignore
 
     [<Fact>]
     let ``PullImage avec image servercore fonctionne`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let req = PullImageRequest(Image = "mcr.microsoft.com/windows/servercore:ltsc2022")
-        let result = svc.PullImage(req, ctx).Result
+        let req = { Image = "mcr.microsoft.com/windows/servercore:ltsc2022" }
+        let result = (svc :> IContainerService).PullImage(req, ctx).Result
         result.Image |> should equal "mcr.microsoft.com/windows/servercore:ltsc2022"
         mock.PulledImages |> should contain "mcr.microsoft.com/windows/servercore:ltsc2022"
 
@@ -228,8 +242,8 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = RenameContainerRequest(Id = "c1", NewName = "nouveau-nom")
-        let result = svc.RenameContainer(req, ctx).Result
+        let req = { Id = "c1"; NewName = "nouveau-nom" }
+        let result = (svc :> IContainerService).RenameContainer(req, ctx).Result
         result.Success |> should equal true
         result.Message |> shouldContain "nouveau-nom"
 
@@ -237,8 +251,8 @@ module ContainerServiceImplTests =
     let ``RenameContainer avec id vide leve InvalidArgument`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = RenameContainerRequest(Id = "", NewName = "nom")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.RenameContainer(req, ctx).Result |> ignore)
+        let req = { Id = ""; NewName = "nom" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).RenameContainer(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -247,8 +261,8 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = RenameContainerRequest(Id = "c1", NewName = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.RenameContainer(req, ctx).Result |> ignore)
+        let req = { Id = "c1"; NewName = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).RenameContainer(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -259,8 +273,8 @@ module ContainerServiceImplTests =
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
         mock.Mock.StartContainer("default", "c1")
-        let req = TopContainerRequest(Id = "c1")
-        let result = svc.TopContainer(req, ctx).Result
+        let req : TopContainerRequest = { Id = "c1" }
+        let result = (svc :> IContainerService).TopContainer(req, ctx).Result
         result.Processes.Count |> should equal 1
         result.Processes.[0].Pid |> should equal 1234L
         result.Processes.[0].User |> should equal "root"
@@ -270,8 +284,8 @@ module ContainerServiceImplTests =
     let ``TopContainer avec id vide leve InvalidArgument`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = TopContainerRequest(Id = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.TopContainer(req, ctx).Result |> ignore)
+        let req : TopContainerRequest = { Id = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).TopContainer(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -281,19 +295,19 @@ module ContainerServiceImplTests =
         let svc, mock = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
-        let req = GetContainerStatsRequest(Id = "c1")
-        let result = svc.GetContainerStats(req, ctx).Result
-        result.CpuUsage |> should equal 123456L
+        let req : GetContainerStatsRequest = { Id = "c1" }
+        let result = (svc :> IContainerService).GetContainerStats(req, ctx).Result
+        result.CpuUsage |> should equal 123456.0
         result.MemoryUsage |> should equal 1048576L
         result.MemoryLimit |> should equal 536870912L
-        result.Pids |> should equal 3.0
+        result.Pids |> should equal 3
 
     [<Fact>]
     let ``GetContainerStats avec id vide leve InvalidArgument`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = GetContainerStatsRequest(Id = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.GetContainerStats(req, ctx).Result |> ignore)
+        let req : GetContainerStatsRequest = { Id = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).GetContainerStats(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -302,8 +316,8 @@ module ContainerServiceImplTests =
     let ``ListImages retourne les images disponibles`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = ListImagesRequest()
-        let result = svc.ListImages(req, ctx).Result
+        let req : ListImagesRequest = { NamespaceName = "" }
+        let result = (svc :> IContainerService).ListImages(req, ctx).Result
         result.Images.Count |> should equal 2
         result.Images |> Seq.exists (fun i -> i.Repository = "library/nginx") |> should equal true
         result.Images |> Seq.exists (fun i -> i.Repository = "library/redis") |> should equal true
@@ -312,8 +326,8 @@ module ContainerServiceImplTests =
     let ``ListImages avec namespace vide utilise le namespace par defaut`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = ListImagesRequest()
-        let result = svc.ListImages(req, ctx).Result
+        let req : ListImagesRequest = { NamespaceName = "" }
+        let result = (svc :> IContainerService).ListImages(req, ctx).Result
         result.Images.Count |> should equal 2
 
     // --- InspectImage ---
@@ -321,8 +335,8 @@ module ContainerServiceImplTests =
     let ``InspectImage retourne les details de l'image`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = InspectImageRequest(Ref = "nginx:latest")
-        let result = svc.InspectImage(req, ctx).Result
+        let req : InspectImageRequest = { Ref = "nginx:latest"; NamespaceName = "" }
+        let result = (svc :> IContainerService).InspectImage(req, ctx).Result
         result.Ref |> should equal "nginx:latest"
         result.Repository |> should equal "library/nginx"
         result.Labels.["maintainer"] |> should equal "nginx"
@@ -331,8 +345,8 @@ module ContainerServiceImplTests =
     let ``InspectImage avec ref vide leve InvalidArgument`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = InspectImageRequest(Ref = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.InspectImage(req, ctx).Result |> ignore)
+        let req : InspectImageRequest = { Ref = ""; NamespaceName = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).InspectImage(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -341,8 +355,8 @@ module ContainerServiceImplTests =
     let ``RemoveImage supprime l'image avec succes`` () =
         let svc, mock = createService ()
         let ctx = createCtx ()
-        let req = RemoveImageRequest(Ref = "nginx:latest")
-        let result = svc.RemoveImage(req, ctx).Result
+        let req : RemoveImageRequest = { Ref = "nginx:latest"; NamespaceName = "" }
+        let result = (svc :> IContainerService).RemoveImage(req, ctx).Result
         result.Success |> should equal true
         result.Message |> shouldContain "nginx:latest"
 
@@ -350,8 +364,8 @@ module ContainerServiceImplTests =
     let ``RemoveImage avec ref vide leve InvalidArgument`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = RemoveImageRequest(Ref = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.RemoveImage(req, ctx).Result |> ignore)
+        let req : RemoveImageRequest = { Ref = ""; NamespaceName = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).RemoveImage(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -360,8 +374,8 @@ module ContainerServiceImplTests =
     let ``TagImage tag l'image avec succes`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = TagImageRequest(Source = "nginx:latest", Target = "myregistry.azurecr.io/nginx:v1")
-        let result = svc.TagImage(req, ctx).Result
+        let req = { Source = "nginx:latest"; Target = "myregistry.azurecr.io/nginx:v1"; NamespaceName = "" }
+        let result = (svc :> IContainerService).TagImage(req, ctx).Result
         result.Source |> should equal "nginx:latest"
         result.Target |> should equal "myregistry.azurecr.io/nginx:v1"
 
@@ -369,8 +383,8 @@ module ContainerServiceImplTests =
     let ``TagImage avec source vide leve InvalidArgument`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = TagImageRequest(Source = "", Target = "myregistry.azurecr.io/nginx:v1")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.TagImage(req, ctx).Result |> ignore)
+        let req = { Source = ""; Target = "myregistry.azurecr.io/nginx:v1"; NamespaceName = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).TagImage(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
@@ -378,7 +392,7 @@ module ContainerServiceImplTests =
     let ``TagImage avec cible vide leve InvalidArgument`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = TagImageRequest(Source = "nginx:latest", Target = "")
-        let ex = Assert.Throws<AggregateException>(fun () -> svc.TagImage(req, ctx).Result |> ignore)
+        let req = { Source = "nginx:latest"; Target = ""; NamespaceName = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).TagImage(req, ctx).Result |> ignore)
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument

@@ -313,7 +313,7 @@ type MainWindowViewModel() as this =
                 let client = new ContainerClient()
                 let! response = client.GetContainerStatsAsync(id = this.ContainerIdInput) |> Async.AwaitTask
                 (outputPort :> IOutputPort).WriteLine(sprintf "Métriques du conteneur %s:" this.ContainerIdInput)
-                (outputPort :> IOutputPort).WriteLine(sprintf "  CPU: %d  Mémoire: %d" response.CpuUsage response.MemoryUsage)
+                (outputPort :> IOutputPort).WriteLine(sprintf "  CPU: %.2f  Mémoire: %d" response.CpuUsage response.MemoryUsage)
                 (outputPort :> IOutputPort).WriteLine(sprintf "  Réseau RX: %d  TX: %d" response.NetworkRx response.NetworkTx)
             with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
         }
@@ -391,10 +391,10 @@ type MainWindowViewModel() as this =
         async {
             try
                 let client = new ContainerClient()
-                let stream = client.GetLogs(id = this.ContainerIdInput, follow = this.ContainerFollow, tail = this.ContainerTail, since = this.ContainerSince)
+                let! entries = client.GetLogs(id = this.ContainerIdInput, follow = this.ContainerFollow, tail = this.ContainerTail, since = this.ContainerSince) |> Async.AwaitTask
                 let sb = System.Text.StringBuilder()
-                while stream.MoveNext(System.Threading.CancellationToken.None) |> Async.AwaitTask |> Async.RunSynchronously do
-                    sb.AppendLine(sprintf "[%s] %s" stream.Current.Timestamp stream.Current.Log) |> ignore
+                for entry in entries do
+                    sb.AppendLine(sprintf "[%s] %s" entry.Timestamp entry.Log) |> ignore
                 (outputPort :> IOutputPort).WriteSuccess(sb.ToString())
             with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
         }
@@ -404,10 +404,10 @@ type MainWindowViewModel() as this =
             try
                 let client = new ContainerClient()
                 let parts = this.ContainerExecCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                let stream = client.Exec(id = this.ContainerIdInput, command = parts)
+                let! entries = client.Exec(id = this.ContainerIdInput, command = parts) |> Async.AwaitTask
                 let sb = System.Text.StringBuilder()
-                while stream.MoveNext(System.Threading.CancellationToken.None) |> Async.AwaitTask |> Async.RunSynchronously do
-                    sb.Append(stream.Current.Data.ToStringUtf8()) |> ignore
+                for entry in entries do
+                    sb.Append(System.Text.Encoding.UTF8.GetString(entry.Data)) |> ignore
                 (outputPort :> IOutputPort).WriteSuccess(sb.ToString())
             with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
         }

@@ -5,13 +5,15 @@ open System.Collections.Generic
 open System.Threading
 open Diplo.Abstractions
 open Diplo.Core.Connection
+open Diplo.Grpc
 open Diplo.Grpc.Network
 open Grpc.Net.Client
+open ProtoBuf.Grpc.Client
 
 type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
     inherit GrpcClientBase(channel, ownsChannel)
 
-    let client = NetworkService.NetworkServiceClient(channel)
+    let client = channel.CreateGrpcService<INetworkService>()
 
     new(port: int) =
         let ch = DiploChannel.forNetwork port
@@ -37,10 +39,10 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
             let r = defaultArg ipRange ""
             let p = defaultArg cniPluginPath ""
             let ct = defaultArg ct CancellationToken.None
-            let request = CreateNetworkRequest(Name = name, Driver = d, Subnet = s, Gateway = g, IpRange = r, CniPluginPath = p)
-            options |> Option.iter (fun o -> request.Options.Add(o))
-            labels |> Option.iter (fun l -> request.Labels.Add(l))
-            let! response = client.CreateNetworkAsync(request, cancellationToken = ct).ResponseAsync
+            let request = { Name = name; Driver = d; Subnet = s; Gateway = g; IpRange = r; Options = Dictionary<string, string>(); Labels = Dictionary<string, string>(); CniPluginPath = p }
+            options |> Option.iter (fun o -> for kv in o do request.Options.[kv.Key] <- kv.Value)
+            labels |> Option.iter (fun l -> for kv in l do request.Labels.[kv.Key] <- kv.Value)
+            let! response = client.CreateNetwork(request, ct)
             return response
         }
 
@@ -49,7 +51,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
             if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du réseau est requis"
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
-            let! response = client.RemoveNetworkAsync(RemoveNetworkRequest(Id = id, Force = f), cancellationToken = ct).ResponseAsync
+            let! response = client.RemoveNetwork({ Id = id; Force = f }, ct)
             return response
         }
 
@@ -57,16 +59,16 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
         task {
             if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du réseau est requis"
             let ct = defaultArg ct CancellationToken.None
-            let! response = client.InspectNetworkAsync(InspectNetworkRequest(Id = id), cancellationToken = ct).ResponseAsync
+            let! response = client.InspectNetwork({ Id = id }, ct)
             return response
         }
 
     member _.ListAsync(?filters: IDictionary<string, string>, ?ct: CancellationToken) =
         task {
             let ct = defaultArg ct CancellationToken.None
-            let request = ListNetworksRequest()
-            filters |> Option.iter (fun f -> request.Filters.Add(f))
-            let! response = client.ListNetworksAsync(request, cancellationToken = ct).ResponseAsync
+            let request = { Filters = Dictionary<string, string>() }
+            filters |> Option.iter (fun f -> for kv in f do request.Filters.[kv.Key] <- kv.Value)
+            let! response = client.ListNetworks(request, ct)
             return response
         }
 
@@ -77,9 +79,9 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
             let eId = defaultArg endpointId ""
             let ip = defaultArg ipv4Address ""
             let ct = defaultArg ct CancellationToken.None
-            let request = ConnectContainerRequest(NetworkId = networkId, ContainerId = containerId, EndpointId = eId, Ipv4Address = ip)
-            options |> Option.iter (fun o -> request.Options.Add(o))
-            let! response = client.ConnectContainerAsync(request, cancellationToken = ct).ResponseAsync
+            let request = { NetworkId = networkId; ContainerId = containerId; EndpointId = eId; Ipv4Address = ip; Options = Dictionary<string, string>() }
+            options |> Option.iter (fun o -> for kv in o do request.Options.[kv.Key] <- kv.Value)
+            let! response = client.ConnectContainer(request, ct)
             return response
         }
 
@@ -90,7 +92,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
             let eId = defaultArg endpointId ""
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
-            let! response = client.DisconnectContainerAsync(DisconnectContainerRequest(NetworkId = networkId, ContainerId = containerId, EndpointId = eId, Force = f), cancellationToken = ct).ResponseAsync
+            let! response = client.DisconnectContainer({ NetworkId = networkId; ContainerId = containerId; EndpointId = eId; Force = f }, ct)
             return response
         }
 
@@ -101,17 +103,15 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
             if String.IsNullOrEmpty(containerId) then invalidArg (nameof containerId) "L'identifiant du conteneur est requis"
             if String.IsNullOrEmpty(netnsPath) then invalidArg (nameof netnsPath) "Le chemin netns est requis"
             let ct = defaultArg ct CancellationToken.None
-            let request = RunCniPluginRequest(PluginPath = pluginPath, Command = command, ContainerId = containerId, NetnsPath = netnsPath)
+            let request = { PluginPath = pluginPath; Command = command; ContainerId = containerId; NetnsPath = netnsPath; Config = Unchecked.defaultof<CniConfiguration> }
             config |> Option.iter (fun c -> request.Config <- c)
-            let! response = client.RunCniPluginAsync(request, cancellationToken = ct).ResponseAsync
+            let! response = client.RunCniPlugin(request, ct)
             return response
         }
 
     member _.PruneNetworksAsync(?ct: CancellationToken) =
         task {
             let ct = defaultArg ct CancellationToken.None
-            let! response = client.PruneNetworksAsync(PruneNetworksRequest(), cancellationToken = ct).ResponseAsync
+            let! response = client.PruneNetworks({ Placeholder = false }, ct)
             return response
         }
-
-

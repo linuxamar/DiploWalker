@@ -14,11 +14,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Grpc.Net.Client"  />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="protobuf-net.Grpc" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Diplo.Grpc\Diplo.Grpc.csproj" />
+    <ProjectReference Include="..\Diplo.Grpc\Diplo.Grpc.fsproj" />
     <ProjectReference Include="..\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
   </ItemGroup>
 

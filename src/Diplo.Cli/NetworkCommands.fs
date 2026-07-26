@@ -206,11 +206,14 @@ type RunCniPluginCommand(output: IOutputPort) =
                 if isNull settings.ConfigType then
                     None
                 else
-                    Some (CniConfiguration(
-                        Name = (if isNull settings.ConfigName then "" else settings.ConfigName),
-                        Type = settings.ConfigType,
-                        Subnet = (if isNull settings.ConfigSubnet then "" else settings.ConfigSubnet),
-                        Gateway = (if isNull settings.ConfigGateway then "" else settings.ConfigGateway)))
+                    Some ({ CniConfiguration.Name = (if isNull settings.ConfigName then "" else settings.ConfigName)
+                            Type = settings.ConfigType
+                            Subnet = (if isNull settings.ConfigSubnet then "" else settings.ConfigSubnet)
+                            Gateway = (if isNull settings.ConfigGateway then "" else settings.ConfigGateway)
+                            IpRange = ""
+                            HairpinMode = false
+                            IsDefaultGateway = false
+                            Dns = System.Collections.Generic.Dictionary<string, string>() })
             let! response =
                 client.RunCniPluginAsync(
                     pluginPath = settings.PluginPath,

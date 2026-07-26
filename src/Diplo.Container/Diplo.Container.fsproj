@@ -3,8 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
-    <EnableDefaultProtobufItems>false</EnableDefaultProtobufItems>
-    <Protobuf_ProjectSupported>true</Protobuf_ProjectSupported>
+
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,12 +14,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Grpc.AspNetCore"  />
+    <PackageReference Include="protobuf-net.Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Core.Api" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Diplo.Contracts\Diplo.Contracts.fsproj" />
     <ProjectReference Include="..\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
-    <ProjectReference Include="..\Diplo.Grpc\Diplo.Grpc.csproj" />
+    <ProjectReference Include="..\Diplo.Grpc\Diplo.Grpc.fsproj" />
   </ItemGroup>
 </Project>

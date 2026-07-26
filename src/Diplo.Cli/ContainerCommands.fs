@@ -186,9 +186,9 @@ type CreateContainerCommand(output: IOutputPort) =
                     ?command = (if command.IsEmpty then None else Some command),
                     ?args = (if args.IsEmpty then None else Some args),
                     ?labels = (if labels.Count > 0 then Some labels else None),
-                    ?pidLimit = (if settings.PidLimit > 0u then Some settings.PidLimit else None),
+                    ?pidLimit = (if settings.PidLimit > 0u then Some(int settings.PidLimit) else None),
                     ?memoryLimit = (if settings.MemoryLimit > 0L then Some settings.MemoryLimit else None),
-                    ?cpuShares = (if settings.CpuShares > 0L then Some settings.CpuShares else None))
+                    ?cpuShares = (if settings.CpuShares > 0L then Some(int settings.CpuShares) else None))
             output.WriteSuccess(sprintf "Conteneur %s créé (%s)" response.Name (response.State.ToString()))
             output.WriteLine(sprintf "  ID      : %s" response.Id)
             output.WriteLine(sprintf "  Créé    : %s" response.CreatedAt)
@@ -212,14 +212,9 @@ type LogsContainerCommand(output: IOutputPort) =
 
             use client = new ContainerClient()
             let since = if isNull settings.Since then "" else settings.Since
-            let stream = client.GetLogs(settings.Id, follow = settings.Follow, tail = settings.Tail, since = since)
-            let mutable running = true
-            while running do
-                let! hasMore = stream.MoveNext(_ct)
-                running <- hasMore
-                if hasMore then
-                    let entry = stream.Current
-                    output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
+            let! entries = client.GetLogs(settings.Id, follow = settings.Follow, tail = settings.Tail, since = since)
+            for entry in entries do
+                output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
             return 0
         }
 
@@ -241,14 +236,9 @@ type ExecContainerCommand(output: IOutputPort) =
                 output.WriteError("Au moins une commande est requise")
                 return 1
             else
-                let stream = client.Exec(settings.Id, settings.Command :> seq<string>)
-                let mutable running = true
-                while running do
-                    let! hasMore = stream.MoveNext(_ct)
-                    running <- hasMore
-                    if hasMore then
-                        let entry = stream.Current
-                        output.WriteLine(entry.Data.ToStringUtf8())
+                let! entries = client.Exec(settings.Id, settings.Command :> seq<string>)
+                for entry in entries do
+                    output.WriteLine(System.Text.Encoding.UTF8.GetString(entry.Data))
                 return 0
         }
 
@@ -351,13 +341,13 @@ type StatsContainerCommand(output: IOutputPort) =
             use client = new ContainerClient()
             let! response = client.GetContainerStatsAsync(settings.Id)
             output.WriteSuccess(sprintf "Métriques du conteneur %s" settings.Id)
-            output.WriteLine(sprintf "  CPU       : %d" response.CpuUsage)
+            output.WriteLine(sprintf "  CPU       : %.2f" response.CpuUsage)
             output.WriteLine(sprintf "  Mémoire   : %d / %d octets" response.MemoryUsage response.MemoryLimit)
             output.WriteLine(sprintf "  Réseau rx : %d octets" response.NetworkRx)
             output.WriteLine(sprintf "  Réseau tx : %d octets" response.NetworkTx)
             output.WriteLine(sprintf "  Disque r  : %d octets" response.DiskRead)
             output.WriteLine(sprintf "  Disque w  : %d octets" response.DiskWrite)
-            output.WriteLine(sprintf "  PIDs      : %.0f" response.Pids)
+            output.WriteLine(sprintf "  PIDs      : %d" response.Pids)
             return 0
         }
 

@@ -31,7 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Network\Diplo.Network.fsproj" />
-    <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.csproj" />
+    <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.fsproj" />
   </ItemGroup>
 
 </Project>
