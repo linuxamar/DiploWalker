@@ -31,9 +31,17 @@
 
   <PropertyGroup>
     <!--
-      Forcer la résolution de la version transitive System.Security.Cryptography.Pkcs
-      (vulnérabilité GHSA-555c-2p6r-68mm dans la version 6.0.1, apportée par System.ServiceModel.Primitives).
-      La version est définie dans Directory.Packages.props.
+      NU1510 : avertissement inoffensif pour les projets sans dépendance transitives
+      sur les packages de sécurité globaux (Pkcs / Xml).
+    -->
+    <NoWarn>$(NoWarn);NU1510</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      Forcer la résolution des versions transitives vulnérables
+      (apportées par System.ServiceModel.Primitives).
+      Les versions sont définies dans Directory.Packages.props.
     -->
   </PropertyGroup>
 
@@ -48,6 +56,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <PackageReference Include="System.Security.Cryptography.Xml" />
   </ItemGroup>
 
 </Project>
