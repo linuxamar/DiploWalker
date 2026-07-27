@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Diplo.Gui.ViewModels"
+        x:CompileBindings="False"
         Title="Diplo — Gestion Docker"
         Width="960" Height="720"
         WindowStartupLocation="CenterScreen">
@@ -53,16 +54,16 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerIdInput}" Width="200" Margin="0,0,12,0"
-                                 Watermark="identifiant du conteneur" />
+                                 PlaceholderText="identifiant du conteneur" />
                         <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerNameInput}" Width="160" Margin="0,0,12,0"
-                                 Watermark="nom (optionnel)" />
+                                 PlaceholderText="nom (optionnel)" />
                         <TextBlock Text="Image:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerImageInput}" Width="200" Margin="0,0,12,0"
-                                 Watermark="nom:tag" />
+                                 PlaceholderText="nom:tag" />
                         <TextBlock Text="Espace:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerNamespace}" Width="140" Margin="0,0,12,0"
-                                 Watermark="namespace (optionnel)" />
+                                 PlaceholderText="namespace (optionnel)" />
                         <TextBlock Text="Timeout:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <NumericUpDown Value="{Binding ContainerTimeout}" Minimum="1" Maximum="300"
                                        Width="80" />
@@ -76,13 +77,13 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Nouveau nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerNewName}" Width="140" Margin="0,0,12,0"
-                                 Watermark="renommer" />
+                                 PlaceholderText="renommer" />
                         <TextBlock Text="Réf. image:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerImageRef}" Width="200" Margin="0,0,12,0"
-                                 Watermark="image:tag (inspect/remove/tag)" />
+                                 PlaceholderText="image:tag (inspect/remove/tag)" />
                         <TextBlock Text="Cible:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerImageTarget}" Width="200" Margin="0,0,12,0"
-                                 Watermark="nouveau:tag (tag)" />
+                                 PlaceholderText="nouveau:tag (tag)" />
                         <Button Content="📋 Lister images" Command="{Binding ListImagesCommand}" Margin="0,0,4,0" />
                         <Button Content="🔍 Inspecter img" Command="{Binding InspectImageCommand}" Margin="0,0,4,0" />
                         <Button Content="🗑 Supprimer img" Command="{Binding RemoveImageCommand}" Margin="0,0,4,0" />
@@ -96,10 +97,10 @@
                         <TextBlock Text="Lignes:" VerticalAlignment="Center" Margin="8,0,4,0" />
                         <NumericUpDown Value="{Binding ContainerTail}" Minimum="10" Maximum="10000" Width="80" />
                         <TextBlock Text="Depuis:" VerticalAlignment="Center" Margin="8,0,4,0" />
-                        <TextBox Text="{Binding ContainerSince}" Width="140" Margin="0,0,12,0" Watermark="ISO date (optionnel)" />
+                        <TextBox Text="{Binding ContainerSince}" Width="140" Margin="0,0,12,0" PlaceholderText="ISO date (optionnel)" />
                         <Button Content="⚡ Exécuter" Command="{Binding ExecInContainerCommand}" Margin="0,0,4,0" />
                         <TextBlock Text="Cmd:" VerticalAlignment="Center" Margin="8,0,4,0" />
-                        <TextBox Text="{Binding ContainerExecCommand}" Width="200" Margin="0,0,12,0" Watermark="commande à exécuter" />
+                        <TextBox Text="{Binding ContainerExecCommand}" Width="200" Margin="0,0,12,0" PlaceholderText="commande à exécuter" />
                         <Button Content="📁 Espaces" Command="{Binding ListNamespacesCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
@@ -148,16 +149,16 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding VolumeIdInput}" Width="200" Margin="0,0,12,0"
-                                 Watermark="identifiant du volume" />
+                                 PlaceholderText="identifiant du volume" />
                         <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding VolumeNameInput}" Width="160" Margin="0,0,12,0"
-                                 Watermark="nom du volume" />
+                                 PlaceholderText="nom du volume" />
                         <TextBlock Text="Driver:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding VolumeDriver}" Width="100" Margin="0,0,12,0"
-                                 Watermark="local" />
+                                 PlaceholderText="local" />
                         <TextBlock Text="Cible:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding VolumeTargetPath}" Width="200" Margin="0,0,12,0"
-                                 Watermark="chemin de montage" />
+                                 PlaceholderText="chemin de montage" />
                         <CheckBox Content="Forcer" IsChecked="{Binding VolumeForce}" Margin="12,0,0,0"
                                   VerticalAlignment="Center" />
                     </WrapPanel>
@@ -193,31 +194,31 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkIdInput}" Width="180" Margin="0,0,12,0"
-                                 Watermark="identifiant réseau" />
+                                 PlaceholderText="identifiant réseau" />
                         <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkNameInput}" Width="140" Margin="0,0,12,0"
-                                 Watermark="nom du réseau" />
+                                 PlaceholderText="nom du réseau" />
                         <TextBlock Text="Driver:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkDriver}" Width="100" Margin="0,0,12,0"
-                                 Watermark="bridge" />
+                                 PlaceholderText="bridge" />
                         <TextBlock Text="Sous-réseau:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkSubnet}" Width="140" Margin="0,0,12,0"
-                                 Watermark="172.20.0.0/16" />
+                                 PlaceholderText="172.20.0.0/16" />
                         <TextBlock Text="Passerelle:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkGateway}" Width="140" Margin="0,0,12,0"
-                                 Watermark="172.20.0.1" />
+                                 PlaceholderText="172.20.0.1" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Endpoint:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkEndpointId}" Width="180" Margin="0,0,12,0"
-                                 Watermark="ID endpoint (connect/déconnect)" />
+                                 PlaceholderText="ID endpoint (connect/déconnect)" />
                         <TextBlock Text="Conteneur:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkContainerId}" Width="180" Margin="0,0,12,0"
-                                 Watermark="ID conteneur" />
+                                 PlaceholderText="ID conteneur" />
                         <TextBlock Text="IPv4:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkIpv4}" Width="140" Margin="0,0,12,0"
-                                 Watermark="172.20.0.2/16" />
+                                 PlaceholderText="172.20.0.2/16" />
                         <CheckBox Content="Forcer" IsChecked="{Binding NetworkForce}" Margin="12,0,0,0"
                                    VerticalAlignment="Center" />
                     </WrapPanel>
@@ -226,13 +227,13 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Plugin CNI:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkCniPluginPath}" Width="200" Margin="0,0,12,0"
-                                 Watermark="chemin vers plugin CNI" />
+                                 PlaceholderText="chemin vers plugin CNI" />
                         <TextBlock Text="Commande:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkCniCommand}" Width="80" Margin="0,0,12,0"
-                                 Watermark="ADD/DEL/CHECK" />
+                                 PlaceholderText="ADD/DEL/CHECK" />
                         <TextBlock Text="NetNS:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkNetnsPath}" Width="200" Margin="0,0,12,0"
-                                 Watermark="chemin namespace réseau" />
+                                 PlaceholderText="chemin namespace réseau" />
                     </WrapPanel>
 
                     <DataGrid ItemsSource="{Binding Networks}" AutoGenerateColumns="False"
