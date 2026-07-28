@@ -1,0 +1,110 @@
+namespace Diplo.Cli.Compose
+
+open System
+open Diplo.Core.Compose
+open Diplo.Core.Output
+open Spectre.Console.Cli
+
+// ── up ─────────────────────────────────────────────────────────────
+type ComposeUpSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+type ComposeUpCommand(output: IOutputPort) =
+    inherit AsyncCommand<ComposeUpSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+
+            let orchestrator = ComposeOrchestrator(output)
+            do! orchestrator.Up(settings.File)
+            return 0
+        }
+
+// ── down ───────────────────────────────────────────────────────────
+type ComposeDownSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+type ComposeDownCommand(output: IOutputPort) =
+    inherit AsyncCommand<ComposeDownSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+
+            let orchestrator = ComposeOrchestrator(output)
+            do! orchestrator.Down(settings.File)
+            return 0
+        }
+
+// ── ps ─────────────────────────────────────────────────────────────
+type ComposePsSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+type ComposePsCommand(output: IOutputPort) =
+    inherit AsyncCommand<ComposePsSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+
+            let orchestrator = ComposeOrchestrator(output)
+            do! orchestrator.Ps(settings.File)
+            return 0
+        }
+
+// ── logs ───────────────────────────────────────────────────────────
+type ComposeLogsSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+    [<CommandOption("-s|--service")>] member val Service: string = null with get, set
+
+type ComposeLogsCommand(output: IOutputPort) =
+    inherit AsyncCommand<ComposeLogsSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+
+            let orchestrator = ComposeOrchestrator(output)
+            let service = if isNull settings.Service then None else Some settings.Service
+            do! orchestrator.Logs(settings.File, service)
+            return 0
+        }
+
+// ── pull ───────────────────────────────────────────────────────────
+type ComposePullSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+type ComposePullCommand(output: IOutputPort) =
+    inherit AsyncCommand<ComposePullSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+
+            let orchestrator = ComposeOrchestrator(output)
+            do! orchestrator.Pull(settings.File)
+            return 0
+        }
+
+// ── build ──────────────────────────────────────────────────────────
+type ComposeBuildSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+type ComposeBuildCommand(output: IOutputPort) =
+    inherit AsyncCommand<ComposeBuildSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) =
+        task {
+            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+
+            let orchestrator = ComposeOrchestrator(output)
+            do! orchestrator.Build(settings.File)
+            return 0
+        }

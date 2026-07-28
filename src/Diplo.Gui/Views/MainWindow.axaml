@@ -250,6 +250,41 @@
                     </DataGrid>
                 </DockPanel>
             </TabItem>
+
+            <!-- ONGLET COMPOSE -->
+            <TabItem Header="Compose">
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
+                        <Button Content="▶ Démarrer" Command="{Binding ComposeUpCommand}" Margin="0,0,4,0" />
+                        <Button Content="⏹ Arrêter" Command="{Binding ComposeDownCommand}" Margin="0,0,4,0" />
+                        <Button Content="📋 État" Command="{Binding ComposePsCommand}" Margin="0,0,4,0" />
+                        <Button Content="📜 Journaux" Command="{Binding ComposeLogsCommand}" Margin="0,0,4,0" />
+                        <Button Content="📥 Télécharger" Command="{Binding ComposePullCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Fichier:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ComposeFilePath}" Width="400" Margin="0,0,12,0"
+                                 PlaceholderText="chemin vers docker-compose.yml" />
+                        <TextBlock Text="Service:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ComposeServiceName}" Width="160" Margin="0,0,12,0"
+                                 PlaceholderText="nom du service (optionnel)" />
+                    </WrapPanel>
+
+                    <DataGrid ItemsSource="{Binding ComposeServices}" AutoGenerateColumns="False"
+                              IsReadOnly="True" GridLinesVisibility="Horizontal"
+                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
+                              CanUserResizeColumns="True" CanUserSortColumns="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Service" Binding="{Binding Service}" Width="120" />
+                            <DataGridTextColumn Header="Conteneur" Binding="{Binding Conteneur}" Width="200" />
+                            <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="200" />
+                            <DataGridTextColumn Header="État" Binding="{Binding État}" Width="80" />
+                            <DataGridTextColumn Header="Projet" Binding="{Binding Projet}" Width="120" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

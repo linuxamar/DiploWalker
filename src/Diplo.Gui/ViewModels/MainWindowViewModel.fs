@@ -5,6 +5,7 @@ open System.Collections.ObjectModel
 open System.Windows.Input
 open Avalonia.Threading
 open Diplo.Core.Clients
+open Diplo.Core.Compose
 open Diplo.Core.Connection
 open Diplo.Core.Output
 open Diplo.Gui.Services
@@ -43,6 +44,14 @@ type ImageInfo = {
     mutable CrééLe: string
 }
 
+type ComposeServiceInfo = {
+    mutable Service: string
+    mutable Conteneur: string
+    mutable Image: string
+    mutable État: string
+    mutable Projet: string
+}
+
 type MainWindowViewModel() as this =
     inherit ViewModelBase()
 
@@ -51,6 +60,7 @@ type MainWindowViewModel() as this =
     let volumes = ObservableCollection<VolumeInfo>()
     let networks = ObservableCollection<NetworkInfo>()
     let images = ObservableCollection<ImageInfo>()
+    let composeServices = ObservableCollection<ComposeServiceInfo>()
     let logText = System.Text.StringBuilder()
 
     let mutable containerIdInput = ""
@@ -88,6 +98,9 @@ type MainWindowViewModel() as this =
     let mutable networkCniCommand = "ADD"
     let mutable networkNetnsPath = ""
 
+    let mutable composeFilePath = ""
+    let mutable composeServiceName = ""
+
     let updateLog () =
         logText.Clear() |> ignore
         for entry in outputPort.LogLines do
@@ -102,6 +115,7 @@ type MainWindowViewModel() as this =
     member _.Volumes = volumes
     member _.Networks = networks
     member _.Images = images
+    member _.ComposeServices = composeServices
 
     member _.LogOutput = logText.ToString()
 
@@ -144,6 +158,10 @@ type MainWindowViewModel() as this =
     member _.NetworkCniCommand with get () = networkCniCommand and set v = networkCniCommand <- v; this.OnPropertyChanged()
     member _.NetworkNetnsPath with get () = networkNetnsPath and set v = networkNetnsPath <- v; this.OnPropertyChanged()
 
+    // --- Compose inputs ---
+    member _.ComposeFilePath with get () = composeFilePath and set v = composeFilePath <- v; this.OnPropertyChanged()
+    member _.ComposeServiceName with get () = composeServiceName and set v = composeServiceName <- v; this.OnPropertyChanged()
+
     // --- Container commands ---
     member _.ListContainersCommand = RelayCommand(Action(fun () -> this.ListContainers() |> Async.Start))
     member _.InspectContainerCommand = RelayCommand(Action(fun () -> this.InspectContainer() |> Async.Start))
@@ -182,6 +200,13 @@ type MainWindowViewModel() as this =
     member _.DisconnectNetworkCommand = RelayCommand(Action(fun () -> this.DisconnectContainer() |> Async.Start))
     member _.RunCniPluginCommand = RelayCommand(Action(fun () -> this.RunCniPlugin() |> Async.Start))
     member _.PruneNetworksCommand = RelayCommand(Action(fun () -> this.PruneNetworks() |> Async.Start))
+
+    // --- Compose commands ---
+    member _.ComposeUpCommand = RelayCommand(Action(fun () -> this.ComposeUp() |> Async.Start))
+    member _.ComposeDownCommand = RelayCommand(Action(fun () -> this.ComposeDown() |> Async.Start))
+    member _.ComposePsCommand = RelayCommand(Action(fun () -> this.ComposePs() |> Async.Start))
+    member _.ComposeLogsCommand = RelayCommand(Action(fun () -> this.ComposeLogs() |> Async.Start))
+    member _.ComposePullCommand = RelayCommand(Action(fun () -> this.ComposePull() |> Async.Start))
 
     // --- Menu commands ---
     member _.QuitCommand = RelayCommand(Action(fun () ->
@@ -610,5 +635,70 @@ type MainWindowViewModel() as this =
                 let client = new NetworkClient()
                 let! response = client.PruneNetworksAsync() |> Async.AwaitTask
                 (outputPort :> IOutputPort).WriteSuccess(sprintf "Réseaux nettoyés - %s" response.Message)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    // --- Compose operations ---
+    member private this.ComposeUp() =
+        async {
+            try
+                let orchestrator = ComposeOrchestrator(outputPort)
+                do! orchestrator.Up(this.ComposeFilePath) |> Async.AwaitTask
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.ComposeDown() =
+        async {
+            try
+                let orchestrator = ComposeOrchestrator(outputPort)
+                do! orchestrator.Down(this.ComposeFilePath) |> Async.AwaitTask
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.ComposePs() =
+        async {
+            try
+                let orchestrator = ComposeOrchestrator(outputPort)
+                let compose = orchestrator.ParseFile(this.ComposeFilePath)
+                let! containers = (new ContainerClient()).ListAsync(all = true) |> Async.AwaitTask
+
+                Dispatcher.UIThread.Post(fun () ->
+                    composeServices.Clear()
+                    for c in containers.Containers do
+                        let hasProject =
+                            c.Labels
+                            |> Seq.exists (fun kv -> kv.Key = composeProjectLabel && kv.Value = compose.ProjectName)
+                        if hasProject then
+                            let service =
+                                c.Labels
+                                |> Seq.tryFind (fun kv -> kv.Key = composeServiceLabel)
+                                |> Option.map (fun kv -> kv.Value)
+                                |> Option.defaultValue "-"
+                            composeServices.Add({
+                                Service = service
+                                Conteneur = c.Name
+                                Image = c.Image
+                                État = c.State.ToString()
+                                Projet = compose.ProjectName
+                            })
+                )
+                (outputPort :> IOutputPort).WriteSuccess(sprintf "%d conteneur(s) compose trouvé(s)" composeServices.Count)
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.ComposeLogs() =
+        async {
+            try
+                let orchestrator = ComposeOrchestrator(outputPort)
+                let service = if String.IsNullOrEmpty(this.ComposeServiceName) then None else Some this.ComposeServiceName
+                do! orchestrator.Logs(this.ComposeFilePath, service) |> Async.AwaitTask
+            with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
+        }
+
+    member private this.ComposePull() =
+        async {
+            try
+                let orchestrator = ComposeOrchestrator(outputPort)
+                do! orchestrator.Pull(this.ComposeFilePath) |> Async.AwaitTask
             with ex -> (outputPort :> IOutputPort).WriteError(ex.Message)
         }

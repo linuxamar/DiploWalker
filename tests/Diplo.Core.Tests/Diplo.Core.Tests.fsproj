@@ -10,6 +10,7 @@
     <Compile Include="ContainerClientTests.fs" />
     <Compile Include="VolumeClientTests.fs" />
     <Compile Include="NetworkClientTests.fs" />
+    <Compile Include="ComposeTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

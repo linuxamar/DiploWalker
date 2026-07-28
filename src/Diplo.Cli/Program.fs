@@ -2,6 +2,7 @@ open Diplo.Cli
 open Diplo.Cli.Container
 open Diplo.Cli.Volume
 open Diplo.Cli.Network
+open Diplo.Cli.Compose
 open Spectre.Console.Cli
 
 [<AutoOpen>]
@@ -73,6 +74,15 @@ let main argv =
 
         config.AddBranch("config", fun (c: IConfigurator<CommandSettings>) ->
             addCmd<InitConfigCommand> c "init"
+        ) |> ignore
+
+        config.AddBranch("compose", fun (c: IConfigurator<CommandSettings>) ->
+            addCmd<ComposeUpCommand> c "up"
+            addCmd<ComposeDownCommand> c "down"
+            addCmd<ComposePsCommand> c "ps"
+            addCmd<ComposeLogsCommand> c "logs"
+            addCmd<ComposePullCommand> c "pull"
+            addCmd<ComposeBuildCommand> c "build"
         ) |> ignore
     ) |> ignore
     app.Run(argv)
