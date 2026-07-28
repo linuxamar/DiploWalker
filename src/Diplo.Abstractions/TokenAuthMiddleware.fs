@@ -62,11 +62,14 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
                             if verifyToken token then
                                 next.Invoke(context)
                             else
+                                logger.LogWarning("Token invalide depuis {ClientIp}", clientIp)
                                 context.Response.StatusCode <- 401
                                 context.Response.WriteAsync("Token invalide")
                         else
+                            logger.LogWarning("Format Authorization invalide depuis {ClientIp}: {Header}", clientIp, header)
                             context.Response.StatusCode <- 401
                             context.Response.WriteAsync("Format Authorization invalide")
                     | _ ->
+                        logger.LogWarning("En-tête Authorization manquant depuis {ClientIp}", clientIp)
                         context.Response.StatusCode <- 401
                         context.Response.WriteAsync("En-tête Authorization manquant")

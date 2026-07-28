@@ -4,16 +4,18 @@ open System.Diagnostics
 open Diplo.Abstractions.Interfaces
 
 /// Exécuteur réel de processus (ctr CLI)
-type ProcessRunner() =
+type ProcessRunner(?timeoutMs: int) =
+
+    let timeout = defaultArg timeoutMs 60_000
 
     let runProcess (psi: ProcessStartInfo) =
         use proc = Process.Start(psi)
         if proc |> isNull then failwith "Impossible de démarrer le processus"
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
-        if not (proc.WaitForExit(60_000)) then
+        if not (proc.WaitForExit(timeout)) then
             try proc.Kill(true) with _ -> ()
-            failwith "Délai d'attente dépassé pour le processus (60s)"
+            failwithf "Délai d'attente dépassé pour le processus (%dms)" timeout
         if proc.ExitCode <> 0 then
             failwithf "Le processus a échoué (code %d)" proc.ExitCode
         stdout

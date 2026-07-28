@@ -137,17 +137,14 @@ type BridgeNetworkDriver() =
                     Log.Error(ex, "Erreur de connexion au bridge {NetworkId} pour le conteneur {ContainerId}", networkId, containerId)
                     Error "Erreur de connexion au bridge"
 
-        member _.Disconnect(networkId, containerId, endpointId, _force) =
+        member _.Disconnect(networkId, containerId, _endpointId, _force) =
             match networks.TryGetValue(networkId) with
             | false, _ -> Error (sprintf "Bridge '%s' introuvable" networkId)
             | true, netInfo ->
                 try
                     SecurityValidation.validateContainerId containerId
-                    let adapterName = if String.IsNullOrEmpty(endpointId) then
-                                          let shortId = containerId.Substring(0, min 8 containerId.Length)
-                                          sprintf "vEthernet (%s-%s)" netInfo.Name shortId
-                                      else endpointId
-                    SecurityValidation.validateName adapterName "Le nom de l'adaptateur"
+                    let shortId = containerId.Substring(0, min 8 containerId.Length)
+                    let adapterName = sprintf "vEthernet (%s-%s)" netInfo.Name shortId
                     runPowershellWithArgs "Remove-VMNetworkAdapter"
                         [ "-Name", adapterName; "-ManagementOS", "$true" ] |> ignore
                     Ok ()

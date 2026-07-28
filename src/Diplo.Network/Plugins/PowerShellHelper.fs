@@ -6,7 +6,8 @@ open System.Diagnostics
 [<AutoOpen>]
 module PowerShellHelper =
 
-    let private runPowershell cmdletOrScript parameters isScript =
+    let private runPowershell cmdletOrScript parameters isScript (timeoutMs: int option) =
+        let timeout = defaultArg timeoutMs 60_000
         let psi = ProcessStartInfo()
         psi.FileName <- "powershell"
         psi.RedirectStandardOutput <- true
@@ -29,15 +30,15 @@ module PowerShellHelper =
         use proc = Process.Start(psi)
         let stdout = proc.StandardOutput.ReadToEnd()
         let stderr = proc.StandardError.ReadToEnd()
-        if not (proc.WaitForExit(60_000)) then
+        if not (proc.WaitForExit(timeout)) then
             try proc.Kill(true) with _ -> ()
-            failwith "Délai d'attente dépassé pour PowerShell (60s)"
+            failwithf "Délai d'attente dépassé pour PowerShell (%dms)" timeout
         if proc.ExitCode <> 0 then
             failwithf "PowerShell a échoué (code %d)" proc.ExitCode
         stdout
 
     let runPowershellWithArgs (cmdlet: string) (parameters: (string * string) list) =
-        runPowershell cmdlet parameters false
+        runPowershell cmdlet parameters false None
 
     let runPowershellScript (scriptBody: string) (parameters: (string * string) list) =
-        runPowershell scriptBody parameters true
+        runPowershell scriptBody parameters true None

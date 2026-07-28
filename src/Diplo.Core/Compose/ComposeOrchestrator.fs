@@ -30,6 +30,7 @@ type ComposeOrchestrator(output: IOutputPort) =
         | _ -> []
 
     member _.ParseFile(filePath: string) : ComposeFile =
+        SecurityValidation.validateFilePath filePath "Le fichier compose"
         if not (File.Exists filePath) then
             failwithf "Le fichier compose '%s' est introuvable" filePath
 

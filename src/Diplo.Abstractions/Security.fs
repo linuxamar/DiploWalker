@@ -222,6 +222,21 @@ module SecurityValidation =
         | false, _ ->
             failwithf "L'adresse gRPC '%s' n'est pas une URL valide" address
 
+    /// Extensions autorisées pour les fichiers de configuration (compose, etc.).
+    let private allowedYamlExtensions = set [ ".yaml"; ".yml" ]
+
+    /// Valide le chemin d'un fichier de configuration (anti-traversée + extension + caractères nuls).
+    let validateFilePath (path: string) (label: string) =
+        if String.IsNullOrEmpty(path) then
+            failwithf "%s ne peut pas être vide" label
+        if path.Contains("..") then
+            failwithf "%s contient une traversée de répertoire interdite: '%s'" label path
+        if path.Contains("\0") then
+            failwithf "%s contient un caractère nul" label
+        let ext = Path.GetExtension(path)
+        if not (allowedYamlExtensions.Contains(ext)) then
+            failwithf "%s doit avoir une extension .yaml ou .yml, reçu: '%s'" label ext
+
     /// Répertoires de base autorisés pour les volumes (immutable snapshot pattern).
     let private defaultAllowedVolumeDirs =
         [
