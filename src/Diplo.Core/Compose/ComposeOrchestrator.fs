@@ -6,6 +6,7 @@ open System.IO
 open System.Threading.Tasks
 open Diplo.Core.Clients
 open Diplo.Core.Output
+open Diplo.Abstractions
 open YamlDotNet.RepresentationModel
 
 type ComposeOrchestrator(output: IOutputPort) =
@@ -128,6 +129,13 @@ type ComposeOrchestrator(output: IOutputPort) =
                         match tryGetChild svc "restart" |> Option.bind scalarValue with
                         | Some r -> Some r
                         | _ -> None
+
+                    SecurityValidation.validateName name "Nom de service"
+                    SecurityValidation.validateImage image
+                    if command.IsSome then
+                        command.Value |> List.toArray |> SecurityValidation.validateCommand
+                    for kv in labels do
+                        SecurityValidation.validateLabel kv.Key kv.Value
 
                     { Name = name
                       Image = image

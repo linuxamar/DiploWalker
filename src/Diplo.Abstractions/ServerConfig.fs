@@ -18,6 +18,9 @@ open Serilog
 open Serilog.Extensions.Hosting
 open Diplo.Abstractions.TokenAuthMiddleware
 
+/// Taille maximale des messages gRPC en octets (4 Mo).
+let private grpcMaxMessageSize = 4 * 1024 * 1024
+
 let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
     let grpcPort = config.GetValue<int>("ServiceSettings:GrpcPort")
     let pipeName = config.GetValue<string>("ServiceSettings:NamedPipeName")
@@ -70,6 +73,9 @@ let runGrpcHost (serviceName: string) (args: string[]) (configureServices: WebAp
         builder.Services.AddGrpcHealthChecks() |> ignore
         builder.Services.AddHealthChecks() |> ignore
         configureServices builder
+        builder.Services.Configure<Grpc.AspNetCore.Server.GrpcServiceOptions>(fun (opts: Grpc.AspNetCore.Server.GrpcServiceOptions) ->
+            opts.MaxReceiveMessageSize <- Nullable(grpcMaxMessageSize)
+            opts.MaxSendMessageSize <- Nullable(grpcMaxMessageSize)) |> ignore
         builder.WebHost.ConfigureKestrel(fun ctx opts -> configureKestrel ctx.Configuration opts) |> ignore
         builder.WebHost.UseNamedPipes(fun opts -> configureNamedPipeSecurity opts) |> ignore
         let app = builder.Build()

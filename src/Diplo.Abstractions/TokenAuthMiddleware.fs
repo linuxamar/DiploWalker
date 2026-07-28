@@ -31,33 +31,42 @@ let private rateLimiter = RateLimiter(maxRequests = 30, windowSeconds = 60)
 
 type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddleware>) =
 
-    member _.Invoke(context: HttpContext) : Task =
-        let clientIp = context.Connection.RemoteIpAddress |> Option.ofObj |> function Some ip -> ip.ToString() | None -> "unknown"
+    /// Chemins exclus de l'authentification (health checks, probes).
+    let isExcludedPath (path: string) =
+        path.StartsWith("/healthz", StringComparison.OrdinalIgnoreCase)
 
-        if not (rateLimiter.IsAllowed(clientIp)) then
-            logger.LogWarning("Rate limit dépassé pour {ClientIp}", clientIp)
-            context.Response.StatusCode <- 429
-            context.Response.WriteAsync("Trop de requêtes — réessayez plus tard")
+    member _.Invoke(context: HttpContext) : Task =
+        let path = context.Request.Path.Value
+
+        if isExcludedPath path then
+            next.Invoke(context)
         else
-            match loadToken() with
-            | None ->
-                logger.LogWarning("Fichier auth-token.json introuvable — accès refusé (fail-closed)")
-                context.Response.StatusCode <- 401
-                context.Response.WriteAsync("Fichier auth-token.json introuvable")
-            | Some _ ->
-                match context.Request.Headers.TryGetValue("authorization") with
-                | true, values when values.Count > 0 ->
-                    let header = values.[0]
-                    if header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) then
-                        let token = header.Substring(7)
-                        if verifyToken token then
-                            next.Invoke(context)
+            let clientIp = context.Connection.RemoteIpAddress |> Option.ofObj |> function Some ip -> ip.ToString() | None -> "unknown"
+
+            if not (rateLimiter.IsAllowed(clientIp)) then
+                logger.LogWarning("Rate limit dépassé pour {ClientIp}", clientIp)
+                context.Response.StatusCode <- 429
+                context.Response.WriteAsync("Trop de requêtes — réessayez plus tard")
+            else
+                match loadToken() with
+                | None ->
+                    logger.LogWarning("Fichier auth-token.json introuvable — accès refusé (fail-closed)")
+                    context.Response.StatusCode <- 401
+                    context.Response.WriteAsync("Fichier auth-token.json introuvable")
+                | Some _ ->
+                    match context.Request.Headers.TryGetValue("authorization") with
+                    | true, values when values.Count > 0 ->
+                        let header = values.[0]
+                        if header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) then
+                            let token = header.Substring(7)
+                            if verifyToken token then
+                                next.Invoke(context)
+                            else
+                                context.Response.StatusCode <- 401
+                                context.Response.WriteAsync("Token invalide")
                         else
                             context.Response.StatusCode <- 401
-                            context.Response.WriteAsync("Token invalide")
-                    else
+                            context.Response.WriteAsync("Format Authorization invalide")
+                    | _ ->
                         context.Response.StatusCode <- 401
-                        context.Response.WriteAsync("Format Authorization invalide")
-                | _ ->
-                    context.Response.StatusCode <- 401
-                    context.Response.WriteAsync("En-tête Authorization manquant")
+                        context.Response.WriteAsync("En-tête Authorization manquant")
