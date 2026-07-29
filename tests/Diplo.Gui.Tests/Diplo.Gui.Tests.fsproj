@@ -6,8 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="FakeOutputPort.fs" />
     <Compile Include="ViewModelBaseTests.fs" />
     <Compile Include="AvaloniaOutputPortTests.fs" />
+    <Compile Include="TabViewModelTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

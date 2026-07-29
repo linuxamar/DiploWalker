@@ -7,20 +7,9 @@ open Spectre.Console.Cli
 
 [<AutoOpen>]
 module private SpectreCliHelpers =
-    open System.Reflection
-
-    let private addCommandMethod =
-        typeof<IConfigurator<CommandSettings>>
-            .GetMethods(BindingFlags.Public ||| BindingFlags.Instance)
-            |> Array.find (fun m ->
-                m.Name = "AddCommand" && m.IsGenericMethodDefinition)
-
     let addCmd<'TCommand when 'TCommand : not struct>
         (config: IConfigurator<CommandSettings>) (name: string) =
-        addCommandMethod
-            .MakeGenericMethod(typeof<'TCommand>)
-            .Invoke(config, [| box name |])
-        |> ignore
+        (config :> IConfigurator).AddCommand(typeof<'TCommand>, name)
 
 [<EntryPoint>]
 let main argv =

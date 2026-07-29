@@ -8,6 +8,10 @@
   <ItemGroup>
     <Compile Include="ViewModels\ViewModelBase.fs" />
     <Compile Include="Services\AvaloniaOutputPort.fs" />
+    <Compile Include="ViewModels\ContainerTabViewModel.fs" />
+    <Compile Include="ViewModels\VolumeTabViewModel.fs" />
+    <Compile Include="ViewModels\NetworkTabViewModel.fs" />
+    <Compile Include="ViewModels\ComposeTabViewModel.fs" />
     <Compile Include="ViewModels\MainWindowViewModel.fs" />
     <AvaloniaResource Include="Views\MainWindow.axaml" />
     <Compile Include="Views\MainWindow.axaml.fs" />

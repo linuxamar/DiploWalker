@@ -45,7 +45,9 @@ type InspectNetworkCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du réseau est requis"
+            if String.IsNullOrEmpty(settings.Id) then
+                output.WriteError("L'identifiant du réseau est requis")
+                return 1
 
             use client = new NetworkClient()
             let! response = client.InspectAsync(settings.Id)
@@ -78,7 +80,18 @@ type CreateNetworkCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.Name) then failwithf "Le nom du réseau est requis"
+            if String.IsNullOrEmpty(settings.Name) then
+                output.WriteError("Le nom du réseau est requis")
+                return 1
+
+            match settings.Driver.ToLowerInvariant() with
+            | "bridge" -> ()
+            | "none" -> ()
+            | "custom_cni" -> ()
+            | "pod" -> ()
+            | other ->
+                output.WriteError(sprintf "Driver inconnu: %s. Valeurs: bridge, none, custom_cni, pod" other)
+                return 1
 
             let driver =
                 match settings.Driver.ToLowerInvariant() with
@@ -86,7 +99,7 @@ type CreateNetworkCommand(output: IOutputPort) =
                 | "none" -> NetworkDriver.None
                 | "custom_cni" -> NetworkDriver.CustomCni
                 | "pod" -> NetworkDriver.Pod
-                | other -> failwithf "Driver inconnu: %s. Valeurs: bridge, none, custom_cni, pod" other
+                | _ -> Unchecked.defaultof<_>
 
             use client = new NetworkClient()
             let! response =
@@ -111,7 +124,9 @@ type RemoveNetworkCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du réseau est requis"
+            if String.IsNullOrEmpty(settings.Id) then
+                output.WriteError("L'identifiant du réseau est requis")
+                return 1
 
             use client = new NetworkClient()
             let! response = client.RemoveAsync(settings.Id, settings.Force)
@@ -135,8 +150,12 @@ type ConnectCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.NetworkId) then failwithf "L'identifiant du réseau est requis"
-            if String.IsNullOrEmpty(settings.ContainerId) then failwithf "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(settings.NetworkId) then
+                output.WriteError("L'identifiant du réseau est requis")
+                return 1
+            if String.IsNullOrEmpty(settings.ContainerId) then
+                output.WriteError("L'identifiant du conteneur est requis")
+                return 1
 
             use client = new NetworkClient()
             let! response =
@@ -166,8 +185,12 @@ type DisconnectCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.NetworkId) then failwithf "L'identifiant du réseau est requis"
-            if String.IsNullOrEmpty(settings.ContainerId) then failwithf "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(settings.NetworkId) then
+                output.WriteError("L'identifiant du réseau est requis")
+                return 1
+            if String.IsNullOrEmpty(settings.ContainerId) then
+                output.WriteError("L'identifiant du conteneur est requis")
+                return 1
 
             use client = new NetworkClient()
             let! response =

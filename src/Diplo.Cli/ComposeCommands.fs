@@ -15,7 +15,9 @@ type ComposeUpCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+            if String.IsNullOrEmpty(settings.File) then
+                output.WriteError("Le chemin du fichier compose est requis")
+                return 1
 
             let orchestrator = ComposeOrchestrator(output)
             do! orchestrator.Up(settings.File)
@@ -32,7 +34,9 @@ type ComposeDownCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+            if String.IsNullOrEmpty(settings.File) then
+                output.WriteError("Le chemin du fichier compose est requis")
+                return 1
 
             let orchestrator = ComposeOrchestrator(output)
             do! orchestrator.Down(settings.File)
@@ -49,7 +53,9 @@ type ComposePsCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+            if String.IsNullOrEmpty(settings.File) then
+                output.WriteError("Le chemin du fichier compose est requis")
+                return 1
 
             let orchestrator = ComposeOrchestrator(output)
             do! orchestrator.Ps(settings.File)
@@ -67,7 +73,9 @@ type ComposeLogsCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+            if String.IsNullOrEmpty(settings.File) then
+                output.WriteError("Le chemin du fichier compose est requis")
+                return 1
 
             let orchestrator = ComposeOrchestrator(output)
             let service = if isNull settings.Service then None else Some settings.Service
@@ -85,7 +93,9 @@ type ComposePullCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+            if String.IsNullOrEmpty(settings.File) then
+                output.WriteError("Le chemin du fichier compose est requis")
+                return 1
 
             let orchestrator = ComposeOrchestrator(output)
             do! orchestrator.Pull(settings.File)
@@ -102,7 +112,9 @@ type ComposeBuildCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.File) then failwithf "Le chemin du fichier compose est requis"
+            if String.IsNullOrEmpty(settings.File) then
+                output.WriteError("Le chemin du fichier compose est requis")
+                return 1
 
             let orchestrator = ComposeOrchestrator(output)
             do! orchestrator.Build(settings.File)

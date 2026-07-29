@@ -44,7 +44,9 @@ type InspectVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du volume est requis"
+            if String.IsNullOrEmpty(settings.Id) then
+                output.WriteError("L'identifiant du volume est requis")
+                return 1
 
             use client = new VolumeClient()
             let! response = client.InspectAsync(settings.Id)
@@ -70,7 +72,20 @@ type CreateVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.Name) then failwithf "Le nom du volume est requis"
+            if String.IsNullOrEmpty(settings.Name) then
+                output.WriteError("Le nom du volume est requis")
+                return 1
+
+            match settings.Driver.ToLowerInvariant() with
+            | "local" -> ()
+            | "nfs" -> ()
+            | "smb" -> ()
+            | "azure" -> ()
+            | "aws" -> ()
+            | "gcp" -> ()
+            | other ->
+                output.WriteError(sprintf "Driver inconnu: %s" other)
+                return 1
 
             let driverType =
                 match settings.Driver.ToLowerInvariant() with
@@ -80,7 +95,7 @@ type CreateVolumeCommand(output: IOutputPort) =
                 | "azure" -> StorageDriverType.CloudAzure
                 | "aws" -> StorageDriverType.CloudAws
                 | "gcp" -> StorageDriverType.CloudGcp
-                | other -> failwithf "Driver inconnu: %s" other
+                | _ -> Unchecked.defaultof<_>
 
             use client = new VolumeClient()
             let! response = client.CreateAsync(name = settings.Name, driver = driverType)
@@ -99,7 +114,9 @@ type RemoveVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du volume est requis"
+            if String.IsNullOrEmpty(settings.Id) then
+                output.WriteError("L'identifiant du volume est requis")
+                return 1
 
             use client = new VolumeClient()
             let! response = client.RemoveAsync(settings.Id, settings.Force)
@@ -121,7 +138,9 @@ type MountVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du volume est requis"
+            if String.IsNullOrEmpty(settings.Id) then
+                output.WriteError("L'identifiant du volume est requis")
+                return 1
 
             use client = new VolumeClient()
             let! response = client.MountAsync(settings.Id, settings.Target)
@@ -140,7 +159,9 @@ type UnmountVolumeCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) =
         task {
-            if String.IsNullOrEmpty(settings.Id) then failwithf "L'identifiant du volume est requis"
+            if String.IsNullOrEmpty(settings.Id) then
+                output.WriteError("L'identifiant du volume est requis")
+                return 1
 
             use client = new VolumeClient()
             let! response = client.UnmountAsync(settings.Id, settings.Target)

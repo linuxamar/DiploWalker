@@ -23,6 +23,7 @@ type EnvironmentVariable = {
 type ServiceDefinition = {
     Name: string
     Image: string
+    Build: string option
     Command: string list option
     Args: string list option
     Environment: EnvironmentVariable list

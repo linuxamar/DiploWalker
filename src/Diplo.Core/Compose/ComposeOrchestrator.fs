@@ -2,6 +2,7 @@ namespace Diplo.Core.Compose
 
 open System
 open System.Collections.Generic
+open System.Diagnostics
 open System.IO
 open System.Threading.Tasks
 open Diplo.Core.Clients
@@ -59,10 +60,16 @@ type ComposeOrchestrator(output: IOutputPort) =
                     let name = kv.Key.ToString()
                     let svc = kv.Value :?> YamlMappingNode
 
+                    let buildCtx =
+                        tryGetChild svc "build" |> Option.bind scalarValue
+
                     let image =
                         match tryGetChild svc "image" |> Option.bind scalarValue with
                         | Some img -> img
-                        | _ -> failwithf "Le service '%s' doit avoir une image" name
+                        | _ ->
+                            match buildCtx with
+                            | Some ctx -> sprintf "%s_%s" projectName name
+                            | _ -> failwithf "Le service '%s' doit avoir une image ou un build" name
 
                     let command =
                         match tryGetChild svc "command" with
@@ -140,6 +147,7 @@ type ComposeOrchestrator(output: IOutputPort) =
 
                     { Name = name
                       Image = image
+                      Build = buildCtx
                       Command = command
                       Args = args
                       Environment = environment
@@ -277,5 +285,46 @@ type ComposeOrchestrator(output: IOutputPort) =
     member this.Build(filePath: string) =
         task {
             let compose = this.ParseFile(filePath)
-            output.WriteWarning(sprintf "Build (construction d'images) pas encore implémenté pour %d service(s)" compose.Services.Length)
+            output.WriteSuccess(sprintf "Construction des images pour le projet '%s' (%d service(s))" compose.ProjectName compose.Services.Length)
+
+            for svc in compose.Services do
+                match svc.Build with
+                | Some buildCtx ->
+                    let resolvedPath =
+                        if Path.IsPathRooted buildCtx then buildCtx
+                        else
+                            let composeDir = Path.GetDirectoryName(Path.GetFullPath(filePath))
+                            Path.GetFullPath(Path.Combine(composeDir, buildCtx))
+
+                    let dockerfile = Path.Combine(resolvedPath, "Dockerfile")
+                    if not (File.Exists dockerfile) then
+                        output.WriteError(sprintf "  Dockerfile introuvable dans '%s' pour le service '%s'" resolvedPath svc.Name)
+                    else
+                        output.WriteSuccess(sprintf "  Construction de %s → %s..." svc.Name svc.Image)
+                        let psi = ProcessStartInfo(
+                            FileName = "docker",
+                            Arguments = sprintf "build -t %s \"%s\"" svc.Image resolvedPath,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true)
+                        psi.EnvironmentVariables.["DOCKER_BUILDKIT"] <- "1"
+                        use proc = new Process()
+                        proc.StartInfo <- psi
+                        proc.OutputDataReceived.Add(fun args ->
+                            if not (isNull args.Data) then output.WriteLine("  " + args.Data))
+                        proc.ErrorDataReceived.Add(fun args ->
+                            if not (isNull args.Data) then output.WriteError("  " + args.Data))
+                        proc.Start() |> ignore
+                        proc.BeginOutputReadLine()
+                        proc.BeginErrorReadLine()
+                        do! proc.WaitForExitAsync()
+                        if proc.ExitCode = 0 then
+                            output.WriteSuccess(sprintf "  ✓ Image '%s' construite" svc.Image)
+                        else
+                            output.WriteError(sprintf "  ✗ Échec de la construction de '%s' (code %d)" svc.Image proc.ExitCode)
+                | None ->
+                    output.WriteLine(sprintf "  %s utilise une image existante (%s), téléchargement..." svc.Name svc.Image)
+                    let! _ = containerClient.PullImageAsync(svc.Image)
+                    output.WriteSuccess(sprintf "  ✓ Image '%s' disponible" svc.Image)
         }

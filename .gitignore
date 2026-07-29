@@ -58,3 +58,6 @@ nunit-*.xml
 
 # Temporary test/debug directories
 test-repro/
+
+# Installer artifacts
+Diplo-Setup-*.exe

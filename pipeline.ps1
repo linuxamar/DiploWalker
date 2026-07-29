@@ -227,12 +227,32 @@ foreach ($plat in $Platforms) {
 
 }
 
+}
+
+# --- Package NSIS (après publication) ----------------------------------------
+
+if ($runPublish) {
+    foreach ($plat in $Platforms) {
+        $setupRoot = Join-Path $PSScriptRoot "setup"
+        $setupScript = Join-Path $setupRoot "build.ps1"
+        if (Test-Path $setupScript) {
+            Write-Host ""
+            Write-Host "═══ Package NSIS ($plat) ═══" -ForegroundColor Cyan
+            & $setupScript -Version "1.0.0" -Platform $plat
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Le packaging NSIS a échoué pour $plat."
+            } else {
+                Write-Host "  ✓ Package NSIS ($plat) créé." -ForegroundColor Green
+            }
+        }
+    }
+}
+
 $timer.Stop()
 
 Write-Progress -Id 1 -Activity "Publication Diplo" -Completed
 
 Write-Host ""
 Write-Host "══════════════════════════════════════" -ForegroundColor Green
-Write-Host " Publication terminée en $($timer.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
-Write-Host " Sortie : $PublishRoot" -ForegroundColor Green
+Write-Host " Diplo terminé en $($timer.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
 Write-Host "══════════════════════════════════════" -ForegroundColor Green

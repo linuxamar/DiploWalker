@@ -7,7 +7,6 @@
         WindowStartupLocation="CenterScreen">
 
     <DockPanel>
-        <!-- Barre de menus -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_Fichier">
                 <MenuItem Header="_Quitter" Command="{Binding QuitCommand}" />
@@ -17,7 +16,6 @@
             </MenuItem>
         </Menu>
 
-        <!-- Panneau de logs en bas -->
         <Border DockPanel.Dock="Bottom" Height="200" Background="#1e1e1e" BorderBrush="#333" BorderThickness="1" Margin="0,4,0,0">
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="Journal" FontWeight="Bold" Foreground="#aaa"
@@ -30,82 +28,75 @@
             </DockPanel>
         </Border>
 
-        <!-- Contenu principal -->
         <TabControl Margin="4">
-            <!-- ONGLET CONTENEURS -->
             <TabItem Header="Conteneurs">
                 <DockPanel>
-                    <!-- Barre d'actions -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="🔄 Lister" Command="{Binding ListContainersCommand}" Margin="0,0,4,0" />
-                        <Button Content="🔍 Inspecter" Command="{Binding InspectContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="▶ Démarrer" Command="{Binding StartContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="⏹ Arrêter" Command="{Binding StopContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="🗑 Supprimer" Command="{Binding DeleteContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="✏ Renommer" Command="{Binding RenameContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="⚙ Processus" Command="{Binding TopContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="📊 Métriques" Command="{Binding StatsContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="➕ Créer" Command="{Binding CreateContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="📥 Télécharger" Command="{Binding PullImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="ℹ Version" Command="{Binding VersionCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔄 Lister" Command="{Binding ContainerTab.ListContainersCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="▶ Démarrer" Command="{Binding ContainerTab.StartContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="⏹ Arrêter" Command="{Binding ContainerTab.StopContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.DeleteContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="✏ Renommer" Command="{Binding ContainerTab.RenameContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="⚙ Processus" Command="{Binding ContainerTab.TopContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="📊 Métriques" Command="{Binding ContainerTab.StatsContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding ContainerTab.CreateContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="📥 Télécharger" Command="{Binding ContainerTab.PullImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="ℹ Version" Command="{Binding ContainerTab.VersionCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
-                    <!-- Champs de saisie -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerIdInput}" Width="200" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ContainerTab.ContainerIdInput}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="identifiant du conteneur" />
                         <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerNameInput}" Width="160" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ContainerTab.ContainerNameInput}" Width="160" Margin="0,0,12,0"
                                  PlaceholderText="nom (optionnel)" />
                         <TextBlock Text="Image:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerImageInput}" Width="200" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ContainerTab.ContainerImageInput}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="nom:tag" />
                         <TextBlock Text="Espace:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerNamespace}" Width="140" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ContainerTab.ContainerNamespace}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="namespace (optionnel)" />
                         <TextBlock Text="Timeout:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <NumericUpDown Value="{Binding ContainerTimeout}" Minimum="1" Maximum="300"
+                        <NumericUpDown Value="{Binding ContainerTab.ContainerTimeout}" Minimum="1" Maximum="300"
                                        Width="80" />
-                        <CheckBox Content="Tous" IsChecked="{Binding ContainerAll}" Margin="12,0,0,0"
+                        <CheckBox Content="Tous" IsChecked="{Binding ContainerTab.ContainerAll}" Margin="12,0,0,0"
                                   VerticalAlignment="Center" />
-                        <CheckBox Content="Forcer" IsChecked="{Binding ContainerForce}" Margin="8,0,0,0"
+                        <CheckBox Content="Forcer" IsChecked="{Binding ContainerTab.ContainerForce}" Margin="8,0,0,0"
                                    VerticalAlignment="Center" />
                     </WrapPanel>
 
-                    <!-- Champs images -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Nouveau nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerNewName}" Width="140" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ContainerTab.ContainerNewName}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="renommer" />
                         <TextBlock Text="Réf. image:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerImageRef}" Width="200" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ContainerTab.ContainerImageRef}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="image:tag (inspect/remove/tag)" />
                         <TextBlock Text="Cible:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerImageTarget}" Width="200" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="nouveau:tag (tag)" />
-                        <Button Content="📋 Lister images" Command="{Binding ListImagesCommand}" Margin="0,0,4,0" />
-                        <Button Content="🔍 Inspecter img" Command="{Binding InspectImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="🗑 Supprimer img" Command="{Binding RemoveImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="🏷 Étiqueter" Command="{Binding TagImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="📋 Lister images" Command="{Binding ContainerTab.ListImagesCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter img" Command="{Binding ContainerTab.InspectImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer img" Command="{Binding ContainerTab.RemoveImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🏷 Étiqueter" Command="{Binding ContainerTab.TagImageCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
-                    <!-- Journaux / Exec / Espaces -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Button Content="📜 Journaux" Command="{Binding GetContainerLogsCommand}" Margin="0,0,4,0" />
-                        <CheckBox Content="Suivre" IsChecked="{Binding ContainerFollow}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        <Button Content="📜 Journaux" Command="{Binding ContainerTab.GetContainerLogsCommand}" Margin="0,0,4,0" />
+                        <CheckBox Content="Suivre" IsChecked="{Binding ContainerTab.ContainerFollow}" Margin="8,0,0,0" VerticalAlignment="Center" />
                         <TextBlock Text="Lignes:" VerticalAlignment="Center" Margin="8,0,4,0" />
-                        <NumericUpDown Value="{Binding ContainerTail}" Minimum="10" Maximum="10000" Width="80" />
+                        <NumericUpDown Value="{Binding ContainerTab.ContainerTail}" Minimum="10" Maximum="10000" Width="80" />
                         <TextBlock Text="Depuis:" VerticalAlignment="Center" Margin="8,0,4,0" />
-                        <TextBox Text="{Binding ContainerSince}" Width="140" Margin="0,0,12,0" PlaceholderText="ISO date (optionnel)" />
-                        <Button Content="⚡ Exécuter" Command="{Binding ExecInContainerCommand}" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.ContainerSince}" Width="140" Margin="0,0,12,0" PlaceholderText="ISO date (optionnel)" />
+                        <Button Content="⚡ Exécuter" Command="{Binding ContainerTab.ExecInContainerCommand}" Margin="0,0,4,0" />
                         <TextBlock Text="Cmd:" VerticalAlignment="Center" Margin="8,0,4,0" />
-                        <TextBox Text="{Binding ContainerExecCommand}" Width="200" Margin="0,0,12,0" PlaceholderText="commande à exécuter" />
-                        <Button Content="📁 Espaces" Command="{Binding ListNamespacesCommand}" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.ContainerExecCommand}" Width="200" Margin="0,0,12,0" PlaceholderText="commande à exécuter" />
+                        <Button Content="📁 Espaces" Command="{Binding ContainerTab.ListNamespacesCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
-                    <!-- Grille conteneurs -->
-                    <DataGrid ItemsSource="{Binding Containers}" AutoGenerateColumns="False"
+                    <DataGrid ItemsSource="{Binding ContainerTab.Containers}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"
                               Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
                               CanUserResizeColumns="True" CanUserSortColumns="True">
@@ -118,8 +109,7 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <!-- Grille images -->
-                    <DataGrid ItemsSource="{Binding Images}" AutoGenerateColumns="False"
+                    <DataGrid ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"
                               Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
                               CanUserResizeColumns="True" CanUserSortColumns="True">
@@ -133,37 +123,36 @@
                 </DockPanel>
             </TabItem>
 
-            <!-- ONGLET VOLUMES -->
             <TabItem Header="Volumes">
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="🔄 Lister" Command="{Binding ListVolumesCommand}" Margin="0,0,4,0" />
-                        <Button Content="🔍 Inspecter" Command="{Binding InspectVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="➕ Créer" Command="{Binding CreateVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="🗑 Supprimer" Command="{Binding RemoveVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="📁 Monter" Command="{Binding MountVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="📂 Démonter" Command="{Binding UnmountVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="🧹 Nettoyer" Command="{Binding PruneVolumesCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔄 Lister" Command="{Binding VolumeTab.ListVolumesCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding VolumeTab.InspectVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding VolumeTab.CreateVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding VolumeTab.RemoveVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="📁 Monter" Command="{Binding VolumeTab.MountVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="📂 Démonter" Command="{Binding VolumeTab.UnmountVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding VolumeTab.PruneVolumesCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding VolumeIdInput}" Width="200" Margin="0,0,12,0"
+                        <TextBox Text="{Binding VolumeTab.VolumeIdInput}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="identifiant du volume" />
                         <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding VolumeNameInput}" Width="160" Margin="0,0,12,0"
+                        <TextBox Text="{Binding VolumeTab.VolumeNameInput}" Width="160" Margin="0,0,12,0"
                                  PlaceholderText="nom du volume" />
                         <TextBlock Text="Driver:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding VolumeDriver}" Width="100" Margin="0,0,12,0"
+                        <TextBox Text="{Binding VolumeTab.VolumeDriver}" Width="100" Margin="0,0,12,0"
                                  PlaceholderText="local" />
                         <TextBlock Text="Cible:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding VolumeTargetPath}" Width="200" Margin="0,0,12,0"
+                        <TextBox Text="{Binding VolumeTab.VolumeTargetPath}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="chemin de montage" />
-                        <CheckBox Content="Forcer" IsChecked="{Binding VolumeForce}" Margin="12,0,0,0"
+                        <CheckBox Content="Forcer" IsChecked="{Binding VolumeTab.VolumeForce}" Margin="12,0,0,0"
                                   VerticalAlignment="Center" />
                     </WrapPanel>
 
-                    <DataGrid ItemsSource="{Binding Volumes}" AutoGenerateColumns="False"
+                    <DataGrid ItemsSource="{Binding VolumeTab.Volumes}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"
                               Background="#252526" Foreground="#d4d4d4" BorderThickness="0">
                         <DataGrid.Columns>
@@ -177,66 +166,64 @@
                 </DockPanel>
             </TabItem>
 
-            <!-- ONGLET RÉSEAUX -->
             <TabItem Header="Réseaux">
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="🔄 Lister" Command="{Binding ListNetworksCommand}" Margin="0,0,4,0" />
-                        <Button Content="🔍 Inspecter" Command="{Binding InspectNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="➕ Créer" Command="{Binding CreateNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="🗑 Supprimer" Command="{Binding RemoveNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="🔗 Connecter" Command="{Binding ConnectNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="🔌 Déconnecter" Command="{Binding DisconnectNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="⚙ Exécuter CNI" Command="{Binding RunCniPluginCommand}" Margin="0,0,4,0" />
-                        <Button Content="🧹 Nettoyer" Command="{Binding PruneNetworksCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔄 Lister" Command="{Binding NetworkTab.ListNetworksCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding NetworkTab.InspectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding NetworkTab.CreateNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding NetworkTab.RemoveNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔗 Connecter" Command="{Binding NetworkTab.ConnectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔌 Déconnecter" Command="{Binding NetworkTab.DisconnectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="⚙ Exécuter CNI" Command="{Binding NetworkTab.RunCniPluginCommand}" Margin="0,0,4,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding NetworkTab.PruneNetworksCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkIdInput}" Width="180" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkIdInput}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="identifiant réseau" />
                         <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkNameInput}" Width="140" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkNameInput}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="nom du réseau" />
                         <TextBlock Text="Driver:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkDriver}" Width="100" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkDriver}" Width="100" Margin="0,0,12,0"
                                  PlaceholderText="bridge" />
                         <TextBlock Text="Sous-réseau:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkSubnet}" Width="140" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkSubnet}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="172.20.0.0/16" />
                         <TextBlock Text="Passerelle:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkGateway}" Width="140" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkGateway}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="172.20.0.1" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Endpoint:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkEndpointId}" Width="180" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkEndpointId}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="ID endpoint (connect/déconnect)" />
                         <TextBlock Text="Conteneur:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkContainerId}" Width="180" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkContainerId}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="ID conteneur" />
                         <TextBlock Text="IPv4:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkIpv4}" Width="140" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkIpv4}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="172.20.0.2/16" />
-                        <CheckBox Content="Forcer" IsChecked="{Binding NetworkForce}" Margin="12,0,0,0"
+                        <CheckBox Content="Forcer" IsChecked="{Binding NetworkTab.NetworkForce}" Margin="12,0,0,0"
                                    VerticalAlignment="Center" />
                     </WrapPanel>
 
-                    <!-- Champs CNI -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Plugin CNI:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkCniPluginPath}" Width="200" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkCniPluginPath}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="chemin vers plugin CNI" />
                         <TextBlock Text="Commande:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkCniCommand}" Width="80" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkCniCommand}" Width="80" Margin="0,0,12,0"
                                  PlaceholderText="ADD/DEL/CHECK" />
                         <TextBlock Text="NetNS:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding NetworkNetnsPath}" Width="200" Margin="0,0,12,0"
+                        <TextBox Text="{Binding NetworkTab.NetworkNetnsPath}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="chemin namespace réseau" />
                     </WrapPanel>
 
-                    <DataGrid ItemsSource="{Binding Networks}" AutoGenerateColumns="False"
+                    <DataGrid ItemsSource="{Binding NetworkTab.Networks}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"
                               Background="#252526" Foreground="#d4d4d4" BorderThickness="0">
                         <DataGrid.Columns>
@@ -251,27 +238,27 @@
                 </DockPanel>
             </TabItem>
 
-            <!-- ONGLET COMPOSE -->
             <TabItem Header="Compose">
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="▶ Démarrer" Command="{Binding ComposeUpCommand}" Margin="0,0,4,0" />
-                        <Button Content="⏹ Arrêter" Command="{Binding ComposeDownCommand}" Margin="0,0,4,0" />
-                        <Button Content="📋 État" Command="{Binding ComposePsCommand}" Margin="0,0,4,0" />
-                        <Button Content="📜 Journaux" Command="{Binding ComposeLogsCommand}" Margin="0,0,4,0" />
-                        <Button Content="📥 Télécharger" Command="{Binding ComposePullCommand}" Margin="0,0,4,0" />
+                        <Button Content="▶ Démarrer" Command="{Binding ComposeTab.ComposeUpCommand}" Margin="0,0,4,0" />
+                        <Button Content="⏹ Arrêter" Command="{Binding ComposeTab.ComposeDownCommand}" Margin="0,0,4,0" />
+                        <Button Content="📋 État" Command="{Binding ComposeTab.ComposePsCommand}" Margin="0,0,4,0" />
+                        <Button Content="📜 Journaux" Command="{Binding ComposeTab.ComposeLogsCommand}" Margin="0,0,4,0" />
+                        <Button Content="📥 Télécharger" Command="{Binding ComposeTab.ComposePullCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔨 Construire" Command="{Binding ComposeTab.ComposeBuildCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Fichier:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ComposeFilePath}" Width="400" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ComposeTab.ComposeFilePath}" Width="400" Margin="0,0,12,0"
                                  PlaceholderText="chemin vers docker-compose.yml" />
                         <TextBlock Text="Service:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ComposeServiceName}" Width="160" Margin="0,0,12,0"
+                        <TextBox Text="{Binding ComposeTab.ComposeServiceName}" Width="160" Margin="0,0,12,0"
                                  PlaceholderText="nom du service (optionnel)" />
                     </WrapPanel>
 
-                    <DataGrid ItemsSource="{Binding ComposeServices}" AutoGenerateColumns="False"
+                    <DataGrid ItemsSource="{Binding ComposeTab.ComposeServices}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"
                               Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
                               CanUserResizeColumns="True" CanUserSortColumns="True">

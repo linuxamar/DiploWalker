@@ -13,11 +13,11 @@ type StatusCommand(output: IOutputPort) =
             output.WriteLine("Vérification de l'état des services Diplo...")
             output.WriteLine("")
 
-            let containerClient = new ContainerClient()
-            let volumeClient = new VolumeClient()
-            let networkClient = new NetworkClient()
+            use containerClient = new ContainerClient()
+            use volumeClient = new VolumeClient()
+            use networkClient = new NetworkClient()
 
-            try
+
                 let! containerStatus =
                     task {
                         try
@@ -67,8 +67,4 @@ type StatusCommand(output: IOutputPort) =
                     output.WriteWarning("Certains services ne sont pas disponibles.")
 
                 return 0
-            finally
-                (containerClient :> System.IDisposable).Dispose()
-                (volumeClient :> System.IDisposable).Dispose()
-                (networkClient :> System.IDisposable).Dispose()
         }
