@@ -94,7 +94,7 @@ type CreateNetworkCommand(output: IOutputPort) =
                     | "none" -> NetworkDriver.None
                     | "custom_cni" -> NetworkDriver.CustomCni
                     | "pod" -> NetworkDriver.Pod
-                    | _ -> Unchecked.defaultof<_>
+                    | _ -> failwithf "Driver %s non géré (normalement déjà validé)" settings.Driver
 
                 use client = new NetworkClient()
                 let! response =

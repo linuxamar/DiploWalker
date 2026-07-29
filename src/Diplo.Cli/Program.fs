@@ -9,8 +9,10 @@ open Spectre.Console.Cli
 
 let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) =
     let mi = typeof<IConfigurator<CommandSettings>>.GetMethods()
-             |> Array.find (fun m -> m.Name = "AddCommand" && m.GetParameters().Length = 1 && m.IsGenericMethod)
-    mi.MakeGenericMethod(t).Invoke(c, [| name |]) |> ignore
+             |> Array.tryFind (fun m -> m.Name = "AddCommand" && m.GetParameters().Length = 1 && m.IsGenericMethod)
+    match mi with
+    | Some mi -> mi.MakeGenericMethod(t).Invoke(c, [| name |]) |> ignore
+    | None -> failwithf "AddCommand<T>(string) introuvable sur IConfigurator<CommandSettings>"
 
 [<EntryPoint>]
 let main argv =

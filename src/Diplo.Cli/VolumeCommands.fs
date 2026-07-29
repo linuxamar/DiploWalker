@@ -88,7 +88,7 @@ type CreateVolumeCommand(output: IOutputPort) =
                     | "azure" -> StorageDriverType.CloudAzure
                     | "aws" -> StorageDriverType.CloudAws
                     | "gcp" -> StorageDriverType.CloudGcp
-                    | _ -> Unchecked.defaultof<_>
+                    | _ -> failwithf "Driver %s non géré (normalement déjà validé)" settings.Driver
 
                 use client = new VolumeClient()
                 let! response = client.CreateAsync(name = settings.Name, driver = driverType)
