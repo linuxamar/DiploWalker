@@ -61,3 +61,6 @@ test-repro/
 
 # Installer artifacts
 Diplo-Setup-*.exe
+
+# Code signing certificate (development)
+eng/Diplo_dev.pfx

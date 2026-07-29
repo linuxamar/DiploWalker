@@ -13,7 +13,10 @@ param(
     [string]$Version = "1.0.0",
     [ValidateSet("x64", "x86")]
     [string]$Platform = "x64",
-    [string]$PublishRoot
+    [string]$PublishRoot,
+    [switch]$Sign,
+    [string]$SignCert,
+    [string]$SignPassword
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,6 +73,41 @@ try {
 $defaultOut = Join-Path $setupDir "Diplo-Setup-$Version.exe"
 if (Test-Path $defaultOut) {
     Move-Item -Path $defaultOut -Destination $outFile -Force
+}
+
+# --- Signature (optionnelle) -------------------------------------------------
+if ($Sign) {
+    $signtool = Get-Command "signtool.exe" -ErrorAction SilentlyContinue
+    if (-not $signtool) {
+        Write-Warning "signtool.exe introuvable — signature ignorée."
+    } else {
+        Write-Host ""
+        Write-Host "═══ Signature ═══" -ForegroundColor Cyan
+
+        $signArgs = @("sign", "/fd", "SHA256")
+
+        if ($SignCert) {
+            $signArgs += "/f", $SignCert
+            if ($SignPassword) {
+                $signArgs += "/p", $SignPassword
+            }
+        } else {
+            $signArgs += "/a"
+        }
+
+        $signArgs += "/tr", "http://timestamp.digicert.com"
+        $signArgs += "/td", "SHA256"
+        $signArgs += $outFile
+
+        Write-Host "  Signature de $outFile ..." -ForegroundColor Yellow
+        & $signtool.Source $signArgs
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  ✓ Installateur signé." -ForegroundColor Green
+        } else {
+            Write-Warning "La signature a échoué (code $LASTEXITCODE)."
+        }
+    }
 }
 
 Write-Host ""

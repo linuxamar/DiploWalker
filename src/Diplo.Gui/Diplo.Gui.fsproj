@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <ApplicationIcon>Diplo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,7 @@
     <AvaloniaResource Include="Views\MainWindow.axaml" />
     <Compile Include="Views\MainWindow.axaml.fs" />
     <AvaloniaResource Include="App.axaml" />
+    <AvaloniaResource Include="Diplo.ico" />
     <Compile Include="App.axaml.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

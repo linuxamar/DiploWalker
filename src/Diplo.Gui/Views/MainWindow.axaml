@@ -4,7 +4,8 @@
         x:CompileBindings="False"
         Title="Diplo — Gestion Docker"
         Width="960" Height="720"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Icon="avares://Diplo.Gui/Diplo.ico">
 
     <DockPanel>
         <Menu DockPanel.Dock="Top">

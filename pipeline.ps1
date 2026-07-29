@@ -236,9 +236,9 @@ if ($runPublish) {
         $setupRoot = Join-Path $PSScriptRoot "setup"
         $setupScript = Join-Path $setupRoot "build.ps1"
         if (Test-Path $setupScript) {
-            Write-Host ""
-            Write-Host "═══ Package NSIS ($plat) ═══" -ForegroundColor Cyan
-            & $setupScript -Version "1.0.0" -Platform $plat
+    Write-Host ""
+    Write-Host "═══ Package NSIS ($plat) ═══" -ForegroundColor Cyan
+            & $setupScript -Version "1.0.0" -Platform $plat -Sign
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "Le packaging NSIS a échoué pour $plat."
             } else {
