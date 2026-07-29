@@ -1,6 +1,7 @@
 namespace Diplo.Cli.Compose
 
 open System
+open System.Threading.Tasks
 open Diplo.Core.Compose
 open Diplo.Core.Output
 open Spectre.Console.Cli
@@ -13,15 +14,15 @@ type ComposeUpSettings() =
 type ComposeUpCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposeUpSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
-
-            let orchestrator = ComposeOrchestrator(output)
-            do! orchestrator.Up(settings.File)
-            return 0
+            else
+                let orchestrator = ComposeOrchestrator(output)
+                do! orchestrator.Up(settings.File)
+                return 0
         }
 
 // ── down ───────────────────────────────────────────────────────────
@@ -32,15 +33,15 @@ type ComposeDownSettings() =
 type ComposeDownCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposeDownSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
-
-            let orchestrator = ComposeOrchestrator(output)
-            do! orchestrator.Down(settings.File)
-            return 0
+            else
+                let orchestrator = ComposeOrchestrator(output)
+                do! orchestrator.Down(settings.File)
+                return 0
         }
 
 // ── ps ─────────────────────────────────────────────────────────────
@@ -51,15 +52,15 @@ type ComposePsSettings() =
 type ComposePsCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposePsSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
-
-            let orchestrator = ComposeOrchestrator(output)
-            do! orchestrator.Ps(settings.File)
-            return 0
+            else
+                let orchestrator = ComposeOrchestrator(output)
+                do! orchestrator.Ps(settings.File)
+                return 0
         }
 
 // ── logs ───────────────────────────────────────────────────────────
@@ -71,16 +72,16 @@ type ComposeLogsSettings() =
 type ComposeLogsCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposeLogsSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
-
-            let orchestrator = ComposeOrchestrator(output)
-            let service = if isNull settings.Service then None else Some settings.Service
-            do! orchestrator.Logs(settings.File, service)
-            return 0
+            else
+                let orchestrator = ComposeOrchestrator(output)
+                let service = if isNull settings.Service then None else Some settings.Service
+                do! orchestrator.Logs(settings.File, service)
+                return 0
         }
 
 // ── pull ───────────────────────────────────────────────────────────
@@ -91,15 +92,15 @@ type ComposePullSettings() =
 type ComposePullCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposePullSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
-
-            let orchestrator = ComposeOrchestrator(output)
-            do! orchestrator.Pull(settings.File)
-            return 0
+            else
+                let orchestrator = ComposeOrchestrator(output)
+                do! orchestrator.Pull(settings.File)
+                return 0
         }
 
 // ── build ──────────────────────────────────────────────────────────
@@ -110,13 +111,13 @@ type ComposeBuildSettings() =
 type ComposeBuildCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposeBuildSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
-
-            let orchestrator = ComposeOrchestrator(output)
-            do! orchestrator.Build(settings.File)
-            return 0
+            else
+                let orchestrator = ComposeOrchestrator(output)
+                do! orchestrator.Build(settings.File)
+                return 0
         }

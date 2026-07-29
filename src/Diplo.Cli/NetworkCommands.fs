@@ -2,6 +2,7 @@ namespace Diplo.Cli.Network
 
 open System
 open System.Threading
+open System.Threading.Tasks
 open Diplo.Core.Clients
 open Diplo.Core.Output
 open Diplo.Grpc.Network
@@ -14,7 +15,7 @@ type ListNetworksSettings() =
 type ListNetworksCommand(output: IOutputPort) =
     inherit AsyncCommand<ListNetworksSettings>()
 
-    override _.ExecuteAsync(_ctx, _settings, _ct) =
+    override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
             use client = new NetworkClient()
             let! response = client.ListAsync(ct = CancellationToken.None)
@@ -43,28 +44,28 @@ type InspectNetworkSettings() =
 type InspectNetworkCommand(output: IOutputPort) =
     inherit AsyncCommand<InspectNetworkSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
+            else
+                use client = new NetworkClient()
+                let! response = client.InspectAsync(settings.Id)
 
-            use client = new NetworkClient()
-            let! response = client.InspectAsync(settings.Id)
+                output.WriteSuccess(sprintf "Réseau %s" response.Name)
+                output.WriteLine(sprintf "  ID          : %s" response.Id)
+                output.WriteLine(sprintf "  Driver      : %s" (response.Driver.ToString()))
+                output.WriteLine(sprintf "  Sous-réseau : %s" response.Subnet)
+                output.WriteLine(sprintf "  Passerelle  : %s" response.Gateway)
+                output.WriteLine(sprintf "  Plage IP    : %s" response.IpRange)
+                output.WriteLine(sprintf "  Créé        : %s" response.CreatedAt)
 
-            output.WriteSuccess(sprintf "Réseau %s" response.Name)
-            output.WriteLine(sprintf "  ID          : %s" response.Id)
-            output.WriteLine(sprintf "  Driver      : %s" (response.Driver.ToString()))
-            output.WriteLine(sprintf "  Sous-réseau : %s" response.Subnet)
-            output.WriteLine(sprintf "  Passerelle  : %s" response.Gateway)
-            output.WriteLine(sprintf "  Plage IP    : %s" response.IpRange)
-            output.WriteLine(sprintf "  Créé        : %s" response.CreatedAt)
-
-            if response.Endpoints.Count > 0 then
-                output.WriteLine("  Endpoints:")
-                for ep in response.Endpoints do
-                    output.WriteLine(sprintf "    - %s (%s) → %s" ep.ContainerId ep.Ipv4Address (ep.State.ToString()))
-            return 0
+                if response.Endpoints.Count > 0 then
+                    output.WriteLine("  Endpoints:")
+                    for ep in response.Endpoints do
+                        output.WriteLine(sprintf "    - %s (%s) → %s" ep.ContainerId ep.Ipv4Address (ep.State.ToString()))
+                return 0
         }
 
 // ── create ────────────────────────────────────────────────────────
@@ -78,39 +79,33 @@ type CreateNetworkSettings() =
 type CreateNetworkCommand(output: IOutputPort) =
     inherit AsyncCommand<CreateNetworkSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Name) then
                 output.WriteError("Le nom du réseau est requis")
                 return 1
-
-            match settings.Driver.ToLowerInvariant() with
-            | "bridge" -> ()
-            | "none" -> ()
-            | "custom_cni" -> ()
-            | "pod" -> ()
-            | other ->
-                output.WriteError(sprintf "Driver inconnu: %s. Valeurs: bridge, none, custom_cni, pod" other)
+            elif not (List.contains (settings.Driver.ToLowerInvariant()) ["bridge"; "none"; "custom_cni"; "pod"]) then
+                output.WriteError(sprintf "Driver inconnu: %s. Valeurs: bridge, none, custom_cni, pod" settings.Driver)
                 return 1
+            else
+                let driver =
+                    match settings.Driver.ToLowerInvariant() with
+                    | "bridge" -> NetworkDriver.Bridge
+                    | "none" -> NetworkDriver.None
+                    | "custom_cni" -> NetworkDriver.CustomCni
+                    | "pod" -> NetworkDriver.Pod
+                    | _ -> Unchecked.defaultof<_>
 
-            let driver =
-                match settings.Driver.ToLowerInvariant() with
-                | "bridge" -> NetworkDriver.Bridge
-                | "none" -> NetworkDriver.None
-                | "custom_cni" -> NetworkDriver.CustomCni
-                | "pod" -> NetworkDriver.Pod
-                | _ -> Unchecked.defaultof<_>
+                use client = new NetworkClient()
+                let! response =
+                    client.CreateAsync(
+                        name = settings.Name,
+                        driver = driver,
+                        subnet = (if isNull settings.Subnet then "" else settings.Subnet),
+                        gateway = (if isNull settings.Gateway then "" else settings.Gateway))
 
-            use client = new NetworkClient()
-            let! response =
-                client.CreateAsync(
-                    name = settings.Name,
-                    driver = driver,
-                    subnet = (if isNull settings.Subnet then "" else settings.Subnet),
-                    gateway = (if isNull settings.Gateway then "" else settings.Gateway))
-
-            output.WriteSuccess(sprintf "Réseau %s créé (ID: %s)" response.Name response.Id)
-            return 0
+                output.WriteSuccess(sprintf "Réseau %s créé (ID: %s)" response.Name response.Id)
+                return 0
         }
 
 // ── remove ────────────────────────────────────────────────────────
@@ -122,19 +117,19 @@ type RemoveNetworkSettings() =
 type RemoveNetworkCommand(output: IOutputPort) =
     inherit AsyncCommand<RemoveNetworkSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
-
-            use client = new NetworkClient()
-            let! response = client.RemoveAsync(settings.Id, settings.Force)
-            if response.Success then
-                output.WriteSuccess(response.Message)
             else
-                output.WriteError(response.Message)
-            return 0
+                use client = new NetworkClient()
+                let! response = client.RemoveAsync(settings.Id, settings.Force)
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                else
+                    output.WriteError(response.Message)
+                return 0
         }
 
 // ── connect ───────────────────────────────────────────────────────
@@ -148,28 +143,28 @@ type ConnectSettings() =
 type ConnectCommand(output: IOutputPort) =
     inherit AsyncCommand<ConnectSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.NetworkId) then
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
-            if String.IsNullOrEmpty(settings.ContainerId) then
+            elif String.IsNullOrEmpty(settings.ContainerId) then
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
+            else
+                use client = new NetworkClient()
+                let! response =
+                    client.ConnectAsync(
+                        networkId = settings.NetworkId,
+                        containerId = settings.ContainerId,
+                        endpointId = (if isNull settings.EndpointId then "" else settings.EndpointId),
+                        ipv4Address = (if isNull settings.Ipv4Address then "" else settings.Ipv4Address))
 
-            use client = new NetworkClient()
-            let! response =
-                client.ConnectAsync(
-                    networkId = settings.NetworkId,
-                    containerId = settings.ContainerId,
-                    endpointId = (if isNull settings.EndpointId then "" else settings.EndpointId),
-                    ipv4Address = (if isNull settings.Ipv4Address then "" else settings.Ipv4Address))
-
-            output.WriteSuccess(response.Message)
-            output.WriteLine(sprintf "  Endpoint  : %s" response.EndpointId)
-            output.WriteLine(sprintf "  IPv4      : %s" response.Ipv4Address)
-            output.WriteLine(sprintf "  MAC       : %s" response.MacAddress)
-            return 0
+                output.WriteSuccess(response.Message)
+                output.WriteLine(sprintf "  Endpoint  : %s" response.EndpointId)
+                output.WriteLine(sprintf "  IPv4      : %s" response.Ipv4Address)
+                output.WriteLine(sprintf "  MAC       : %s" response.MacAddress)
+                return 0
         }
 
 // ── disconnect ────────────────────────────────────────────────────
@@ -183,28 +178,28 @@ type DisconnectSettings() =
 type DisconnectCommand(output: IOutputPort) =
     inherit AsyncCommand<DisconnectSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.NetworkId) then
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
-            if String.IsNullOrEmpty(settings.ContainerId) then
+            elif String.IsNullOrEmpty(settings.ContainerId) then
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
-
-            use client = new NetworkClient()
-            let! response =
-                client.DisconnectAsync(
-                    networkId = settings.NetworkId,
-                    containerId = settings.ContainerId,
-                    endpointId = (if isNull settings.EndpointId then "" else settings.EndpointId),
-                    force = settings.Force)
-
-            if response.Success then
-                output.WriteSuccess(response.Message)
             else
-                output.WriteError(response.Message)
-            return 0
+                use client = new NetworkClient()
+                let! response =
+                    client.DisconnectAsync(
+                        networkId = settings.NetworkId,
+                        containerId = settings.ContainerId,
+                        endpointId = (if isNull settings.EndpointId then "" else settings.EndpointId),
+                        force = settings.Force)
+
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                else
+                    output.WriteError(response.Message)
+                return 0
         }
 
 // ── run-cni-plugin ────────────────────────────────────────────────
@@ -222,21 +217,21 @@ type RunCniPluginSettings() =
 type RunCniPluginCommand(output: IOutputPort) =
     inherit AsyncCommand<RunCniPluginSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             use client = new NetworkClient()
             let config =
                 if isNull settings.ConfigType then
                     None
                 else
-                    Some ({ CniConfiguration.Name = (if isNull settings.ConfigName then "" else settings.ConfigName)
-                            Type = settings.ConfigType
-                            Subnet = (if isNull settings.ConfigSubnet then "" else settings.ConfigSubnet)
-                            Gateway = (if isNull settings.ConfigGateway then "" else settings.ConfigGateway)
-                            IpRange = ""
-                            HairpinMode = false
-                            IsDefaultGateway = false
-                            Dns = System.Collections.Generic.Dictionary<string, string>() })
+                    Some { CniConfiguration.Name = (if isNull settings.ConfigName then "" else settings.ConfigName)
+                           Type = settings.ConfigType
+                           Subnet = (if isNull settings.ConfigSubnet then "" else settings.ConfigSubnet)
+                           Gateway = (if isNull settings.ConfigGateway then "" else settings.ConfigGateway)
+                           IpRange = ""
+                           HairpinMode = false
+                           IsDefaultGateway = false
+                           Dns = System.Collections.Generic.Dictionary<string, string>() }
             let! response =
                 client.RunCniPluginAsync(
                     pluginPath = settings.PluginPath,
@@ -261,7 +256,7 @@ type RunCniPluginCommand(output: IOutputPort) =
 type PruneNetworksCommand(output: IOutputPort) =
     inherit AsyncCommand<CommandSettings>()
 
-    override _.ExecuteAsync(_ctx, _settings, _ct) =
+    override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
             use client = new NetworkClient()
             let! response = client.PruneNetworksAsync()

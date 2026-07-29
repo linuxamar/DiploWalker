@@ -1,3 +1,5 @@
+open System
+
 open Diplo.Cli
 open Diplo.Cli.Container
 open Diplo.Cli.Volume
@@ -5,73 +7,73 @@ open Diplo.Cli.Network
 open Diplo.Cli.Compose
 open Spectre.Console.Cli
 
-[<AutoOpen>]
-module private SpectreCliHelpers =
-    let addCmd<'TCommand when 'TCommand : not struct>
-        (config: IConfigurator<CommandSettings>) (name: string) =
-        (config :> IConfigurator).AddCommand(typeof<'TCommand>, name)
+let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) =
+    let mi = typeof<IConfigurator<CommandSettings>>.GetMethods()
+             |> Array.find (fun m -> m.Name = "AddCommand" && m.GetParameters().Length = 1 && m.IsGenericMethod)
+    mi.MakeGenericMethod(t).Invoke(c, [| name |]) |> ignore
 
 [<EntryPoint>]
 let main argv =
     let app = CommandApp(TypeRegistrar())
     app.Configure(fun (config: IConfigurator) ->
-        config.AddBranch("container", fun (c: IConfigurator<CommandSettings>) ->
-            addCmd<ListCommand> c "list"
-            addCmd<InspectContainerCommand> c "inspect"
-            addCmd<StartContainerCommand> c "start"
-            addCmd<StopContainerCommand> c "stop"
-            addCmd<DeleteContainerCommand> c "delete"
-            addCmd<PullImageCommand> c "pull"
-            addCmd<CreateContainerCommand> c "create"
-            addCmd<LogsContainerCommand> c "logs"
-            addCmd<ExecContainerCommand> c "exec"
-            addCmd<NamespacesCommand> c "namespaces"
-            addCmd<VersionCommand> c "version"
-            addCmd<RenameContainerCommand> c "rename"
-            addCmd<TopContainerCommand> c "top"
-            addCmd<StatsContainerCommand> c "stats"
-            addCmd<ImageListCommand> c "image-list"
-            addCmd<ImageInspectCommand> c "image-inspect"
-            addCmd<ImageRemoveCommand> c "image-remove"
-            addCmd<ImageTagCommand> c "image-tag"
-        ) |> ignore
 
-        config.AddBranch("volume", fun (c: IConfigurator<CommandSettings>) ->
-            addCmd<ListVolumesCommand> c "list"
-            addCmd<InspectVolumeCommand> c "inspect"
-            addCmd<CreateVolumeCommand> c "create"
-            addCmd<RemoveVolumeCommand> c "remove"
-            addCmd<MountVolumeCommand> c "mount"
-            addCmd<UnmountVolumeCommand> c "unmount"
-            addCmd<PruneVolumesCommand> c "prune"
-        ) |> ignore
+        config.AddBranch("container", Action<IConfigurator<CommandSettings>>(fun c ->
+            addCmd c "list" typeof<ListCommand>
+            addCmd c "inspect" typeof<InspectContainerCommand>
+            addCmd c "start" typeof<StartContainerCommand>
+            addCmd c "stop" typeof<StopContainerCommand>
+            addCmd c "delete" typeof<DeleteContainerCommand>
+            addCmd c "pull" typeof<PullImageCommand>
+            addCmd c "create" typeof<CreateContainerCommand>
+            addCmd c "logs" typeof<LogsContainerCommand>
+            addCmd c "exec" typeof<ExecContainerCommand>
+            addCmd c "namespaces" typeof<NamespacesCommand>
+            addCmd c "version" typeof<VersionCommand>
+            addCmd c "rename" typeof<RenameContainerCommand>
+            addCmd c "top" typeof<TopContainerCommand>
+            addCmd c "stats" typeof<StatsContainerCommand>
+            addCmd c "image-list" typeof<ImageListCommand>
+            addCmd c "image-inspect" typeof<ImageInspectCommand>
+            addCmd c "image-remove" typeof<ImageRemoveCommand>
+            addCmd c "image-tag" typeof<ImageTagCommand>
+        )) |> ignore
 
-        config.AddBranch("network", fun (c: IConfigurator<CommandSettings>) ->
-            addCmd<ListNetworksCommand> c "list"
-            addCmd<InspectNetworkCommand> c "inspect"
-            addCmd<CreateNetworkCommand> c "create"
-            addCmd<RemoveNetworkCommand> c "remove"
-            addCmd<ConnectCommand> c "connect"
-            addCmd<DisconnectCommand> c "disconnect"
-            addCmd<RunCniPluginCommand> c "run-cni-plugin"
-            addCmd<PruneNetworksCommand> c "prune"
-        ) |> ignore
+        config.AddBranch("volume", Action<IConfigurator<CommandSettings>>(fun c ->
+            addCmd c "list" typeof<ListVolumesCommand>
+            addCmd c "inspect" typeof<InspectVolumeCommand>
+            addCmd c "create" typeof<CreateVolumeCommand>
+            addCmd c "remove" typeof<RemoveVolumeCommand>
+            addCmd c "mount" typeof<MountVolumeCommand>
+            addCmd c "unmount" typeof<UnmountVolumeCommand>
+            addCmd c "prune" typeof<PruneVolumesCommand>
+        )) |> ignore
 
-        config.AddBranch("status", fun (c: IConfigurator<CommandSettings>) ->
-            addCmd<StatusCommand> c "check"
-        ) |> ignore
+        config.AddBranch("network", Action<IConfigurator<CommandSettings>>(fun c ->
+            addCmd c "list" typeof<ListNetworksCommand>
+            addCmd c "inspect" typeof<InspectNetworkCommand>
+            addCmd c "create" typeof<CreateNetworkCommand>
+            addCmd c "remove" typeof<RemoveNetworkCommand>
+            addCmd c "connect" typeof<ConnectCommand>
+            addCmd c "disconnect" typeof<DisconnectCommand>
+            addCmd c "run-cni-plugin" typeof<RunCniPluginCommand>
+            addCmd c "prune" typeof<PruneNetworksCommand>
+        )) |> ignore
 
-        config.AddBranch("config", fun (c: IConfigurator<CommandSettings>) ->
-            addCmd<InitConfigCommand> c "init"
-        ) |> ignore
+        config.AddBranch("status", Action<IConfigurator<CommandSettings>>(fun c ->
+            addCmd c "check" typeof<StatusCommand>
+        )) |> ignore
 
-        config.AddBranch("compose", fun (c: IConfigurator<CommandSettings>) ->
-            addCmd<ComposeUpCommand> c "up"
-            addCmd<ComposeDownCommand> c "down"
-            addCmd<ComposePsCommand> c "ps"
-            addCmd<ComposeLogsCommand> c "logs"
-            addCmd<ComposePullCommand> c "pull"
-            addCmd<ComposeBuildCommand> c "build"
-        ) |> ignore
+        config.AddBranch("config", Action<IConfigurator<CommandSettings>>(fun c ->
+            addCmd c "init" typeof<InitConfigCommand>
+        )) |> ignore
+
+        config.AddBranch("compose", Action<IConfigurator<CommandSettings>>(fun c ->
+            addCmd c "up" typeof<ComposeUpCommand>
+            addCmd c "down" typeof<ComposeDownCommand>
+            addCmd c "ps" typeof<ComposePsCommand>
+            addCmd c "logs" typeof<ComposeLogsCommand>
+            addCmd c "pull" typeof<ComposePullCommand>
+            addCmd c "build" typeof<ComposeBuildCommand>
+        )) |> ignore
     ) |> ignore
     app.Run(argv)
