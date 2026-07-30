@@ -63,7 +63,9 @@ Function ${UN}AddToPath
 FunctionEnd
 !macroend
 !insertmacro AddToPathFunc ""
+!pragma warning disable 6010
 !insertmacro AddToPathFunc "un."
+!pragma warning enable 6010
 
 !macro StrStrFunc UN
 Function ${UN}StrStr
@@ -145,7 +147,9 @@ r_done:
   Pop $R0
 FunctionEnd
 !macroend
+!pragma warning disable 6010
 !insertmacro RemoveFromPathFunc ""
+!pragma warning enable 6010
 !insertmacro RemoveFromPathFunc "un."
 
 ; ── Sections ────────────────────────────────────────────────────────────────
