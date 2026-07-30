@@ -71,9 +71,7 @@ Function ${UN}AddToPath
 FunctionEnd
 !macroend
 !insertmacro AddToPathFunc ""
-!pragma warning disable 6010
-!insertmacro AddToPathFunc "un."
-!pragma warning enable 6010
+; un.AddToPath n'est pas appelée — on ne génère que la variante installateur
 
 !macro StrStrFunc UN
 Function ${UN}StrStr
@@ -113,7 +111,7 @@ s_done:
   Pop $R0
 FunctionEnd
 !macroend
-!insertmacro StrStrFunc ""
+; StrStr (installateur) n'est plus appelée — on ne génère que la variante désinstallateur
 !insertmacro StrStrFunc "un."
 
 !macro RemoveFromPathFunc UN
@@ -155,10 +153,8 @@ r_done:
   Pop $R0
 FunctionEnd
 !macroend
-!pragma warning disable 6010
-!insertmacro RemoveFromPathFunc ""
-!pragma warning enable 6010
 !insertmacro RemoveFromPathFunc "un."
+; RemoveFromPath (installateur) n'est pas appelée — on ne génère que la variante désinstallateur
 
 ; ── Sections ────────────────────────────────────────────────────────────────
 
