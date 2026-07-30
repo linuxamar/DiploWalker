@@ -74,7 +74,7 @@ type ContainerdClientTests() =
         let runner = createRunner ()
         runner.OnCommand("task kill", "")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
-        client.StopContainer("default", "c-1", 0)
+        client.StopContainer("default", "c-1", 0) |> ignore
         let cmd = runner.SecureCommands |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains("task kill"))
         cmd.IsSome |> should be True
         let (_, args) = cmd.Value
