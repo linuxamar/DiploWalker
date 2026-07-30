@@ -236,7 +236,8 @@ if ($runPublish) {
         if (Test-Path $setupScript) {
     Write-Host ""
     Write-Host "═══ Package NSIS ($plat) ═══" -ForegroundColor Cyan
-            & $setupScript -Version "1.0.0" -Platform $plat -Sign
+            $appVersion = (Select-Xml -Path (Join-Path $PSScriptRoot "Directory.Build.props") -XPath "//Version").Node.InnerText
+            & $setupScript -Version $appVersion -Platform $plat -Sign
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "Le packaging NSIS a échoué pour $plat."
             } else {
