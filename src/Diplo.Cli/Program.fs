@@ -1,6 +1,4 @@
 open System
-
-open System
 open System.Reflection
 open Diplo.Cli
 open Diplo.Cli.Container

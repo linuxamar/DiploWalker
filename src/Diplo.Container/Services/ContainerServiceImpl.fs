@@ -39,6 +39,13 @@ type ContainerServiceImpl(client: IContainerdClient) =
         | "dead" -> ContainerState.Failed
         | _ -> ContainerState.Unknown
 
+    let safeEnvVars =
+        set [ "PATH"; "USERNAME"; "USERDOMAIN"; "TEMP"; "TMP"
+              "HOMEDRIVE"; "HOMEPATH"; "SYSTEMROOT"; "OS"
+              "PROCESSOR_ARCHITECTURE"; "NUMBER_OF_PROCESSORS"
+              "ASPNETCORE_ENVIRONMENT"; "DOTNET_ENVIRONMENT"
+              "DOTNET_CLI_TELEMETRY_OPTOUT" ]
+
     interface IContainerService with
 
         member _.CreateContainer(request, _context) =
@@ -93,12 +100,6 @@ type ContainerServiceImpl(client: IContainerdClient) =
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
                 let info = client.InspectContainer(DefaultNamespace, request.Id)
                 let taskInfo = client.TaskInfo(DefaultNamespace, request.Id)
-                let safeEnvVars =
-                    set [ "PATH"; "USERNAME"; "USERDOMAIN"; "TEMP"; "TMP"
-                          "HOMEDRIVE"; "HOMEPATH"; "SYSTEMROOT"; "OS"
-                          "PROCESSOR_ARCHITECTURE"; "NUMBER_OF_PROCESSORS"
-                          "ASPNETCORE_ENVIRONMENT"; "DOTNET_ENVIRONMENT"
-                          "DOTNET_CLI_TELEMETRY_OPTOUT" ]
                 let env =
                     let mutable e = Dictionary<string, string>()
                     try
@@ -188,7 +189,6 @@ type ContainerServiceImpl(client: IContainerdClient) =
             let command = request.Command |> Seq.toArray
             let result = client.ExecInContainer(DefaultNamespace, request.Id, command)
             Seq.singleton { ExecOutput.Stream = "stdout"; Data = Encoding.UTF8.GetBytes(result) }
-            |> Seq.map id
             |> fun s -> s.ToAsyncEnumerable()
 
         member _.PullImage(request, _context) =
