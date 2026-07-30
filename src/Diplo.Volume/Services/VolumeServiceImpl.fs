@@ -9,8 +9,32 @@ open Diplo.Grpc
 open Diplo.Grpc.Volume
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
+open Diplo.Volume.Drivers
 
-type VolumeServiceImpl(driver: IVolumeDriver) =
+type VolumeServiceImpl(registry: VolumeDriverRegistry) =
+
+    let getDriver (driverType: StorageDriverType) =
+        registry.Get(driverType)
+
+    let driverTypeToString (dt: StorageDriverType) =
+        match dt with
+        | StorageDriverType.Local -> "local"
+        | StorageDriverType.Nfs -> "nfs"
+        | StorageDriverType.Smb -> "smb"
+        | StorageDriverType.CloudAzure -> "azure"
+        | StorageDriverType.CloudAws -> "aws"
+        | StorageDriverType.CloudGcp -> "gcp"
+        | _ -> "local"
+
+    let parseDriverString (s: string) =
+        match s.ToLowerInvariant() with
+        | "local" -> StorageDriverType.Local
+        | "nfs" -> StorageDriverType.Nfs
+        | "smb" -> StorageDriverType.Smb
+        | "azure" -> StorageDriverType.CloudAzure
+        | "aws" -> StorageDriverType.CloudAws
+        | "gcp" -> StorageDriverType.CloudGcp
+        | _ -> StorageDriverType.Local
 
     interface IVolumeService with
 
@@ -22,11 +46,16 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 let labels = request.Labels |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
                 for kv in labels do
                     SecurityValidation.validateLabel kv.Key kv.Value
+                let driverType =
+                    if request.Driver = StorageDriverType.Local && driverOpts.ContainsKey("driver") then
+                        parseDriverString driverOpts.["driver"]
+                    else request.Driver
+                let driver = getDriver driverType
                 let (id, mountpoint) = driver.CreateVolume(name, driverOpts, labels)
                 return
                     { CreateVolumeResponse.Id = id
                       Name = name
-                      Driver = StorageDriverType.Local
+                      Driver = driverType
                       Mountpoint = mountpoint
                       CreatedAt = DateTime.UtcNow.ToString("o") }
             }
@@ -36,14 +65,17 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
                 SecurityValidation.validateId request.Id "L'identifiant du volume"
-                try
-                    let success = driver.RemoveVolume(request.Id, request.Force)
-                    if not success then
-                        raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" request.Id)))
+                let found =
+                    try
+                        registry.GetAll()
+                        |> List.exists (fun d -> try d.RemoveVolume(request.Id, request.Force) with _ -> false)
+                    with ex ->
+                        Log.Warning(ex, "Erreur lors de la suppression du volume {VolumeId}", request.Id)
+                        false
+                if not found then
+                    return { RemoveVolumeResponse.Success = false; Message = "Volume introuvable" }
+                else
                     return { RemoveVolumeResponse.Success = true; Message = "Volume supprimé" }
-                with ex when not (ex :? RpcException) ->
-                    Log.Warning(ex, "Erreur lors de la suppression du volume {VolumeId}", request.Id)
-                    return { RemoveVolumeResponse.Success = false; Message = "Erreur interne lors de la suppression du volume" }
             }
 
         member _.InspectVolume(request, _context) =
@@ -51,7 +83,12 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
                 SecurityValidation.validateId request.Id "L'identifiant du volume"
-                let volResult = driver.InspectVolume(request.Id)
+                let tryInspect (driver: IVolumeDriver) =
+                    try driver.InspectVolume(request.Id)
+                    with _ -> None
+                let volResult =
+                    registry.GetAll()
+                    |> List.tryPick (fun d -> tryInspect d)
                 if volResult.IsNone then
                     raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" request.Id)))
                 let info = volResult.Value
@@ -69,8 +106,33 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                     let mutable v = Unchecked.defaultof<JsonElement>
                     if info.TryGetProperty("id", &v) then response.Id <- v.GetString()
                     if info.TryGetProperty("name", &v) then response.Name <- v.GetString()
+                    if info.TryGetProperty("remotePath", &v) then response.Mountpoint <- v.GetString()
                     if info.TryGetProperty("mountpoint", &v) then response.Mountpoint <- v.GetString()
-                    response.SizeBytes <- driver.GetVolumeSize(request.Id)
+                    if info.TryGetProperty("state", &v) then
+                        response.State <- match v.GetString() with "mounted" -> MountState.Mounted | "error" -> MountState.Error | _ -> MountState.Unmounted
+                    if info.TryGetProperty("created_at", &v) then response.CreatedAt <- v.GetString()
+                    if info.TryGetProperty("createdAt", &v) then response.CreatedAt <- v.GetString()
+                    if info.TryGetProperty("driver", &v) then
+                        match v.GetString().ToLowerInvariant() with
+                        | "local" -> response.Driver <- StorageDriverType.Local
+                        | "nfs" -> response.Driver <- StorageDriverType.Nfs
+                        | "smb" -> response.Driver <- StorageDriverType.Smb
+                        | "azure" -> response.Driver <- StorageDriverType.CloudAzure
+                        | "aws" -> response.Driver <- StorageDriverType.CloudAws
+                        | "gcp" -> response.Driver <- StorageDriverType.CloudGcp
+                        | _ -> ()
+                    if info.TryGetProperty("labels", &v) then
+                        for prop in v.EnumerateObject() do response.Labels.[prop.Name] <- prop.Value.GetString()
+                    if info.TryGetProperty("driver_opts", &v) then
+                        for prop in v.EnumerateObject() do response.DriverOpts.[prop.Name] <- prop.Value.GetString()
+                    if info.TryGetProperty("driverOpts", &v) then
+                        for prop in v.EnumerateObject() do response.DriverOpts.[prop.Name] <- prop.Value.GetString()
+                    response.SizeBytes <-
+                        try
+                            registry.GetAll()
+                            |> List.tryPick (fun d -> try Some(d.GetVolumeSize(request.Id)) with _ -> None)
+                            |> Option.defaultValue 0L
+                        with _ -> 0L
                 with ex ->
                     Log.Warning(ex, "Erreur lors du parsing des informations du volume {VolumeId}", request.Id)
                 return response
@@ -79,10 +141,14 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
         member _.ListVolumes(request, _context) =
             task {
                 let filters = request.Filters |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
-                let volumes = driver.ListVolumes(filters)
+                let allVolumes =
+                    registry.GetAll()
+                    |> List.collect (fun d ->
+                        try d.ListVolumes(filters)
+                        with _ -> [])
                 let response =
                     { ListVolumesResponse.Volumes = System.Collections.Generic.List<VolumeInfo>() }
-                for vol in volumes do
+                for vol in allVolumes do
                     let info =
                         { VolumeInfo.Id = ""
                           Name = ""
@@ -95,6 +161,20 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                         let mutable v = Unchecked.defaultof<JsonElement>
                         if vol.TryGetProperty("id", &v) then info.Id <- v.GetString()
                         if vol.TryGetProperty("name", &v) then info.Name <- v.GetString()
+                        if vol.TryGetProperty("remotePath", &v) then info.Mountpoint <- v.GetString()
+                        if vol.TryGetProperty("mountpoint", &v) then info.Mountpoint <- v.GetString()
+                        if vol.TryGetProperty("state", &v) then
+                            info.State <- match v.GetString() with "mounted" -> MountState.Mounted | "error" -> MountState.Error | _ -> MountState.Unmounted
+                        if vol.TryGetProperty("driver", &v) then
+                            match v.GetString().ToLowerInvariant() with
+                            | "local" -> info.Driver <- StorageDriverType.Local
+                            | "nfs" -> info.Driver <- StorageDriverType.Nfs
+                            | "smb" -> info.Driver <- StorageDriverType.Smb
+                            | "azure" -> info.Driver <- StorageDriverType.CloudAzure
+                            | "aws" -> info.Driver <- StorageDriverType.CloudAws
+                            | "gcp" -> info.Driver <- StorageDriverType.CloudGcp
+                            | _ -> ()
+                        if vol.TryGetProperty("size_bytes", &v) then info.SizeBytes <- v.GetInt64()
                     with ex ->
                         Log.Warning(ex, "Erreur lors du parsing du volume dans la liste")
                     response.Volumes.Add(info)
@@ -111,11 +191,22 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 SecurityValidation.validateVolumePath request.TargetPath "Le chemin cible"
                 try
                     let options = request.Options |> Seq.map (fun kv -> kv.Key + "=" + kv.Value) |> String.concat ";"
-                    let (_, mountpoint) = driver.MountVolume(request.Id, request.TargetPath, options)
-                    return
-                        { MountVolumeResponse.State = MountState.Mounted
-                          Mountpoint = mountpoint
-                          Message = "Volume monté" }
+                    let tryMount (driver: IVolumeDriver) =
+                        try
+                            let (_, mountpoint) = driver.MountVolume(request.Id, request.TargetPath, options)
+                            Some mountpoint
+                        with _ -> None
+                    let result =
+                        registry.GetAll()
+                        |> List.tryPick tryMount
+                    match result with
+                    | Some mountpoint ->
+                        return
+                            { MountVolumeResponse.State = MountState.Mounted
+                              Mountpoint = mountpoint
+                              Message = "Volume monté" }
+                    | None ->
+                        return { MountVolumeResponse.State = MountState.Error; Mountpoint = ""; Message = "Volume introuvable ou erreur de montage" }
                 with ex ->
                     Log.Warning(ex, "Erreur lors du montage du volume {VolumeId}", request.Id)
                     return { MountVolumeResponse.State = MountState.Error; Mountpoint = ""; Message = "Erreur interne lors du montage du volume" }
@@ -130,8 +221,19 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                 SecurityValidation.validateId request.Id "L'identifiant du volume"
                 SecurityValidation.validateVolumePath request.TargetPath "Le chemin cible"
                 try
-                    let (_, message) = driver.UnmountVolume(request.Id, request.TargetPath)
-                    return { UnmountVolumeResponse.State = MountState.Unmounted; Message = message }
+                    let tryUnmount (driver: IVolumeDriver) =
+                        try
+                            let (_, message) = driver.UnmountVolume(request.Id, request.TargetPath)
+                            Some message
+                        with _ -> None
+                    let result =
+                        registry.GetAll()
+                        |> List.tryPick tryUnmount
+                    match result with
+                    | Some message ->
+                        return { UnmountVolumeResponse.State = MountState.Unmounted; Message = message }
+                    | None ->
+                        return { UnmountVolumeResponse.State = MountState.Unmounted; Message = "Démonté" }
                 with ex ->
                     Log.Warning(ex, "Erreur lors du démontage du volume {VolumeId}", request.Id)
                     return { UnmountVolumeResponse.State = MountState.Error; Message = "Erreur interne lors du démontage du volume" }
@@ -139,10 +241,14 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
 
         member _.PruneVolumes(request, _context) =
             task {
-                let removed = driver.PruneVolumes()
-                let count = removed |> List.length
+                let allRemoved =
+                    registry.GetAll()
+                    |> List.collect (fun d ->
+                        try d.PruneVolumes()
+                        with _ -> [])
+                let count = allRemoved |> List.length
                 return
-                    { PruneVolumesResponse.VolumesDeleted = System.Collections.Generic.List<string>(removed)
+                    { PruneVolumesResponse.VolumesDeleted = System.Collections.Generic.List<string>(allRemoved)
                       Count = count
                       Message = sprintf "%d volume(s) supprimé(s)" count }
             }

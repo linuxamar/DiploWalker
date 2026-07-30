@@ -14,13 +14,21 @@
   !define APP_NAME "Diplo"
 !endif
 
+!ifndef PLATFORM
+  !define PLATFORM "x64"
+!endif
+
 !define REG_KEY_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
 !define REG_KEY_ENV "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
 
 ; ── Attributs ───────────────────────────────────────────────────────────────
 Name "${APP_NAME}"
-OutFile "Diplo-Setup-${APP_VERSION}.exe"
-InstallDir "$PROGRAMFILES64\${APP_NAME}"
+OutFile "Diplo-Setup-${APP_VERSION}-${PLATFORM}.exe"
+!if ${PLATFORM} == "x64"
+  InstallDir "$PROGRAMFILES64\${APP_NAME}"
+!else
+  InstallDir "$PROGRAMFILES32\${APP_NAME}"
+!endif
 InstallDirRegKey HKLM "${REG_KEY_UNINSTALL}" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "Diplo"
@@ -63,7 +71,7 @@ Function ${UN}AddToPath
 FunctionEnd
 !macroend
 !insertmacro AddToPathFunc ""
-!insertmacro AddToPathFunc "un."
+; un.AddToPath n'est pas appelée — on ne génère que la variante installateur
 
 !macro StrStrFunc UN
 Function ${UN}StrStr
@@ -103,7 +111,7 @@ s_done:
   Pop $R0
 FunctionEnd
 !macroend
-!insertmacro StrStrFunc ""
+; StrStr (installateur) n'est plus appelée — on ne génère que la variante désinstallateur
 !insertmacro StrStrFunc "un."
 
 !macro RemoveFromPathFunc UN
@@ -145,8 +153,8 @@ r_done:
   Pop $R0
 FunctionEnd
 !macroend
-!insertmacro RemoveFromPathFunc ""
 !insertmacro RemoveFromPathFunc "un."
+; RemoveFromPath (installateur) n'est pas appelée — on ne génère que la variante désinstallateur
 
 ; ── Sections ────────────────────────────────────────────────────────────────
 

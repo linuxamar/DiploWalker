@@ -1,4 +1,4 @@
-# ---------------------------------------------------------------------------
+﻿# ---------------------------------------------------------------------------
 #  build.ps1 – Compile Diplo-Setup.exe (NSIS)
 # ---------------------------------------------------------------------------
 #  Usage :
@@ -10,7 +10,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Version = "1.0.0",
+    [string]$Version = (Select-Xml -Path (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")) "Directory.Build.props") -XPath "//Version").Node.InnerText,
     [ValidateSet("x64", "x86")]
     [string]$Platform = "x64",
     [string]$PublishRoot,

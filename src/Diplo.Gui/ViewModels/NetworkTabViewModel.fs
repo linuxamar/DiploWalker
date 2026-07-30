@@ -49,20 +49,20 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
     member _.NetworkCniCommand with get () = networkCniCommand and set v = networkCniCommand <- v; this.OnPropertyChanged()
     member _.NetworkNetnsPath with get () = networkNetnsPath and set v = networkNetnsPath <- v; this.OnPropertyChanged()
 
-    member _.ListNetworksCommand = RelayCommand(Action(fun () -> this.ListNetworks() |> Async.Start))
-    member _.InspectNetworkCommand = RelayCommand(Action(fun () -> this.InspectNetwork() |> Async.Start))
-    member _.CreateNetworkCommand = RelayCommand(Action(fun () -> this.CreateNetwork() |> Async.Start))
-    member _.RemoveNetworkCommand = RelayCommand(Action(fun () -> this.RemoveNetwork() |> Async.Start))
-    member _.ConnectNetworkCommand = RelayCommand(Action(fun () -> this.ConnectContainer() |> Async.Start))
-    member _.DisconnectNetworkCommand = RelayCommand(Action(fun () -> this.DisconnectContainer() |> Async.Start))
-    member _.RunCniPluginCommand = RelayCommand(Action(fun () -> this.RunCniPlugin() |> Async.Start))
-    member _.PruneNetworksCommand = RelayCommand(Action(fun () -> this.PruneNetworks() |> Async.Start))
+    member _.ListNetworksCommand = RelayCommand(Action(fun () -> this.ListNetworks() |> ignore))
+    member _.InspectNetworkCommand = RelayCommand(Action(fun () -> this.InspectNetwork() |> ignore))
+    member _.CreateNetworkCommand = RelayCommand(Action(fun () -> this.CreateNetwork() |> ignore))
+    member _.RemoveNetworkCommand = RelayCommand(Action(fun () -> this.RemoveNetwork() |> ignore))
+    member _.ConnectNetworkCommand = RelayCommand(Action(fun () -> this.ConnectContainer() |> ignore))
+    member _.DisconnectNetworkCommand = RelayCommand(Action(fun () -> this.DisconnectContainer() |> ignore))
+    member _.RunCniPluginCommand = RelayCommand(Action(fun () -> this.RunCniPlugin() |> ignore))
+    member _.PruneNetworksCommand = RelayCommand(Action(fun () -> this.PruneNetworks() |> ignore))
 
     member private this.ListNetworks() =
-        async {
+        task {
             try
                 use client = new NetworkClient()
-                let! response = client.ListAsync() |> Async.AwaitTask
+                let! response = client.ListAsync()
                 Dispatcher.UIThread.Post(fun () ->
                     networks.Clear()
                     for n in response.Networks do
@@ -80,10 +80,10 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.InspectNetwork() =
-        async {
+        task {
             try
                 use client = new NetworkClient()
-                let! response = client.InspectAsync(id = this.NetworkIdInput) |> Async.AwaitTask
+                let! response = client.InspectAsync(id = this.NetworkIdInput)
                 outputPort.WriteLine(sprintf "ID: %s" response.Id)
                 outputPort.WriteLine(sprintf "Nom: %s" response.Name)
                 outputPort.WriteLine(sprintf "Driver: %s" (response.Driver.ToString()))
@@ -95,7 +95,7 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.CreateNetwork() =
-        async {
+        task {
             try
                 use client = new NetworkClient()
                 let driverEnum =
@@ -105,16 +105,16 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
                     | "pod" -> Diplo.Grpc.Network.NetworkDriver.Pod
                     | "cni" -> Diplo.Grpc.Network.NetworkDriver.CustomCni
                     | _ -> Diplo.Grpc.Network.NetworkDriver.Bridge
-                let! response = client.CreateAsync(this.NetworkNameInput, driver = driverEnum, subnet = this.NetworkSubnet, gateway = this.NetworkGateway) |> Async.AwaitTask
+                let! response = client.CreateAsync(this.NetworkNameInput, driver = driverEnum, subnet = this.NetworkSubnet, gateway = this.NetworkGateway)
                 outputPort.WriteSuccess(sprintf "Réseau %s créé (ID: %s)" this.NetworkNameInput response.Id)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.RemoveNetwork() =
-        async {
+        task {
             try
                 use client = new NetworkClient()
-                let! response = client.RemoveAsync(id = this.NetworkIdInput, force = this.NetworkForce) |> Async.AwaitTask
+                let! response = client.RemoveAsync(id = this.NetworkIdInput, force = this.NetworkForce)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Réseau %s supprimé" this.NetworkIdInput)
                 else
@@ -123,19 +123,19 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.ConnectContainer() =
-        async {
+        task {
             try
                 use client = new NetworkClient()
-                let! response = client.ConnectAsync(this.NetworkIdInput, this.NetworkContainerId, endpointId = this.NetworkEndpointId, ipv4Address = this.NetworkIpv4) |> Async.AwaitTask
+                let! response = client.ConnectAsync(this.NetworkIdInput, this.NetworkContainerId, endpointId = this.NetworkEndpointId, ipv4Address = this.NetworkIpv4)
                 outputPort.WriteSuccess(sprintf "Conteneur %s connecté au réseau %s - %s" this.NetworkContainerId this.NetworkIdInput response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.DisconnectContainer() =
-        async {
+        task {
             try
                 use client = new NetworkClient()
-                let! response = client.DisconnectAsync(this.NetworkIdInput, this.NetworkContainerId, endpointId = this.NetworkEndpointId, force = this.NetworkForce) |> Async.AwaitTask
+                let! response = client.DisconnectAsync(this.NetworkIdInput, this.NetworkContainerId, endpointId = this.NetworkEndpointId, force = this.NetworkForce)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Conteneur %s déconnecté du réseau %s" this.NetworkContainerId this.NetworkIdInput)
                 else
@@ -144,10 +144,10 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.RunCniPlugin() =
-        async {
+        task {
             try
                 use client = new NetworkClient()
-                let! response = client.RunCniPluginAsync(pluginPath = this.NetworkCniPluginPath, command = this.NetworkCniCommand, containerId = this.NetworkContainerId, netnsPath = this.NetworkNetnsPath) |> Async.AwaitTask
+                let! response = client.RunCniPluginAsync(pluginPath = this.NetworkCniPluginPath, command = this.NetworkCniCommand, containerId = this.NetworkContainerId, netnsPath = this.NetworkNetnsPath)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Plugin CNI exécuté - %s" response.Message)
                 else
@@ -156,10 +156,10 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.PruneNetworks() =
-        async {
+        task {
             try
                 use client = new NetworkClient()
-                let! response = client.PruneNetworksAsync() |> Async.AwaitTask
+                let! response = client.PruneNetworksAsync()
                 outputPort.WriteSuccess(sprintf "Réseaux nettoyés - %s" response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }

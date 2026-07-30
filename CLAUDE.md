@@ -27,7 +27,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **.NET 10** (`dotnet 10.0.302` installé localement).
 - Orientation **F#** (services, drivers, CLI) + C# (gRPC généré).
-- **Tests** : xUnit v3 + FsUnit.xUnit — 263 tests au total.
+- **Tests** : xUnit v3 + FsUnit.xUnit — 421 tests au total.
 
 ## Commandes
 

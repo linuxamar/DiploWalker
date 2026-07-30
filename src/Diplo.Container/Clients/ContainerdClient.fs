@@ -3,9 +3,36 @@ namespace Diplo.Container.Clients
 open System
 open System.IO
 open System.Text.Json
+open System.Threading.Tasks
 open Serilog
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
+
+[<Struct>]
+type private OciProcess = { args: string array option; env: string array }
+
+[<Struct>]
+type private OciMemoryLimit = { limit: int64 }
+
+[<Struct>]
+type private OciCpuShares = { shares: int64 }
+
+[<Struct>]
+type private OciPidsLimit = { limit: int }
+
+[<Struct>]
+type private OciResourceEntry =
+    { memory: OciMemoryLimit option
+      cpu: OciCpuShares option
+      pids: OciPidsLimit option }
+
+[<Struct>]
+type private OciLinux = { resources: OciResourceEntry }
+
+[<Struct>]
+type private OciSpec =
+    { ``process``: string
+      linux: OciLinux }
 
 type ContainerdClient(runner: IProcessRunner) =
 
@@ -21,21 +48,14 @@ type ContainerdClient(runner: IProcessRunner) =
         let processObj =
             let allArgs = if command.Length > 0 || args.Length > 0 then Array.append command args |> Some else None
             let envList = if envArray.IsEmpty then null else envArray |> List.toArray
-            let proc = {| args = allArgs; env = envList |}
+            let proc: OciProcess = { args = allArgs; env = envList }
             JsonSerializer.Serialize(proc)
-        let resources = {|
-            memory = if memoryLimit > 0L then Some {| limit = memoryLimit |} else None
-            cpu = if cpuShares > 0L then Some {| shares = cpuShares |} else None
-            pids = if pidLimit > 0u then Some {| limit = int pidLimit |} else None
-        |}
-        let linux = {|
-            resources = {|
-                memory = resources.memory
-                cpu = resources.cpu
-                pids = resources.pids
-            |}
-        |}
-        let spec = {| ``process`` = processObj; linux = linux |}
+        let resources =
+            { memory = if memoryLimit > 0L then Some { limit = memoryLimit } else None
+              cpu = if cpuShares > 0L then Some { shares = cpuShares } else None
+              pids = if pidLimit > 0u then Some { limit = int pidLimit } else None }
+        let linux: OciLinux = { resources = resources }
+        let spec: OciSpec = { ``process`` = processObj; linux = linux }
         JsonSerializer.Serialize(spec)
 
     interface IContainerdClient with
@@ -80,13 +100,15 @@ type ContainerdClient(runner: IProcessRunner) =
             SecurityValidation.validateContainerId id
             runCtr [ "task"; "start"; "--namespace"; namespaceName; id ] |> ignore
 
-        member _.StopContainer(namespaceName, id, timeoutSeconds) =
+        member _.StopContainer(namespaceName, id, timeoutSeconds) : Task =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
             runCtr [ "task"; "kill"; "--namespace"; namespaceName; "--signal"; "SIGTERM"; id ] |> ignore
-            if timeoutSeconds > 0 then
-                let capped = min timeoutSeconds 300
-                System.Threading.Thread.Sleep(capped * 1000)
+            task {
+                if timeoutSeconds > 0 then
+                    let capped = min timeoutSeconds 300
+                    do! Task.Delay(capped * 1000)
+            } :> Task
 
         member _.DeleteContainer(namespaceName, id, force) =
             SecurityValidation.validateId namespaceName "Le namespace"
@@ -114,13 +136,12 @@ type ContainerdClient(runner: IProcessRunner) =
         member _.GetContainerLogs(namespaceName, id, tail, follow, since) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
-            let mutable logArgs =
-                [ "task"; "logs"; "--namespace"; namespaceName; "--tail"; tail.ToString() ]
-            if follow then
-                logArgs <- logArgs @ [ "--follow" ]
-            if not (String.IsNullOrEmpty(since)) then
-                logArgs <- logArgs @ [ "--since"; since ]
-            logArgs <- logArgs @ [ id ]
+            let logArgs =
+                [ yield "task"; yield "logs"; yield "--namespace"; yield namespaceName
+                  yield "--tail"; yield tail.ToString()
+                  if follow then yield "--follow"
+                  if not (String.IsNullOrEmpty(since)) then yield "--since"; yield since
+                  yield id ]
             try
                 let output = runCtr logArgs
                 output.Split('\n')

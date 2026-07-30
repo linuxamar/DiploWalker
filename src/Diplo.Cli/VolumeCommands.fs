@@ -2,6 +2,7 @@ namespace Diplo.Cli.Volume
 
 open System
 open System.Threading
+open System.Threading.Tasks
 open Diplo.Core.Clients
 open Diplo.Core.Output
 open Diplo.Grpc.Volume
@@ -14,7 +15,7 @@ type ListVolumesSettings() =
 type ListVolumesCommand(output: IOutputPort) =
     inherit AsyncCommand<ListVolumesSettings>()
 
-    override _.ExecuteAsync(_ctx, _settings, _ct) =
+    override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
             use client = new VolumeClient()
             let! response = client.ListAsync(ct = CancellationToken.None)
@@ -42,23 +43,23 @@ type InspectVolumeSettings() =
 type InspectVolumeCommand(output: IOutputPort) =
     inherit AsyncCommand<InspectVolumeSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
+            else
+                use client = new VolumeClient()
+                let! response = client.InspectAsync(settings.Id)
 
-            use client = new VolumeClient()
-            let! response = client.InspectAsync(settings.Id)
-
-            output.WriteSuccess(sprintf "Volume %s" response.Name)
-            output.WriteLine(sprintf "  ID        : %s" response.Id)
-            output.WriteLine(sprintf "  Driver    : %s" (response.Driver.ToString()))
-            output.WriteLine(sprintf "  Montage   : %s" response.Mountpoint)
-            output.WriteLine(sprintf "  État      : %s" (response.State.ToString()))
-            output.WriteLine(sprintf "  Taille    : %d octets" response.SizeBytes)
-            output.WriteLine(sprintf "  Créé      : %s" response.CreatedAt)
-            return 0
+                output.WriteSuccess(sprintf "Volume %s" response.Name)
+                output.WriteLine(sprintf "  ID        : %s" response.Id)
+                output.WriteLine(sprintf "  Driver    : %s" (response.Driver.ToString()))
+                output.WriteLine(sprintf "  Montage   : %s" response.Mountpoint)
+                output.WriteLine(sprintf "  État      : %s" (response.State.ToString()))
+                output.WriteLine(sprintf "  Taille    : %d octets" response.SizeBytes)
+                output.WriteLine(sprintf "  Créé      : %s" response.CreatedAt)
+                return 0
         }
 
 // ── create ────────────────────────────────────────────────────────
@@ -70,37 +71,29 @@ type CreateVolumeSettings() =
 type CreateVolumeCommand(output: IOutputPort) =
     inherit AsyncCommand<CreateVolumeSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Name) then
                 output.WriteError("Le nom du volume est requis")
                 return 1
-
-            match settings.Driver.ToLowerInvariant() with
-            | "local" -> ()
-            | "nfs" -> ()
-            | "smb" -> ()
-            | "azure" -> ()
-            | "aws" -> ()
-            | "gcp" -> ()
-            | other ->
-                output.WriteError(sprintf "Driver inconnu: %s" other)
+            elif not (List.contains (settings.Driver.ToLowerInvariant()) ["local"; "nfs"; "smb"; "azure"; "aws"; "gcp"]) then
+                output.WriteError(sprintf "Driver inconnu: %s" settings.Driver)
                 return 1
+            else
+                let driverType =
+                    match settings.Driver.ToLowerInvariant() with
+                    | "local" -> StorageDriverType.Local
+                    | "nfs" -> StorageDriverType.Nfs
+                    | "smb" -> StorageDriverType.Smb
+                    | "azure" -> StorageDriverType.CloudAzure
+                    | "aws" -> StorageDriverType.CloudAws
+                    | "gcp" -> StorageDriverType.CloudGcp
+                    | _ -> failwithf "Driver %s non géré (normalement déjà validé)" settings.Driver
 
-            let driverType =
-                match settings.Driver.ToLowerInvariant() with
-                | "local" -> StorageDriverType.Local
-                | "nfs" -> StorageDriverType.Nfs
-                | "smb" -> StorageDriverType.Smb
-                | "azure" -> StorageDriverType.CloudAzure
-                | "aws" -> StorageDriverType.CloudAws
-                | "gcp" -> StorageDriverType.CloudGcp
-                | _ -> Unchecked.defaultof<_>
-
-            use client = new VolumeClient()
-            let! response = client.CreateAsync(name = settings.Name, driver = driverType)
-            output.WriteSuccess(sprintf "Volume %s créé (ID: %s)" response.Name response.Id)
-            return 0
+                use client = new VolumeClient()
+                let! response = client.CreateAsync(name = settings.Name, driver = driverType)
+                output.WriteSuccess(sprintf "Volume %s créé (ID: %s)" response.Name response.Id)
+                return 0
         }
 
 // ── remove ────────────────────────────────────────────────────────
@@ -112,19 +105,19 @@ type RemoveVolumeSettings() =
 type RemoveVolumeCommand(output: IOutputPort) =
     inherit AsyncCommand<RemoveVolumeSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
-
-            use client = new VolumeClient()
-            let! response = client.RemoveAsync(settings.Id, settings.Force)
-            if response.Success then
-                output.WriteSuccess(response.Message)
             else
-                output.WriteError(response.Message)
-            return 0
+                use client = new VolumeClient()
+                let! response = client.RemoveAsync(settings.Id, settings.Force)
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                else
+                    output.WriteError(response.Message)
+                return 0
         }
 
 // ── mount ─────────────────────────────────────────────────────────
@@ -136,16 +129,16 @@ type MountSettings() =
 type MountVolumeCommand(output: IOutputPort) =
     inherit AsyncCommand<MountSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
-
-            use client = new VolumeClient()
-            let! response = client.MountAsync(settings.Id, settings.Target)
-            output.WriteSuccess(sprintf "Volume %s monté sur %s (%s)" settings.Id settings.Target response.Mountpoint)
-            return 0
+            else
+                use client = new VolumeClient()
+                let! response = client.MountAsync(settings.Id, settings.Target)
+                output.WriteSuccess(sprintf "Volume %s monté sur %s (%s)" settings.Id settings.Target response.Mountpoint)
+                return 0
         }
 
 // ── unmount ───────────────────────────────────────────────────────
@@ -157,23 +150,23 @@ type UnmountSettings() =
 type UnmountVolumeCommand(output: IOutputPort) =
     inherit AsyncCommand<UnmountSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) =
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
-
-            use client = new VolumeClient()
-            let! response = client.UnmountAsync(settings.Id, settings.Target)
-            output.WriteSuccess(sprintf "Volume %s démonté de %s" settings.Id settings.Target)
-            return 0
+            else
+                use client = new VolumeClient()
+                let! response = client.UnmountAsync(settings.Id, settings.Target)
+                output.WriteSuccess(sprintf "Volume %s démonté de %s" settings.Id settings.Target)
+                return 0
         }
 
 // ── prune ─────────────────────────────────────────────────────────
 type PruneVolumesCommand(output: IOutputPort) =
     inherit AsyncCommand<CommandSettings>()
 
-    override _.ExecuteAsync(_ctx, _settings, _ct) =
+    override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
             use client = new VolumeClient()
             let! response = client.PruneVolumesAsync()

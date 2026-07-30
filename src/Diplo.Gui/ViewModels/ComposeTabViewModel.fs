@@ -28,36 +28,36 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member _.ComposeFilePath with get () = composeFilePath and set v = composeFilePath <- v; this.OnPropertyChanged()
     member _.ComposeServiceName with get () = composeServiceName and set v = composeServiceName <- v; this.OnPropertyChanged()
 
-    member _.ComposeUpCommand = RelayCommand(Action(fun () -> this.ComposeUp() |> Async.Start))
-    member _.ComposeDownCommand = RelayCommand(Action(fun () -> this.ComposeDown() |> Async.Start))
-    member _.ComposePsCommand = RelayCommand(Action(fun () -> this.ComposePs() |> Async.Start))
-    member _.ComposeLogsCommand = RelayCommand(Action(fun () -> this.ComposeLogs() |> Async.Start))
-    member _.ComposePullCommand = RelayCommand(Action(fun () -> this.ComposePull() |> Async.Start))
-    member _.ComposeBuildCommand = RelayCommand(Action(fun () -> this.ComposeBuild() |> Async.Start))
+    member _.ComposeUpCommand = RelayCommand(Action(fun () -> this.ComposeUp() |> ignore))
+    member _.ComposeDownCommand = RelayCommand(Action(fun () -> this.ComposeDown() |> ignore))
+    member _.ComposePsCommand = RelayCommand(Action(fun () -> this.ComposePs() |> ignore))
+    member _.ComposeLogsCommand = RelayCommand(Action(fun () -> this.ComposeLogs() |> ignore))
+    member _.ComposePullCommand = RelayCommand(Action(fun () -> this.ComposePull() |> ignore))
+    member _.ComposeBuildCommand = RelayCommand(Action(fun () -> this.ComposeBuild() |> ignore))
 
     member private this.ComposeUp() =
-        async {
+        task {
             try
                 let orchestrator = ComposeOrchestrator(outputPort)
-                do! orchestrator.Up(this.ComposeFilePath) |> Async.AwaitTask
+                do! orchestrator.Up(this.ComposeFilePath)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.ComposeDown() =
-        async {
+        task {
             try
                 let orchestrator = ComposeOrchestrator(outputPort)
-                do! orchestrator.Down(this.ComposeFilePath) |> Async.AwaitTask
+                do! orchestrator.Down(this.ComposeFilePath)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.ComposePs() =
-        async {
+        task {
             try
                 let orchestrator = ComposeOrchestrator(outputPort)
                 let compose = orchestrator.ParseFile(this.ComposeFilePath)
                 use client = new ContainerClient()
-                let! response = client.ListAsync(all = true) |> Async.AwaitTask
+                let! response = client.ListAsync(all = true)
 
                 Dispatcher.UIThread.Post(fun () ->
                     composeServices.Clear()
@@ -84,26 +84,26 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.ComposeLogs() =
-        async {
+        task {
             try
                 let orchestrator = ComposeOrchestrator(outputPort)
                 let service = if String.IsNullOrEmpty(this.ComposeServiceName) then None else Some this.ComposeServiceName
-                do! orchestrator.Logs(this.ComposeFilePath, service) |> Async.AwaitTask
+                do! orchestrator.Logs(this.ComposeFilePath, service)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.ComposeBuild() =
-        async {
+        task {
             try
                 let orchestrator = ComposeOrchestrator(outputPort)
-                do! orchestrator.Build(this.ComposeFilePath) |> Async.AwaitTask
+                do! orchestrator.Build(this.ComposeFilePath)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.ComposePull() =
-        async {
+        task {
             try
                 let orchestrator = ComposeOrchestrator(outputPort)
-                do! orchestrator.Pull(this.ComposeFilePath) |> Async.AwaitTask
+                do! orchestrator.Pull(this.ComposeFilePath)
             with ex -> outputPort.WriteError(ex.Message)
         }

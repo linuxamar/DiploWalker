@@ -1,6 +1,10 @@
 <Project>
 
   <PropertyGroup>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <!--
       Plateformes autorisées : x64 ou x86 exclusivement.
       AnyCPU est interdit — les binaires Diplo ciblent containerd/WSL2 nativement.

@@ -34,19 +34,19 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member _.VolumeTargetPath with get () = volumeTargetPath and set v = volumeTargetPath <- v; this.OnPropertyChanged()
     member _.VolumeForce with get () = volumeForce and set v = volumeForce <- v; this.OnPropertyChanged()
 
-    member _.ListVolumesCommand = RelayCommand(Action(fun () -> this.ListVolumes() |> Async.Start))
-    member _.InspectVolumeCommand = RelayCommand(Action(fun () -> this.InspectVolume() |> Async.Start))
-    member _.CreateVolumeCommand = RelayCommand(Action(fun () -> this.CreateVolume() |> Async.Start))
-    member _.RemoveVolumeCommand = RelayCommand(Action(fun () -> this.RemoveVolume() |> Async.Start))
-    member _.MountVolumeCommand = RelayCommand(Action(fun () -> this.MountVolume() |> Async.Start))
-    member _.UnmountVolumeCommand = RelayCommand(Action(fun () -> this.UnmountVolume() |> Async.Start))
-    member _.PruneVolumesCommand = RelayCommand(Action(fun () -> this.PruneVolumes() |> Async.Start))
+    member _.ListVolumesCommand = RelayCommand(Action(fun () -> this.ListVolumes() |> ignore))
+    member _.InspectVolumeCommand = RelayCommand(Action(fun () -> this.InspectVolume() |> ignore))
+    member _.CreateVolumeCommand = RelayCommand(Action(fun () -> this.CreateVolume() |> ignore))
+    member _.RemoveVolumeCommand = RelayCommand(Action(fun () -> this.RemoveVolume() |> ignore))
+    member _.MountVolumeCommand = RelayCommand(Action(fun () -> this.MountVolume() |> ignore))
+    member _.UnmountVolumeCommand = RelayCommand(Action(fun () -> this.UnmountVolume() |> ignore))
+    member _.PruneVolumesCommand = RelayCommand(Action(fun () -> this.PruneVolumes() |> ignore))
 
     member private this.ListVolumes() =
-        async {
+        task {
             try
                 use client = new VolumeClient()
-                let! response = client.ListAsync() |> Async.AwaitTask
+                let! response = client.ListAsync()
                 Dispatcher.UIThread.Post(fun () ->
                     volumes.Clear()
                     for v in response.Volumes do
@@ -63,10 +63,10 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.InspectVolume() =
-        async {
+        task {
             try
                 use client = new VolumeClient()
-                let! response = client.InspectAsync(id = this.VolumeIdInput) |> Async.AwaitTask
+                let! response = client.InspectAsync(id = this.VolumeIdInput)
                 outputPort.WriteLine(sprintf "ID: %s" response.Id)
                 outputPort.WriteLine(sprintf "Nom: %s" response.Name)
                 outputPort.WriteLine(sprintf "Driver: %s" (response.Driver.ToString()))
@@ -78,19 +78,28 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.CreateVolume() =
-        async {
+        task {
             try
                 use client = new VolumeClient()
-                let! response = client.CreateAsync(name = this.VolumeNameInput, driver = StorageDriverType.Parse(this.VolumeDriver, true)) |> Async.AwaitTask
+                let driverEnum =
+                    match this.VolumeDriver.ToLowerInvariant() with
+                    | "local" -> StorageDriverType.Local
+                    | "nfs" -> StorageDriverType.Nfs
+                    | "smb" -> StorageDriverType.Smb
+                    | "azure" -> StorageDriverType.CloudAzure
+                    | "aws" -> StorageDriverType.CloudAws
+                    | "gcp" -> StorageDriverType.CloudGcp
+                    | _ -> StorageDriverType.Local
+                let! response = client.CreateAsync(name = this.VolumeNameInput, driver = driverEnum)
                 outputPort.WriteSuccess(sprintf "Volume %s créé (ID: %s)" this.VolumeNameInput response.Id)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.RemoveVolume() =
-        async {
+        task {
             try
                 use client = new VolumeClient()
-                let! response = client.RemoveAsync(id = this.VolumeIdInput, force = this.VolumeForce) |> Async.AwaitTask
+                let! response = client.RemoveAsync(id = this.VolumeIdInput, force = this.VolumeForce)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Volume %s supprimé" this.VolumeIdInput)
                 else
@@ -99,28 +108,28 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
         }
 
     member private this.MountVolume() =
-        async {
+        task {
             try
                 use client = new VolumeClient()
-                let! response = client.MountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath) |> Async.AwaitTask
+                let! response = client.MountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
                 outputPort.WriteSuccess(sprintf "Volume %s monté sur %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.UnmountVolume() =
-        async {
+        task {
             try
                 use client = new VolumeClient()
-                let! response = client.UnmountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath) |> Async.AwaitTask
+                let! response = client.UnmountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
                 outputPort.WriteSuccess(sprintf "Volume %s démonté de %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.PruneVolumes() =
-        async {
+        task {
             try
                 use client = new VolumeClient()
-                let! response = client.PruneVolumesAsync() |> Async.AwaitTask
+                let! response = client.PruneVolumesAsync()
                 outputPort.WriteSuccess(sprintf "Volumes nettoyés - %s" response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }

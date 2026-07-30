@@ -7,7 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Drivers\RemoteVolumeStore.fs" />
+    <Compile Include="Drivers\VolumeDriverRegistry.fs" />
     <Compile Include="Drivers\LocalDriver.fs" />
+    <Compile Include="Drivers\NfsDriver.fs" />
+    <Compile Include="Drivers\SmbDriver.fs" />
+    <Compile Include="Drivers\CloudAzureDriver.fs" />
+    <Compile Include="Drivers\CloudAwsDriver.fs" />
+    <Compile Include="Drivers\CloudGcpDriver.fs" />
     <Compile Include="Services\VolumeServiceImpl.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

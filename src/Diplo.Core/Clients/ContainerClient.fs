@@ -103,7 +103,6 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             let ct = defaultArg ct CancellationToken.None
             let request = { Id = id; Follow = f; Tail = t; Since = s }
             let entries = ResizeArray()
-            let mutable _ = Task.CompletedTask
             do!
                 task {
                     let enumerator = client.GetContainerLogs(request, ct).GetAsyncEnumerator(ct)
