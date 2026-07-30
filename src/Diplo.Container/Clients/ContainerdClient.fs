@@ -136,13 +136,12 @@ type ContainerdClient(runner: IProcessRunner) =
         member _.GetContainerLogs(namespaceName, id, tail, follow, since) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
-            let mutable logArgs =
-                [ "task"; "logs"; "--namespace"; namespaceName; "--tail"; tail.ToString() ]
-            if follow then
-                logArgs <- logArgs @ [ "--follow" ]
-            if not (String.IsNullOrEmpty(since)) then
-                logArgs <- logArgs @ [ "--since"; since ]
-            logArgs <- logArgs @ [ id ]
+            let logArgs =
+                [ yield "task"; yield "logs"; yield "--namespace"; yield namespaceName
+                  yield "--tail"; yield tail.ToString()
+                  if follow then yield "--follow"
+                  if not (String.IsNullOrEmpty(since)) then yield "--since"; yield since
+                  yield id ]
             try
                 let output = runCtr logArgs
                 output.Split('\n')

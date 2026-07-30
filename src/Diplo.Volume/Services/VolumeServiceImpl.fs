@@ -70,6 +70,22 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                     if info.TryGetProperty("id", &v) then response.Id <- v.GetString()
                     if info.TryGetProperty("name", &v) then response.Name <- v.GetString()
                     if info.TryGetProperty("mountpoint", &v) then response.Mountpoint <- v.GetString()
+                    if info.TryGetProperty("state", &v) then
+                        response.State <- match v.GetString() with "mounted" -> MountState.Mounted | "error" -> MountState.Error | _ -> MountState.Unmounted
+                    if info.TryGetProperty("created_at", &v) then response.CreatedAt <- v.GetString()
+                    if info.TryGetProperty("driver", &v) then
+                        match v.GetString().ToLowerInvariant() with
+                        | "local" -> response.Driver <- StorageDriverType.Local
+                        | "nfs" -> response.Driver <- StorageDriverType.Nfs
+                        | "smb" -> response.Driver <- StorageDriverType.Smb
+                        | "azure" -> response.Driver <- StorageDriverType.CloudAzure
+                        | "aws" -> response.Driver <- StorageDriverType.CloudAws
+                        | "gcp" -> response.Driver <- StorageDriverType.CloudGcp
+                        | _ -> ()
+                    if info.TryGetProperty("labels", &v) then
+                        for prop in v.EnumerateObject() do response.Labels.[prop.Name] <- prop.Value.GetString()
+                    if info.TryGetProperty("driver_opts", &v) then
+                        for prop in v.EnumerateObject() do response.DriverOpts.[prop.Name] <- prop.Value.GetString()
                     response.SizeBytes <- driver.GetVolumeSize(request.Id)
                 with ex ->
                     Log.Warning(ex, "Erreur lors du parsing des informations du volume {VolumeId}", request.Id)
@@ -95,6 +111,21 @@ type VolumeServiceImpl(driver: IVolumeDriver) =
                         let mutable v = Unchecked.defaultof<JsonElement>
                         if vol.TryGetProperty("id", &v) then info.Id <- v.GetString()
                         if vol.TryGetProperty("name", &v) then info.Name <- v.GetString()
+                        if vol.TryGetProperty("mountpoint", &v) then info.Mountpoint <- v.GetString()
+                        if vol.TryGetProperty("state", &v) then
+                            info.State <- match v.GetString() with "mounted" -> MountState.Mounted | "error" -> MountState.Error | _ -> MountState.Unmounted
+                        if vol.TryGetProperty("driver", &v) then
+                            match v.GetString().ToLowerInvariant() with
+                            | "local" -> info.Driver <- StorageDriverType.Local
+                            | "nfs" -> info.Driver <- StorageDriverType.Nfs
+                            | "smb" -> info.Driver <- StorageDriverType.Smb
+                            | "azure" -> info.Driver <- StorageDriverType.CloudAzure
+                            | "aws" -> info.Driver <- StorageDriverType.CloudAws
+                            | "gcp" -> info.Driver <- StorageDriverType.CloudGcp
+                            | _ -> ()
+                        if vol.TryGetProperty("labels", &v) then
+                            for prop in v.EnumerateObject() do info.Labels.[prop.Name] <- prop.Value.GetString()
+                        if vol.TryGetProperty("size_bytes", &v) then info.SizeBytes <- v.GetInt64()
                     with ex ->
                         Log.Warning(ex, "Erreur lors du parsing du volume dans la liste")
                     response.Volumes.Add(info)

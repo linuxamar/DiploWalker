@@ -53,12 +53,12 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
         member _.RemoveNetwork(request, _context) =
             task {
                 SecurityValidation.validateId request.Id "L'identifiant du réseau"
-                let mutable foundDriver = None
-                for kvp in drivers do
-                    match kvp.Value.Inspect(request.Id) with
-                    | Ok info when info.Driver = kvp.Key ->
-                        foundDriver <- Some kvp.Value
-                    | _ -> ()
+                let foundDriver =
+                    drivers
+                    |> Seq.tryPick (fun kvp ->
+                        match kvp.Value.Inspect(request.Id) with
+                        | Ok info when info.Driver = kvp.Key -> Some kvp.Value
+                        | _ -> None)
                 if foundDriver.IsNone then
                     raise (RpcException(Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.Id)))
                 let driver = foundDriver.Value
@@ -72,9 +72,9 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
         member _.InspectNetwork(request, _context) =
             task {
                 SecurityValidation.validateId request.Id "L'identifiant du réseau"
-                let mutable result = None
-                for kvp in drivers do
-                    if result.IsNone then
+                let result =
+                    drivers
+                    |> Seq.tryPick (fun kvp ->
                         match kvp.Value.Inspect(request.Id) with
                         | Ok info ->
                             let ep =
@@ -95,8 +95,8 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                                   Endpoints = List<Diplo.Grpc.Network.EndpointInfo>()
                                   CreatedAt = "" }
                             response.Endpoints.Add(ep)
-                            result <- Some response
-                        | Error _ -> ()
+                            Some response
+                        | Error _ -> None)
                 if result.IsNone then
                     raise (RpcException(Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.Id)))
                 return result.Value
@@ -131,12 +131,12 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     SecurityValidation.validateId request.EndpointId "L'identifiant de l'endpoint"
                 SecurityValidation.validateIp request.Ipv4Address "L'adresse IPv4"
                 let driverType =
-                    let mutable found = None
-                    for kvp in drivers do
+                    drivers
+                    |> Seq.tryPick (fun kvp ->
                         match kvp.Value.Inspect(request.NetworkId) with
-                        | Ok info when info.Driver = kvp.Key -> found <- Some kvp.Key
-                        | _ -> ()
-                    found |> Option.defaultValue NetworkDriver.Bridge
+                        | Ok info when info.Driver = kvp.Key -> Some kvp.Key
+                        | _ -> None)
+                    |> Option.defaultValue NetworkDriver.Bridge
                 let driver = getDriver driverType |> Option.defaultValue (defaultDriver ())
                 let ipv4Opt = if String.IsNullOrEmpty(request.Ipv4Address) then None else Some request.Ipv4Address
                 match driver.Connect(request.NetworkId, request.ContainerId, request.EndpointId, ipv4Opt, Map.empty) with
@@ -156,11 +156,12 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                 SecurityValidation.validateContainerId request.ContainerId
                 if String.IsNullOrEmpty(request.EndpointId) |> not then
                     SecurityValidation.validateId request.EndpointId "L'identifiant de l'endpoint"
-                let mutable foundDriver = None
-                for kvp in drivers do
-                    match kvp.Value.Inspect(request.NetworkId) with
-                    | Ok info when info.Driver = kvp.Key -> foundDriver <- Some kvp.Value
-                    | _ -> ()
+                let foundDriver =
+                    drivers
+                    |> Seq.tryPick (fun kvp ->
+                        match kvp.Value.Inspect(request.NetworkId) with
+                        | Ok info when info.Driver = kvp.Key -> Some kvp.Value
+                        | _ -> None)
                 let driver = foundDriver |> Option.defaultValue (defaultDriver ())
                 match driver.Disconnect(request.NetworkId, request.ContainerId, request.EndpointId, request.Force) with
                 | Ok () ->
