@@ -1,5 +1,7 @@
 open System
 
+open System
+open System.Reflection
 open Diplo.Cli
 open Diplo.Cli.Container
 open Diplo.Cli.Volume
@@ -8,11 +10,12 @@ open Diplo.Cli.Compose
 open Spectre.Console.Cli
 
 let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) =
-    let mi = typeof<IConfigurator<CommandSettings>>.GetMethods()
-             |> Array.tryFind (fun m -> m.Name = "AddCommand" && m.GetParameters().Length = 1 && m.IsGenericMethod)
-    match mi with
-    | Some mi -> mi.MakeGenericMethod(t).Invoke(c, [| name |]) |> ignore
-    | None -> failwithf "AddCommand<T>(string) introuvable sur IConfigurator<CommandSettings>"
+    typeof<IConfigurator<CommandSettings>>
+        .GetTypeInfo()
+        .DeclaredMethods
+    |> Seq.find (fun m -> m.Name = "AddCommand" && m.GetParameters().Length = 1 && m.IsGenericMethod)
+    |> fun mi -> mi.MakeGenericMethod(t).Invoke(c, [| name |])
+    |> ignore
 
 [<EntryPoint>]
 let main argv =

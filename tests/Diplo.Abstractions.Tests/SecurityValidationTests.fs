@@ -3,6 +3,7 @@ namespace Diplo.Abstractions.Tests
 module SecurityValidationTests =
 
     open System
+    open Grpc.Core
     open Xunit
     open FsUnit.Xunit
     open Diplo.Abstractions.SecurityValidation
@@ -340,7 +341,7 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateCniPluginPath avec vide lève une exception`` () =
-        Assert.Throws<Exception>(fun () -> validateCniPluginPath "" |> ignore)
+        Assert.Throws<RpcException>(fun () -> validateCniPluginPath "" |> ignore)
 
     [<Fact>]
     let ``validateCniPluginPath avec chemin dans répertoire autorisé retourne le chemin résolu`` () =
@@ -351,7 +352,7 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateCniPluginPath avec chemin non autorisé lève une exception`` () =
-        Assert.Throws<Exception>(fun () -> validateCniPluginPath @"C:\malicious\path\plugin.exe" |> ignore)
+        Assert.Throws<RpcException>(fun () -> validateCniPluginPath @"C:\malicious\path\plugin.exe" |> ignore)
 
     [<Fact>]
     let ``validateCniPluginPath avec opt cni bin est valide`` () =

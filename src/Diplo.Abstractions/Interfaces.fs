@@ -13,7 +13,7 @@ module Interfaces =
     type IContainerdClient =
         abstract member CreateContainer: namespaceName: string * id: string * image: string * labels: Map<string, string> * env: Map<string, string> * command: string array * args: string array * memoryLimit: int64 * cpuShares: int64 * pidLimit: uint32 -> string
         abstract member StartContainer: namespaceName: string * id: string -> unit
-        abstract member StopContainer: namespaceName: string * id: string * timeoutSeconds: int -> unit
+        abstract member StopContainer: namespaceName: string * id: string * timeoutSeconds: int -> System.Threading.Tasks.Task
         abstract member DeleteContainer: namespaceName: string * id: string * force: bool -> unit
         abstract member InspectContainer: namespaceName: string * id: string -> JsonElement
         abstract member TaskInfo: namespaceName: string * id: string -> JsonElement

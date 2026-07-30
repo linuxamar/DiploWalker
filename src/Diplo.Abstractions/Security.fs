@@ -3,6 +3,7 @@ namespace Diplo.Abstractions
 open System
 open System.IO
 open System.Text.RegularExpressions
+open Grpc.Core
 
 /// Validation et assainissement des entrées utilisateur pour prévenir les injections de commandes.
 module SecurityValidation =
@@ -42,35 +43,35 @@ module SecurityValidation =
     /// Vérifie qu'une valeur correspond au motif d'identifiant.
     let validateId (value: string) (label: string) =
         if String.IsNullOrEmpty(value) then
-            failwithf "%s ne peut pas être vide" label
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s ne peut pas être vide" label)))
         if value.Length > maxLength then
-            failwithf "%s dépasse la longueur maximale de %d caractères" label maxLength
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s dépasse la longueur maximale de %d caractères" label maxLength)))
         if not (idPattern.IsMatch(value)) then
-            failwithf "%s contient des caractères interdits: '%s'" label value
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient des caractères interdits: '%s'" label value)))
 
     /// Vérifie qu'un nom est valide.
     let validateName (value: string) (label: string) =
         if String.IsNullOrEmpty(value) then
-            failwithf "%s ne peut pas être vide" label
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s ne peut pas être vide" label)))
         if value.Length > 64 then
-            failwithf "%s dépasse la longueur maximale de 64 caractères" label
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s dépasse la longueur maximale de 64 caractères" label)))
         if not (namePattern.IsMatch(value)) then
-            failwithf "%s contient des caractères interdits: '%s'" label value
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient des caractères interdits: '%s'" label value)))
 
     /// Vérifie qu'un nom d'image Docker est valide.
     let validateImage (value: string) =
         if String.IsNullOrEmpty(value) then
-            failwithf "Le nom de l'image ne peut pas être vide"
+            raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom de l'image ne peut pas être vide")))
         if value.Length > 512 then
-            failwithf "Le nom de l'image dépasse 512 caractères"
+            raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom de l'image dépasse 512 caractères")))
         if not (imagePattern.IsMatch(value)) then
-            failwithf "Le nom de l'image contient des caractères interdits: '%s'" value
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "Le nom de l'image contient des caractères interdits: '%s'" value)))
 
     /// Valide qu'un octet IP est dans la plage 0-255.
     let private validateOctet (value: string) (label: string) =
         match Int32.TryParse(value) with
         | true, n when n >= 0 && n <= 255 -> ()
-        | _ -> failwithf "%s contient un octet invalide: '%s'" label value
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un octet invalide: '%s'" label value)))
 
     /// Vérifie qu'un sous-réseau CIDR est valide (octets 0-255, masque 0-32).
     let validateCidr (value: string) (label: string) =
@@ -78,16 +79,16 @@ module SecurityValidation =
         else
             let parts = value.Split('/')
             if parts.Length < 1 || parts.Length > 2 then
-                failwithf "%s n'est pas un sous-réseau CIDR valide: '%s'" label value
+                raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s n'est pas un sous-réseau CIDR valide: '%s'" label value)))
             let ipParts = parts.[0].Split('.')
             if ipParts.Length <> 4 then
-                failwithf "%s n'est pas une adresse IP valide: '%s'" label value
+                raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s n'est pas une adresse IP valide: '%s'" label value)))
             for part in ipParts do
                 validateOctet part label
             if parts.Length = 2 then
                 match Int32.TryParse(parts.[1]) with
                 | true, n when n >= 0 && n <= 32 -> ()
-                | _ -> failwithf "%s a un masque CIDR invalide (doit être 0-32): '%s'" label value
+                | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s a un masque CIDR invalide (doit être 0-32): '%s'" label value)))
 
     /// Vérifie qu'une adresse IP est valide (octets 0-255).
     let validateIp (value: string) (label: string) =
@@ -95,32 +96,31 @@ module SecurityValidation =
         else
             let parts = value.Split('.')
             if parts.Length <> 4 then
-                failwithf "%s n'est pas une adresse IP valide: '%s'" label value
+                raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s n'est pas une adresse IP valide: '%s'" label value)))
             for part in parts do
                 validateOctet part label
 
     /// Vérifie qu'une clé et une valeur de label sont valides.
     let validateLabel (key: string) (value: string) =
         if not (labelPattern.IsMatch(key)) then
-            failwithf "La clé du label contient des caractères interdits: '%s'" key
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "La clé du label contient des caractères interdits: '%s'" key)))
         if not (labelPattern.IsMatch(value)) then
-            failwithf "La valeur du label contient des caractères interdits: '%s'" value
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "La valeur du label contient des caractères interdits: '%s'" value)))
 
     /// Vérifie qu'un identifiant de conteneur est au format hexadécimal ou GUID.
     let validateContainerId (value: string) =
         if String.IsNullOrEmpty(value) then
-            failwithf "L'identifiant du conteneur ne peut pas être vide"
+            raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur ne peut pas être vide")))
         if value.Length > maxLength then
-            failwithf "L'identifiant du conteneur dépasse %d caractères" maxLength
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'identifiant du conteneur dépasse %d caractères" maxLength)))
         if not (idPattern.IsMatch(value)) then
-            failwithf "L'identifiant du conteneur contient des caractères interdits: '%s'" value
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'identifiant du conteneur contient des caractères interdits: '%s'" value)))
 
     /// Vérifie qu'un chemin de plugin CNI est dans les répertoires autorisés.
     /// Résout les symlinks et retourne le chemin résolu pour éliminer la fenêtre TOCTOU.
     let validateCniPluginPath (pluginPath: string) : string =
         if String.IsNullOrEmpty(pluginPath) then
-            failwithf "Le chemin du plugin CNI ne peut pas être vide"
-        // Résoudre le vrai chemin (suivre les symlinks junctions)
+            raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin du plugin CNI ne peut pas être vide")))
         let resolvedPath =
             try
                 let fi = new FileInfo(pluginPath)
@@ -136,7 +136,7 @@ module SecurityValidation =
                 let fullDir = Path.GetFullPath(dir)
                 resolvedPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
         if not isAllowed then
-            failwithf "Le plugin CNI '%s' n'est pas dans un répertoire autorisé" pluginPath
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "Le plugin CNI '%s' n'est pas dans un répertoire autorisé" pluginPath)))
         resolvedPath
 
     /// Commandes CNI autorisées (spécification CNI v1.0).
@@ -146,45 +146,43 @@ module SecurityValidation =
     /// Vérifie qu'une commande CNI fait partie de l'allowlist.
     let validateCniCommand (command: string) =
         if String.IsNullOrEmpty(command) then
-            failwithf "La commande CNI ne peut pas être vide"
+            raise (RpcException(Status(StatusCode.InvalidArgument, "La commande CNI ne peut pas être vide")))
         let normalized = command.Trim().ToUpperInvariant()
         if not (allowedCniCommands.Contains(normalized)) then
-            failwithf "La commande CNI '%s' n'est pas autorisée. Commandes autorisées: %s"
-                command (allowedCniCommands |> Set.toSeq |> String.concat ", ")
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "La commande CNI '%s' n'est pas autorisée. Commandes autorisées: %s"
+                command (allowedCniCommands |> Set.toSeq |> String.concat ", "))))
 
     /// Vérifie qu'une commande ne contient pas de caractères dangereux.
     let validateCommand (command: string array) =
         if isNull command || command.Length = 0 then
-            failwithf "La commande ne peut pas être vide"
+            raise (RpcException(Status(StatusCode.InvalidArgument, "La commande ne peut pas être vide")))
         if command.Length > 64 then
-            failwithf "La commande ne peut pas contenir plus de 64 arguments"
-        // Le premier argument (l'exécutable) ne doit pas contenir de slash ou de traversée
+            raise (RpcException(Status(StatusCode.InvalidArgument, "La commande ne peut pas contenir plus de 64 arguments")))
         if command.Length > 0 && not (String.IsNullOrEmpty(command.[0])) then
             if command.[0].Contains("/") || command.[0].Contains("\\") then
-                failwithf "L'exécutable ne doit pas contenir de chemin: '%s'" command.[0]
+                raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'exécutable ne doit pas contenir de chemin: '%s'" command.[0])))
         for arg in command do
             if String.IsNullOrEmpty(arg) |> not then
                 if arg.Length > 1024 then
-                    failwithf "Un argument de commande dépasse 1024 caractères"
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "Un argument de commande dépasse 1024 caractères")))
                 let upperArg = arg.ToUpperInvariant()
                 for pattern in dangerousEnvPatterns do
                     if upperArg.Contains(pattern) then
-                        failwithf "L'argument de commande contient une variable d'environnement interdite: '%s'" pattern
+                        raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'argument de commande contient une variable d'environnement interdite: '%s'" pattern)))
                 for prefix in dangerousPrefixes do
                     if arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
-                        failwithf "L'argument de commande contient un préfixe interdit: '%s'" arg
+                        raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'argument de commande contient un préfixe interdit: '%s'" arg)))
                 for c in arg do
                     if Array.exists (fun dc -> dc = c) dangerousChars then
-                        failwithf "L'argument de commande contient un caractère interdit: '%c' dans '%s'" c arg
+                        raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'argument de commande contient un caractère interdit: '%c' dans '%s'" c arg)))
 
     /// Vérifie qu'un chemin est sûr (pas de traversée via ..).
     /// Résout les symlinks pour empêcher les contournements via liens symboliques.
     let validatePath (path: string) (baseDir: string) (label: string) =
         if String.IsNullOrEmpty(path) then
-            failwithf "%s ne peut pas être vide" label
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s ne peut pas être vide" label)))
         if path.Contains("..") then
-            failwithf "%s contient une traversée de répertoire interdite: '%s'" label path
-        // Résoudre le chemin complet en suivant les symlinks
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient une traversée de répertoire interdite: '%s'" label path)))
         let resolvedPath =
             try
                 let combined = Path.Combine(baseDir, path)
@@ -202,7 +200,7 @@ module SecurityValidation =
                 else Path.GetFullPath(baseDir)
             with _ -> Path.GetFullPath(baseDir)
         if not (resolvedPath.StartsWith(resolvedBase, StringComparison.OrdinalIgnoreCase)) then
-            failwithf "%s sort du répertoire autorisé: '%s'" label resolvedPath
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s sort du répertoire autorisé: '%s'" label resolvedPath)))
 
     /// Hosts autorisés pour les connexions gRPC (localhost uniquement).
     let private allowedGrpcHosts = set [ "localhost"; "127.0.0.1"; "::1" ]
@@ -211,16 +209,16 @@ module SecurityValidation =
     /// Empêche la fuite de tokens d'authentification sur le réseau.
     let validateGrpcAddress (address: string) =
         if String.IsNullOrEmpty(address) then
-            failwithf "L'adresse gRPC ne peut pas être vide"
+            raise (RpcException(Status(StatusCode.InvalidArgument, "L'adresse gRPC ne peut pas être vide")))
         match System.Uri.TryCreate(address, System.UriKind.Absolute) with
         | true, uri ->
             let host = uri.Host.Trim('[', ']')
             if not (allowedGrpcHosts.Contains(host)) then
-                failwithf "L'adresse gRPC '%s' n'est pas autorisée. Seul l'hôte local est accepté (localhost, 127.0.0.1, ::1)" address
+                raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'adresse gRPC '%s' n'est pas autorisée. Seul l'hôte local est accepté (localhost, 127.0.0.1, ::1)" address)))
             if not (uri.Scheme = "http" || uri.Scheme = "https") then
-                failwithf "Le schéma '%s' n'est pas supporté. Utilisez http:// ou https://" uri.Scheme
+                raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "Le schéma '%s' n'est pas supporté. Utilisez http:// ou https://" uri.Scheme)))
         | false, _ ->
-            failwithf "L'adresse gRPC '%s' n'est pas une URL valide" address
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'adresse gRPC '%s' n'est pas une URL valide" address)))
 
     /// Extensions autorisées pour les fichiers de configuration (compose, etc.).
     let private allowedYamlExtensions = set [ ".yaml"; ".yml" ]
@@ -228,14 +226,14 @@ module SecurityValidation =
     /// Valide le chemin d'un fichier de configuration (anti-traversée + extension + caractères nuls).
     let validateFilePath (path: string) (label: string) =
         if String.IsNullOrEmpty(path) then
-            failwithf "%s ne peut pas être vide" label
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s ne peut pas être vide" label)))
         if path.Contains("..") then
-            failwithf "%s contient une traversée de répertoire interdite: '%s'" label path
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient une traversée de répertoire interdite: '%s'" label path)))
         if path.Contains("\0") then
-            failwithf "%s contient un caractère nul" label
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul" label)))
         let ext = Path.GetExtension(path)
         if not (allowedYamlExtensions.Contains(ext)) then
-            failwithf "%s doit avoir une extension .yaml ou .yml, reçu: '%s'" label ext
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s doit avoir une extension .yaml ou .yml, reçu: '%s'" label ext)))
 
     /// Répertoires de base autorisés pour les volumes (immutable snapshot pattern).
     let private defaultAllowedVolumeDirs =
@@ -259,12 +257,11 @@ module SecurityValidation =
     /// Valide un chemin de volume (anti-traversée + containment absolu).
     let validateVolumePath (path: string) (label: string) =
         if String.IsNullOrEmpty(path) then
-            failwithf "%s ne peut pas être vide" label
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s ne peut pas être vide" label)))
         if path.Contains("..") then
-            failwithf "%s contient une traversée de répertoire interdite: '%s'" label path
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient une traversée de répertoire interdite: '%s'" label path)))
         if path.Contains("\0") then
-            failwithf "%s contient un caractère nul: '%s'" label path
-        // Résoudre le chemin complet et vérifier qu'il est dans un répertoire autorisé
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul: '%s'" label path)))
         let fullPath = Path.GetFullPath(path)
         let snapshot = !allowedVolumeBaseDirsRef
         let isAllowed =
@@ -272,4 +269,4 @@ module SecurityValidation =
             |> Set.exists (fun fullDir ->
                 fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
         if not isAllowed then
-            failwithf "%s n'est pas dans un répertoire autorisé: '%s'" label fullPath
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s n'est pas dans un répertoire autorisé: '%s'" label fullPath)))

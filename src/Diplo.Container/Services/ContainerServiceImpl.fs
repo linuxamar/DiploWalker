@@ -2,6 +2,7 @@ namespace Diplo.Container.Services
 
 open System
 open System.Collections.Generic
+open System.Linq
 open System.Text
 open System.Text.Json
 open System.Threading.Tasks
@@ -17,19 +18,26 @@ type ContainerServiceImpl(client: IContainerdClient) =
     [<Literal>]
     static let DefaultNamespace = "default"
 
-    let toAsyncEnumerable (source: seq<'T>) : IAsyncEnumerable<'T> =
-        { new IAsyncEnumerable<'T> with
-            member _.GetAsyncEnumerator(_ct: Threading.CancellationToken) =
-                let enumerator = source.GetEnumerator()
-                { new IAsyncEnumerator<'T> with
-                    member _.Current = enumerator.Current
-                    member _.MoveNextAsync() =
-                        ValueTask<bool>(enumerator.MoveNext())
-                    member _.DisposeAsync() =
-                        enumerator.Dispose()
-                        ValueTask()
-                }
-        }
+    let tryGetString (el: JsonElement) (prop: string) =
+        let mutable v = Unchecked.defaultof<JsonElement>
+        if el.TryGetProperty(prop, &v) then v.GetString() else ""
+
+    let tryGetInt64 (el: JsonElement) (prop: string) =
+        let mutable v = Unchecked.defaultof<JsonElement>
+        if el.TryGetProperty(prop, &v) then v.GetInt64() else 0L
+
+    let tryGetDouble (el: JsonElement) (prop: string) =
+        let mutable v = Unchecked.defaultof<JsonElement>
+        if el.TryGetProperty(prop, &v) then v.GetDouble() else 0.0
+
+    let mapState (status: string) =
+        match status.ToLowerInvariant() with
+        | "running" -> ContainerState.Running
+        | "created" -> ContainerState.Created
+        | "paused" | "pausing" -> ContainerState.Paused
+        | "stopped" | "deleted" -> ContainerState.Stopped
+        | "dead" -> ContainerState.Failed
+        | _ -> ContainerState.Unknown
 
     interface IContainerService with
 
@@ -67,7 +75,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
                 let timeout = if request.TimeoutSeconds > 0 then request.TimeoutSeconds else 10
-                client.StopContainer(DefaultNamespace, request.Id, timeout)
+                do! client.StopContainer(DefaultNamespace, request.Id, timeout)
                 return { StopContainerResponse.State = ContainerState.Stopped; Message = "Conteneur arrêté" }
             }
 
@@ -85,97 +93,79 @@ type ContainerServiceImpl(client: IContainerdClient) =
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
                 let info = client.InspectContainer(DefaultNamespace, request.Id)
                 let taskInfo = client.TaskInfo(DefaultNamespace, request.Id)
-                let response =
+                let safeEnvVars =
+                    set [ "PATH"; "USERNAME"; "USERDOMAIN"; "TEMP"; "TMP"
+                          "HOMEDRIVE"; "HOMEPATH"; "SYSTEMROOT"; "OS"
+                          "PROCESSOR_ARCHITECTURE"; "NUMBER_OF_PROCESSORS"
+                          "ASPNETCORE_ENVIRONMENT"; "DOTNET_ENVIRONMENT"
+                          "DOTNET_CLI_TELEMETRY_OPTOUT" ]
+                let env =
+                    let mutable e = Dictionary<string, string>()
+                    try
+                        let mutable envEl = Unchecked.defaultof<JsonElement>
+                        if info.TryGetProperty("env", &envEl) then
+                            for prop in envEl.EnumerateObject() do
+                                if safeEnvVars |> Set.contains prop.Name then
+                                    e[prop.Name] <- prop.Value.GetString()
+                    with ex ->
+                        Log.Warning(ex, "Erreur lors du parsing des variables d'environnement")
+                    e
+                let labels =
+                    let mutable d = Dictionary<string, string>()
+                    try
+                        let mutable lbl = Unchecked.defaultof<JsonElement>
+                        if info.TryGetProperty("labels", &lbl) then
+                            for prop in lbl.EnumerateObject() do
+                                d[prop.Name] <- prop.Value.GetString()
+                    with ex -> Log.Warning(ex, "Erreur lors du parsing des labels")
+                    d
+                let state, pid, finishedAt =
+                    try
+                        let s = mapState (tryGetString taskInfo "status")
+                        let p = tryGetInt64 taskInfo "pid" |> int
+                        let f = tryGetString taskInfo "exited_at"
+                        s, p, f
+                    with ex ->
+                        Log.Warning(ex, "Erreur lors du parsing de la tâche")
+                        ContainerState.Unknown, 0, ""
+                return
                     { InspectContainerResponse.Id = request.Id
-                      Name = ""
-                      Image = ""
-                      State = ContainerState.Unknown
-                      CreatedAt = ""
+                      Name = tryGetString info "id"
+                      Image = tryGetString info "image"
+                      State = state
+                      CreatedAt = tryGetString info "created_at"
                       StartedAt = ""
-                      FinishedAt = ""
-                      Labels = Dictionary<string, string>()
-                      Env = Dictionary<string, string>()
-                      Pid = 0
-                      ExitCode = 0 }
-                try
-                    let mutable temp = Unchecked.defaultof<JsonElement>
-                    if info.TryGetProperty("id", &temp) then
-                        response.Name <- temp.GetString()
-                    if info.TryGetProperty("image", &temp) then
-                        response.Image <- temp.GetString()
-                    if info.TryGetProperty("created_at", &temp) then
-                        response.CreatedAt <- temp.GetString()
-                    let mutable labelsValue = Unchecked.defaultof<JsonElement>
-                    if info.TryGetProperty("labels", &labelsValue) then
-                        for prop in labelsValue.EnumerateObject() do
-                            response.Labels[prop.Name] <- prop.Value.GetString()
-                    if info.TryGetProperty("env", &labelsValue) then
-                        let safeEnvVars =
-                            set [ "PATH"; "USERNAME"; "USERDOMAIN"; "TEMP"; "TMP"
-                                  "HOMEDRIVE"; "HOMEPATH"; "SYSTEMROOT"; "OS"
-                                  "PROCESSOR_ARCHITECTURE"; "NUMBER_OF_PROCESSORS"
-                                  "ASPNETCORE_ENVIRONMENT"; "DOTNET_ENVIRONMENT"
-                                  "DOTNET_CLI_TELEMETRY_OPTOUT" ]
-                        for prop in labelsValue.EnumerateObject() do
-                            if safeEnvVars |> Set.contains prop.Name then
-                                response.Env[prop.Name] <- prop.Value.GetString()
-                    if info.TryGetProperty("exit_code", &temp) then
-                        response.ExitCode <- temp.GetInt64() |> int
-                with ex ->
-                    Log.Warning(ex, "Erreur lors du parsing des métadonnées du conteneur {ContainerId}", request.Id)
-                try
-                    let mutable temp = Unchecked.defaultof<JsonElement>
-                    if taskInfo.TryGetProperty("pid", &temp) then
-                        response.Pid <- temp.GetInt64() |> int
-                    if taskInfo.TryGetProperty("status", &temp) then
-                        let status = temp.GetString()
-                        response.State <-
-                            match status.ToLowerInvariant() with
-                            | "running" -> ContainerState.Running
-                            | "created" -> ContainerState.Created
-                            | "paused" | "pausing" -> ContainerState.Paused
-                            | "stopped" | "deleted" -> ContainerState.Stopped
-                            | "dead" -> ContainerState.Failed
-                            | _ -> ContainerState.Unknown
-                    if taskInfo.TryGetProperty("exited_at", &temp) then
-                        response.FinishedAt <- temp.GetString()
-                with ex ->
-                    Log.Warning(ex, "Erreur lors du parsing de la tâche du conteneur {ContainerId}", request.Id)
-                return response
+                      FinishedAt = finishedAt
+                      Labels = labels
+                      Env = env
+                      Pid = pid
+                      ExitCode = tryGetInt64 info "exit_code" |> int }
             }
 
         member _.ListContainers(request, _context) =
             task {
-                let ids = client.ListContainers(DefaultNamespace, request.All)
-                let response =
-                    { ListContainersResponse.Containers = List<ContainerInfo>() }
-                for id in ids do
-                    let ci =
-                        { ContainerInfo.Id = id
-                          Name = ""
-                          Image = ""
-                          State = ContainerState.Unknown
-                          CreatedAt = ""
-                          Labels = Dictionary<string, string>() }
-                    try
-                        let info = client.InspectContainer(DefaultNamespace, id)
-                        let mutable temp = Unchecked.defaultof<JsonElement>
-                        if info.TryGetProperty("image", &temp) then ci.Image <- temp.GetString()
-                        let mutable taskInfo = Unchecked.defaultof<JsonElement>
-                        let ti = client.TaskInfo(DefaultNamespace, id)
-                        if ti.TryGetProperty("status", &taskInfo) then
-                            ci.State <-
-                                match taskInfo.GetString().ToLowerInvariant() with
-                                | "running" -> ContainerState.Running
-                                | "created" -> ContainerState.Created
-                                | "paused" | "pausing" -> ContainerState.Paused
-                                | "stopped" | "deleted" -> ContainerState.Stopped
-                                | "dead" -> ContainerState.Failed
-                                | _ -> ContainerState.Unknown
-                    with ex ->
-                        Log.Warning(ex, "Erreur lors de l'inspection du conteneur {ContainerId} pour ListContainers", id)
-                    response.Containers.Add(ci)
-                return response
+                let ids = client.ListContainers(DefaultNamespace, request.All) |> Seq.toArray
+                let containers =
+                    ids
+                    |> Array.Parallel.map (fun id ->
+                        try
+                            let info = client.InspectContainer(DefaultNamespace, id)
+                            let ti = client.TaskInfo(DefaultNamespace, id)
+                            { ContainerInfo.Id = id
+                              Name = ""
+                              Image = tryGetString info "image"
+                              State = mapState (tryGetString ti "status")
+                              CreatedAt = tryGetString info "created_at"
+                              Labels = Dictionary<string, string>() }
+                        with ex ->
+                            Log.Warning(ex, "Erreur lors de l'inspection du conteneur {ContainerId} pour ListContainers", id)
+                            { ContainerInfo.Id = id
+                              Name = ""
+                              Image = ""
+                              State = ContainerState.Unknown
+                              CreatedAt = ""
+                              Labels = Dictionary<string, string>() })
+                return { ListContainersResponse.Containers = List<ContainerInfo>(containers) }
             }
 
         member _.GetContainerLogs(request, _context) =
@@ -185,13 +175,10 @@ type ContainerServiceImpl(client: IContainerdClient) =
             let follow = request.Follow
             let since = if String.IsNullOrEmpty(request.Since) then "" else request.Since
             let logs = client.GetContainerLogs(DefaultNamespace, request.Id, tail, follow, since)
-            toAsyncEnumerable (seq {
-                for line in logs do
-                    yield
-                        { ContainerLogEntry.Timestamp = DateTime.UtcNow.ToString("o")
-                          Stream = "stdout"
-                          Log = line }
-            })
+            logs.Select(fun line ->
+                { ContainerLogEntry.Timestamp = DateTime.UtcNow.ToString("o")
+                  Stream = "stdout"
+                  Log = line }).ToAsyncEnumerable()
 
         member _.ExecInContainer(request, _context) =
             if String.IsNullOrEmpty(request.Id) then
@@ -200,9 +187,9 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 raise (RpcException(Status(StatusCode.InvalidArgument, "Au moins une commande est requise")))
             let command = request.Command |> Seq.toArray
             let result = client.ExecInContainer(DefaultNamespace, request.Id, command)
-            toAsyncEnumerable (seq {
-                yield { ExecOutput.Stream = "stdout"; Data = Encoding.UTF8.GetBytes(result) }
-            })
+            Seq.singleton { ExecOutput.Stream = "stdout"; Data = Encoding.UTF8.GetBytes(result) }
+            |> Seq.map id
+            |> fun s -> s.ToAsyncEnumerable()
 
         member _.PullImage(request, _context) =
             task {
@@ -269,52 +256,54 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
                 let json = client.GetContainerStats(DefaultNamespace, request.Id)
-                let response =
-                    { GetContainerStatsResponse.CpuUsage = 0.0
-                      MemoryUsage = 0L
-                      MemoryLimit = 0L
+                let cpuUsage =
+                    try
+                        let mutable cpu = Unchecked.defaultof<JsonElement>
+                        if json.TryGetProperty("cpu", &cpu) then tryGetDouble cpu "usage" else 0.0
+                    with ex ->
+                        Log.Warning(ex, "Erreur lors du parsing CPU")
+                        0.0
+                let memoryUsage, memoryLimit =
+                    try
+                        let mutable mem = Unchecked.defaultof<JsonElement>
+                        if json.TryGetProperty("memory", &mem) then
+                            tryGetInt64 mem "usage", tryGetInt64 mem "limit"
+                        else 0L, 0L
+                    with ex ->
+                        Log.Warning(ex, "Erreur lors du parsing mémoire")
+                        0L, 0L
+                let pids =
+                    try
+                        let mutable p = Unchecked.defaultof<JsonElement>
+                        if json.TryGetProperty("pids", &p) then tryGetInt64 p "current" |> int else 0
+                    with ex ->
+                        Log.Warning(ex, "Erreur lors du parsing PIDs")
+                        0
+                return
+                    { GetContainerStatsResponse.CpuUsage = cpuUsage
+                      MemoryUsage = memoryUsage
+                      MemoryLimit = memoryLimit
                       NetworkRx = 0L
                       NetworkTx = 0L
                       DiskRead = 0L
                       DiskWrite = 0L
-                      Pids = 0 }
-                try
-                    let mutable temp = Unchecked.defaultof<JsonElement>
-                    if json.TryGetProperty("cpu", &temp) then
-                        if temp.TryGetProperty("usage", &temp) then response.CpuUsage <- temp.GetDouble()
-                    if json.TryGetProperty("memory", &temp) then
-                        let memObj = temp
-                        if memObj.TryGetProperty("usage", &temp) then response.MemoryUsage <- temp.GetInt64()
-                        if memObj.TryGetProperty("limit", &temp) then response.MemoryLimit <- temp.GetInt64()
-                    if json.TryGetProperty("pids", &temp) then
-                        if temp.TryGetProperty("current", &temp) then response.Pids <- temp.GetInt64() |> int
-                with ex ->
-                    Log.Warning(ex, "Erreur lors du parsing des métriques du conteneur {ContainerId}", request.Id)
-                return response
+                      Pids = pids }
             }
 
         member _.ListImages(request, _context) =
             task {
                 let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
-                let images = client.ListImages(ns)
-                let response = { ListImagesResponse.Images = List<ImageInfo>() }
-                for imgJson in images do
-                    let info =
-                        { ImageInfo.Ref = ""
-                          Id = ""
-                          Repository = ""
-                          Tag = ""
-                          Size = 0L
-                          CreatedAt = "" }
-                    let mutable temp = Unchecked.defaultof<JsonElement>
-                    if imgJson.TryGetProperty("ref", &temp) then info.Ref <- temp.GetString()
-                    if imgJson.TryGetProperty("id", &temp) then info.Id <- temp.GetString()
-                    if imgJson.TryGetProperty("repository", &temp) then info.Repository <- temp.GetString()
-                    if imgJson.TryGetProperty("tag", &temp) then info.Tag <- temp.GetString()
-                    if imgJson.TryGetProperty("size", &temp) then info.Size <- temp.GetInt64()
-                    if imgJson.TryGetProperty("created_at", &temp) then info.CreatedAt <- temp.GetString()
-                    response.Images.Add(info)
-                return response
+                let images = client.ListImages(ns) |> Seq.toArray
+                let infos =
+                    images
+                    |> Array.Parallel.map (fun imgJson ->
+                        { ImageInfo.Ref = tryGetString imgJson "ref"
+                          Id = tryGetString imgJson "id"
+                          Repository = tryGetString imgJson "repository"
+                          Tag = tryGetString imgJson "tag"
+                          Size = tryGetInt64 imgJson "size"
+                          CreatedAt = tryGetString imgJson "created_at" })
+                return { ListImagesResponse.Images = List<ImageInfo>(infos) }
             }
 
         member _.InspectImage(request, _context) =
@@ -323,26 +312,21 @@ type ContainerServiceImpl(client: IContainerdClient) =
                     raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
                 let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
                 let imgJson = client.InspectImage(ns, request.Ref)
-                let response =
-                    { InspectImageResponse.Ref = ""
-                      Id = ""
-                      Repository = ""
-                      Tag = ""
-                      Size = 0L
-                      CreatedAt = ""
-                      Labels = Dictionary<string, string>() }
-                let mutable temp = Unchecked.defaultof<JsonElement>
-                if imgJson.TryGetProperty("ref", &temp) then response.Ref <- temp.GetString()
-                if imgJson.TryGetProperty("id", &temp) then response.Id <- temp.GetString()
-                if imgJson.TryGetProperty("repository", &temp) then response.Repository <- temp.GetString()
-                if imgJson.TryGetProperty("tag", &temp) then response.Tag <- temp.GetString()
-                if imgJson.TryGetProperty("size", &temp) then response.Size <- temp.GetInt64()
-                if imgJson.TryGetProperty("created_at", &temp) then response.CreatedAt <- temp.GetString()
-                let mutable labelsValue = Unchecked.defaultof<JsonElement>
-                if imgJson.TryGetProperty("labels", &labelsValue) then
-                    for prop in labelsValue.EnumerateObject() do
-                        response.Labels[prop.Name] <- prop.Value.GetString()
-                return response
+                let labels =
+                    let mutable d = Dictionary<string, string>()
+                    let mutable lbl = Unchecked.defaultof<JsonElement>
+                    if imgJson.TryGetProperty("labels", &lbl) then
+                        for prop in lbl.EnumerateObject() do
+                            d[prop.Name] <- prop.Value.GetString()
+                    d
+                return
+                    { InspectImageResponse.Ref = tryGetString imgJson "ref"
+                      Id = tryGetString imgJson "id"
+                      Repository = tryGetString imgJson "repository"
+                      Tag = tryGetString imgJson "tag"
+                      Size = tryGetInt64 imgJson "size"
+                      CreatedAt = tryGetString imgJson "created_at"
+                      Labels = labels }
             }
 
         member _.RemoveImage(request, _context) =

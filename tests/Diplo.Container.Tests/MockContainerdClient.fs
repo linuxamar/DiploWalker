@@ -2,6 +2,7 @@ namespace Diplo.Container.Tests
 
 open System
 open System.Text.Json
+open System.Threading.Tasks
 open Diplo.Abstractions.Interfaces
 
 type MockContainerdClient() =
@@ -38,6 +39,7 @@ type MockContainerdClient() =
 
         member _.StopContainer(_namespaceName, id, timeoutSeconds) =
             stopCalled <- stopCalled |> Map.add id timeoutSeconds
+            Task.CompletedTask
 
         member _.DeleteContainer(_namespaceName, id, _force) =
             deletedContainers <- deletedContainers |> Set.add id
