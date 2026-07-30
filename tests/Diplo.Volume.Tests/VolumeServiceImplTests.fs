@@ -14,6 +14,7 @@ module VolumeServiceImplTests =
     open ProtoBuf.Grpc
     open Diplo.Grpc
     open Diplo.Grpc.Volume
+    open Diplo.Volume.Drivers
     open Diplo.Volume.Services
     open Diplo.Abstractions.SecurityValidation
 
@@ -22,7 +23,9 @@ module VolumeServiceImplTests =
 
     let createService () =
         let mock = MockVolumeDriver()
-        let svc = VolumeServiceImpl(mock.Mock)
+        let registry = VolumeDriverRegistry()
+        registry.Register(StorageDriverType.Local, mock.Mock)
+        let svc = VolumeServiceImpl(registry)
         svc, mock
 
     let createCtx () =
@@ -78,13 +81,13 @@ module VolumeServiceImplTests =
         result.Message |> should equal "Volume supprimé"
 
     [<Fact>]
-    let ``RemoveVolume sur volume inexistant lance RpcException NotFound`` () =
+    let ``RemoveVolume sur volume inexistant retourne success false`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
         let req = { Id = "nonexistent"; Force = false }
-        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IVolumeService).RemoveVolume(req, ctx).Result |> ignore)
-        let rpcEx = ex.InnerException :?> RpcException
-        rpcEx.StatusCode |> should equal StatusCode.NotFound
+        let result = (svc :> IVolumeService).RemoveVolume(req, ctx).Result
+        result.Success |> should equal false
+        result.Message |> should haveSubstring "introuvable"
 
     [<Fact>]
     let ``InspectVolume retourne les metadonnees du volume`` () =
