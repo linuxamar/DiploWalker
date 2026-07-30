@@ -14,13 +14,21 @@
   !define APP_NAME "Diplo"
 !endif
 
+!ifndef PLATFORM
+  !define PLATFORM "x64"
+!endif
+
 !define REG_KEY_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
 !define REG_KEY_ENV "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
 
 ; ── Attributs ───────────────────────────────────────────────────────────────
 Name "${APP_NAME}"
-OutFile "Diplo-Setup-${APP_VERSION}.exe"
-InstallDir "$PROGRAMFILES64\${APP_NAME}"
+OutFile "Diplo-Setup-${APP_VERSION}-${PLATFORM}.exe"
+!if ${PLATFORM} == "x64"
+  InstallDir "$PROGRAMFILES64\${APP_NAME}"
+!else
+  InstallDir "$PROGRAMFILES32\${APP_NAME}"
+!endif
 InstallDirRegKey HKLM "${REG_KEY_UNINSTALL}" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "Diplo"
