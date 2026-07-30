@@ -227,8 +227,6 @@ foreach ($plat in $Platforms) {
 
 }
 
-}
-
 # --- Package NSIS (après publication) ----------------------------------------
 
 if ($runPublish) {
