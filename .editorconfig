@@ -26,7 +26,3 @@ indent_size = 2
 [*.ps1]
 indent_style = space
 indent_size = 4
-
-[*.proto]
-indent_style = space
-indent_size = 2

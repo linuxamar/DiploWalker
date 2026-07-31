@@ -24,7 +24,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (421 tests)
+- **Tests** : xUnit (473 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -130,7 +130,7 @@ Diplo/
 │   ├── Diplo.Volume/           # Service gRPC de gestion des volumes
 │   ├── Diplo.Network/          # Service gRPC de gestion des réseaux
 │   ├── Diplo.Installer/        # Outil d'installation Windows
-│   ├── Diplo.Grpc/             # Proto definitions et code généré C#
+│   ├── Diplo.Grpc/             # Types messages et services gRPC (protobuf-net)
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, abstraction IOutputPort
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
