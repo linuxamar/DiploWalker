@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Diplo.Volume | Service gRPC de gestion des volumes persistants |
 | Diplo.Network | Service gRPC de gestion des réseaux (CNI) |
 | Diplo.Installer | Installation Windows (services, containerd, CNI) |
-| Diplo.Grpc | Proto definitions et code généré C# |
+| Diplo.Grpc | Types messages et interfaces de service gRPC (protobuf-net, code-first) |
 | Diplo.Contracts | Types partagés entre services |
 | Diplo.Core | Clients gRPC, abstraction `IOutputPort` |
 | Diplo.Cli | Client CLI (Spectre.Console) |
@@ -26,8 +26,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Stack
 
 - **.NET 10** (`dotnet 10.0.302` installé localement).
-- Orientation **F#** (services, drivers, CLI) + C# (gRPC généré).
-- **Tests** : xUnit v3 + FsUnit.xUnit — 421 tests au total.
+- Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
+- **Tests** : xUnit v3 + FsUnit.xUnit — 473 tests au total (dont 27 d'intégration gRPC).
 
 ## Commandes
 
