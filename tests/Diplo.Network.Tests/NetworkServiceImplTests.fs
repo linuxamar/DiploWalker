@@ -9,8 +9,6 @@ module NetworkServiceImplTests =
     open Xunit
     open FsUnit.Xunit
     open Grpc.Core
-    open Grpc.Core.Testing
-    open ProtoBuf.Grpc
     open Diplo.Grpc.Network
     open Diplo.Grpc
     open Diplo.Network.Plugins
@@ -24,13 +22,7 @@ module NetworkServiceImplTests =
         let svc = NetworkServiceImpl(drivers :> IReadOnlyDictionary<_, _>)
         svc, mock
 
-    let createCtx () =
-        let ctx =
-            TestServerCallContext.Create(
-                "test", "localhost", DateTime.UtcNow, Metadata(), CancellationToken.None,
-                "peer", Unchecked.defaultof<AuthContext>, Unchecked.defaultof<ContextPropagationToken>,
-                Unchecked.defaultof<System.Func<Metadata,Task>>, Unchecked.defaultof<System.Func<WriteOptions>>, Unchecked.defaultof<System.Action<WriteOptions>>)
-        Unchecked.defaultof<CallContext>
+    let createCtx () = CancellationToken.None
 
     [<Fact>]
     let ``CreateNetwork avec nom retourne les informations du reseau`` () =

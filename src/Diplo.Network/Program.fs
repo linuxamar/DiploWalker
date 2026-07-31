@@ -5,12 +5,13 @@ open Diplo.Abstractions.ServerConfig
 open Diplo.Grpc.Network
 open Diplo.Network.Plugins
 open Diplo.Network.Services
+open ProtoBuf.Grpc.Server
 
 [<EntryPoint>]
 let main args =
     runGrpcHost "Diplo.Network" args
         (fun builder ->
-            builder.Services.AddGrpc() |> ignore
+            builder.Services.AddCodeFirstGrpc() |> ignore
             let drivers = Dictionary<NetworkDriver, INetworkDriver>()
             drivers.[NetworkDriver.Bridge] <- BridgeNetworkDriver() :> INetworkDriver
             drivers.[NetworkDriver.CustomCni] <- CustomCniDriver() :> INetworkDriver

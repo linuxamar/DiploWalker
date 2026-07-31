@@ -6,12 +6,13 @@ open Diplo.Abstractions.ServerConfig
 open Diplo.Grpc.Volume
 open Diplo.Volume.Drivers
 open Diplo.Volume.Services
+open ProtoBuf.Grpc.Server
 
 [<EntryPoint>]
 let main args =
     runGrpcHost "Diplo.Volume" args
         (fun builder ->
-            builder.Services.AddGrpc() |> ignore
+            builder.Services.AddCodeFirstGrpc() |> ignore
 
             builder.Services.AddSingleton<VolumeDriverRegistry>(fun sp ->
                 let config = sp.GetRequiredService<IConfiguration>()

@@ -1,6 +1,7 @@
 namespace Diplo.Network.Services
 
 open System
+open System.ServiceModel
 open System.Collections.Generic
 open System.Diagnostics
 open System.Text.Json
@@ -12,6 +13,7 @@ open Diplo.Grpc
 open Diplo.Grpc.Network
 open Diplo.Network.Plugins
 
+[<ServiceContract(Name = "INetworkService")>]
 type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriver>) =
 
     let getDriver (driverType: NetworkDriver) =

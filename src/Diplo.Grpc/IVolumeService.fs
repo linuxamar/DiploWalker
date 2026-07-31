@@ -1,6 +1,7 @@
 namespace Diplo.Grpc
 
 open System.ServiceModel
+open System.Threading
 open System.Threading.Tasks
 open ProtoBuf.Grpc
 open Diplo.Grpc.Volume
@@ -8,16 +9,16 @@ open Diplo.Grpc.Volume
 [<ServiceContract>]
 type IVolumeService =
 
-    abstract member CreateVolume: request: CreateVolumeRequest * ?context: CallContext -> Task<CreateVolumeResponse>
+    abstract member CreateVolume: request: CreateVolumeRequest * ct: CancellationToken -> Task<CreateVolumeResponse>
 
-    abstract member RemoveVolume: request: RemoveVolumeRequest * ?context: CallContext -> Task<RemoveVolumeResponse>
+    abstract member RemoveVolume: request: RemoveVolumeRequest * ct: CancellationToken -> Task<RemoveVolumeResponse>
 
-    abstract member InspectVolume: request: InspectVolumeRequest * ?context: CallContext -> Task<InspectVolumeResponse>
+    abstract member InspectVolume: request: InspectVolumeRequest * ct: CancellationToken -> Task<InspectVolumeResponse>
 
-    abstract member ListVolumes: request: ListVolumesRequest * ?context: CallContext -> Task<ListVolumesResponse>
+    abstract member ListVolumes: request: ListVolumesRequest * ct: CancellationToken -> Task<ListVolumesResponse>
 
-    abstract member MountVolume: request: MountVolumeRequest * ?context: CallContext -> Task<MountVolumeResponse>
+    abstract member MountVolume: request: MountVolumeRequest * ct: CancellationToken -> Task<MountVolumeResponse>
 
-    abstract member UnmountVolume: request: UnmountVolumeRequest * ?context: CallContext -> Task<UnmountVolumeResponse>
+    abstract member UnmountVolume: request: UnmountVolumeRequest * ct: CancellationToken -> Task<UnmountVolumeResponse>
 
-    abstract member PruneVolumes: request: PruneVolumesRequest * ?context: CallContext -> Task<PruneVolumesResponse>
+    abstract member PruneVolumes: request: PruneVolumesRequest * ct: CancellationToken -> Task<PruneVolumesResponse>

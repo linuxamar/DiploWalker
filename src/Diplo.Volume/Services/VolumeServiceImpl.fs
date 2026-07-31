@@ -1,6 +1,7 @@
 namespace Diplo.Volume.Services
 
 open System
+open System.ServiceModel
 open System.Text.Json
 open System.Threading.Tasks
 open Grpc.Core
@@ -11,6 +12,7 @@ open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 open Diplo.Volume.Drivers
 
+[<ServiceContract(Name = "IVolumeService")>]
 type VolumeServiceImpl(registry: VolumeDriverRegistry) =
 
     let getDriver (driverType: StorageDriverType) =
