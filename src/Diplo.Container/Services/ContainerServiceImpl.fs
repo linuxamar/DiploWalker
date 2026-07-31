@@ -1,6 +1,7 @@
 namespace Diplo.Container.Services
 
 open System
+open System.ServiceModel
 open System.Collections.Generic
 open System.Linq
 open System.Text
@@ -13,6 +14,7 @@ open Diplo.Grpc.Container
 open Diplo.Abstractions.Interfaces
 open Diplo.Abstractions
 
+[<ServiceContract(Name = "IContainerService")>]
 type ContainerServiceImpl(client: IContainerdClient) =
 
     [<Literal>]

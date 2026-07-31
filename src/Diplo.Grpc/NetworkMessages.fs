@@ -24,6 +24,7 @@ type EndpointState =
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type CreateNetworkRequest =
     { [<ProtoMember(1)>] mutable Name : string
       [<ProtoMember(2)>] mutable Driver : NetworkDriver
@@ -33,8 +34,13 @@ type CreateNetworkRequest =
       [<ProtoMember(6)>] mutable Options : System.Collections.Generic.Dictionary<string, string>
       [<ProtoMember(7)>] mutable Labels : System.Collections.Generic.Dictionary<string, string>
       [<ProtoMember(8)>] mutable CniPluginPath : string }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Options then this.Options <- System.Collections.Generic.Dictionary<string, string>()
+        if isNull this.Labels then this.Labels <- System.Collections.Generic.Dictionary<string, string>()
 
 [<ProtoContract>]
+[<CLIMutable>]
 type CreateNetworkResponse =
     { [<ProtoMember(1)>] mutable Id : string
       [<ProtoMember(2)>] mutable Name : string
@@ -48,11 +54,13 @@ type CreateNetworkResponse =
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type RemoveNetworkRequest =
     { [<ProtoMember(1)>] mutable Id : string
       [<ProtoMember(2)>] mutable Force : bool }
 
 [<ProtoContract>]
+[<CLIMutable>]
 type RemoveNetworkResponse =
     { [<ProtoMember(1)>] mutable Success : bool
       [<ProtoMember(2)>] mutable Message : string }
@@ -62,6 +70,7 @@ type RemoveNetworkResponse =
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type EndpointInfo =
     { [<ProtoMember(1)>] mutable EndpointId : string
       [<ProtoMember(2)>] mutable ContainerId : string
@@ -74,10 +83,12 @@ type EndpointInfo =
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type InspectNetworkRequest =
     { [<ProtoMember(1)>] mutable Id : string }
 
 [<ProtoContract>]
+[<CLIMutable>]
 type InspectNetworkResponse =
     { [<ProtoMember(1)>] mutable Id : string
       [<ProtoMember(2)>] mutable Name : string
@@ -89,16 +100,26 @@ type InspectNetworkResponse =
       [<ProtoMember(8)>] mutable Labels : System.Collections.Generic.Dictionary<string, string>
       [<ProtoMember(9)>] mutable Endpoints : System.Collections.Generic.List<EndpointInfo>
       [<ProtoMember(10)>] mutable CreatedAt : string }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Options then this.Options <- System.Collections.Generic.Dictionary<string, string>()
+        if isNull this.Labels then this.Labels <- System.Collections.Generic.Dictionary<string, string>()
+        if isNull this.Endpoints then this.Endpoints <- System.Collections.Generic.List<EndpointInfo>()
 
 // ═══════════════════════════════════════════════
 // ListNetworks
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type ListNetworksRequest =
     { [<ProtoMember(1)>] mutable Filters : System.Collections.Generic.Dictionary<string, string> }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Filters then this.Filters <- System.Collections.Generic.Dictionary<string, string>()
 
 [<ProtoContract>]
+[<CLIMutable>]
 type NetworkInfo =
     { [<ProtoMember(1)>] mutable Id : string
       [<ProtoMember(2)>] mutable Name : string
@@ -109,22 +130,31 @@ type NetworkInfo =
       [<ProtoMember(7)>] mutable CreatedAt : string }
 
 [<ProtoContract>]
+[<CLIMutable>]
 type ListNetworksResponse =
     { [<ProtoMember(1)>] mutable Networks : System.Collections.Generic.List<NetworkInfo> }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Networks then this.Networks <- System.Collections.Generic.List<NetworkInfo>()
 
 // ═══════════════════════════════════════════════
 // ConnectContainer
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type ConnectContainerRequest =
     { [<ProtoMember(1)>] mutable NetworkId : string
       [<ProtoMember(2)>] mutable ContainerId : string
       [<ProtoMember(3)>] mutable EndpointId : string
       [<ProtoMember(4)>] mutable Ipv4Address : string
       [<ProtoMember(5)>] mutable Options : System.Collections.Generic.Dictionary<string, string> }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Options then this.Options <- System.Collections.Generic.Dictionary<string, string>()
 
 [<ProtoContract>]
+[<CLIMutable>]
 type ConnectContainerResponse =
     { [<ProtoMember(1)>] mutable EndpointId : string
       [<ProtoMember(2)>] mutable Ipv4Address : string
@@ -136,6 +166,7 @@ type ConnectContainerResponse =
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type DisconnectContainerRequest =
     { [<ProtoMember(1)>] mutable NetworkId : string
       [<ProtoMember(2)>] mutable ContainerId : string
@@ -143,6 +174,7 @@ type DisconnectContainerRequest =
       [<ProtoMember(4)>] mutable Force : bool }
 
 [<ProtoContract>]
+[<CLIMutable>]
 type DisconnectContainerResponse =
     { [<ProtoMember(1)>] mutable Success : bool
       [<ProtoMember(2)>] mutable Message : string }
@@ -152,6 +184,7 @@ type DisconnectContainerResponse =
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type CniConfiguration =
     { [<ProtoMember(1)>] mutable Name : string
       [<ProtoMember(2)>] mutable Type : string
@@ -161,8 +194,12 @@ type CniConfiguration =
       [<ProtoMember(6)>] mutable HairpinMode : bool
       [<ProtoMember(7)>] mutable IsDefaultGateway : bool
       [<ProtoMember(8)>] mutable Dns : System.Collections.Generic.Dictionary<string, string> }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Dns then this.Dns <- System.Collections.Generic.Dictionary<string, string>()
 
 [<ProtoContract>]
+[<CLIMutable>]
 type RunCniPluginRequest =
     { [<ProtoMember(1)>] mutable PluginPath : string
       [<ProtoMember(2)>] mutable Command : string
@@ -171,6 +208,7 @@ type RunCniPluginRequest =
       [<ProtoMember(5)>] mutable Config : CniConfiguration }
 
 [<ProtoContract>]
+[<CLIMutable>]
 type RunCniPluginResponse =
     { [<ProtoMember(1)>] mutable Success : bool
       [<ProtoMember(2)>] mutable Ifname : string
@@ -183,10 +221,15 @@ type RunCniPluginResponse =
 // ═══════════════════════════════════════════════
 
 [<ProtoContract>]
+[<CLIMutable>]
 type PruneNetworksRequest = { [<ProtoMember(1)>] mutable Placeholder : bool }
 
 [<ProtoContract>]
+[<CLIMutable>]
 type PruneNetworksResponse =
     { [<ProtoMember(1)>] mutable NetworksDeleted : System.Collections.Generic.List<string>
       [<ProtoMember(2)>] mutable Count : int
       [<ProtoMember(3)>] mutable Message : string }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.NetworksDeleted then this.NetworksDeleted <- System.Collections.Generic.List<string>()

@@ -10,8 +10,6 @@ module VolumeServiceImplTests =
     open Xunit
     open FsUnit.Xunit
     open Grpc.Core
-    open Grpc.Core.Testing
-    open ProtoBuf.Grpc
     open Diplo.Grpc
     open Diplo.Grpc.Volume
     open Diplo.Volume.Drivers
@@ -28,13 +26,7 @@ module VolumeServiceImplTests =
         let svc = VolumeServiceImpl(registry)
         svc, mock
 
-    let createCtx () =
-        let ctx =
-            TestServerCallContext.Create(
-                "test", "localhost", DateTime.UtcNow, Metadata(), CancellationToken.None,
-                "peer", Unchecked.defaultof<AuthContext>, Unchecked.defaultof<ContextPropagationToken>,
-                Unchecked.defaultof<System.Func<Metadata,Task>>, Unchecked.defaultof<System.Func<WriteOptions>>, Unchecked.defaultof<System.Action<WriteOptions>>)
-        Unchecked.defaultof<CallContext>
+    let createCtx () = CancellationToken.None
 
     [<Fact>]
     let ``CreateVolume avec nom retourne le nom et le mountpoint`` () =
