@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>diplo-linux</AssemblyName>
+    <RootNamespace>Diplo.Linux.Cli</RootNamespace>
+    <Description>Interface en ligne de commande de Diplo.Linux</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Diplo.Linux\Diplo.Linux.fsproj" />
+  </ItemGroup>
+
+</Project>
