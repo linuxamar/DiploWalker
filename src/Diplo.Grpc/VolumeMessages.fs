@@ -15,6 +15,7 @@ type StorageDriverType =
     | [<ProtoEnum>] CloudAzure = 3
     | [<ProtoEnum>] CloudAws = 4
     | [<ProtoEnum>] CloudGcp = 5
+    | [<ProtoEnum>] Iso = 6
 
 [<ProtoContract>]
 type MountState =

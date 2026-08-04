@@ -26,6 +26,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
         | StorageDriverType.CloudAzure -> "azure"
         | StorageDriverType.CloudAws -> "aws"
         | StorageDriverType.CloudGcp -> "gcp"
+        | StorageDriverType.Iso -> "iso"
         | _ -> "local"
 
     let parseDriverString (s: string) =
@@ -36,6 +37,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
         | "azure" -> StorageDriverType.CloudAzure
         | "aws" -> StorageDriverType.CloudAws
         | "gcp" -> StorageDriverType.CloudGcp
+        | "iso" -> StorageDriverType.Iso
         | _ -> StorageDriverType.Local
 
     interface IVolumeService with
@@ -122,6 +124,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                         | "azure" -> response.Driver <- StorageDriverType.CloudAzure
                         | "aws" -> response.Driver <- StorageDriverType.CloudAws
                         | "gcp" -> response.Driver <- StorageDriverType.CloudGcp
+                        | "iso" -> response.Driver <- StorageDriverType.Iso
                         | _ -> ()
                     if info.TryGetProperty("labels", &v) then
                         for prop in v.EnumerateObject() do response.Labels.[prop.Name] <- prop.Value.GetString()
@@ -175,6 +178,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                             | "azure" -> info.Driver <- StorageDriverType.CloudAzure
                             | "aws" -> info.Driver <- StorageDriverType.CloudAws
                             | "gcp" -> info.Driver <- StorageDriverType.CloudGcp
+                            | "iso" -> info.Driver <- StorageDriverType.Iso
                             | _ -> ()
                         if vol.TryGetProperty("size_bytes", &v) then info.SizeBytes <- v.GetInt64()
                     with ex ->
