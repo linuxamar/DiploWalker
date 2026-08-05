@@ -21,7 +21,7 @@ open Diplo.Abstractions.Interfaces
 ///   présents dans les enregistrements de répertoire sont ignorés ;
 /// - Multi-session : seule la première session (bloc 16) est lue, les
 ///   sessions suivantes sont ignorées.
-module private Iso9660 =
+module Iso9660 =
 
     let private blockSize = 2048
 
@@ -109,9 +109,9 @@ module private Iso9660 =
     let private pathFromRelative (targetPath: string) (relPath: string) =
         Path.Combine(Array.append [| targetPath |] (relPath.Split('/')))
 
-    /// Extrait tous les fichiers d'un tampon ISO9660 dans le répertoire cible.
-    /// Retourne le nombre de fichiers extraits.
-    let extract (iso: byte[]) (isoPath: string) (targetPath: string) : int =
+    /// Lit le descripteur de volume principal (PVD) et retourne les
+    /// (extent, longueur) du répertoire racine.
+    let readPvd (iso: byte[]) (isoPath: string) : int * int =
         let pvdOffset = 16 * blockSize
         if pvdOffset + 170 > iso.Length then
             failwithf "Le fichier '%s' est trop petit pour être une image ISO9660" isoPath
@@ -126,6 +126,40 @@ module private Iso9660 =
             failwith "Image ISO9660 invalide (enregistrement de répertoire racine manquant)"
         let rootExtent = readUInt32LE iso (pvdOffset + 158)
         let rootLength = readUInt32LE iso (pvdOffset + 166)
+        (rootExtent, rootLength)
+
+    /// Retrouve le contenu d'un fichier de l'image par son chemin ISO9660
+    /// (chemin de répertoires séparés par '/', ex. "/DOSSIER/HELLO.TXT").
+    let readFileByPath (iso: byte[]) (isoPath: string) (pathInImage: string) : byte[] =
+        let segments =
+            pathInImage.Split('/')
+            |> Array.filter (fun s -> s <> "" && s <> "." && s <> "..")
+        if segments.Length = 0 then
+            failwithf "Chemin de fichier invalide : '%s'" pathInImage
+        let rec find (extent: int) (length: int) (remaining: string[]) =
+            let entries = readDirectoryRecords iso extent length
+            let segment = remaining.[0]
+            let isLast = remaining.Length = 1
+            let name = if isLast then cleanFileName segment else cleanDirName segment
+            let entry = entries |> List.tryFind (fun e -> (if isLast then cleanFileName e.name else cleanDirName e.name) = name)
+            match entry with
+            | None ->
+                failwithf "Fichier introuvable dans l'image '%s' : %s" isoPath pathInImage
+            | Some e when isLast ->
+                if e.isDirectory then
+                    failwithf "'%s' est un répertoire dans l'image '%s'" pathInImage isoPath
+                readFile iso e.extent e.dataLength
+            | Some e ->
+                if not e.isDirectory then
+                    failwithf "'%s' n'est pas un répertoire dans l'image '%s'" pathInImage isoPath
+                find e.extent e.dataLength remaining.[1..]
+        let (rootExtent, rootLength) = readPvd iso isoPath
+        find rootExtent rootLength segments
+
+    /// Extrait tous les fichiers d'un tampon ISO9660 dans le répertoire cible.
+    /// Retourne le nombre de fichiers extraits.
+    let extract (iso: byte[]) (isoPath: string) (targetPath: string) : int =
+        let (rootExtent, rootLength) = readPvd iso isoPath
 
         let pending = System.Collections.Generic.Queue<(string * int * int)>()
         let visited = System.Collections.Generic.HashSet<string * int>()
@@ -156,7 +190,7 @@ module private Iso9660 =
 
 /// Parseur minimal d'images UDF (lecture seule) destiné aux images DVD,
 /// permettant d'extraire le contenu d'une image dans un répertoire cible.
-module private Udf =
+module Udf =
 
     let private blockSize = 2048
 
@@ -294,6 +328,56 @@ module private Udf =
         else
             data
 
+    /// Liste les entrées d'un répertoire UDF identifié par son ICB. Retourne
+    /// pour chaque entrée (nom brut, emplacement de l'ICB enfant, estRépertoire).
+    /// Les entrées parent (« . » / « .. ») et les noms vides sont exclus.
+    let readDirEntries (iso: byte[]) (icbLocation: int) (partitionStart: int) (logicalBlockSize: int) : (string * int * bool) list =
+        let icbOffset = (partitionStart + icbLocation) * logicalBlockSize
+        if icbOffset + 36 > iso.Length then
+            failwithf "Image UDF invalide (ICB à l'adresse %d)" icbOffset
+        let icbTag = readUInt16LE iso icbOffset
+        if icbTag <> 0x0105 && icbTag <> 0x0201 then
+            failwithf "Image UDF invalide (ICB manquant, tag 0x%04x)" icbTag
+        let dirData = readIcbData iso icbOffset partitionStart logicalBlockSize
+        let entries = ResizeArray<string * int * bool>()
+        let mutable pos = 0
+        let mutable running = pos + 38 <= dirData.Length
+        while running do
+            let fidTag = readUInt16LE dirData pos
+            if fidTag <> 0x0101 then running <- false
+            else
+                let characteristics = dirData.[pos + 18]
+                let nameLen = int dirData.[pos + 19]
+                let childIcbLocation = readUInt32LE dirData (pos + 24)
+                let implUseLen = readUInt16LE dirData (pos + 36)
+                // Le nom de fichier est un d-string (ECMA-167 1/7.2.12) :
+                // un octet de type (8 = ASCII, 16 = UTF-16BE) suivi du nom.
+                let nameOffset = pos + 38 + implUseLen
+                let rawName =
+                    if nameLen <= 1 then ""
+                    else
+                        let dType = dirData.[nameOffset]
+                        if dType = 8uy then
+                            ascii dirData (nameOffset + 1) (nameLen - 1)
+                        elif dType = 16uy then
+                            let chars = ResizeArray<char>()
+                            let mutable i = nameOffset + 1
+                            while i + 1 <= nameOffset + nameLen - 1 do
+                                chars.Add(char ((int dirData.[i] <<< 8) ||| int dirData.[i + 1]))
+                                i <- i + 2
+                            System.String(chars.ToArray())
+                        else
+                            ""
+                let isParent = (characteristics &&& 0x08uy) <> 0uy
+                if not isParent && rawName <> "\x00" && rawName <> "\x01" && nameLen > 0 then
+                    let isDir = (characteristics &&& 0x02uy) <> 0uy
+                    entries.Add(rawName, childIcbLocation, isDir)
+                // Descripteur suivant, aligné sur 4 octets.
+                let total = 38 + implUseLen + nameLen
+                pos <- pos + total + ((4 - (total % 4)) % 4)
+                running <- pos + 38 <= dirData.Length
+        List.ofSeq entries
+
     /// Extrait tous les fichiers de l'image UDF dans le répertoire cible.
     /// Retourne le nombre de fichiers extraits.
     let extract (iso: byte[]) (targetPath: string) : int =
@@ -326,59 +410,59 @@ module private Udf =
             if fileType = 4 then
                 // Répertoire : la séquence de descripteurs d'identifiant de
                 // fichier est stockée dans les blocs pointés par l'ICB.
-                let dirData = readIcbData iso icbOffset partitionStart logicalBlockSize
-                let mutable pos = 0
-                let mutable running = pos + 38 <= dirData.Length
-                while running do
-                    let fidTag = readUInt16LE dirData pos
-                    if fidTag <> 0x0101 then running <- false
-                    else
-                        let characteristics = dirData.[pos + 18]
-                        let nameLen = int dirData.[pos + 19]
-                        let childIcbLocation = readUInt32LE dirData (pos + 24)
-                        let implUseLen = readUInt16LE dirData (pos + 36)
-                        // Le nom de fichier est un d-string (ECMA-167 1/7.2.12) :
-                        // un octet de type (8 = ASCII, 16 = UTF-16BE) suivi du nom.
-                        let nameOffset = pos + 38 + implUseLen
-                        let rawName =
-                            if nameLen <= 1 then ""
-                            else
-                                let dType = dirData.[nameOffset]
-                                if dType = 8uy then
-                                    ascii dirData (nameOffset + 1) (nameLen - 1)
-                                elif dType = 16uy then
-                                    let chars = ResizeArray<char>()
-                                    let mutable i = nameOffset + 1
-                                    while i + 1 <= nameOffset + nameLen - 1 do
-                                        chars.Add(char ((int dirData.[i] <<< 8) ||| int dirData.[i + 1]))
-                                        i <- i + 2
-                                    System.String(chars.ToArray())
-                                else
-                                    ""
-                        let isParent = (characteristics &&& 0x08uy) <> 0uy
-                        if not isParent && rawName <> "\x00" && rawName <> "\x01" && nameLen > 0 then
-                            let name = sanitizeName rawName
-                            if name <> "" && name <> "." && name <> ".." then
-                                let sub = if relDir = "" then name else relDir + "/" + name
-                                if (characteristics &&& 0x02uy) <> 0uy then
-                                    Directory.CreateDirectory(pathFromRelative targetPath sub) |> ignore
-                                    if visited.Add(sub, childIcbLocation) then
-                                        pending.Enqueue(sub, childIcbLocation)
-                                else
-                                    let fileIcb = (partitionStart + childIcbLocation) * logicalBlockSize
-                                    let fileData = readIcbData iso fileIcb partitionStart logicalBlockSize
-                                    let filePath = pathFromRelative targetPath sub
-                                    Directory.CreateDirectory(Path.GetDirectoryName(filePath)) |> ignore
-                                    File.WriteAllBytes(filePath, fileData)
-                                    count <- count + 1
-                        // Descripteur suivant, aligné sur 4 octets.
-                        let total = 38 + implUseLen + nameLen
-                        pos <- pos + total + ((4 - (total % 4)) % 4)
-                        running <- pos + 38 <= dirData.Length
+                for (rawName, childIcbLocation, isDir) in readDirEntries iso icbLocation partitionStart logicalBlockSize do
+                    let name = sanitizeName rawName
+                    if name <> "" && name <> "." && name <> ".." then
+                        let sub = if relDir = "" then name else relDir + "/" + name
+                        if isDir then
+                            Directory.CreateDirectory(pathFromRelative targetPath sub) |> ignore
+                            if visited.Add(sub, childIcbLocation) then
+                                pending.Enqueue(sub, childIcbLocation)
+                        else
+                            let fileIcb = (partitionStart + childIcbLocation) * logicalBlockSize
+                            let fileData = readIcbData iso fileIcb partitionStart logicalBlockSize
+                            let filePath = pathFromRelative targetPath sub
+                            Directory.CreateDirectory(Path.GetDirectoryName(filePath)) |> ignore
+                            File.WriteAllBytes(filePath, fileData)
+                            count <- count + 1
         count
 
+    /// Retrouve le contenu d'un fichier de l'image par son chemin UDF
+    /// (chemin de répertoires séparés par '/', ex. "/DOSSIER/HELLO.TXT").
+    let readFileByPath (iso: byte[]) (isoPath: string) (pathInImage: string) : byte[] =
+        let segments =
+            pathInImage.Split('/')
+            |> Array.filter (fun s -> s <> "" && s <> "." && s <> "..")
+        if segments.Length = 0 then
+            failwithf "Chemin de fichier invalide : '%s'" pathInImage
+        let (partitionStart, logicalBlockSize, fsdLocation) = readVds iso
+        let fsdOffset = (partitionStart + fsdLocation) * logicalBlockSize
+        if fsdOffset + 466 > iso.Length then
+            failwith "Image UDF invalide (descripteur de jeu de fichiers manquant)"
+        if readUInt16LE iso fsdOffset <> 0x0100 then
+            failwith "Image UDF invalide (descripteur de jeu de fichiers introuvable)"
+        let rootIcb = readUInt32LE iso (fsdOffset + 404)
+        let rec find (icbLocation: int) (remaining: string[]) =
+            let entries = readDirEntries iso icbLocation partitionStart logicalBlockSize
+            let segment = remaining.[0]
+            let isLast = remaining.Length = 1
+            let entry = entries |> List.tryFind (fun (n, _, _) -> n = segment)
+            match entry with
+            | None ->
+                failwithf "Fichier introuvable dans l'image '%s' : %s" isoPath pathInImage
+            | Some (_, childIcb, isDir) when isLast ->
+                if isDir then
+                    failwithf "'%s' est un répertoire dans l'image '%s'" pathInImage isoPath
+                let fileIcb = (partitionStart + childIcb) * logicalBlockSize
+                readIcbData iso fileIcb partitionStart logicalBlockSize
+            | Some (_, childIcb, isDir) ->
+                if not isDir then
+                    failwithf "'%s' n'est pas un répertoire dans l'image '%s'" pathInImage isoPath
+                find childIcb remaining.[1..]
+        find rootIcb segments
+
 /// Extraction d'une image (ISO9660 ou UDF pour les DVD) dans un répertoire cible.
-module private IsoImage =
+module IsoImage =
 
     /// Extrait le contenu de l'image dans le répertoire cible. Retourne le
     /// nombre de fichiers extraits.
@@ -389,6 +473,14 @@ module private IsoImage =
             Udf.extract iso targetPath
         else
             Iso9660.extract iso isoPath targetPath
+
+    /// Lit le contenu d'un fichier de l'image par son chemin (ISO9660 ou UDF).
+    let readFile (isoPath: string) (pathInImage: string) : byte[] =
+        let iso = File.ReadAllBytes(isoPath)
+        if Udf.isUdf iso then
+            Udf.readFileByPath iso isoPath pathInImage
+        else
+            Iso9660.readFileByPath iso isoPath pathInImage
 
 /// Pilote de volume permettant de monter un fichier ISO9660 ou UDF (DVD) en
 /// extrayant son contenu (lecture seule) dans le répertoire cible.

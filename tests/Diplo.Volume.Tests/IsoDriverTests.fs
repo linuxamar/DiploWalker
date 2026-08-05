@@ -624,3 +624,39 @@ module IsoDriverTests =
         File.WriteAllBytes(Path.Combine(dumpDir, "udf-dvd.iso"), buildUdfDvd ())
         File.WriteAllBytes(Path.Combine(dumpDir, "udf-nsr02.iso"), buildUdfNsr02 ())
         File.WriteAllBytes(Path.Combine(dumpDir, "udf-multiblock.iso"), buildUdfMultiBlock ())
+
+    [<Fact>]
+    let ``IsoImage.readFile lit un fichier ISO9660 par son chemin`` () =
+        let tempRoot = createTempDir ()
+        try
+            let isoFile = Path.Combine(tempRoot, "test.iso")
+            File.WriteAllBytes(isoFile, buildIso ())
+            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/HELLO.TXT") |> should equal "Bonjour ISO!\n"
+        finally cleanupDir tempRoot
+    [<Fact>]
+    let ``IsoImage.readFile lit un fichier UDF par son chemin`` () =
+        let tempRoot = createTempDir ()
+        try
+            let isoFile = Path.Combine(tempRoot, "test.iso")
+            File.WriteAllBytes(isoFile, buildUdfDvd ())
+            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/HELLO.TXT") |> should equal "Bonjour DVD!\n"
+        finally cleanupDir tempRoot
+
+    [<Fact>]
+    let ``IsoImage.readFile lit un fichier UDF dans un sous-repertoire`` () =
+        let tempRoot = createTempDir ()
+        try
+            let isoFile = Path.Combine(tempRoot, "test.iso")
+            File.WriteAllBytes(isoFile, buildUdfMultiBlock ())
+            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/DOSSIER/SOUS.TXT") |> should equal "Bonjour SOUS\n"
+        finally cleanupDir tempRoot
+
+    [<Fact>]
+    let ``IsoImage.readFile leve une exception si le fichier est absent`` () =
+        let tempRoot = createTempDir ()
+        try
+            let isoFile = Path.Combine(tempRoot, "test.iso")
+            File.WriteAllBytes(isoFile, buildIso ())
+            (fun () -> IsoImage.readFile isoFile "/INEXISTANT.TXT" |> ignore)
+            |> should throw typeof<System.Exception>
+        finally cleanupDir tempRoot
