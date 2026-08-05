@@ -831,5 +831,9 @@ module Emulator =
         let mem = host.Memory
         let regs = host.Registers
         while not host.Halted do
+            if host.NeedsSwitch then
+                host.NeedsSwitch <- false
+                host.Restore host.TaskQueue.[0]
+                host.TaskQueue.RemoveAt 0
             let ins = Decoder.decode mem regs.RIP
             execute host ins

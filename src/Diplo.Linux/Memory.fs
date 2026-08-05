@@ -88,3 +88,15 @@ type VirtualMemory(size : uint64) =
     member _.Zero(addr : uint64) (count : uint64) =
         check addr count
         Array.Clear(buffer, int addr, int count)
+
+    /// Prend une copie complète de la mémoire (pour la sauvegarde d'une tâche).
+    member _.Snapshot() : byte[] =
+        let dst = Array.zeroCreate buffer.Length
+        Array.Copy(buffer, dst, buffer.Length)
+        dst
+
+    /// Restaure le contenu complet de la mémoire depuis une copie.
+    member _.Restore(data : byte[]) =
+        if data.Length <> buffer.Length then
+            invalidArg "data" $"Taille mémoire incompatible : {data.Length} <> {buffer.Length}"
+        Array.Copy(data, buffer, buffer.Length)

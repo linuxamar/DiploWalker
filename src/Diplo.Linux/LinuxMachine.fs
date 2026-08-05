@@ -20,6 +20,13 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
     let mutable stdin : Stream = Console.OpenStandardInput()
     let mutable stdout : Stream = Console.OpenStandardOutput()
     let mutable stderr : Stream = Console.OpenStandardError()
+    let mutable consoleInput : Stream = stdin
+    let mutable consoleOutput : Stream = stdout
+    let regions = ResizeArray<MemoryRegion>()
+    let taskQueue = ResizeArray<TaskState>()
+    let exitedStatuses = ResizeArray<int>()
+    let mutable needsSwitch = false
+    let mutable cwd = Directory.GetCurrentDirectory()
 
     interface ISyscallHost with
         member _.Memory = mem
@@ -43,6 +50,44 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
         member _.ExitStatus
             with get () = exitStatus
             and set v = exitStatus <- v
+        member _.Console = new ConsoleStream(consoleInput, consoleOutput) :> Stream
+        member _.Regions = regions
+        member _.TaskQueue = taskQueue
+        member _.ExitedStatuses = exitedStatuses
+        member _.NeedsSwitch
+            with get () = needsSwitch
+            and set v = needsSwitch <- v
+        member _.CurrentDirectory
+            with get () = cwd
+            and set v = cwd <- v
+        member _.Snapshot() : TaskState =
+            { Memory = mem.Snapshot()
+              Registers = regs.Clone()
+              OpenFiles = Dictionary<int, Stream>(openFiles)
+              NextFd = nextFd
+              ProgramBreak = programBreak
+              MmapCursor = mmapCursor }
+        member _.Restore(st : TaskState) =
+            mem.Restore st.Memory
+            for i = 0 to 15 do
+                Registers.set64 regs i (Registers.get64 st.Registers i)
+            regs.RIP <- st.Registers.RIP
+            regs.RFLAGS <- st.Registers.RFLAGS
+            for i = 0 to 15 do
+                Registers.setXmm regs i (st.Registers.Xmm i)
+            openFiles.Clear()
+            for kv in st.OpenFiles do
+                openFiles[kv.Key] <- kv.Value
+            nextFd <- st.NextFd
+            programBreak <- st.ProgramBreak
+            mmapCursor <- st.MmapCursor
+        member this.ExecImage (bytes : byte[]) (argv : string[]) =
+            let image = ElfLoader.load mem bytes
+            programBreak <- image.EndOfData
+            let stackTop = size - 0x1000UL
+            let rsp = this.SetupStack stackTop argv
+            regs.RIP <- image.EntryPoint
+            regs.RSP <- rsp
 
     /// Entrée standard de la machine (redirigeable pour les tests).
     member _.StandardInput
@@ -59,7 +104,17 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
         with get () = stderr
         and set v = stderr <- v
 
-    member private _.SetupStack (stackTop : uint64) : uint64 =
+    /// Entrée de la console série (redirigeable pour les tests).
+    member _.ConsoleInput
+        with get () = consoleInput
+        and set v = consoleInput <- v
+
+    /// Sortie de la console série (redirigeable pour les tests).
+    member _.ConsoleOutput
+        with get () = consoleOutput
+        and set v = consoleOutput <- v
+
+    member private _.SetupStack (stackTop : uint64) (argv : string[]) : uint64 =
         let mutable sp = stackTop
 
         let pushCString (s : string) : uint64 =
@@ -68,7 +123,7 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
             mem.WriteBytes sp bytes
             sp
 
-        let argvAddrs = Array.map pushCString arguments
+        let argvAddrs = Array.map pushCString argv
         sp <- sp &&& ~~~0xFUL
 
         let push64v (v : uint64) =
@@ -90,7 +145,7 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
         programBreak <- image.EndOfData
 
         let stackTop = size - 0x1000UL
-        let rsp = this.SetupStack stackTop
+        let rsp = this.SetupStack stackTop arguments
 
         regs.RIP <- image.EntryPoint
         regs.RSP <- rsp
