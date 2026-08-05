@@ -89,6 +89,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                     | "azure" -> StorageDriverType.CloudAzure
                     | "aws" -> StorageDriverType.CloudAws
                     | "gcp" -> StorageDriverType.CloudGcp
+                    | "iso" -> StorageDriverType.Iso
                     | _ -> StorageDriverType.Local
                 let! response = client.CreateAsync(name = this.VolumeNameInput, driver = driverEnum)
                 outputPort.WriteSuccess(sprintf "Volume %s créé (ID: %s)" this.VolumeNameInput response.Id)

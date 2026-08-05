@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="ElfTest.fs" />
     <Compile Include="LinuxMachineTests.fs" />
+    <Compile Include="BootTests.fs" />
+    <Compile Include="BootIsoTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Diplo.Linux\Diplo.Linux.fsproj" />
+    <ProjectReference Include="..\..\src\Diplo.Volume\Diplo.Volume.fsproj" />
   </ItemGroup>
 
 </Project>

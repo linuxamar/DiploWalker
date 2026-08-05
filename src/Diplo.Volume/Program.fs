@@ -29,6 +29,7 @@ let main args =
                 registry.Register(StorageDriverType.CloudAzure, CloudAzureDriver(getDataRoot "AzureDataRoot" "azure"))
                 registry.Register(StorageDriverType.CloudAws, CloudAwsDriver(getDataRoot "AwsDataRoot" "aws"))
                 registry.Register(StorageDriverType.CloudGcp, CloudGcpDriver(getDataRoot "GcpDataRoot" "gcp"))
+                registry.Register(StorageDriverType.Iso, IsoDriver(getDataRoot "IsoDataRoot" "iso"))
                 registry) |> ignore
 
             builder.Services.AddSingleton<VolumeServiceImpl>() |> ignore)

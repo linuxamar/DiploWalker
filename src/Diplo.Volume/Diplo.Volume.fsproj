@@ -15,6 +15,7 @@
     <Compile Include="Drivers\CloudAzureDriver.fs" />
     <Compile Include="Drivers\CloudAwsDriver.fs" />
     <Compile Include="Drivers\CloudGcpDriver.fs" />
+    <Compile Include="Drivers\IsoDriver.fs" />
     <Compile Include="Services\VolumeServiceImpl.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
