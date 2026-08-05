@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="ElfTest.fs" />
     <Compile Include="LinuxMachineTests.fs" />
+    <Compile Include="BootTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

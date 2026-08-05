@@ -14,6 +14,7 @@
     <Compile Include="Syscalls.fs" />
     <Compile Include="Emulator.fs" />
     <Compile Include="LinuxMachine.fs" />
+    <Compile Include="BootImage.fs" />
   </ItemGroup>
 
 </Project>
