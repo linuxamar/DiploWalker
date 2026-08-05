@@ -10,6 +10,17 @@ open Diplo.Abstractions.Interfaces
 
 /// Parseur minimal d'images ISO9660 (lecture seule) permettant d'extraire
 /// le contenu d'un fichier ISO dans un répertoire cible.
+///
+/// Le parseur ne traite que le descripteur de volume principal (PVD) situé au
+/// bloc 16. Les extensions et variantes suivantes ne sont volontairement PAS
+/// prises en charge :
+/// - Joliet : le descripteur de volume supplémentaire (type 2, jeu de
+///   caractères UCS-2) est ignoré, seuls les noms de fichiers ISO9660 de
+///   niveau 1 (8.3) sont lus ;
+/// - Rock Ridge (RRIP) : les attributs étendus POSIX (entrées NM, SL, etc.)
+///   présents dans les enregistrements de répertoire sont ignorés ;
+/// - Multi-session : seule la première session (bloc 16) est lue, les
+///   sessions suivantes sont ignorées.
 module private Iso9660 =
 
     let private blockSize = 2048
@@ -196,11 +207,24 @@ module private Udf =
     let isUdf (iso: byte[]) : bool =
         findNsr iso >= 0
 
+    /// Retrouve la séquence de descripteurs de volume depuis le pointeur
+    /// d'ancrage (AVDP) situé conventionnellement au bloc 256.
+    let private findVdsLocation (iso: byte[]) : int =
+        let mutable result = -1
+        for candidate in [ 256; 257; 512 ] do
+            if result < 0 && (candidate + 1) * blockSize <= iso.Length then
+                let offset = candidate * blockSize
+                if readUInt16LE iso offset = 0x0002 then
+                    result <- readUInt32LE iso (offset + 20)
+        if result < 0 then
+            failwith "Image UDF invalide (pointeur de volume d'ancrage introuvable)"
+        result
+
     /// Lit la séquence de descripteurs de volume : emplacement de partition,
-    /// taille de bloc logique et emplacement du descripteur de jeu de fichiers.
-    let private readVds (iso: byte[]) (nsrOffset: int) =
-        let vdsLocation = readUInt32LE iso (nsrOffset + 16)
-        let mutable offset = vdsLocation * blockSize
+    /// taille de bloc logique et emplacement du descripteur de jeu de fichiers
+    /// (issu de logicalVolContentsUse du descripteur de volume logique).
+    let private readVds (iso: byte[]) =
+        let mutable offset = findVdsLocation iso * blockSize
         let mutable partitionStart = 0
         let mutable logicalBlockSize = 2048
         let mutable fsdLocation = -1
@@ -208,48 +232,67 @@ module private Udf =
         while running && offset + blockSize <= iso.Length do
             let tagId = readUInt16LE iso offset
             if tagId = 0x0005 then
-                partitionStart <- readUInt32LE iso (offset + 185)
+                partitionStart <- readUInt32LE iso (offset + 188)
                 offset <- offset + blockSize
             elif tagId = 0x0006 then
-                logicalBlockSize <- readUInt32LE iso (offset + 210)
-                fsdLocation <- readUInt32LE iso (offset + 250)
+                logicalBlockSize <- readUInt32LE iso (offset + 212)
+                fsdLocation <- readUInt32LE iso (offset + 252)
                 offset <- offset + blockSize
             else
                 offset <- offset + blockSize
-                if tagId = 0x0000 then running <- false
+                if tagId = 0x0008 || tagId = 0x0000 then running <- false
         if fsdLocation < 0 then
             failwith "Image UDF invalide (descripteur de volume logique manquant)"
         (partitionStart, logicalBlockSize, fsdLocation)
 
-    /// Lit le contenu d'un fichier à partir de son ICB (descripteurs
-    /// d'allocation courts ou longs).
-    let private readFileData (iso: byte[]) (icbOffset: int) (partitionStart: int) (logicalBlockSize: int) =
-        if readUInt16LE iso icbOffset <> 0x0201 then
-            failwithf "Image UDF invalide (ICB fichier manquant, tag 0x%04x)" (readUInt16LE iso icbOffset)
-        let flags = readUInt16LE iso (icbOffset + 36)
-        let allocationType = (flags >>> 2) &&& 3
+    let private readUInt64LE (data: byte[]) (offset: int) =
+        let mutable v = 0UL
+        for i in 0 .. 7 do
+            v <- v ||| (uint64 data.[offset + i] <<< (8 * i))
+        v
+
+    /// Assemble les données pointées par un ICB (fichier ou répertoire) en
+    /// parcourant ses descripteurs d'allocation (short_ad, long_ad ou
+    /// extended_ad) ou en lisant le contenu inline (AD_IN_ICB).
+    let private readIcbData (iso: byte[]) (icbOffset: int) (partitionStart: int) (logicalBlockSize: int) =
+        let tag = readUInt16LE iso icbOffset
+        if tag <> 0x0105 && tag <> 0x0201 then
+            failwithf "Image UDF invalide (ICB fichier manquant, tag 0x%04x)" tag
+        let flags = readUInt16LE iso (icbOffset + 34)
+        let allocationType = flags &&& 7
+        let informationLength = int64 (readUInt64LE iso (icbOffset + 56))
+        let extendedAttrLength = readUInt32LE iso (icbOffset + 168)
+        let allocLength = readUInt32LE iso (icbOffset + 172)
+        let allocStart = icbOffset + 176 + extendedAttrLength
+        let allocEnd = allocStart + allocLength
+        let content = ResizeArray<byte>()
         if allocationType = 3 then
-            Array.empty
+            // AD_IN_ICB : les données sont stockées dans l'ICB lui-même.
+            let inlineLen = int (min informationLength (int64 allocLength))
+            for i in 0 .. inlineLen - 1 do
+                if allocStart + i < iso.Length then content.Add(iso.[allocStart + i])
         else
-            let content = ResizeArray<byte>()
-            let extendedAttrLength = readUInt32LE iso (icbOffset + 168)
-            let mutable pos = icbOffset + 176 + extendedAttrLength
-            let allocEnd = icbOffset + 176 + extendedAttrLength + readUInt32LE iso (icbOffset + 172)
+            let step = if allocationType = 0 then 8 elif allocationType = 1 then 16 else 20
+            let locOffset = if allocationType = 2 then 12 else 4
+            let mutable pos = allocStart
             let mutable running = pos + 8 <= allocEnd && pos + 8 <= iso.Length
             while running do
-                let length = readUInt32LE iso pos
-                if length = 0 then running <- false
+                let extLength = readUInt32LE iso pos
+                if extLength = 0 then running <- false
                 else
-                    let location = readUInt32LE iso (pos + 4)
+                    let length = extLength &&& 0x3FFFFFFF
+                    let location = readUInt32LE iso (pos + locOffset)
                     let start = (partitionStart + location) * logicalBlockSize
                     let available = min length (max 0 (iso.Length - start))
                     if available > 0 then
                         content.AddRange(iso.[start .. start + available - 1])
-                    if allocationType = 0 then pos <- pos + 8
-                    elif allocationType = 1 then pos <- pos + 16
-                    else pos <- pos + 20
+                    pos <- pos + step
                     running <- pos + 8 <= allocEnd && pos + 8 <= iso.Length
-            content.ToArray()
+        let data = content.ToArray()
+        if int64 data.Length > informationLength then
+            Array.sub data 0 (int informationLength)
+        else
+            data
 
     /// Extrait tous les fichiers de l'image UDF dans le répertoire cible.
     /// Retourne le nombre de fichiers extraits.
@@ -257,14 +300,14 @@ module private Udf =
         let nsrOffset = findNsr iso
         if nsrOffset < 0 then
             failwith "Image non UDF (descripteur NSR introuvable)"
-        let (partitionStart, logicalBlockSize, fsdLocation) = readVds iso nsrOffset
+        let (partitionStart, logicalBlockSize, fsdLocation) = readVds iso
 
-        let fsdOffset = fsdLocation * logicalBlockSize
+        let fsdOffset = (partitionStart + fsdLocation) * logicalBlockSize
         if fsdOffset + 466 > iso.Length then
             failwith "Image UDF invalide (descripteur de jeu de fichiers manquant)"
         if readUInt16LE iso fsdOffset <> 0x0100 then
             failwith "Image UDF invalide (descripteur de jeu de fichiers introuvable)"
-        let rootIcb = readUInt32LE iso (fsdOffset + 462)
+        let rootIcb = readUInt32LE iso (fsdOffset + 404)
 
         let pending = System.Collections.Generic.Queue<string * int>()
         let visited = System.Collections.Generic.HashSet<string * int>()
@@ -276,34 +319,54 @@ module private Udf =
             let icbOffset = (partitionStart + icbLocation) * logicalBlockSize
             if icbOffset + 36 > iso.Length then
                 failwithf "Image UDF invalide (ICB à l'adresse %d)" icbOffset
-            if readUInt16LE iso icbOffset <> 0x0201 then
-                failwithf "Image UDF invalide (ICB manquant, tag 0x%04x)" (readUInt16LE iso icbOffset)
+            let icbTag = readUInt16LE iso icbOffset
+            if icbTag <> 0x0105 && icbTag <> 0x0201 then
+                failwithf "Image UDF invalide (ICB manquant, tag 0x%04x)" icbTag
             let fileType = int iso.[icbOffset + 27]
-            if fileType = 2 then
-                // Répertoire : séquence de descripteurs d'identifiant de fichier.
-                let mutable pos = icbOffset + 36
-                let mutable running = pos + 38 <= icbOffset + logicalBlockSize && pos + 38 <= iso.Length
+            if fileType = 4 then
+                // Répertoire : la séquence de descripteurs d'identifiant de
+                // fichier est stockée dans les blocs pointés par l'ICB.
+                let dirData = readIcbData iso icbOffset partitionStart logicalBlockSize
+                let mutable pos = 0
+                let mutable running = pos + 38 <= dirData.Length
                 while running do
-                    let fidTag = readUInt16LE iso pos
+                    let fidTag = readUInt16LE dirData pos
                     if fidTag <> 0x0101 then running <- false
                     else
-                        let characteristics = iso.[pos + 18]
-                        let nameLen = int iso.[pos + 19]
-                        let childIcbLocation = readUInt32LE iso (pos + 24)
-                        let implUseLen = readUInt16LE iso (pos + 36)
-                        let rawName = ascii iso (pos + 38 + implUseLen) nameLen
-                        let isParent = (characteristics &&& 0x40uy) <> 0uy
+                        let characteristics = dirData.[pos + 18]
+                        let nameLen = int dirData.[pos + 19]
+                        let childIcbLocation = readUInt32LE dirData (pos + 24)
+                        let implUseLen = readUInt16LE dirData (pos + 36)
+                        // Le nom de fichier est un d-string (ECMA-167 1/7.2.12) :
+                        // un octet de type (8 = ASCII, 16 = UTF-16BE) suivi du nom.
+                        let nameOffset = pos + 38 + implUseLen
+                        let rawName =
+                            if nameLen <= 1 then ""
+                            else
+                                let dType = dirData.[nameOffset]
+                                if dType = 8uy then
+                                    ascii dirData (nameOffset + 1) (nameLen - 1)
+                                elif dType = 16uy then
+                                    let chars = ResizeArray<char>()
+                                    let mutable i = nameOffset + 1
+                                    while i + 1 <= nameOffset + nameLen - 1 do
+                                        chars.Add(char ((int dirData.[i] <<< 8) ||| int dirData.[i + 1]))
+                                        i <- i + 2
+                                    System.String(chars.ToArray())
+                                else
+                                    ""
+                        let isParent = (characteristics &&& 0x08uy) <> 0uy
                         if not isParent && rawName <> "\x00" && rawName <> "\x01" && nameLen > 0 then
                             let name = sanitizeName rawName
                             if name <> "" && name <> "." && name <> ".." then
                                 let sub = if relDir = "" then name else relDir + "/" + name
-                                if (characteristics &&& 0x08uy) <> 0uy then
+                                if (characteristics &&& 0x02uy) <> 0uy then
                                     Directory.CreateDirectory(pathFromRelative targetPath sub) |> ignore
                                     if visited.Add(sub, childIcbLocation) then
                                         pending.Enqueue(sub, childIcbLocation)
                                 else
                                     let fileIcb = (partitionStart + childIcbLocation) * logicalBlockSize
-                                    let fileData = readFileData iso fileIcb partitionStart logicalBlockSize
+                                    let fileData = readIcbData iso fileIcb partitionStart logicalBlockSize
                                     let filePath = pathFromRelative targetPath sub
                                     Directory.CreateDirectory(Path.GetDirectoryName(filePath)) |> ignore
                                     File.WriteAllBytes(filePath, fileData)
@@ -311,7 +374,7 @@ module private Udf =
                         // Descripteur suivant, aligné sur 4 octets.
                         let total = 38 + implUseLen + nameLen
                         pos <- pos + total + ((4 - (total % 4)) % 4)
-                        running <- pos + 38 <= icbOffset + logicalBlockSize && pos + 38 <= iso.Length
+                        running <- pos + 38 <= dirData.Length
         count
 
 /// Extraction d'une image (ISO9660 ou UDF pour les DVD) dans un répertoire cible.
@@ -349,7 +412,16 @@ type IsoDriver(dataRoot: string) =
             store.CreateVolume(name, isoPath, labels, driverOpts)
 
         member _.RemoveVolume(id, force) =
-            store.RemoveVolume(id)
+            let isoPath =
+                match store.InspectVolume(id) with
+                | Some info ->
+                    let mutable v = Unchecked.defaultof<JsonElement>
+                    if info.TryGetProperty("remotePath", &v) then v.GetString() else null
+                | None -> null
+            store.RemoveVolume(id) |> ignore
+            if force && not (String.IsNullOrEmpty(isoPath)) && File.Exists(isoPath) then
+                File.Delete(isoPath)
+            true
 
         member _.InspectVolume(id) =
             store.InspectVolume(id)

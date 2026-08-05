@@ -76,7 +76,7 @@ type CreateVolumeCommand(output: IOutputPort) =
             if String.IsNullOrEmpty(settings.Name) then
                 output.WriteError("Le nom du volume est requis")
                 return 1
-            elif not (List.contains (settings.Driver.ToLowerInvariant()) ["local"; "nfs"; "smb"; "azure"; "aws"; "gcp"]) then
+            elif not (List.contains (settings.Driver.ToLowerInvariant()) ["local"; "nfs"; "smb"; "azure"; "aws"; "gcp"; "iso"]) then
                 output.WriteError(sprintf "Driver inconnu: %s" settings.Driver)
                 return 1
             else
@@ -88,6 +88,7 @@ type CreateVolumeCommand(output: IOutputPort) =
                     | "azure" -> StorageDriverType.CloudAzure
                     | "aws" -> StorageDriverType.CloudAws
                     | "gcp" -> StorageDriverType.CloudGcp
+                    | "iso" -> StorageDriverType.Iso
                     | _ -> failwithf "Driver %s non géré (normalement déjà validé)" settings.Driver
 
                 use client = new VolumeClient()
