@@ -24,12 +24,6 @@ type ConsoleStream (input : Stream, output : Stream) =
     override _.Read(data, offset, count) = input.Read(data, offset, count)
     override _.Write(data, offset, count) = output.Write(data, offset, count)
 
-/// Région mémoire allouée (mmap/mprotect).
-type MemoryRegion =
-    { Start : uint64
-      Length : uint64
-      Prot : uint64 }
-
 /// Copie de l'état d'une tâche (fork).
 type TaskState =
     { Memory : byte[]
@@ -37,7 +31,8 @@ type TaskState =
       OpenFiles : Dictionary<int, Stream>
       NextFd : int
       ProgramBreak : uint64
-      MmapCursor : uint64 }
+      MmapCursor : uint64
+      Regions : MemoryRegion list }
 
 /// Flux en lecture seule représentant un répertoire (getdents).
 type DirectoryStream (path : string) =
@@ -452,21 +447,20 @@ module Syscalls =
     let private align8 (length : uint64) : uint64 =
         (length + 7UL) &&& ~~~7UL
 
-    let private addRegion (host : ISyscallHost) (start : uint64) (length : uint64) (prot : uint64) =
-        let remaining =
-            host.Regions
-            |> Seq.filter (fun r -> not (start + length > r.Start && start < r.Start + r.Length))
-            |> Seq.toArray
-        host.Regions.Clear()
-        host.Regions.AddRange remaining
-        host.Regions.Add({ Start = start; Length = length; Prot = prot })
+    let private mapShared = 0x1UL
+    let private mapPrivate = 0x2UL
+    let private mapFixed = 0x10UL
+    let private mapAnonymous = 0x20UL
+    let private mremapMayMove = 0x1UL
+    let private mremapFixed = 0x2UL
 
     let private sysMmap (host : ISyscallHost) (addr : uint64) (length : uint64)
                         (prot : uint64) (flags : uint64) (fd : uint64) (offset : uint64) : uint64 =
         let pageLen = alignPage length
+        let anonymous = flags &&& mapAnonymous <> 0UL || fd = 0xFFFFFFFFFFFFFFFFUL
         let dest =
-            if addr <> 0UL then addr
-            elif flags &&& 0x10UL <> 0UL then addr   // MAP_FIXED
+            if flags &&& mapFixed <> 0UL then addr
+            elif addr <> 0UL then addr
             else
                 let result = host.MmapCursor
                 host.MmapCursor <- host.MmapCursor + pageLen
@@ -474,8 +468,8 @@ module Syscalls =
         if dest + pageLen > host.Memory.Size then
             errno -12   // ENOMEM
         else
-            addRegion host dest pageLen prot
-            if fd <> 0xFFFFFFFFFFFFFFFFUL then   // MAP_ANONYMOUS
+            host.Memory.MapRegion dest pageLen prot
+            if not anonymous then
                 match host.OpenFiles.TryGetValue(int fd) with
                 | true, s ->
                     let oldPos = s.Position
@@ -490,24 +484,13 @@ module Syscalls =
 
     let private sysMunmap (host : ISyscallHost) (addr : uint64) (length : uint64) : uint64 =
         let pageLen = alignPage length
+        host.Memory.UnmapRange addr pageLen
         host.Memory.Zero addr pageLen
-        host.Regions
-        |> Seq.filter (fun r -> not (addr + pageLen > r.Start && addr < r.Start + r.Length))
-        |> Seq.toArray
-        |> Array.iter (fun r -> host.Regions.Remove r |> ignore)
         0UL
 
     let private sysMprotect (host : ISyscallHost) (addr : uint64) (length : uint64) (prot : uint64) : uint64 =
         let pageLen = alignPage length
-        let updated =
-            host.Regions
-            |> Seq.map (fun r ->
-                if addr + pageLen > r.Start && addr < r.Start + r.Length then
-                    { r with Prot = prot }
-                else r)
-            |> Seq.toArray
-        host.Regions.Clear()
-        host.Regions.AddRange updated
+        host.Memory.ProtectRange addr pageLen prot
         0UL
 
     let private sysBrk (host : ISyscallHost) (addr : uint64) : uint64 =
@@ -819,22 +802,24 @@ module Syscalls =
         with _ -> errno enosys
 
     let private sysMremap (host : ISyscallHost) (oldAddr : uint64) (oldSize : uint64) (newSize : uint64) (flags : uint64) (newAddr : uint64) : uint64 =
-        try
-            let newLen = alignPage newSize
-            let dest =
-                if flags &&& 0x20UL <> 0UL then newAddr
-                else
-                    let cursor = host.MmapCursor
-                    host.MmapCursor <- cursor + newLen
-                    cursor
-            let copyLen = min oldSize newSize
+        let oldLen = alignPage oldSize
+        let newLen = alignPage newSize
+        let dest =
+            if flags &&& mremapFixed <> 0UL then newAddr
+            else
+                let result = host.MmapCursor
+                host.MmapCursor <- host.MmapCursor + newLen
+                result
+        if dest + newLen > host.Memory.Size then
+            errno -12   // ENOMEM
+        else
+            let copyLen = min oldLen newLen
             if copyLen > 0UL then
                 let data = host.Memory.ReadBytes oldAddr (int copyLen)
                 host.Memory.WriteBytes dest data
-            host.Memory.Zero oldAddr (alignPage oldSize)
-            addRegion host dest newLen 0x3UL
+            host.Memory.UnmapRange oldAddr oldLen
+            host.Memory.MapRegion dest newLen 0x3UL
             dest
-        with _ -> errno enosys
 
     let private sysFutex (_host : ISyscallHost) (_uaddr : uint64) (op : uint64) (_val : uint64) (_timeout : uint64) (_uaddr2 : uint64) (_val3 : uint64) : uint64 =
         if op &&& 0x7FUL = 1UL then 1UL else 0UL

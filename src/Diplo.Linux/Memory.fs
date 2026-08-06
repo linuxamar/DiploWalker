@@ -1,10 +1,18 @@
 namespace Diplo.Linux
 
 open System
+open System.Collections.Generic
+
+/// Région mémoire allouée (mmap/mprotect).
+type MemoryRegion =
+    { Start : uint64
+      Length : uint64
+      Prot : uint64 }
 
 /// Espace d'adressage virtuel plat de la machine émulée.
 type VirtualMemory(size : uint64) =
     let buffer : byte[] = Array.zeroCreate (int size)
+    let mutable regions = ResizeArray<MemoryRegion>()
 
     let check (addr : uint64) (count : uint64) =
         if addr + count > size then
@@ -12,6 +20,58 @@ type VirtualMemory(size : uint64) =
 
     /// Taille totale de la mémoire virtuelle, en octets.
     member _.Size = size
+
+    /// Régions mémoire allouées par mmap (pour la restauration d'une tâche).
+    member _.Regions = regions
+
+    /// Mappe une région, en remplaçant les régions qui se chevauchent.
+    member _.MapRegion(start : uint64) (length : uint64) (prot : uint64) =
+        let remaining =
+            regions
+            |> Seq.filter (fun r -> not (start + length > r.Start && start < r.Start + r.Length))
+            |> Seq.toArray
+        regions.Clear()
+        regions.AddRange remaining
+        regions.Add({ Start = start; Length = length; Prot = prot })
+
+    /// Retire une plage de pages, en découpant les régions traversées.
+    member _.UnmapRange(start : uint64) (length : uint64) =
+        let endAddr = start + length
+        let updated =
+            regions
+            |> Seq.collect (fun r ->
+                let rEnd = r.Start + r.Length
+                if rEnd <= start || r.Start >= endAddr then
+                    Seq.singleton r
+                else
+                    [ if r.Start < start then
+                          { r with Length = start - r.Start }
+                      if rEnd > endAddr then
+                          { Start = endAddr; Length = rEnd - endAddr; Prot = r.Prot } ])
+            |> Seq.toArray
+        regions.Clear()
+        regions.AddRange updated
+
+    /// Applique une protection aux pages couvertes, en découpant les régions traversées.
+    member _.ProtectRange(start : uint64) (length : uint64) (prot : uint64) =
+        let endAddr = start + length
+        let updated =
+            regions
+            |> Seq.collect (fun r ->
+                let rEnd = r.Start + r.Length
+                if rEnd <= start || r.Start >= endAddr then
+                    Seq.singleton r
+                else
+                    let pStart = max r.Start start
+                    let pEnd = min rEnd endAddr
+                    [ if r.Start < start then
+                          { r with Length = start - r.Start }
+                      if rEnd > endAddr then
+                          { Start = endAddr; Length = rEnd - endAddr; Prot = r.Prot }
+                      { Start = pStart; Length = pEnd - pStart; Prot = prot } ])
+            |> Seq.toArray
+        regions.Clear()
+        regions.AddRange updated
 
     member _.ReadByte(addr : uint64) : byte =
         check addr 1UL

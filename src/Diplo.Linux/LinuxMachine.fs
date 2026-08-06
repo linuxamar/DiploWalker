@@ -22,7 +22,6 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
     let mutable stderr : Stream = Console.OpenStandardError()
     let mutable consoleInput : Stream = stdin
     let mutable consoleOutput : Stream = stdout
-    let regions = ResizeArray<MemoryRegion>()
     let taskQueue = ResizeArray<TaskState>()
     let exitedStatuses = ResizeArray<int>()
     let mutable needsSwitch = false
@@ -51,7 +50,7 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
             with get () = exitStatus
             and set v = exitStatus <- v
         member _.Console = new ConsoleStream(consoleInput, consoleOutput) :> Stream
-        member _.Regions = regions
+        member _.Regions = mem.Regions
         member _.TaskQueue = taskQueue
         member _.ExitedStatuses = exitedStatuses
         member _.NeedsSwitch
@@ -66,7 +65,8 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
               OpenFiles = Dictionary<int, Stream>(openFiles)
               NextFd = nextFd
               ProgramBreak = programBreak
-              MmapCursor = mmapCursor }
+              MmapCursor = mmapCursor
+              Regions = List.ofSeq mem.Regions }
         member _.Restore(st : TaskState) =
             mem.Restore st.Memory
             for i = 0 to 15 do
@@ -81,6 +81,8 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
             nextFd <- st.NextFd
             programBreak <- st.ProgramBreak
             mmapCursor <- st.MmapCursor
+            mem.Regions.Clear()
+            mem.Regions.AddRange st.Regions
         member this.ExecImage (bytes : byte[]) (argv : string[]) =
             let image = ElfLoader.load mem bytes
             programBreak <- image.EndOfData
