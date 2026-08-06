@@ -579,3 +579,46 @@ module LinuxMachineTests =
         let image = ElfTest.create ElfTest.pselect6Code 0x400000UL 0x400000UL
         let code, _ = runWithStdout image [||]
         code |> should equal 0
+
+    [<Fact>]
+    let ``/dev/null renvoie une fin de fichier en lecture et ignore l'écriture`` () =
+        let image = ElfTest.create ElfTest.devNullCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``/dev/zero renvoie des octets nuls en lecture`` () =
+        let image = ElfTest.create ElfTest.devZeroCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``/dev/random renvoie des octets aléatoires en lecture`` () =
+        let image = ElfTest.create ElfTest.devRandomCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``/proc/self/cmdline expose la ligne de commande du processus`` () =
+        let image = ElfTest.create ElfTest.procSelfCmdlineCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [|"/bin/test"|]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``/proc/self s'énumère comme un répertoire contenant ses entrées`` () =
+        let image = ElfTest.create ElfTest.procSelfGetdentsCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``readlink /proc/self/exe pointe vers l'exécutable courant`` () =
+        let image = ElfTest.create ElfTest.readlinkExeCode 0x400000UL 0x400000UL
+        let code, text = runWithStdout image [|"/bin/diplo"|]
+        code |> should equal 0
+        text |> should equal "/bin/diplo"
+
+    [<Fact>]
+    let ``stat /dev/null reconnaît un périphérique de caractères`` () =
+        let image = ElfTest.create ElfTest.statDevNullCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0

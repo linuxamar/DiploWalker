@@ -59,6 +59,7 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
         member _.CurrentDirectory
             with get () = cwd
             and set v = cwd <- v
+        member _.Arguments = arguments
         member _.Snapshot() : TaskState =
             { Memory = mem.Snapshot()
               Registers = regs.Clone()

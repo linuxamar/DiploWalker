@@ -978,6 +978,204 @@ module ElfTest =
         a.Zeros 256
         a.Build()
 
+    let devNullCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.MovEsiImm 2
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 0
+        a.MovRdiRbx()
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 16
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 1
+        a.MovRdiRbx()
+        a.LeaRsiRip "x"
+        a.MovEdxImm 1
+        a.Syscall()
+        a.CmpEaxImm8 1
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data "/dev/null"
+        a.Label "x"
+        a.Data "x"
+        a.Label "buf"
+        a.Zeros 16
+        a.Build()
+
+    let devZeroCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 0
+        a.MovRdiRbx()
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 16
+        a.Syscall()
+        a.CmpEaxImm8 16
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovAlBytePtrRdi()
+        a.CmpAlImm 0
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data "/dev/zero"
+        a.Label "buf"
+        a.Zeros 16
+        a.Build()
+
+    let devRandomCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 0
+        a.MovRdiRbx()
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 16
+        a.Syscall()
+        a.CmpEaxImm8 16
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data "/dev/random"
+        a.Label "buf"
+        a.Zeros 16
+        a.Build()
+
+    let procSelfCmdlineCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 0
+        a.MovRdiRbx()
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 64
+        a.Syscall()
+        a.LeaRdiRip "buf"
+        a.MovAlBytePtrRdi()
+        a.CmpAlImm 47
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data "/proc/self/cmdline"
+        a.Label "buf"
+        a.Zeros 64
+        a.Build()
+
+    let procSelfGetdentsCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 217
+        a.MovRdiRbx()
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 512
+        a.Syscall()
+        a.TestEaxEax()
+        a.Je "fail"
+        a.CmpEaxImm8 -9
+        a.Je "fail"
+        a.CmpEaxImm8 -2
+        a.Je "fail"
+        a.CmpEaxImm8 -22
+        a.Je "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data "/proc/self"
+        a.Label "buf"
+        a.Zeros 512
+        a.Build()
+
+    let readlinkExeCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 89
+        a.LeaRdiRip "link"
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 256
+        a.Syscall()
+        a.MovRdxRax()
+        a.MovEaxImm 1
+        a.MovEdiImm 1
+        a.LeaRsiRip "buf"
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "link"
+        a.Data "/proc/self/exe"
+        a.Label "buf"
+        a.Zeros 256
+        a.Build()
+
+    let statDevNullCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 4
+        a.LeaRdiRip "path"
+        a.LeaRsiRip "buf"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data "/dev/null"
+        a.Label "buf"
+        a.Zeros 144
+        a.Build()
+
     let getresuidCode : byte[] =
         let a = Asm()
         a.MovEaxImm 118
