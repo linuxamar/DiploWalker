@@ -622,3 +622,38 @@ module LinuxMachineTests =
         let image = ElfTest.create ElfTest.statDevNullCode 0x400000UL 0x400000UL
         let code, _ = runWithStdout image [||]
         code |> should equal 0
+
+    [<Fact>]
+    let ``Step exécute le programme instruction par instruction jusqu'à l'arrêt`` () =
+        let image = ElfTest.create ElfTest.helloWorldCode 0x400000UL 0x400000UL
+        use machine = new LinuxMachine(image, [||])
+        machine.StandardOutput <- new MemoryStream()
+        let mutable steps = 0
+        while machine.Step() do
+            steps <- steps + 1
+        steps |> should be (greaterThan 0)
+        machine.ExitStatus |> should equal 42
+
+    [<Fact>]
+    let ``Un point d'arrêt stoppe la machine avant d'exécuter l'instruction visée`` () =
+        let image = ElfTest.create ElfTest.helloWorldCode 0x400000UL 0x400000UL
+        use machine = new LinuxMachine(image, [||])
+        machine.StandardOutput <- new MemoryStream()
+        machine.Breakpoints.Add 0x400000UL
+        machine.Step() |> should equal false
+        machine.Rip |> should equal 0x400000UL
+        machine.IsHalted |> should equal false
+        machine.ExitStatus |> should equal 0
+
+    [<Fact>]
+    let ``SyscallHook reçoit chaque appel système exécuté`` () =
+        let a = ElfTest.Asm()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        let image = ElfTest.create (a.Build()) 0x400000UL 0x400000UL
+        use machine = new LinuxMachine(image, [||])
+        let captured = ResizeArray<uint64>()
+        machine.SyscallHook <- Some (fun n -> captured.Add n)
+        machine.Run() |> should equal 0
+        captured.Contains 60UL |> should be True
