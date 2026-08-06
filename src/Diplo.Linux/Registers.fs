@@ -44,6 +44,31 @@ type Registers() =
     /// Registre XMM d'index donné (128 bits = 16 octets).
     member _.Xmm(i : int) : byte[] = xmm[i]
 
+    /// Duplique l'ensemble des registres (copie complète, XMM inclus).
+    member _.Clone() : Registers =
+        let copy = Registers()
+        copy.RAX <- rax
+        copy.RBX <- rbx
+        copy.RCX <- rcx
+        copy.RDX <- rdx
+        copy.RSI <- rsi
+        copy.RDI <- rdi
+        copy.RBP <- rbp
+        copy.RSP <- rsp
+        copy.R8 <- r8
+        copy.R9 <- r9
+        copy.R10 <- r10
+        copy.R11 <- r11
+        copy.R12 <- r12
+        copy.R13 <- r13
+        copy.R14 <- r14
+        copy.R15 <- r15
+        copy.RIP <- rip
+        copy.RFLAGS <- rflags
+        for i in 0 .. 15 do
+            Array.blit xmm[i] 0 (copy.Xmm i) 0 16
+        copy
+
 /// Module utilitaire d'accès aux registres.
 module Registers =
 
