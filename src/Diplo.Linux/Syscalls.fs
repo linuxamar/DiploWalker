@@ -436,15 +436,15 @@ module Syscalls =
         let consoleDevices =
             [ "/dev/console"; "/dev/tty"; "/dev/ttyS0"; "/dev/ttyS1" ]
         match path with
-        | "/dev/null" -> openVirtual (NullDeviceStream())
-        | "/dev/zero" -> openVirtual (ZeroDeviceStream())
-        | "/dev/random" | "/dev/urandom" -> openVirtual (RandomDeviceStream())
+        | "/dev/null" -> openVirtual (new NullDeviceStream())
+        | "/dev/zero" -> openVirtual (new ZeroDeviceStream())
+        | "/dev/random" | "/dev/urandom" -> openVirtual (new RandomDeviceStream())
         | "/proc/self/cmdline" | "/proc/self/stat" ->
-            openVirtual (VirtualFileStream(virtualBytes host path))
+            openVirtual (new VirtualFileStream(virtualBytes host path))
         | "/proc/self/fd" ->
-            openVirtual (ProcDirectoryStream(path, fdEntries host))
+            openVirtual (new ProcDirectoryStream(path, fdEntries host))
         | "/proc/self" | "/proc/self/" ->
-            openVirtual (ProcDirectoryStream(path, procEntries host))
+            openVirtual (new ProcDirectoryStream(path, procEntries host))
         | _ when List.contains path consoleDevices ->
             let fd = host.NextFd
             host.NextFd <- host.NextFd + 1
