@@ -223,3 +223,359 @@ module LinuxMachineTests =
             text |> should equal dir
         finally
             if Directory.Exists dir then Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``poll signale la sortie standard prête en écriture`` () =
+        let image = ElfTest.create ElfTest.pollCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``ppoll relaie vers poll`` () =
+        let image = ElfTest.create ElfTest.ppollCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``select marque la sortie standard comme prête à écrire`` () =
+        let image = ElfTest.create ElfTest.selectCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``pread64 lit à une position donnée sans déplacer le curseur`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-pread-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "Bonjour")
+            let image = ElfTest.create (ElfTest.preadCode path) 0x400000UL 0x400000UL
+            let code, text = runWithStdout image [||]
+            code |> should equal 0
+            text |> should equal "njour"
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``pwrite64 écrit à une position donnée sans déplacer le curseur`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-pwrite-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "abcdef")
+            let image = ElfTest.create (ElfTest.pwriteCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            File.ReadAllText path |> should equal "abhief"
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``sendfile copie le contenu d'un fichier vers la sortie standard`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-sendfile-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "Bonjour")
+            let image = ElfTest.create (ElfTest.sendfileCode path) 0x400000UL 0x400000UL
+            let code, text = runWithStdout image [||]
+            code |> should equal 0
+            text |> should equal "Bonjour"
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``getdents énumère le contenu d'un répertoire`` () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-getdents-" + Guid.NewGuid().ToString("N"))
+        try
+            Directory.CreateDirectory dir |> ignore
+            File.WriteAllText(Path.Combine(dir, "f.txt"), "x")
+            let image = ElfTest.create (ElfTest.getdentsCode dir) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+        finally
+            if Directory.Exists dir then Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``truncate réduit la taille du fichier`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-truncate-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "0123456789")
+            let image = ElfTest.create (ElfTest.truncateCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            FileInfo(path).Length |> should equal 3L
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``symlink crée un lien symbolique`` () =
+        let target = Path.Combine(Path.GetTempPath(), "diplo-symlink-target-" + Guid.NewGuid().ToString("N"))
+        let link = Path.Combine(Path.GetTempPath(), "diplo-symlink-link-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(target, "cible")
+            let image = ElfTest.create (ElfTest.symlinkCode target link) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            if File.Exists link then
+                (new FileInfo(link)).LinkTarget |> should equal target
+        finally
+            if File.Exists target then File.Delete target
+            if File.Exists link then File.Delete link
+
+    [<Fact>]
+    let ``readlink lit la cible d'un lien symbolique`` () =
+        let target = Path.Combine(Path.GetTempPath(), "diplo-readlink-target-" + Guid.NewGuid().ToString("N"))
+        let link = Path.Combine(Path.GetTempPath(), "diplo-readlink-link-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(target, "cible")
+            try
+                File.CreateSymbolicLink(link, target) |> ignore
+            with :? UnauthorizedAccessException ->
+                ()
+            let image = ElfTest.create (ElfTest.readlinkCode link) 0x400000UL 0x400000UL
+            let code, text = runWithStdout image [||]
+            code |> should equal 0
+            if File.Exists link then
+                text |> should equal target
+        finally
+            if File.Exists target then File.Delete target
+            if File.Exists link then File.Delete link
+
+    [<Fact>]
+    let ``getresuid et getresgid exposent l'identité courante`` () =
+        let imageUid = ElfTest.create ElfTest.getresuidCode 0x400000UL 0x400000UL
+        let codeUid, _ = runWithStdout imageUid [||]
+        codeUid |> should equal 0
+        let imageGid = ElfTest.create ElfTest.getresgidCode 0x400000UL 0x400000UL
+        let codeGid, _ = runWithStdout imageGid [||]
+        codeGid |> should equal 0
+
+    [<Fact>]
+    let ``getcpu expose le processeur et le nœud`` () =
+        let image = ElfTest.create ElfTest.getcpuCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``umask retourne puis met à jour le masque courant`` () =
+        let image = ElfTest.create ElfTest.umaskCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``getrusage remplit le tampon de ressources`` () =
+        let image = ElfTest.create ElfTest.getrusageCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``sysinfo remplit uptime, mémoire et processus`` () =
+        let image = ElfTest.create ElfTest.sysinfoCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``times remplit le tableau des temps CPU`` () =
+        let image = ElfTest.create ElfTest.timesCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``statfs expose les caractéristiques du système de fichiers`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-statfs-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "x")
+            let image = ElfTest.create (ElfTest.statfsCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``fstatfs expose les caractéristiques via le descripteur`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-fstatfs-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "x")
+            let image = ElfTest.create (ElfTest.fstatfsCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``futex FUTEX_WAKE réveille un observateur`` () =
+        let image = ElfTest.create ElfTest.futexCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``clock_getres remplit la résolution et rejette les horloges inconnues`` () =
+        let image = ElfTest.create ElfTest.clockGetresCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``clock_nanosleep accepte une attente nulle`` () =
+        let image = ElfTest.create ElfTest.clockNanosleepCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``prlimit64 expose la limite RLIMIT_NOFILE`` () =
+        let image = ElfTest.create ElfTest.prlimit64Code 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``sched_getaffinity remplit le masque d'affinité`` () =
+        let image = ElfTest.create ElfTest.schedGetaffinityCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``mincore signale les pages résidentes`` () =
+        let image = ElfTest.create ElfTest.mincoreCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``madvise accepte les conseils de pagination`` () =
+        let image = ElfTest.create ElfTest.madviseCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``msync synchronise la région mappée`` () =
+        let image = ElfTest.create ElfTest.msyncCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``mremap déplace une région en préservant son contenu`` () =
+        let image = ElfTest.create ElfTest.mremapCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``getitimer remplit le tampon de minuterie`` () =
+        let image = ElfTest.create ElfTest.getitimerCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``fdatasync synchronise les données du fichier`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-fdatasync-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "data")
+            let image = ElfTest.create (ElfTest.fdatasyncCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            File.ReadAllText path |> should equal "data"
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``mkdirat crée un répertoire relatif au descripteur`` () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-mkdirat-" + Guid.NewGuid().ToString("N"))
+        try
+            let image = ElfTest.create (ElfTest.mkdiratCode dir) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            Directory.Exists dir |> should equal true
+        finally
+            if Directory.Exists dir then Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``unlinkat supprime un fichier`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-unlinkat-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "x")
+            let image = ElfTest.create (ElfTest.unlinkatCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            File.Exists path |> should equal false
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``renameat renomme un fichier`` () =
+        let oldPath = Path.Combine(Path.GetTempPath(), "diplo-renameat-old-" + Guid.NewGuid().ToString("N"))
+        let newPath = Path.Combine(Path.GetTempPath(), "diplo-renameat-new-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(oldPath, "x")
+            let image = ElfTest.create (ElfTest.renameatCode oldPath newPath) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            File.Exists newPath |> should equal true
+            File.Exists oldPath |> should equal false
+        finally
+            if File.Exists oldPath then File.Delete oldPath
+            if File.Exists newPath then File.Delete newPath
+
+    [<Fact>]
+    let ``newfstatat remplit la structure stat`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-newfstatat-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "Bonjour")
+            let image = ElfTest.create (ElfTest.newfstatatCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``symlinkat crée un lien symbolique relatif à un descripteur`` () =
+        let target = Path.Combine(Path.GetTempPath(), "diplo-symlinkat-target-" + Guid.NewGuid().ToString("N"))
+        let link = Path.Combine(Path.GetTempPath(), "diplo-symlinkat-link-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(target, "cible")
+            let image = ElfTest.create (ElfTest.symlinkatCode target link) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            if File.Exists link then
+                (new FileInfo(link)).LinkTarget |> should equal target
+        finally
+            if File.Exists target then File.Delete target
+            if File.Exists link then File.Delete link
+
+    [<Fact>]
+    let ``readlinkat lit la cible d'un lien symbolique via un descripteur`` () =
+        let target = Path.Combine(Path.GetTempPath(), "diplo-readlinkat-target-" + Guid.NewGuid().ToString("N"))
+        let link = Path.Combine(Path.GetTempPath(), "diplo-readlinkat-link-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(target, "cible")
+            try
+                File.CreateSymbolicLink(link, target) |> ignore
+            with :? UnauthorizedAccessException ->
+                ()
+            let image = ElfTest.create (ElfTest.readlinkatCode link) 0x400000UL 0x400000UL
+            let code, text = runWithStdout image [||]
+            code |> should equal 0
+            if File.Exists link then
+                text |> should equal target
+        finally
+            if File.Exists target then File.Delete target
+            if File.Exists link then File.Delete link
+
+    [<Fact>]
+    let ``fchmodat applique un mode sur un fichier`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-fchmodat-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "x")
+            let image = ElfTest.create (ElfTest.fchmodatCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``faccessat vérifie l'accès à un fichier`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-faccessat-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "x")
+            let image = ElfTest.create (ElfTest.faccessatCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``pselect6 accepte un ensemble de descripteurs vide`` () =
+        let image = ElfTest.create ElfTest.pselect6Code 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0

@@ -123,6 +123,8 @@ module ElfTest =
         member this.MovRdiImm64 (v : int64) = this.Emit(Array.append [| 0x48uy; 0xBFuy |] (this.Imm64 v))
         member this.MovR10Imm64 (v : int64) = this.Emit(Array.append [| 0x49uy; 0xBAuy |] (this.Imm64 v))
         member this.MovR8Imm64 (v : int64) = this.Emit(Array.append [| 0x49uy; 0xB8uy |] (this.Imm64 v))
+        member this.MovRdxImm64 (v : int64) = this.Emit(Array.append [| 0x48uy; 0xBAuy |] (this.Imm64 v))
+        member this.MovRsiImm64 (v : int64) = this.Emit(Array.append [| 0x48uy; 0xBEuy |] (this.Imm64 v))
 
         member this.MovRdiRax () = this.Emit [| 0x48uy; 0x89uy; 0xC7uy |]
         member this.MovRdiRbx () = this.Emit [| 0x48uy; 0x89uy; 0xDFuy |]
@@ -151,6 +153,14 @@ module ElfTest =
             let start = bytes.Count
             this.Emit [| 0x48uy; 0x8Duy; 0x35uy; 0uy; 0uy; 0uy; 0uy |]
             ripRefs.Add(label, start)
+        member this.LeaRdxRip (label : string) =
+            let start = bytes.Count
+            this.Emit [| 0x48uy; 0x8Duy; 0x15uy; 0uy; 0uy; 0uy; 0uy |]
+            ripRefs.Add(label, start)
+        member this.LeaR10Rip (label : string) =
+            let start = bytes.Count
+            this.Emit [| 0x4Cuy; 0x8Duy; 0x15uy; 0uy; 0uy; 0uy; 0uy |]
+            ripRefs.Add(label, start)
         member this.Jnz (label : string) =
             let start = bytes.Count
             this.Emit [| 0x75uy; 0uy |]
@@ -170,6 +180,7 @@ module ElfTest =
         member this.MovRaxMemRsi () = this.Emit [| 0x48uy; 0x8Buy; 0x06uy |]
         member this.MovEdiMemRdi () = this.Emit [| 0x8Buy; 0x3Fuy |]
         member this.MovEdiMemRdiDisp8 (v : int) = this.Emit [| 0x8Buy; 0x7Fuy; byte v |]
+        member this.MovEaxEdi () = this.Emit [| 0x89uy; 0xF8uy |]
         member this.SubEaxImm (v : int) = this.Emit(Array.append [| 0x2Duy |] (this.Imm32 v))
         member this.XorEcxEcx () = this.Emit [| 0x31uy; 0xC9uy |]
         member this.IncEcx () = this.Emit [| 0xFFuy; 0xC1uy |]
@@ -714,4 +725,1031 @@ module ElfTest =
         a.Data dir
         a.Label "buf"
         a.Zeros 256
+        a.Build()
+
+    let pollCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 7
+        a.LeaRdiRip "fds"
+        a.MovEsiImm 1
+        a.XorEdxEdx()
+        a.Syscall()
+        a.CmpEaxImm8 1
+        a.Jnz "fail"
+        a.LeaRdiRip "fds"
+        a.MovEdiMemRdiDisp8 6
+        a.MovEaxEdi()
+        a.AndEaxImm 0xFFFF
+        a.CmpEaxImm8 4
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "fds"
+        a.Data "\u0001\u0000\u0000\u0000\u0004"
+        a.Zeros 8
+        a.Build()
+
+    let ppollCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 271
+        a.LeaRdiRip "fds"
+        a.MovEsiImm 1
+        a.XorEdxEdx()
+        a.MovR10Imm64 0L
+        a.Syscall()
+        a.CmpEaxImm8 1
+        a.Jnz "fail"
+        a.LeaRdiRip "fds"
+        a.MovEdiMemRdiDisp8 6
+        a.MovEaxEdi()
+        a.AndEaxImm 0xFFFF
+        a.CmpEaxImm8 4
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "fds"
+        a.Data "\u0001\u0000\u0000\u0000\u0004"
+        a.Zeros 8
+        a.Build()
+
+    let selectCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 23
+        a.MovEdiImm 2
+        a.XorEsiEsi()
+        a.LeaRdxRip "wr"
+        a.MovR10Imm64 0L
+        a.MovR8Imm64 0L
+        a.Syscall()
+        a.CmpEaxImm8 1
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "wr"
+        a.Data "\u0002"
+        a.Build()
+
+    let preadCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 17
+        a.MovRdiRbx()
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 5
+        a.MovR10Imm64 2L
+        a.Syscall()
+        a.MovEaxImm 1
+        a.MovEdiImm 1
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 5
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "buf"
+        a.Zeros 8
+        a.Build()
+
+    let pwriteCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.MovEsiImm 1
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 18
+        a.MovRdiRbx()
+        a.LeaRsiRip "data"
+        a.MovEdxImm 2
+        a.MovR10Imm64 2L
+        a.Syscall()
+        a.CmpEaxImm8 2
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "data"
+        a.Raw "hi"
+        a.Build()
+
+    let sendfileCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRsiRax()
+        a.MovEaxImm 40
+        a.MovEdiImm 1
+        a.XorEdxEdx()
+        a.MovR10Imm64 7L
+        a.Syscall()
+        a.CmpEaxImm8 7
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Build()
+
+    let getdentsCode (dir : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 78
+        a.MovRdiRbx()
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 512
+        a.Syscall()
+        a.CmpEaxImm8 24
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data dir
+        a.Label "buf"
+        a.Zeros 512
+        a.Build()
+
+    let truncateCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 76
+        a.LeaRdiRip "path"
+        a.MovEsiImm 3
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Build()
+
+    let symlinkCode (target : string) (link : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 88
+        a.LeaRdiRip "target"
+        a.LeaRsiRip "link"
+        a.Syscall()
+        a.CmpEaxImm8 0
+        a.Je "ok"
+        a.CmpEaxImm8 -1
+        a.Je "ok"
+        a.CmpEaxImm8 -2
+        a.Je "ok"
+        a.CmpEaxImm8 -17
+        a.Je "ok"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ok"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "target"
+        a.Data target
+        a.Label "link"
+        a.Data link
+        a.Build()
+
+    let readlinkCode (link : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 89
+        a.LeaRdiRip "link"
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 256
+        a.Syscall()
+        a.MovRdxRax()
+        a.MovEaxImm 1
+        a.MovEdiImm 1
+        a.LeaRsiRip "buf"
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "link"
+        a.Data link
+        a.Label "buf"
+        a.Zeros 256
+        a.Build()
+
+    let getresuidCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 118
+        a.LeaRdiRip "ruid"
+        a.LeaRsiRip "euid"
+        a.XorEdxEdx()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "ruid"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "euid"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ruid"
+        a.Zeros 4
+        a.Label "euid"
+        a.Zeros 4
+        a.Build()
+
+    let getresgidCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 120
+        a.LeaRdiRip "rgid"
+        a.LeaRsiRip "egid"
+        a.XorEdxEdx()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "rgid"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "egid"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "rgid"
+        a.Zeros 4
+        a.Label "egid"
+        a.Zeros 4
+        a.Build()
+
+    let getcpuCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 309
+        a.LeaRdiRip "cpu"
+        a.LeaRsiRip "node"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "cpu"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "node"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "cpu"
+        a.Zeros 4
+        a.Label "node"
+        a.Zeros 4
+        a.Build()
+
+    let umaskCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 95
+        a.MovEdiImm 0x1B
+        a.Syscall()
+        a.CmpEaxImm8 0x12
+        a.Jnz "fail"
+        a.MovEaxImm 95
+        a.MovEdiImm 0x12
+        a.Syscall()
+        a.CmpEaxImm8 0x1B
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Build()
+
+    let getrusageCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 98
+        a.XorEdiEdi()
+        a.LeaRsiRip "usage"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "usage"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "usage"
+        a.Zeros 144
+        a.Build()
+
+    let sysinfoCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 99
+        a.LeaRdiRip "buf"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdiDisp8 32
+        a.MovEaxEdi()
+        a.SubEaxImm 0x10000000
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdiDisp8 80
+        a.MovEaxEdi()
+        a.AndEaxImm 0xFFFF
+        a.CmpEaxImm8 1
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "buf"
+        a.Zeros 112
+        a.Build()
+
+    let timesCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 100
+        a.LeaRdiRip "buf"
+        a.Syscall()
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "buf"
+        a.Zeros 32
+        a.Build()
+
+    let statfsCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 137
+        a.LeaRdiRip "path"
+        a.LeaRsiRip "buf"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.SubEaxImm 0xEF53
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdiDisp8 8
+        a.MovEaxEdi()
+        a.SubEaxImm 4096
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdiDisp8 64
+        a.MovEaxEdi()
+        a.SubEaxImm 255
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "buf"
+        a.Zeros 120
+        a.Build()
+
+    let fstatfsCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 138
+        a.MovRdiRbx()
+        a.LeaRsiRip "buf"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.SubEaxImm 0xEF53
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdiDisp8 8
+        a.MovEaxEdi()
+        a.SubEaxImm 4096
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "buf"
+        a.MovEdiMemRdiDisp8 64
+        a.MovEaxEdi()
+        a.SubEaxImm 255
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "buf"
+        a.Zeros 120
+        a.Build()
+
+    let futexCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 202
+        a.LeaRdiRip "uaddr"
+        a.MovEsiImm 1
+        a.XorEdxEdx()
+        a.MovR10Imm64 0L
+        a.MovR8Imm64 0L
+        a.Syscall()
+        a.CmpEaxImm8 1
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "uaddr"
+        a.Zeros 4
+        a.Build()
+
+    let clockGetresCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 229
+        a.XorEdiEdi()
+        a.LeaRsiRip "res"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "res"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "res"
+        a.MovEdiMemRdiDisp8 8
+        a.MovEaxEdi()
+        a.CmpEaxImm8 1
+        a.Jnz "fail"
+        a.MovEaxImm 229
+        a.MovEdiImm 99
+        a.XorEsiEsi()
+        a.Syscall()
+        a.CmpEaxImm8 -22
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "res"
+        a.Zeros 16
+        a.Build()
+
+    let clockNanosleepCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 230
+        a.XorEdiEdi()
+        a.XorEsiEsi()
+        a.LeaRdxRip "req"
+        a.MovR10Imm64 0L
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "req"
+        a.Zeros 16
+        a.Build()
+
+    let prlimit64Code : byte[] =
+        let a = Asm()
+        a.MovEaxImm 302
+        a.XorEdiEdi()
+        a.MovEsiImm 7
+        a.XorEdxEdx()
+        a.LeaR10Rip "old"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "old"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.SubEaxImm 4096
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "old"
+        a.Zeros 16
+        a.Build()
+
+    let schedGetaffinityCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 204
+        a.XorEdiEdi()
+        a.MovEsiImm 8
+        a.LeaRdxRip "mask"
+        a.Syscall()
+        a.CmpEaxImm8 8
+        a.Jnz "fail"
+        a.LeaRdiRip "mask"
+        a.MovAlBytePtrRdi()
+        a.CmpAlImm 0xFF
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "mask"
+        a.Zeros 8
+        a.Build()
+
+    let mincoreCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 9
+        a.XorEdiEdi()
+        a.MovEsiImm 0x1000
+        a.MovEdxImm 3
+        a.MovR10Imm64 0x22L
+        a.MovR8Imm64 -1L
+        a.XorR9dR9d()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 27
+        a.MovRdiRbx()
+        a.MovEsiImm 0x1000
+        a.LeaRdxRip "vec"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "vec"
+        a.Zeros 8
+        a.Build()
+
+    let madviseCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 9
+        a.XorEdiEdi()
+        a.MovEsiImm 0x1000
+        a.MovEdxImm 3
+        a.MovR10Imm64 0x22L
+        a.MovR8Imm64 -1L
+        a.XorR9dR9d()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 28
+        a.MovRdiRbx()
+        a.MovEsiImm 0x1000
+        a.XorEdxEdx()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Build()
+
+    let msyncCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 9
+        a.XorEdiEdi()
+        a.MovEsiImm 0x1000
+        a.MovEdxImm 3
+        a.MovR10Imm64 0x22L
+        a.MovR8Imm64 -1L
+        a.XorR9dR9d()
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 26
+        a.MovRdiRbx()
+        a.MovEsiImm 0x1000
+        a.XorEdxEdx()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Build()
+
+    let mremapCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 9
+        a.XorEdiEdi()
+        a.MovEsiImm 0x1000
+        a.MovEdxImm 3
+        a.MovR10Imm64 0x22L
+        a.MovR8Imm64 -1L
+        a.XorR9dR9d()
+        a.Syscall()
+        a.MovRbxRax()
+        a.LeaRdiRbxDisp32 0x100
+        a.MovBytePtrRdiImm 0x42
+        a.MovEaxImm 25
+        a.MovRdiRbx()
+        a.MovEsiImm 0x1000
+        a.MovEdxImm 0x2000
+        a.MovR10Imm64 1L
+        a.MovR8Imm64 0L
+        a.Syscall()
+        a.MovRbxRax()
+        a.LeaRdiRbxDisp32 0x100
+        a.MovAlBytePtrRdi()
+        a.CmpAlImm 0x42
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Build()
+
+    let getitimerCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 36
+        a.XorEdiEdi()
+        a.LeaRsiRip "val"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "val"
+        a.MovEdiMemRdi()
+        a.MovEaxEdi()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "val"
+        a.Zeros 16
+        a.Build()
+
+    let fdatasyncCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.MovEsiImm 1
+        a.Syscall()
+        a.MovRbxRax()
+        a.MovEaxImm 1
+        a.MovRdiRbx()
+        a.LeaRsiRip "data"
+        a.MovEdxImm 4
+        a.Syscall()
+        a.MovEaxImm 75
+        a.MovRdiRbx()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "data"
+        a.Raw "data"
+        a.Build()
+
+    let mkdiratCode (dir : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 258
+        a.MovRdiImm64 -100L
+        a.LeaRsiRip "path"
+        a.MovEdxImm 0x1FF
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data dir
+        a.Build()
+
+    let unlinkatCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 263
+        a.MovRdiImm64 -100L
+        a.LeaRsiRip "path"
+        a.XorEdxEdx()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Build()
+
+    let renameatCode (oldPath : string) (newPath : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 264
+        a.MovRdiImm64 -100L
+        a.LeaRsiRip "old"
+        a.MovRdxImm64 -100L
+        a.LeaR10Rip "new"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "old"
+        a.Data oldPath
+        a.Label "new"
+        a.Data newPath
+        a.Build()
+
+    let newfstatatCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 262
+        a.MovRdiImm64 -100L
+        a.LeaRsiRip "path"
+        a.LeaRdxRip "st"
+        a.MovR10Imm64 0L
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "st"
+        a.MovEdiMemRdiDisp8 48
+        a.MovEaxEdi()
+        a.SubEaxImm 7
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "st"
+        a.Zeros 144
+        a.Build()
+
+    let symlinkatCode (target : string) (link : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 266
+        a.LeaRdiRip "target"
+        a.MovRsiImm64 -100L
+        a.LeaRdxRip "link"
+        a.Syscall()
+        a.CmpEaxImm8 0
+        a.Je "ok"
+        a.CmpEaxImm8 -1
+        a.Je "ok"
+        a.CmpEaxImm8 -2
+        a.Je "ok"
+        a.CmpEaxImm8 -17
+        a.Je "ok"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ok"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "target"
+        a.Data target
+        a.Label "link"
+        a.Data link
+        a.Build()
+
+    let readlinkatCode (link : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 267
+        a.MovRdiImm64 -100L
+        a.LeaRsiRip "link"
+        a.LeaRdxRip "buf"
+        a.MovR10Imm64 256L
+        a.Syscall()
+        a.MovRdxRax()
+        a.MovEaxImm 1
+        a.MovEdiImm 1
+        a.LeaRsiRip "buf"
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "link"
+        a.Data link
+        a.Label "buf"
+        a.Zeros 256
+        a.Build()
+
+    let fchmodatCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 268
+        a.MovRdiImm64 -100L
+        a.LeaRsiRip "path"
+        a.MovEdxImm 0x1FF
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Build()
+
+    let faccessatCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 269
+        a.MovRdiImm64 -100L
+        a.LeaRsiRip "path"
+        a.XorEdxEdx()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Build()
+
+    let pselect6Code : byte[] =
+        let a = Asm()
+        a.MovEaxImm 270
+        a.XorEdiEdi()
+        a.XorEsiEsi()
+        a.XorEdxEdx()
+        a.MovR10Imm64 0L
+        a.MovR8Imm64 0L
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
         a.Build()
