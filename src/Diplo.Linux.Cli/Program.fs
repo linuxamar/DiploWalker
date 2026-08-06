@@ -93,7 +93,7 @@ module Program =
         else
             try
                 let bytes = IsoImage.readFile isoPath kernelPath
-                use machine = new LinuxMachine(bytes, args)
+                use machine = new LinuxMachine(bytes, args, kernel = true)
                 runMachine machine trace step breakpoints
             with
             | ex ->

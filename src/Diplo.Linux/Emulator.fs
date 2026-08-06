@@ -741,6 +741,25 @@ module Emulator =
             host.Halted <- true
             host.ExitStatus <- 0
 
+        | Out port ->
+            let p =
+                match port with
+                | Reg idx -> Registers.get64 regs idx
+                | Imm v -> v
+                | Mem _ -> invalidOp "Port mémoire non pris en charge"
+            if p = 0x3F8UL then
+                host.StandardOutput.WriteByte (byte (Registers.get64 regs 0))
+
+        | In port ->
+            let p =
+                match port with
+                | Reg idx -> Registers.get64 regs idx
+                | Imm v -> v
+                | Mem _ -> invalidOp "Port mémoire non pris en charge"
+            let v = if p = 0x3FDUL then 0x60uy else 0xFFuy
+            let rax = Registers.get64 regs 0
+            Registers.set64 regs 0 ((rax &&& 0xFFFF_FFFF_FFFF_FF00UL) ||| uint64 v)
+
         | Cld ->
             regs.RFLAGS <- regs.RFLAGS &&& ~~~FlagDf
 

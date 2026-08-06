@@ -7,7 +7,7 @@ open System.Text
 
 /// Machine Linux émulée sur Windows : charge l'ELF, met en place la pile,
 /// puis exécute le programme en traduisant les syscalls vers Windows.
-type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
+type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64, ?kernel : bool) =
     let size = defaultArg memorySize (256UL <<< 20)
     let mem = VirtualMemory(size)
     let regs = Registers.create ()
@@ -29,6 +29,7 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
     let breakpoints = ResizeArray<uint64>()
     let mutable syscallHook : (uint64 -> unit) option = None
     let mutable imageLoaded = false
+    let kernelMode = defaultArg kernel false
 
     interface ISyscallHost with
         member _.Memory = mem
@@ -181,10 +182,13 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
     member private this.LoadImage () =
         let image = ElfLoader.load mem image
         programBreak <- image.EndOfData
-        let stackTop = size - 0x1000UL
-        let rsp = this.SetupStack stackTop arguments
+        if kernelMode then
+            regs.RSP <- size - 0x1000UL
+        else
+            let stackTop = size - 0x1000UL
+            let rsp = this.SetupStack stackTop arguments
+            regs.RSP <- rsp
         regs.RIP <- image.EntryPoint
-        regs.RSP <- rsp
         imageLoaded <- true
 
     /// Exécute le programme et retourne le code de sortie.
