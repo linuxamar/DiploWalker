@@ -105,3 +105,50 @@ module LinuxMachineTests =
         let image = ElfTest.create ElfTest.getrandomCode 0x400000UL 0x400000UL
         let code, _ = runWithStdout image [||]
         code |> should equal 0
+
+    [<Fact>]
+    let ``pipe2 fait transiter « ping » d'une extrémité à l'autre`` () =
+        let image = ElfTest.create ElfTest.pipe2Code 0x400000UL 0x400000UL
+        let code, text = runWithStdout image [||]
+        code |> should equal 0
+        text |> should equal "ping"
+
+    [<Fact>]
+    let ``dup2 duplique la sortie standard sur un nouveau descripteur`` () =
+        let image = ElfTest.create ElfTest.dup2Code 0x400000UL 0x400000UL
+        let code, text = runWithStdout image [||]
+        code |> should equal 0
+        text |> should equal "duplo"
+
+    [<Fact>]
+    let ``fcntl F_DUPFD duplique la sortie standard sur un descripteur libre`` () =
+        let image = ElfTest.create ElfTest.fcntlDupCode 0x400000UL 0x400000UL
+        let code, text = runWithStdout image [||]
+        code |> should equal 0
+        text |> should equal "fd"
+
+    [<Fact>]
+    let ``ioctl sur une requête non gérée retourne -ENOTTY`` () =
+        let image = ElfTest.create ElfTest.ioctlCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``getrlimit RLIMIT_NOFILE expose 4096 descripteurs`` () =
+        let image = ElfTest.create ElfTest.getrlimitCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``chdir puis getcwd retournent le nouveau répertoire`` () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-chdir-" + Guid.NewGuid().ToString("N"))
+        try
+            Directory.CreateDirectory dir |> ignore
+            use machine = new LinuxMachine(ElfTest.create (ElfTest.chdirCode dir) 0x400000UL 0x400000UL, [||])
+            use output = new MemoryStream()
+            machine.StandardOutput <- output
+            let code = machine.Run()
+            code |> should equal 0
+            Encoding.UTF8.GetString(output.ToArray()) |> should equal dir
+        finally
+            if Directory.Exists dir then Directory.Delete(dir, true)

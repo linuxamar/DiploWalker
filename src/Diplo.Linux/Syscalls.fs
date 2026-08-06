@@ -708,6 +708,46 @@ module Syscalls =
         host.Memory.WriteBytes buf data
         buflen
 
+    let private sysIoctl (_host : ISyscallHost) (_fd : uint64) (_request : uint64) (_arg : uint64) : uint64 =
+        errno -25
+
+    let private sysFcntl (host : ISyscallHost) (fd : uint64) (cmd : uint64) (arg : uint64) : uint64 =
+        match cmd with
+        | 0UL ->   // F_DUPFD : plus petit descripteur libre supérieur ou égal à arg
+            try
+                let s = streamFor host fd
+                let mutable newFd = int arg
+                while host.OpenFiles.ContainsKey newFd do
+                    newFd <- newFd + 1
+                host.OpenFiles.[newFd] <- s
+                uint64 newFd
+            with _ -> errno -9
+        | 1UL -> 0UL   // F_GETFD
+        | 2UL -> 0UL   // F_SETFD
+        | 3UL -> 0UL   // F_GETFL
+        | 4UL -> 0UL   // F_SETFL
+        | _ -> errno -22
+
+    let private sysGetrlimit (host : ISyscallHost) (resource : uint64) (rlim : uint64) : uint64 =
+        match resource with
+        | 7UL ->   // RLIMIT_NOFILE
+            host.Memory.WriteUInt64 rlim 4096UL
+            host.Memory.WriteUInt64 (rlim + 8UL) 4096UL
+            0UL
+        | 3UL ->   // RLIMIT_STACK
+            let stack = 8UL * 1024UL * 1024UL
+            host.Memory.WriteUInt64 rlim stack
+            host.Memory.WriteUInt64 (rlim + 8UL) stack
+            0UL
+        | 9UL ->   // RLIMIT_AS
+            host.Memory.WriteUInt64 rlim UInt64.MaxValue
+            host.Memory.WriteUInt64 (rlim + 8UL) UInt64.MaxValue
+            0UL
+        | _ -> errno -22
+
+    let private sysSetTidAddress (_host : ISyscallHost) (_addr : uint64) : uint64 =
+        0UL
+
     /// Exécute le syscall désigné par RAX et écrit le résultat dans RAX.
     let dispatch (host : ISyscallHost) : unit =
         let r = host.Registers
@@ -753,6 +793,10 @@ module Syscalls =
             | 84UL -> sysRmdir host a1
             | 87UL -> sysUnlink host a1
             | 96UL -> sysGettimeofday host a1
+            | 16UL -> sysIoctl host a1 a2 a3
+            | 72UL -> sysFcntl host a1 a2 a3
+            | 97UL -> sysGetrlimit host a1 a2
+            | 218UL -> sysSetTidAddress host a1
             | 102UL -> sysGetuid ()
             | 104UL -> sysGetgid ()
             | 107UL -> sysGeteuid ()

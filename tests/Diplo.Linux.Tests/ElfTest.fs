@@ -159,6 +159,21 @@ module ElfTest =
             let start = bytes.Count
             this.Emit [| 0x74uy; 0uy |]
             jumpRefs.Add(label, start)
+        member this.Jmp (label : string) =
+            let start = bytes.Count
+            this.Emit [| 0xEBuy; 0uy |]
+            jumpRefs.Add(label, start)
+
+        member this.MovRdiRsi () = this.Emit [| 0x48uy; 0x89uy; 0xF7uy |]
+        member this.MovRdxRax () = this.Emit [| 0x48uy; 0x89uy; 0xC2uy |]
+        member this.MovRdxRcx () = this.Emit [| 0x48uy; 0x89uy; 0xCAuy |]
+        member this.MovRaxMemRsi () = this.Emit [| 0x48uy; 0x8Buy; 0x06uy |]
+        member this.MovEdiMemRdi () = this.Emit [| 0x8Buy; 0x3Fuy |]
+        member this.MovEdiMemRdiDisp8 (v : int) = this.Emit [| 0x8Buy; 0x7Fuy; byte v |]
+        member this.SubEaxImm (v : int) = this.Emit(Array.append [| 0x2Duy |] (this.Imm32 v))
+        member this.XorEcxEcx () = this.Emit [| 0x31uy; 0xC9uy |]
+        member this.IncEcx () = this.Emit [| 0xFFuy; 0xC1uy |]
+        member this.CmpBytePtrRsiRcxImm (v : int) = this.Emit [| 0x80uy; 0x3Cuy; 0x0Euy; byte v |]
 
         member this.Build () : byte[] =
             for (label, start) in ripRefs do
@@ -364,4 +379,165 @@ module ElfTest =
         a.Syscall()
         a.Label "buf"
         a.Zeros 16
+        a.Build()
+
+    /// pipe2 puis aller-retour : écrit « ping » sur l'extrémité d'écriture,
+    /// relit sur l'extrémité de lecture et réécrit le résultat sur stdout.
+    let pipe2Code : byte[] =
+        let a = Asm()
+        a.MovEaxImm 293
+        a.LeaRdiRip "fds"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.LeaRdiRip "fds"
+        a.MovEdiMemRdiDisp8 4
+        a.MovEaxImm 1
+        a.LeaRsiRip "msg"
+        a.MovEdxImm 4
+        a.Syscall()
+        a.LeaRdiRip "fds"
+        a.MovEdiMemRdi ()
+        a.XorEaxEax()
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 4
+        a.Syscall()
+        a.MovEaxImm 1
+        a.MovEdiImm 1
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 4
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "fds"
+        a.Zeros 8
+        a.Label "msg"
+        a.Raw "ping"
+        a.Label "buf"
+        a.Raw "xxxx"
+        a.Build()
+
+    /// dup2(1, 7) puis écriture de « duplo » sur le descripteur 7.
+    let dup2Code : byte[] =
+        let a = Asm()
+        a.MovEaxImm 33
+        a.MovEdiImm 1
+        a.MovEsiImm 7
+        a.Syscall()
+        a.MovEaxImm 1
+        a.MovEdiImm 7
+        a.LeaRsiRip "msg"
+        a.MovEdxImm 5
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "msg"
+        a.Raw "duplo"
+        a.Build()
+
+    /// fcntl F_DUPFD de la sortie standard (fd minimal 10) puis écriture
+    /// de « fd » via le descripteur retourné.
+    let fcntlDupCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 72
+        a.MovEdiImm 1
+        a.XorEsiEsi()
+        a.MovEdxImm 10
+        a.Syscall()
+        a.MovRdiRax()
+        a.MovEaxImm 1
+        a.LeaRsiRip "msg"
+        a.MovEdxImm 2
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "msg"
+        a.Raw "fd"
+        a.Build()
+
+    /// ioctl(0, TCGETS, 0) : la requête n'est pas gérée, il faut -ENOTTY (-25).
+    let ioctlCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 16
+        a.XorEdiEdi()
+        a.MovEsiImm 0x5401
+        a.XorEdxEdx()
+        a.Syscall()
+        a.CmpEaxImm8 -25
+        a.Je "ok"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ok"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Build()
+
+    /// getrlimit(RLIMIT_NOFILE) : la limite courante doit valoir 4096.
+    let getrlimitCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 97
+        a.MovEdiImm 7
+        a.LeaRsiRip "buf"
+        a.Syscall()
+        a.MovRaxMemRsi()
+        a.SubEaxImm 4096
+        a.TestEaxEax()
+        a.Je "ok"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ok"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "buf"
+        a.Zeros 16
+        a.Build()
+
+    /// chdir vers le chemin donné, getcwd, puis écriture du répertoire courant
+    /// sur la sortie standard (longueur calculée par une boucle strlen guest).
+    let chdirCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 80
+        a.LeaRdiRip "path"
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 79
+        a.LeaRdiRip "buf"
+        a.MovEsiImm 256
+        a.Syscall()
+        a.MovRsiRax()
+        a.XorEcxEcx()
+        a.Label "loop"
+        a.CmpBytePtrRsiRcxImm 0
+        a.Je "done"
+        a.IncEcx()
+        a.Jmp "loop"
+        a.Label "done"
+        a.MovEaxImm 1
+        a.MovEdiImm 1
+        a.MovRdxRcx()
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "buf"
+        a.Zeros 256
         a.Build()
