@@ -152,3 +152,74 @@ module LinuxMachineTests =
             Encoding.UTF8.GetString(output.ToArray()) |> should equal dir
         finally
             if Directory.Exists dir then Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``gettid retourne l'identifiant du thread`` () =
+        let image = ElfTest.create ElfTest.gettidCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``time écrit l'heure Unix dans le tampon`` () =
+        use machine = new LinuxMachine(ElfTest.create ElfTest.timeCode 0x400000UL 0x400000UL, [||])
+        use output = new MemoryStream()
+        machine.StandardOutput <- output
+        let code = machine.Run()
+        code |> should equal 0
+        let bytes = output.ToArray()
+        bytes.Length |> should equal 8
+        let guestTime = BitConverter.ToUInt64 (bytes, 0)
+        let now = uint64 (DateTimeOffset.UtcNow.ToUnixTimeSeconds ())
+        abs (int64 guestTime - int64 now) |> should be (lessThan 5L)
+
+    [<Fact>]
+    let ``setrlimit accepte RLIMIT_NOFILE`` () =
+        let image = ElfTest.create ElfTest.setrlimitCode 0x400000UL 0x400000UL
+        let code, _ = runWithStdout image [||]
+        code |> should equal 0
+
+    [<Fact>]
+    let ``creat crée un fichier et permet l'écriture`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-creat-" + Guid.NewGuid().ToString("N"))
+        try
+            let image = ElfTest.create (ElfTest.creatCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            File.ReadAllText path |> should equal "hi"
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``fsync vide les tampons du fichier`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-fsync-" + Guid.NewGuid().ToString("N"))
+        try
+            let image = ElfTest.create (ElfTest.fsyncCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            File.ReadAllText path |> should equal "data"
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``ftruncate réduit la taille du fichier à zéro`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-ftruncate-" + Guid.NewGuid().ToString("N"))
+        try
+            File.WriteAllText(path, "some-content")
+            let image = ElfTest.create (ElfTest.ftruncateCode path) 0x400000UL 0x400000UL
+            let code, _ = runWithStdout image [||]
+            code |> should equal 0
+            FileInfo(path).Length |> should equal 0L
+        finally
+            if File.Exists path then File.Delete path
+
+    [<Fact>]
+    let ``fchdir puis getcwd retournent le répertoire du descripteur`` () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-fchdir-" + Guid.NewGuid().ToString("N"))
+        try
+            Directory.CreateDirectory dir |> ignore
+            let image = ElfTest.create (ElfTest.fchdirCode dir) 0x400000UL 0x400000UL
+            let code, text = runWithStdout image [||]
+            code |> should equal 0
+            text |> should equal dir
+        finally
+            if Directory.Exists dir then Directory.Delete(dir, true)

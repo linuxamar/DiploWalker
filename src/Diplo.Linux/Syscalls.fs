@@ -436,8 +436,11 @@ module Syscalls =
     let private sysClose (host : ISyscallHost) (fd : uint64) : uint64 =
         try
             match host.OpenFiles.TryGetValue(int fd) with
-            | true, _ ->
+            | true, s ->
                 host.OpenFiles.Remove(int fd) |> ignore
+                match s with
+                | :? FileStream as fs -> fs.Dispose()
+                | _ -> ()
                 0UL
             | false, _ -> errno -9
         with
@@ -748,6 +751,48 @@ module Syscalls =
     let private sysSetTidAddress (_host : ISyscallHost) (_addr : uint64) : uint64 =
         0UL
 
+    let private sysFsync (host : ISyscallHost) (fd : uint64) : uint64 =
+        try
+            let s = streamFor host fd
+            s.Flush ()
+            0UL
+        with _ -> errno -9
+
+    let private sysFtruncate (host : ISyscallHost) (fd : uint64) (length : uint64) : uint64 =
+        try
+            let s = streamFor host fd
+            if s.CanWrite then
+                s.SetLength (int64 length)
+                0UL
+            else
+                errno -9
+        with _ -> errno -9
+
+    let private sysFchdir (host : ISyscallHost) (fd : uint64) : uint64 =
+        try
+            let s = streamFor host fd
+            match s with
+            | :? DirectoryStream as d ->
+                host.CurrentDirectory <- d.Path
+                0UL
+            | _ -> errno -9
+        with _ -> errno -9
+
+    let private sysCreat (host : ISyscallHost) (pathPtr : uint64) (_mode : uint64) : uint64 =
+        sysOpenPath host (readCString host.Memory pathPtr) 0x241UL
+
+    let private sysSetrlimit (_host : ISyscallHost) (_resource : uint64) (_rlim : uint64) : uint64 =
+        0UL
+
+    let private sysGettid () : uint64 =
+        1UL
+
+    let private sysTime (host : ISyscallHost) (tloc : uint64) : uint64 =
+        let now = DateTimeOffset.UtcNow.ToUnixTimeSeconds ()
+        if tloc <> 0UL then
+            host.Memory.WriteUInt64 tloc (uint64 now)
+        uint64 now
+
     /// Exécute le syscall désigné par RAX et écrit le résultat dans RAX.
     let dispatch (host : ISyscallHost) : unit =
         let r = host.Registers
@@ -797,6 +842,13 @@ module Syscalls =
             | 72UL -> sysFcntl host a1 a2 a3
             | 97UL -> sysGetrlimit host a1 a2
             | 218UL -> sysSetTidAddress host a1
+            | 74UL -> sysFsync host a1
+            | 77UL -> sysFtruncate host a1 a2
+            | 81UL -> sysFchdir host a1
+            | 85UL -> sysCreat host a1 a2
+            | 160UL -> sysSetrlimit host a1 a2
+            | 186UL -> sysGettid ()
+            | 201UL -> sysTime host a1
             | 102UL -> sysGetuid ()
             | 104UL -> sysGetgid ()
             | 107UL -> sysGeteuid ()

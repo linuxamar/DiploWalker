@@ -541,3 +541,177 @@ module ElfTest =
         a.Label "buf"
         a.Zeros 256
         a.Build()
+
+    /// gettid doit retourner 1.
+    let gettidCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 186
+        a.Syscall()
+        a.CmpEaxImm8 1
+        a.Je "ok"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ok"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Build()
+
+    /// time(buf) écrit l'heure Unix (8 octets) dans buf puis sur stdout.
+    let timeCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 201
+        a.LeaRsiRip "buf"
+        a.MovRdiRsi()
+        a.Syscall()
+        a.MovEaxImm 1
+        a.MovEdiImm 1
+        a.LeaRsiRip "buf"
+        a.MovEdxImm 8
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "buf"
+        a.Zeros 8
+        a.Build()
+
+    /// setrlimit(RLIMIT_NOFILE, buf) doit réussir.
+    let setrlimitCode : byte[] =
+        let a = Asm()
+        a.MovEaxImm 160
+        a.MovEdiImm 7
+        a.LeaRsiRip "buf"
+        a.XorEdxEdx()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Je "ok"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ok"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "buf"
+        a.Zeros 16
+        a.Build()
+
+    /// creat du fichier, écriture de « hi », puis fermeture.
+    let creatCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 85
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRdiRax()
+        a.MovEaxImm 1
+        a.LeaRsiRip "data"
+        a.MovEdxImm 2
+        a.Syscall()
+        a.MovEaxImm 3
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "data"
+        a.Data "hi"
+        a.Build()
+
+    /// Ouvre (ou crée) le fichier, écrit « data », puis fsync.
+    let fsyncCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.MovEsiImm 0x241
+        a.Syscall()
+        a.MovRdiRax()
+        a.MovEaxImm 1
+        a.LeaRsiRip "data"
+        a.MovEdxImm 4
+        a.Syscall()
+        a.MovEaxImm 74
+        a.Syscall()
+        a.TestEaxEax()
+        a.Je "ok"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ok"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Label "data"
+        a.Data "data"
+        a.Build()
+
+    /// Ouvre le fichier en écriture puis le tronque à la taille 0.
+    let ftruncateCode (path : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.MovEsiImm 1
+        a.Syscall()
+        a.MovRdiRax()
+        a.MovEaxImm 77
+        a.XorEsiEsi()
+        a.Syscall()
+        a.TestEaxEax()
+        a.Je "ok"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "ok"
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "path"
+        a.Data path
+        a.Build()
+
+    /// Ouvre le répertoire donné, fchdir, puis getcwd + écriture du chemin
+    /// sur la sortie standard (longueur calculée par une boucle strlen guest).
+    let fchdirCode (dir : string) : byte[] =
+        let a = Asm()
+        a.MovEaxImm 2
+        a.LeaRdiRip "path"
+        a.XorEsiEsi()
+        a.Syscall()
+        a.MovRdiRax()
+        a.MovEaxImm 81
+        a.Syscall()
+        a.TestEaxEax()
+        a.Jnz "fail"
+        a.MovEaxImm 79
+        a.LeaRdiRip "buf"
+        a.MovEsiImm 256
+        a.Syscall()
+        a.MovRsiRax()
+        a.XorEcxEcx()
+        a.Label "loop"
+        a.CmpBytePtrRsiRcxImm 0
+        a.Je "done"
+        a.IncEcx()
+        a.Jmp "loop"
+        a.Label "done"
+        a.MovEaxImm 1
+        a.MovEdiImm 1
+        a.MovRdxRcx()
+        a.Syscall()
+        a.MovEaxImm 60
+        a.XorEdiEdi()
+        a.Syscall()
+        a.Label "fail"
+        a.MovEaxImm 60
+        a.MovEdiImm 1
+        a.Syscall()
+        a.Label "path"
+        a.Data dir
+        a.Label "buf"
+        a.Zeros 256
+        a.Build()
