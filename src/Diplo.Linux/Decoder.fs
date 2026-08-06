@@ -119,6 +119,8 @@ type Op =
     | Ret
     | Nop
     | Hlt
+    | Out of Operand
+    | In of Operand
     | Unknown
 
 /// Instruction décodée.
@@ -516,6 +518,10 @@ module Decoder =
                 elif opcode = 0x90uy then Nop
                 else invalidOp "Xchg sans REX.W non pris en charge"
             else if opcode = 0xF4uy then Hlt
+            else if opcode = 0xEEuy then Out (Reg 2)
+            else if opcode = 0xE6uy then Out (Imm (uint64 (nextByte ())))
+            else if opcode = 0xECuy then In (Reg 2)
+            else if opcode = 0xE4uy then In (Imm (uint64 (nextByte ())))
             else if opcode = 0xC3uy then Ret
             else if opcode = 0xC9uy then Leave
             else if opcode = 0xC2uy then

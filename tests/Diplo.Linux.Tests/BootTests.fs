@@ -38,3 +38,34 @@ module BootTests =
         let code, text = runKernel []
         code |> should equal 0
         text |> should equal ""
+
+    [<Fact>]
+    let ``Le noyau écrit ses messages sur le port série COM1 puis s'arrête`` () =
+        let a = ElfTest.Asm()
+        a.RawBytes [| 0x66uy; 0xBAuy; 0xF8uy; 0x03uy |]  // mov dx, 0x3F8
+        a.RawBytes [| 0xB0uy; 0x4Buy |]                  // mov al, 'K'
+        a.RawBytes [| 0xEEuy |]                          // out dx, al
+        a.RawBytes [| 0xF4uy |]                          // hlt
+        let image = ElfTest.create (a.Build()) BootImage.KernelEntryPoint BootImage.KernelEntryPoint
+        use machine = new LinuxMachine(image, [||], kernel = true)
+        use buffer = new MemoryStream()
+        machine.StandardOutput <- buffer
+        let code = machine.Run()
+        code |> should equal 0
+        Encoding.UTF8.GetString(buffer.ToArray()) |> should equal "K"
+
+    [<Fact>]
+    let ``Le noyau lit l'état du port série COM1 et obtient le registre LSR prêt`` () =
+        let a = ElfTest.Asm()
+        a.RawBytes [| 0x66uy; 0xBAuy; 0xFduy; 0x03uy |]  // mov dx, 0x3FD (LSR)
+        a.RawBytes [| 0xECuy |]                          // in al, dx
+        a.RawBytes [| 0x66uy; 0xBAuy; 0xF8uy; 0x03uy |]  // mov dx, 0x3F8 (THR)
+        a.RawBytes [| 0xEEuy |]                          // out dx, al
+        a.RawBytes [| 0xF4uy |]                          // hlt
+        let image = ElfTest.create (a.Build()) BootImage.KernelEntryPoint BootImage.KernelEntryPoint
+        use machine = new LinuxMachine(image, [||], kernel = true)
+        use buffer = new MemoryStream()
+        machine.StandardOutput <- buffer
+        let code = machine.Run()
+        code |> should equal 0
+        buffer.ToArray() |> should equal [| 0x60uy |]

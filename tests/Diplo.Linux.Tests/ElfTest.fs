@@ -101,6 +101,9 @@ module ElfTest =
         member this.Raw (s : string) =
             this.Emit(System.Text.Encoding.UTF8.GetBytes s)
 
+        member this.RawBytes (b : byte[]) =
+            this.Emit(b)
+
         member this.Zeros (n : int) = this.Emit(Array.zeroCreate n)
 
         member private _.Imm32 (v : int) : byte[] =
