@@ -24,12 +24,6 @@ type ConsoleStream (input : Stream, output : Stream) =
     override _.Read(data, offset, count) = input.Read(data, offset, count)
     override _.Write(data, offset, count) = output.Write(data, offset, count)
 
-/// Région mémoire allouée (mmap/mprotect).
-type MemoryRegion =
-    { Start : uint64
-      Length : uint64
-      Prot : uint64 }
-
 /// Copie de l'état d'une tâche (fork).
 type TaskState =
     { Memory : byte[]
@@ -37,7 +31,8 @@ type TaskState =
       OpenFiles : Dictionary<int, Stream>
       NextFd : int
       ProgramBreak : uint64
-      MmapCursor : uint64 }
+      MmapCursor : uint64
+      Regions : MemoryRegion list }
 
 /// Flux en lecture seule représentant un répertoire (getdents).
 type DirectoryStream (path : string) =
@@ -59,6 +54,91 @@ type DirectoryStream (path : string) =
     /// Chemin du répertoire représenté par ce flux (getdents).
     member _.Path = path
 
+/// Flux de répertoire synthétique (procfs) listant des noms virtuels.
+type ProcDirectoryStream (path : string, entries : (string * bool) []) =
+    inherit DirectoryStream(path)
+
+    /// Entrées virtuelles du répertoire : nom et estRépertoire.
+    member _.VirtualEntries = entries
+
+/// Flux de périphérique de caractères (fstat → mode character device).
+[<AbstractClass>]
+type DeviceStream () =
+    inherit Stream()
+
+    override _.CanSeek = false
+    override _.Length = raise (NotSupportedException "Périphérique non seekable")
+    override _.Position
+        with get () = raise (NotSupportedException "Périphérique non seekable")
+        and set _ = raise (NotSupportedException "Périphérique non seekable")
+    override _.Flush() = ()
+    override _.Seek(_, _) = raise (NotSupportedException "Périphérique non seekable")
+    override _.SetLength(_) = raise (NotSupportedException "Périphérique non seekable")
+
+/// /dev/null : lecture → fin de fichier, écriture → ignorée.
+type NullDeviceStream () =
+    inherit DeviceStream()
+
+    override _.CanRead = true
+    override _.CanWrite = true
+    override _.Read(_, _, _) = 0
+    override _.Write(_, _, _) = ()
+
+/// /dev/zero : lecture → octets nuls, écriture → ignorée.
+type ZeroDeviceStream () =
+    inherit DeviceStream()
+
+    override _.CanRead = true
+    override _.CanWrite = true
+    override _.Read(data, offset, count) =
+        Array.Clear(data, offset, count)
+        count
+    override _.Write(_, _, _) = ()
+
+/// /dev/random et /dev/urandom : lecture → octets aléatoires.
+type RandomDeviceStream () =
+    inherit DeviceStream()
+
+    override _.CanRead = true
+    override _.CanWrite = true
+    override _.Read(data, offset, count) =
+        let buf = Array.zeroCreate<byte> count
+        RandomNumberGenerator.Fill buf
+        Array.Copy(buf, 0, data, offset, count)
+        count
+    override _.Write(_, _, _) = ()
+
+/// Fichier virtuel en lecture seule (procfs, ex. /proc/self/cmdline).
+type VirtualFileStream (content : byte[]) =
+    inherit Stream()
+
+    let mutable position = 0L
+
+    override _.CanRead = true
+    override _.CanWrite = false
+    override _.CanSeek = true
+    override _.Length = int64 content.Length
+    override _.Position
+        with get () = position
+        and set v = position <- v
+    override _.Flush() = ()
+    override _.Seek(offset, origin) =
+        position <-
+            match origin with
+            | SeekOrigin.Begin -> offset
+            | SeekOrigin.Current -> position + offset
+            | _ -> int64 content.Length + offset
+        position
+    override _.SetLength(_) = raise (NotSupportedException "Flux virtuel immuable")
+    override _.Read(data, offset, count) =
+        if position >= int64 content.Length then 0
+        else
+            let n = int (min (int64 count) (int64 content.Length - position))
+            Array.Copy(content, int position, data, offset, n)
+            position <- position + int64 n
+            n
+    override _.Write(_, _, _) = raise (NotSupportedException "Flux virtuel en lecture seule")
+
 /// Hôte exposé au traducteur de syscalls.
 type ISyscallHost =
     abstract Memory : VirtualMemory
@@ -77,6 +157,7 @@ type ISyscallHost =
     abstract TaskQueue : ResizeArray<TaskState>
     abstract NeedsSwitch : bool with get, set
     abstract CurrentDirectory : string with get, set
+    abstract Arguments : string[]
     abstract ExitedStatuses : ResizeArray<int>
     abstract Snapshot : unit -> TaskState
     abstract Restore : TaskState -> unit
@@ -281,17 +362,96 @@ module Syscalls =
         elif access = 1UL then FileAccess.Write
         else FileAccess.ReadWrite
 
+    /// Écrit un struct stat complet (144 octets) dans la mémoire guest.
+    let private writeStat (m : VirtualMemory) (buf : uint64) (mode : uint32) (size : uint64) =
+        let now = uint64 (DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+        m.WriteUInt64 (buf + 0UL) 0UL                 // st_dev
+        m.WriteUInt64 (buf + 8UL) 0UL                 // st_ino
+        m.WriteUInt64 (buf + 16UL) 1UL                // st_nlink
+        m.WriteUInt32 (buf + 24UL) mode               // st_mode
+        m.WriteUInt32 (buf + 28UL) 0u                 // st_uid
+        m.WriteUInt32 (buf + 32UL) 0u                 // st_gid
+        m.WriteUInt32 (buf + 36UL) 0u                 // __pad0
+        m.WriteUInt64 (buf + 40UL) 0UL                // st_rdev
+        m.WriteUInt64 (buf + 48UL) size               // st_size
+        m.WriteUInt64 (buf + 56UL) 4096UL             // st_blksize
+        m.WriteUInt64 (buf + 64UL) ((size + 511UL) / 512UL)  // st_blocks
+        m.WriteUInt64 (buf + 72UL) now                // st_atime
+        m.WriteUInt64 (buf + 80UL) 0UL
+        m.WriteUInt64 (buf + 88UL) now                // st_mtime
+        m.WriteUInt64 (buf + 96UL) 0UL
+        m.WriteUInt64 (buf + 104UL) now               // st_ctime
+        m.WriteUInt64 (buf + 112UL) 0UL
+        m.WriteUInt64 (buf + 120UL) 0UL
+        m.WriteUInt64 (buf + 128UL) 0UL
+        m.WriteUInt64 (buf + 136UL) 0UL
+
+    /// Contenu d'un fichier virtuel du procfs.
+    let private virtualBytes (host : ISyscallHost) (path : string) : byte[] =
+        match path with
+        | "/proc/self/cmdline" ->
+            Encoding.UTF8.GetBytes (String.Join("\u0000", host.Arguments) + "\u0000")
+        | "/proc/self/stat" ->
+            let name = if host.Arguments.Length > 0 then host.Arguments[0] else "diplo"
+            Encoding.UTF8.GetBytes (sprintf "0 (%s) S 0 1 1 4194304 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n" name)
+        | _ -> [||]
+
+    /// Entrées virtuelles du répertoire /proc/self.
+    let private procEntries (host : ISyscallHost) : (string * bool) [] =
+        [| "cmdline", false
+           "exe", false
+           "fd", true
+           "stat", false |]
+
+    /// Entrées virtuelles du répertoire /proc/self/fd.
+    let private fdEntries (host : ISyscallHost) : (string * bool) [] =
+        [| yield "0", false
+           yield "1", false
+           yield "2", false
+           for KeyValue(k, _) in host.OpenFiles do
+               yield string k, false |]
+
+    /// Chemin virtuel (procfs ou périphériques /dev) géré par l'émulateur.
+    let private isVirtualPath (path : string) =
+        path = "/dev/null" || path = "/dev/zero" || path = "/dev/random" || path = "/dev/urandom"
+        || path.StartsWith "/proc/self"
+
+    /// Mode et taille d'un chemin virtuel pour stat.
+    let private virtualStat (host : ISyscallHost) (path : string) : (uint32 * uint64) option =
+        match path with
+        | "/dev/null" | "/dev/zero" | "/dev/random" | "/dev/urandom" ->
+            Some (0x2190u, 0UL)   // périphérique de caractères
+        | "/proc/self" | "/proc/self/" | "/proc/self/fd" ->
+            Some (0x41EDu, 0UL)   // répertoire
+        | "/proc/self/cmdline" | "/proc/self/stat" ->
+            Some (0x81A4u, uint64 (virtualBytes host path).Length)   // fichier
+        | _ -> None
+
     let private sysOpenPath (host : ISyscallHost) (path : string) (flags : uint64) : uint64 =
+        let openVirtual (s : Stream) =
+            let fd = host.NextFd
+            host.NextFd <- host.NextFd + 1
+            host.OpenFiles[fd] <- s
+            uint64 fd
         let consoleDevices =
             [ "/dev/console"; "/dev/tty"; "/dev/ttyS0"; "/dev/ttyS1" ]
-        if List.contains path consoleDevices then
+        match path with
+        | "/dev/null" -> openVirtual (NullDeviceStream())
+        | "/dev/zero" -> openVirtual (ZeroDeviceStream())
+        | "/dev/random" | "/dev/urandom" -> openVirtual (RandomDeviceStream())
+        | "/proc/self/cmdline" | "/proc/self/stat" ->
+            openVirtual (VirtualFileStream(virtualBytes host path))
+        | "/proc/self/fd" ->
+            openVirtual (ProcDirectoryStream(path, fdEntries host))
+        | "/proc/self" | "/proc/self/" ->
+            openVirtual (ProcDirectoryStream(path, procEntries host))
+        | _ when List.contains path consoleDevices ->
             let fd = host.NextFd
             host.NextFd <- host.NextFd + 1
             host.OpenFiles[fd] <- host.Console
             uint64 fd
-        elif path = "" then
-            errno -2
-        else
+        | "" -> errno -2
+        | _ ->
             let fullPath =
                 if Path.IsPathRooted path then path
                 else Path.Combine(host.CurrentDirectory, path)
@@ -361,7 +521,7 @@ module Syscalls =
                     match host.OpenFiles.TryGetValue(int fd) with
                     | true, s -> s
                     | false, _ -> failwith $"Descriptor {fd} inconnu"
-            let isConsole = stream :? ConsoleStream
+            let isConsole = stream :? ConsoleStream || stream :? DeviceStream
             let size =
                 if isConsole then 0L
                 else stream.Length
@@ -396,7 +556,7 @@ module Syscalls =
 
     let private sysAccess (host : ISyscallHost) (path : uint64) : uint64 =
         let p = readCString host.Memory path
-        if File.Exists p || Directory.Exists p then 0UL else errno -2
+        if File.Exists p || Directory.Exists p || isVirtualPath p then 0UL else errno -2
 
     let private sysGetcwd (host : ISyscallHost) (buf : uint64) (size : uint64) : uint64 =
         try
@@ -452,21 +612,20 @@ module Syscalls =
     let private align8 (length : uint64) : uint64 =
         (length + 7UL) &&& ~~~7UL
 
-    let private addRegion (host : ISyscallHost) (start : uint64) (length : uint64) (prot : uint64) =
-        let remaining =
-            host.Regions
-            |> Seq.filter (fun r -> not (start + length > r.Start && start < r.Start + r.Length))
-            |> Seq.toArray
-        host.Regions.Clear()
-        host.Regions.AddRange remaining
-        host.Regions.Add({ Start = start; Length = length; Prot = prot })
+    let private mapShared = 0x1UL
+    let private mapPrivate = 0x2UL
+    let private mapFixed = 0x10UL
+    let private mapAnonymous = 0x20UL
+    let private mremapMayMove = 0x1UL
+    let private mremapFixed = 0x2UL
 
     let private sysMmap (host : ISyscallHost) (addr : uint64) (length : uint64)
                         (prot : uint64) (flags : uint64) (fd : uint64) (offset : uint64) : uint64 =
         let pageLen = alignPage length
+        let anonymous = flags &&& mapAnonymous <> 0UL || fd = 0xFFFFFFFFFFFFFFFFUL
         let dest =
-            if addr <> 0UL then addr
-            elif flags &&& 0x10UL <> 0UL then addr   // MAP_FIXED
+            if flags &&& mapFixed <> 0UL then addr
+            elif addr <> 0UL then addr
             else
                 let result = host.MmapCursor
                 host.MmapCursor <- host.MmapCursor + pageLen
@@ -474,8 +633,8 @@ module Syscalls =
         if dest + pageLen > host.Memory.Size then
             errno -12   // ENOMEM
         else
-            addRegion host dest pageLen prot
-            if fd <> 0xFFFFFFFFFFFFFFFFUL then   // MAP_ANONYMOUS
+            host.Memory.MapRegion dest pageLen prot
+            if not anonymous then
                 match host.OpenFiles.TryGetValue(int fd) with
                 | true, s ->
                     let oldPos = s.Position
@@ -490,24 +649,13 @@ module Syscalls =
 
     let private sysMunmap (host : ISyscallHost) (addr : uint64) (length : uint64) : uint64 =
         let pageLen = alignPage length
+        host.Memory.UnmapRange addr pageLen
         host.Memory.Zero addr pageLen
-        host.Regions
-        |> Seq.filter (fun r -> not (addr + pageLen > r.Start && addr < r.Start + r.Length))
-        |> Seq.toArray
-        |> Array.iter (fun r -> host.Regions.Remove r |> ignore)
         0UL
 
     let private sysMprotect (host : ISyscallHost) (addr : uint64) (length : uint64) (prot : uint64) : uint64 =
         let pageLen = alignPage length
-        let updated =
-            host.Regions
-            |> Seq.map (fun r ->
-                if addr + pageLen > r.Start && addr < r.Start + r.Length then
-                    { r with Prot = prot }
-                else r)
-            |> Seq.toArray
-        host.Regions.Clear()
-        host.Regions.AddRange updated
+        host.Memory.ProtectRange addr pageLen prot
         0UL
 
     let private sysBrk (host : ISyscallHost) (addr : uint64) : uint64 =
@@ -593,7 +741,13 @@ module Syscalls =
         let fullPath =
             if Path.IsPathRooted path then path
             else Path.Combine(host.CurrentDirectory, path)
-        if Directory.Exists fullPath then
+        if isVirtualPath fullPath then
+            match virtualStat host fullPath with
+            | Some (mode, size) ->
+                writeStat m buf mode size
+                0UL
+            | None -> errno -2
+        elif Directory.Exists fullPath then
             let info = DirectoryInfo(fullPath)
             let now = uint64 (DateTimeOffset.UtcNow.ToUnixTimeSeconds())
             m.WriteUInt64 (buf + 0UL) 0UL
@@ -680,29 +834,35 @@ module Syscalls =
         else
             errno -2
 
+    let private sysGetdentsEntries (host : ISyscallHost) (entries : (string * bool) []) (dirp : uint64) : uint64 =
+        let mutable off = 0UL
+        let mutable total = 0UL
+        for (name, isDir) in entries do
+            let nameBytes = Encoding.UTF8.GetBytes name
+            let reclen = uint16 (align8 (24UL + uint64 nameBytes.Length + 1UL))
+            let ino =
+                nameBytes
+                |> Array.fold (fun acc b -> (acc * 131UL) + uint64 b) 1UL
+            host.Memory.WriteUInt64 (dirp + total) ino
+            host.Memory.WriteUInt64 (dirp + total + 8UL) off
+            host.Memory.WriteUInt16 (dirp + total + 16UL) reclen
+            host.Memory.WriteByte (dirp + total + 18UL) (if isDir then 4uy else 8uy)
+            host.Memory.WriteByte (dirp + total + 19UL) 0uy
+            host.Memory.WriteBytes (dirp + total + 20UL) (Array.append nameBytes [| 0uy |])
+            total <- total + uint64 reclen
+            off <- off + uint64 reclen
+        total
+
     let private sysGetdents64 (host : ISyscallHost) (fd : uint64) (dirp : uint64) (_count : uint64) : uint64 =
         let stream = streamFor host fd
         match stream with
+        | :? ProcDirectoryStream as pds ->
+            sysGetdentsEntries host pds.VirtualEntries dirp
         | :? DirectoryStream as ds ->
-            let entries = DirectoryInfo(ds.Path).GetFileSystemInfos()
-            let mutable off = 0UL
-            let mutable total = 0UL
-            for e in entries do
-                let name = e.Name
-                let nameBytes = Encoding.UTF8.GetBytes name
-                let reclen = uint16 (align8 (24UL + uint64 nameBytes.Length + 1UL))
-                let ino =
-                    nameBytes
-                    |> Array.fold (fun acc b -> (acc * 131UL) + uint64 b) 1UL
-                host.Memory.WriteUInt64 (dirp + total) ino
-                host.Memory.WriteUInt64 (dirp + total + 8UL) off
-                host.Memory.WriteUInt16 (dirp + total + 16UL) reclen
-                host.Memory.WriteByte (dirp + total + 18UL) (if e.Attributes.HasFlag FileAttributes.Directory then 4uy else 8uy)
-                host.Memory.WriteByte (dirp + total + 19UL) 0uy
-                host.Memory.WriteBytes (dirp + total + 20UL) (Array.append nameBytes [| 0uy |])
-                total <- total + uint64 reclen
-                off <- off + uint64 reclen
-            total
+            let entries =
+                DirectoryInfo(ds.Path).GetFileSystemInfos()
+                |> Array.map (fun e -> e.Name, e.Attributes.HasFlag FileAttributes.Directory)
+            sysGetdentsEntries host entries dirp
         | _ -> errno -9
 
     let private sysGetrandom (host : ISyscallHost) (buf : uint64) (buflen : uint64) (_flags : uint64) : uint64 =
@@ -819,22 +979,24 @@ module Syscalls =
         with _ -> errno enosys
 
     let private sysMremap (host : ISyscallHost) (oldAddr : uint64) (oldSize : uint64) (newSize : uint64) (flags : uint64) (newAddr : uint64) : uint64 =
-        try
-            let newLen = alignPage newSize
-            let dest =
-                if flags &&& 0x20UL <> 0UL then newAddr
-                else
-                    let cursor = host.MmapCursor
-                    host.MmapCursor <- cursor + newLen
-                    cursor
-            let copyLen = min oldSize newSize
+        let oldLen = alignPage oldSize
+        let newLen = alignPage newSize
+        let dest =
+            if flags &&& mremapFixed <> 0UL then newAddr
+            else
+                let result = host.MmapCursor
+                host.MmapCursor <- host.MmapCursor + newLen
+                result
+        if dest + newLen > host.Memory.Size then
+            errno -12   // ENOMEM
+        else
+            let copyLen = min oldLen newLen
             if copyLen > 0UL then
                 let data = host.Memory.ReadBytes oldAddr (int copyLen)
                 host.Memory.WriteBytes dest data
-            host.Memory.Zero oldAddr (alignPage oldSize)
-            addRegion host dest newLen 0x3UL
+            host.Memory.UnmapRange oldAddr oldLen
+            host.Memory.MapRegion dest newLen 0x3UL
             dest
-        with _ -> errno enosys
 
     let private sysFutex (_host : ISyscallHost) (_uaddr : uint64) (op : uint64) (_val : uint64) (_timeout : uint64) (_uaddr2 : uint64) (_val3 : uint64) : uint64 =
         if op &&& 0x7FUL = 1UL then 1UL else 0UL
@@ -1030,13 +1192,19 @@ module Syscalls =
         try
             let path = readCString host.Memory pathPtr
             let fullPath = if path.StartsWith "/" then path else Path.Combine (host.CurrentDirectory, path)
-            let target = FileInfo(fullPath).LinkTarget
-            if isNull target then errno -22
-            else
-                let bytes = Encoding.UTF8.GetBytes target
+            let target =
+                if fullPath = "/proc/self/exe" then
+                    Some (if host.Arguments.Length > 0 then host.Arguments[0] else "/bin/diplo")
+                else
+                    let t = FileInfo(fullPath).LinkTarget
+                    if isNull t then None else Some t
+            match target with
+            | Some t ->
+                let bytes = Encoding.UTF8.GetBytes t
                 let n = int (min bufsiz (uint64 bytes.Length))
                 host.Memory.WriteBytes buf bytes.[0 .. n - 1]
                 uint64 n
+            | None -> errno -22
         with _ -> errno -2
 
     // -- Entrées / sorties ------------------------------------------------------

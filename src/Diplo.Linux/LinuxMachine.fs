@@ -22,11 +22,13 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
     let mutable stderr : Stream = Console.OpenStandardError()
     let mutable consoleInput : Stream = stdin
     let mutable consoleOutput : Stream = stdout
-    let regions = ResizeArray<MemoryRegion>()
     let taskQueue = ResizeArray<TaskState>()
     let exitedStatuses = ResizeArray<int>()
     let mutable needsSwitch = false
     let mutable cwd = Directory.GetCurrentDirectory()
+    let breakpoints = ResizeArray<uint64>()
+    let mutable syscallHook : (uint64 -> unit) option = None
+    let mutable imageLoaded = false
 
     interface ISyscallHost with
         member _.Memory = mem
@@ -51,7 +53,7 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
             with get () = exitStatus
             and set v = exitStatus <- v
         member _.Console = new ConsoleStream(consoleInput, consoleOutput) :> Stream
-        member _.Regions = regions
+        member _.Regions = mem.Regions
         member _.TaskQueue = taskQueue
         member _.ExitedStatuses = exitedStatuses
         member _.NeedsSwitch
@@ -60,13 +62,15 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
         member _.CurrentDirectory
             with get () = cwd
             and set v = cwd <- v
+        member _.Arguments = arguments
         member _.Snapshot() : TaskState =
             { Memory = mem.Snapshot()
               Registers = regs.Clone()
               OpenFiles = Dictionary<int, Stream>(openFiles)
               NextFd = nextFd
               ProgramBreak = programBreak
-              MmapCursor = mmapCursor }
+              MmapCursor = mmapCursor
+              Regions = List.ofSeq mem.Regions }
         member _.Restore(st : TaskState) =
             mem.Restore st.Memory
             for i = 0 to 15 do
@@ -81,6 +85,8 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
             nextFd <- st.NextFd
             programBreak <- st.ProgramBreak
             mmapCursor <- st.MmapCursor
+            mem.Regions.Clear()
+            mem.Regions.AddRange st.Regions
         member this.ExecImage (bytes : byte[]) (argv : string[]) =
             let image = ElfLoader.load mem bytes
             programBreak <- image.EndOfData
@@ -114,6 +120,38 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
         with get () = consoleOutput
         and set v = consoleOutput <- v
 
+    /// Adresses des points d'arrêt (le pas à pas s'arrête avant d'exécuter
+    /// une instruction dont l'adresse figure dans cette liste).
+    member _.Breakpoints = breakpoints
+
+    /// Pointeur d'instruction courant.
+    member _.Rip
+        with get () = regs.RIP
+
+    /// Code de sortie du programme (après exécution).
+    member _.ExitStatus
+        with get () = exitStatus
+
+    /// La machine est arrêtée (programme terminé).
+    member _.IsHalted
+        with get () = halted
+
+    /// Rappel invoqué à chaque syscall ; il reçoit le numéro du syscall.
+    member _.SyscallHook
+        with get () = syscallHook
+        and set v = syscallHook <- v
+
+    /// Exécute une seule instruction ; retourne false si la machine est arrêtée
+    /// (programme terminé ou point d'arrêt atteint et non encore exécuté).
+    member this.Step() : bool =
+        if not imageLoaded then
+            this.LoadImage()
+        if halted || breakpoints.Contains regs.RIP then
+            false
+        else
+            Emulator.step (this :> ISyscallHost) syscallHook |> ignore
+            not halted
+
     member private _.SetupStack (stackTop : uint64) (argv : string[]) : uint64 =
         let mutable sp = stackTop
 
@@ -139,18 +177,20 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64) =
         push64v (uint64 argvAddrs.Length)
         sp
 
-    /// Exécute le programme et retourne le code de sortie.
-    member this.Run() : int =
+    /// Charge l'image ELF et initialise RIP/RSP ; appelé par Run et Step.
+    member private this.LoadImage () =
         let image = ElfLoader.load mem image
         programBreak <- image.EndOfData
-
         let stackTop = size - 0x1000UL
         let rsp = this.SetupStack stackTop arguments
-
         regs.RIP <- image.EntryPoint
         regs.RSP <- rsp
+        imageLoaded <- true
 
-        Emulator.run (this :> ISyscallHost)
+    /// Exécute le programme et retourne le code de sortie.
+    member this.Run() : int =
+        this.LoadImage()
+        Emulator.run (this :> ISyscallHost) syscallHook
         exitStatus
 
     /// Dispose les descripteurs ouverts.

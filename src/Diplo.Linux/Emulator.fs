@@ -826,14 +826,27 @@ module Emulator =
         | Unknown ->
             invalidOp $"Instruction non supportée à l'adresse 0x{nextRip - uint64 ins.Size:X} (taille {ins.Size})"
 
-    /// Exécute le programme jusqu'à l'arrêt.
-    let run (host : ISyscallHost) : unit =
+    /// Exécute une seule instruction (avec commutation de tâche si nécessaire).
+    let private stepCore (host : ISyscallHost) (onSyscall : (uint64 -> unit) option) : unit =
         let mem = host.Memory
         let regs = host.Registers
-        while not host.Halted do
-            if host.NeedsSwitch then
-                host.NeedsSwitch <- false
-                host.Restore host.TaskQueue.[0]
-                host.TaskQueue.RemoveAt 0
+        if host.NeedsSwitch then
+            host.NeedsSwitch <- false
+            host.Restore host.TaskQueue.[0]
+            host.TaskQueue.RemoveAt 0
+        if not host.Halted then
             let ins = Decoder.decode mem regs.RIP
+            match onSyscall with
+            | Some f when ins.Op = Syscall -> f regs.RAX
+            | _ -> ()
             execute host ins
+
+    /// Exécute le programme jusqu'à l'arrêt.
+    let run (host : ISyscallHost) (onSyscall : (uint64 -> unit) option) : unit =
+        while not host.Halted do
+            stepCore host onSyscall
+
+    /// Exécute une seule instruction ; retourne false si la machine est arrêtée.
+    let step (host : ISyscallHost) (onSyscall : (uint64 -> unit) option) : bool =
+        stepCore host onSyscall
+        not host.Halted
