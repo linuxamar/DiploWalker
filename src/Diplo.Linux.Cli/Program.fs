@@ -4,6 +4,7 @@ open System
 open System.IO
 open Diplo.Linux
 open Diplo.Volume
+open Diplo.Volume.Drivers
 
 module Program =
 
