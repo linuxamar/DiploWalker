@@ -31,7 +31,8 @@ Write-Host "Configuration : $($Cfg.nom) — $($Cfg.description)" -ForegroundColo
 if (-not (Test-Path -LiteralPath $Binary)) {
     Write-Host "Binaire diplo-linux.exe absent, publication en cours..." -ForegroundColor Yellow
     New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
-    dotnet publish (Join-Path $RepoRoot "src\Diplo.Linux.Cli") -c Release -o $BinDir
+    dotnet publish (Join-Path $RepoRoot "src\Diplo.Linux.Cli") -c Release -o $BinDir `
+        --self-contained true -r win-x64 -p:PublishTrimmed=false -p:PublishSingleFile=false
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Échec de la publication de Diplo.Linux.Cli." -ForegroundColor Red
         exit $LASTEXITCODE

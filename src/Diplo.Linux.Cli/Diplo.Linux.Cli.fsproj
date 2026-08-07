@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FSharp.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Diplo.Linux\Diplo.Linux.fsproj" />
     <ProjectReference Include="..\Diplo.Volume\Diplo.Volume.fsproj" />
   </ItemGroup>
