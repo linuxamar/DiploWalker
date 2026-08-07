@@ -15,6 +15,11 @@
     <Compile Include="Emulator.fs" />
     <Compile Include="LinuxMachine.fs" />
     <Compile Include="BootImage.fs" />
+    <Compile Include="KernelImage.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ZstdSharp.Port" />
   </ItemGroup>
 
 </Project>

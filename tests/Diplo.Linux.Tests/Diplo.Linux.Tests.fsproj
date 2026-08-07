@@ -12,6 +12,7 @@
     <Compile Include="VirtualMemoryTests.fs" />
     <Compile Include="BootTests.fs" />
     <Compile Include="BootIsoTests.fs" />
+    <Compile Include="KernelImageTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +24,7 @@
     </PackageReference>
     <PackageReference Include="FSharp.Core" />
     <PackageReference Include="FsUnit.xUnit" />
+    <PackageReference Include="ZstdSharp.Port" />
   </ItemGroup>
 
   <ItemGroup>
