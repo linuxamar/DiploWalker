@@ -64,3 +64,6 @@ Diplo-Setup-*.exe
 
 # Code signing certificate (development)
 eng/Diplo_dev.pfx
+
+# Images ISO téléchargées et état généré (configs/OwnLinuxBase/iso)
+configs/**/iso/

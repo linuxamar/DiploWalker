@@ -1,0 +1,34 @@
+{
+  "nom": "OwnLinuxBase",
+  "description": "Ubuntu Server sans interface graphique, booté par l'émulateur Diplo. Les répertoires système critiques sont montés en lecture/écriture via un overlay tmpfs.",
+  "distribution": {
+    "nom": "Ubuntu Server",
+    "version": "24.04",
+    "url": "https://releases.ubuntu.com/24.04/",
+    "motifNomFichier": "live-server-amd64.iso"
+  },
+  "noyau": {
+    "cheminDansImage": "/casper/vmlinuz",
+    "arguments": [
+      "overlayroot=tmpfs",
+      "quiet",
+      "console=ttyS0"
+    ]
+  },
+  "systemeDeFichiers": {
+    "mode": "overlay",
+    "repertoiresLectureEcriture": [
+      "/",
+      "/etc",
+      "/var",
+      "/home",
+      "/tmp",
+      "/root"
+    ],
+    "racineTemporaire": "tmpfs"
+  },
+  "emulateur": {
+    "binaire": "diplo-linux.exe",
+    "commande": "boot"
+  }
+}

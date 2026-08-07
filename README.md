@@ -24,7 +24,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (473 tests)
+- **Tests** : xUnit (plus de 580 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -134,7 +134,9 @@ Diplo/
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, abstraction IOutputPort
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
-│   └── Diplo.Gui/              # Interface graphique Avalonia
+│   ├── Diplo.Gui/              # Interface graphique Avalonia
+│   ├── Diplo.Linux/            # Émulateur de machine Linux x86-64 (F#)
+│   └── Diplo.Linux.Cli/        # CLI diplo-linux.exe (boot, trace, points d'arrêt)
 ├── tests/
 │   ├── Diplo.Abstractions.Tests/
 │   ├── Diplo.Contracts.Tests/
@@ -144,9 +146,29 @@ Diplo/
 │   ├── Diplo.Network.Tests/
 │   ├── Diplo.Volume.Tests/
 │   ├── Diplo.Cli.Tests/
-│   └── Diplo.Gui.Tests/
+│   ├── Diplo.Gui.Tests/
+│   ├── Diplo.Integration.Tests/
+│   └── Diplo.Linux.Tests/
+├── configs/
+│   └── OwnLinuxBase/           # Boot Ubuntu Server via diplo-linux.exe (ISO, noyau, args)
 ├── pipeline.ps1                # Pipeline de build et déploiement
 └── README.md
+```
+
+## Émulateur Linux
+
+Diplo embarque un **émulateur de machine Linux x86-64** en F# (`Diplo.Linux`) et sa CLI `diplo-linux.exe` (`Diplo.Linux.Cli`) :
+
+- Chargement de noyaux ELF bruts et boot depuis une image ISO : `diplo-linux.exe boot <iso> /chemin/vmlinuz <args...>`
+- Mode noyau, console série COM1, gestion mémoire (mmap), table de syscalls x86-64
+- Options : trace des syscalls `-t`, pas à pas `-s`, points d'arrêt `-b <adresse>`
+- Limites actuelles : `vmlinuz` Ubuntu est un bzImage non supporté — GRUB, PCI, ACPI et timers non implémentés
+
+Une configuration prête à l'emploi est fournie dans `configs/OwnLinuxBase/` :
+
+```powershell
+.\configs\OwnLinuxBase\Download-UbuntuServer.ps1   # Télécharge l'ISO Ubuntu Server
+.\configs\OwnLinuxBase\Launch-OwnLinuxBase.ps1     # Boot via diplo-linux.exe
 ```
 
 ## Aperçu technique
