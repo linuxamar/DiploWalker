@@ -10,12 +10,12 @@
     <Compile Include="Registers.fs" />
     <Compile Include="Memory.fs" />
     <Compile Include="ElfLoader.fs" />
+    <Compile Include="KernelImage.fs" />
     <Compile Include="Decoder.fs" />
     <Compile Include="Syscalls.fs" />
     <Compile Include="Emulator.fs" />
     <Compile Include="LinuxMachine.fs" />
     <Compile Include="BootImage.fs" />
-    <Compile Include="KernelImage.fs" />
   </ItemGroup>
 
   <ItemGroup>

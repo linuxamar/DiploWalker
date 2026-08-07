@@ -89,7 +89,7 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64, ?k
             mem.Regions.Clear()
             mem.Regions.AddRange st.Regions
         member this.ExecImage (bytes : byte[]) (argv : string[]) =
-            let image = ElfLoader.load mem bytes
+            let image = ElfLoader.load mem (this.PrepareImage bytes)
             programBreak <- image.EndOfData
             let stackTop = size - 0x1000UL
             let rsp = this.SetupStack stackTop argv
@@ -142,6 +142,14 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64, ?k
         with get () = syscallHook
         and set v = syscallHook <- v
 
+    /// Prépare les octets de l'image : décompresse la frame zstd éventuelle
+    /// pour obtenir un ELF, sinon retourne les données telles quelles.
+    member private _.PrepareImage (data : byte[]) : byte[] =
+        if KernelImage.isZstdFrame data then
+            KernelImage.decompressKernel data
+        else
+            data
+
     /// Exécute une seule instruction ; retourne false si la machine est arrêtée
     /// (programme terminé ou point d'arrêt atteint et non encore exécuté).
     member this.Step() : bool =
@@ -180,7 +188,7 @@ type LinuxMachine(image : byte[], arguments : string[], ?memorySize : uint64, ?k
 
     /// Charge l'image ELF et initialise RIP/RSP ; appelé par Run et Step.
     member private this.LoadImage () =
-        let image = ElfLoader.load mem image
+        let image = ElfLoader.load mem (this.PrepareImage image)
         programBreak <- image.EndOfData
         if kernelMode then
             regs.RSP <- size - 0x1000UL

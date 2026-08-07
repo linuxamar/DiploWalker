@@ -1,6 +1,7 @@
 namespace Diplo.Linux.Tests
 
 open System
+open System.IO
 open System.Text
 open Xunit
 open FsUnit.Xunit
@@ -66,3 +67,24 @@ module KernelImageTests =
 
         let kernel = KernelImage.decompressKernel image
         kernel |> should equal sampleContent
+
+    [<Fact>]
+    let ``isZstdFrame détecte une frame zstd`` () =
+        KernelImage.isZstdFrame sampleFrame |> should be True
+
+    [<Fact>]
+    let ``isZstdFrame rejette des données non zstd`` () =
+        KernelImage.isZstdFrame [| 0x7Fuy; 0x45uy; 0x4Cuy; 0x46uy |] |> should be False
+
+    [<Fact>]
+    let ``LinuxMachine démarre un noyau compressé en zstd`` () =
+        let kernel = BootImage.createKernel [ "test" ]
+        let compressed = compress kernel
+
+        use machine = new LinuxMachine(compressed, [||])
+        use buffer = new MemoryStream()
+        machine.StandardOutput <- buffer
+        let code = machine.Run()
+
+        code |> should equal 0
+        Encoding.UTF8.GetString(buffer.ToArray()) |> should equal "test"

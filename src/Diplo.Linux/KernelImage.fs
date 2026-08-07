@@ -25,6 +25,14 @@ module KernelImage =
 
         scan 0
 
+    /// Indique si les données commencent par une frame zstd (magic 28 B5 2F FD).
+    let isZstdFrame (data : byte[]) : bool =
+        data.Length >= frameMagic.Length
+        && data[0] = frameMagic[0]
+        && data[1] = frameMagic[1]
+        && data[2] = frameMagic[2]
+        && data[3] = frameMagic[3]
+
     /// Décompresse la frame zstd commençant à frameStart dans data et retourne
     /// les octets décompressés (ex. le noyau ELF). Les données éventuelles après
     /// la fin de la frame (résidu) sont ignorées. Lève ArgumentException si la
