@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-12 projets source (.NET 10, F#) + 11 projets de test :
+10 projets source (.NET 10, F#) + 10 projets de test :
 
 | Projet | Rôle |
 |--------|------|
@@ -22,8 +22,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Diplo.Core | Clients gRPC, abstraction `IOutputPort` |
 | Diplo.Cli | Client CLI (Spectre.Console) |
 | Diplo.Gui | Interface graphique Avalonia |
-| Diplo.Linux | Émulateur de machine Linux x86-64 en F# (boot ISO, noyau, syscalls) |
-| Diplo.Linux.Cli | CLI `diplo-linux.exe` (boot, trace, pas à pas, points d'arrêt) |
 
 ## Stack
 
@@ -37,21 +35,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 .\pipeline.ps1 -DoTests           # Tests unitaires
 .\pipeline.ps1 -DoPublish         # Publication self-contained
 .\pipeline.ps1 -Clean -Restore    # Nettoyage + restauration NuGet
-```
-
-## Émulateur Linux
-
-`Diplo.Linux` émule une machine Linux x86-64 en F# :
-- Chargement de noyaux ELF bruts et boot depuis une image ISO (`diplo-linux.exe boot <iso> /chemin/vmlinuz <args...>`).
-- Mode noyau, console série COM1, gestion mémoire (mmap), table de syscalls x86-64.
-- CLI `diplo-linux.exe` (`Diplo.Linux.Cli`) : trace `-t`, pas à pas `-s`, points d'arrêt `-b <adresse>`.
-- Limites actuelles : `vmlinuz` Ubuntu est un bzImage non supporté — GRUB, PCI, ACPI et timers non implémentés.
-
-Configurations prêtes à l'emploi dans `configs/` :
-
-```powershell
-.\configs\OwnLinuxBase\Download-UbuntuServer.ps1   # Télécharge l'ISO Ubuntu Server
-.\configs\OwnLinuxBase\Launch-OwnLinuxBase.ps1     # Lance l'émulateur diplo-linux.exe
 ```
 
 ## Conventions Git
