@@ -1,6 +1,7 @@
 namespace Diplo.Cli.Volume
 
 open System
+open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open Diplo.Core.Clients
@@ -67,6 +68,13 @@ type CreateVolumeSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<NAME>")>] member val Name: string = null with get, set
     [<CommandOption("--driver")>] member val Driver: string = "local" with get, set
+    [<CommandOption("--path")>] member val Path: string = null with get, set
+    [<CommandOption("--server")>] member val Server: string = null with get, set
+    [<CommandOption("--share")>] member val Share: string = null with get, set
+    [<CommandOption("--username")>] member val Username: string = null with get, set
+    [<CommandOption("--password")>] member val Password: string = null with get, set
+    [<CommandOption("--export")>] member val Export: string = null with get, set
+    [<CommandOption("--opt")>] member val Opts: string[] = [||] with get, set
 
 type CreateVolumeCommand(output: IOutputPort) =
     inherit AsyncCommand<CreateVolumeSettings>()
@@ -78,6 +86,12 @@ type CreateVolumeCommand(output: IOutputPort) =
                 return 1
             elif not (List.contains (settings.Driver.ToLowerInvariant()) ["local"; "nfs"; "smb"; "azure"; "aws"; "gcp"; "iso"]) then
                 output.WriteError(sprintf "Driver inconnu: %s" settings.Driver)
+                return 1
+            elif settings.Driver.ToLowerInvariant() = "smb" && (String.IsNullOrWhiteSpace settings.Server || String.IsNullOrWhiteSpace settings.Share) then
+                output.WriteError("Le driver SMB requiert les options --server et --share")
+                return 1
+            elif settings.Driver.ToLowerInvariant() = "nfs" && (String.IsNullOrWhiteSpace settings.Server || String.IsNullOrWhiteSpace settings.Export) then
+                output.WriteError("Le driver NFS requiert les options --server et --export")
                 return 1
             else
                 let driverType =
@@ -91,8 +105,27 @@ type CreateVolumeCommand(output: IOutputPort) =
                     | "iso" -> StorageDriverType.Iso
                     | _ -> failwithf "Driver %s non géré (normalement déjà validé)" settings.Driver
 
+                let driverOpts = System.Collections.Generic.Dictionary<string, string>()
+                let addOpt (key: string) (value: string) =
+                    if not (String.IsNullOrWhiteSpace value) then
+                        driverOpts.[key] <- value
+                addOpt "path" settings.Path
+                addOpt "server" settings.Server
+                addOpt "share" settings.Share
+                addOpt "username" settings.Username
+                addOpt "password" settings.Password
+                addOpt "export" settings.Export
+                for pair in settings.Opts do
+                    match pair.Split('=', 2) with
+                    | [| k; v |] when not (String.IsNullOrWhiteSpace k) -> driverOpts.[k] <- v
+                    | _ -> ()
+
                 use client = new VolumeClient()
-                let! response = client.CreateAsync(name = settings.Name, driver = driverType)
+                let! response =
+                    client.CreateAsync(
+                        name = settings.Name,
+                        driver = driverType,
+                        ?driverOpts = (if driverOpts.Count > 0 then Some(driverOpts :> IDictionary<string, string>) else None))
                 output.WriteSuccess(sprintf "Volume %s créé (ID: %s)" response.Name response.Id)
                 return 0
         }
