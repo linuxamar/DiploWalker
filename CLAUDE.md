@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-10 projets source (.NET 10, F#) + 9 projets de test :
+10 projets source (.NET 10, F#) + 10 projets de test :
 
 | Projet | Rôle |
 |--------|------|
@@ -27,7 +27,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **.NET 10** (`dotnet 10.0.302` installé localement).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
-- **Tests** : xUnit v3 + FsUnit.xUnit — 473 tests au total (dont 27 d'intégration gRPC).
+- **Tests** : xUnit v3 + FsUnit.xUnit — plus de 580 tests au total (dont 27 d'intégration gRPC).
 
 ## Commandes
 

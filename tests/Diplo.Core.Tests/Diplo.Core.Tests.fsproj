@@ -20,7 +20,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="FSharp.Core" />
     <PackageReference Include="FsUnit.xUnit"  />
     <PackageReference Include="Grpc.Core.Testing"  />
     <PackageReference Include="Grpc.Net.Client"  />

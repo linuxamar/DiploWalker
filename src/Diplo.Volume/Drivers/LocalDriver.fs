@@ -31,16 +31,48 @@ type LocalVolumeDriver(dataRoot: string) =
 
     let generateId () = Guid.NewGuid().ToString("N")
 
+    // Si le volume pointe directement sur un répertoire externe (option "path"),
+    // renvoie ce répertoire ; sinon le répertoire _data interne au volume.
+    let resolveDataPath (id: string) =
+        let file = metaPath id
+        if File.Exists(file) then
+            try
+                let elem =
+                    JsonSerializer.Deserialize<JsonElement>(
+                        File.ReadAllText file,
+                        JsonSerializerOptions(MaxDepth = 32))
+                match elem.TryGetProperty "driverOpts" with
+                | true, opts when opts.ValueKind = JsonValueKind.Object ->
+                    match opts.TryGetProperty "path" with
+                    | true, p when p.ValueKind = JsonValueKind.String ->
+                        let p = p.GetString()
+                        if String.IsNullOrWhiteSpace p then dataPath id else p
+                    | _ -> dataPath id
+                | _ -> dataPath id
+            with _ -> dataPath id
+        else dataPath id
+
     member _.CreateVolume(name: string, driverOpts: Map<string, string>, labels: Map<string, string>) =
         let id = generateId()
         let dir = Path.Combine(volumesDir, id)
         Directory.CreateDirectory(dir) |> ignore
-        Directory.CreateDirectory(Path.Combine(dir, "_data")) |> ignore
+        let dataDir =
+            match driverOpts.TryFind "path" with
+            | Some p when not (String.IsNullOrWhiteSpace p) ->
+                // Référence directe : le volume pointe sur le répertoire fourni,
+                // sans le copier. Le répertoire est créé s'il n'existe pas encore.
+                let full = Path.GetFullPath(p)
+                Directory.CreateDirectory(full) |> ignore
+                full
+            | _ ->
+                let d = Path.Combine(dir, "_data")
+                Directory.CreateDirectory(d) |> ignore
+                d
         let meta = {|
             id = id
             name = name
             driver = "local"
-            mountpoint = Path.Combine(dir, "_data")
+            mountpoint = dataDir
             labels = labels
             driverOpts = driverOpts
             createdAt = DateTime.UtcNow
@@ -91,7 +123,7 @@ type LocalVolumeDriver(dataRoot: string) =
         SecurityValidation.validateId id "L'identifiant du volume"
         SecurityValidation.validateVolumePath targetPath "Le chemin cible"
         lock lockObj (fun () ->
-            let src = dataPath id
+            let src = resolveDataPath id
             if not (Directory.Exists(src)) then
                 failwithf "Volume %s introuvable" id
             let mountDir = mountPath id targetPath
@@ -125,7 +157,7 @@ type LocalVolumeDriver(dataRoot: string) =
     member _.GetVolumeSize(id: string) =
         SecurityValidation.validateId id "L'identifiant du volume"
         lock lockObj (fun () ->
-            let dir = dataPath id
+            let dir = resolveDataPath id
             let dirFull = Path.GetFullPath(dir)
             if Directory.Exists(dir) then
                 let mutable totalBytes = 0L
