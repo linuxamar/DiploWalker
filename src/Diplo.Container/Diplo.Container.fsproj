@@ -22,5 +22,6 @@
     <ProjectReference Include="..\Diplo.Contracts\Diplo.Contracts.fsproj" />
     <ProjectReference Include="..\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
     <ProjectReference Include="..\Diplo.Grpc\Diplo.Grpc.fsproj" />
+    <ProjectReference Include="..\Diplo.Disk\Diplo.Disk.fsproj" />
   </ItemGroup>
 </Project>

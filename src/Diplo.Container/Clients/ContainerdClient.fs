@@ -59,7 +59,7 @@ type ContainerdClient(runner: IProcessRunner) =
         JsonSerializer.Serialize(spec)
 
     interface IContainerdClient with
-        member _.CreateContainer(namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit) =
+        member _.CreateContainer(namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit, mounts) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
             SecurityValidation.validateImage image
@@ -72,6 +72,15 @@ type ContainerdClient(runner: IProcessRunner) =
             for (k, v) in env |> Map.toList do
                 ctrArgs.Add("--env")
                 ctrArgs.Add(sprintf "%s=%s" k v)
+            for (src, dst, readOnly) in mounts do
+                SecurityValidation.validateVolumePath src "La source du volume"
+                if String.IsNullOrEmpty(dst) then
+                    invalidArg "dst" "La destination du montage ne peut pas être vide"
+                if dst.Contains("..") then
+                    invalidArg "dst" (sprintf "La destination du montage contient une traversée de répertoire interdite: '%s'" dst)
+                ctrArgs.Add("--mount")
+                let options = if readOnly then "rbind,ro" else "rbind"
+                ctrArgs.Add(sprintf "type=bind,src=%s,dst=%s,options=%s" src dst options)
             let hasSpecContent =
                 command.Length > 0 || args.Length > 0 ||
                 memoryLimit > 0L || cpuShares > 0L || pidLimit > 0u

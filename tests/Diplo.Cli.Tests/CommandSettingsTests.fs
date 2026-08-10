@@ -279,6 +279,23 @@ module ``Vérification des paramètres des commandes`` =
         typeof<StatsContainerSettings>.IsSubclassOf(typeof<Spectre.Console.Cli.CommandSettings>)
         |> should be True
 
+    [<Fact>]
+    let ``CreateContainerSettings.Mounts est vide par défaut`` () =
+        let settings = CreateContainerSettings()
+        settings.Mounts.Length |> should equal 0
+
+    [<Fact>]
+    let ``CreateContainerSettings.Mounts porte l'option --mount`` () =
+        let attr =
+            typeof<CreateContainerSettings>.GetProperty("Mounts")
+                .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+        let longNames =
+            attr
+            |> Array.tryPick (function
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | _ -> None)
+        longNames |> should equal (Some [| "mount" |])
+
     // --- Image commands ---
     [<Fact>]
     let ``ImageListCommand hérite de AsyncCommand<ImageListSettings>`` () =

@@ -3,6 +3,7 @@ namespace Diplo.Container.Services
 open System
 open System.ServiceModel
 open System.Collections.Generic
+open System.Collections.Concurrent
 open System.Linq
 open System.Text
 open System.Text.Json
@@ -13,12 +14,17 @@ open Diplo.Grpc
 open Diplo.Grpc.Container
 open Diplo.Abstractions.Interfaces
 open Diplo.Abstractions
+open Diplo.Disk
 
 [<ServiceContract(Name = "IContainerService")>]
-type ContainerServiceImpl(client: IContainerdClient) =
+type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
     [<Literal>]
     static let DefaultNamespace = "default"
+
+    /// Volumes montés par conteneur : retenus jusqu'à la suppression du
+    /// conteneur, où les modifications sont réécrites dans l'image source.
+    let mountedVolumes = ConcurrentDictionary<string, MountedVolume list>()
 
     let tryGetString (el: JsonElement) (prop: string) =
         let mutable v = Unchecked.defaultof<JsonElement>
@@ -63,7 +69,31 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 let env = request.Env |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
                 let command = request.Command |> Seq.toArray
                 let args = request.Args |> Seq.toArray
-                let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels, env, command, args, request.MemoryLimit, int64 request.CpuShares, uint32 request.PidLimit)
+                let requestedMounts =
+                    request.Mounts
+                    |> Seq.map (fun m ->
+                        SecurityValidation.validateVolumePath m.Source "La source du volume"
+                        if String.IsNullOrEmpty(m.Destination) then
+                            raise (RpcException(Status(StatusCode.InvalidArgument, "La destination du montage ne peut pas être vide")))
+                        m.Source, m.Destination, m.ReadOnly)
+                    |> Seq.toList
+                let mounted = ResizeArray<MountedVolume>()
+                let id =
+                    try
+                        for (source, destination, readOnly) in requestedMounts do
+                            mounted.Add(mounter.Mount(source, destination, readOnly))
+                        let resolvedMounts =
+                            mounted
+                            |> Seq.map (fun v -> v.HostPath, v.Destination, v.ReadOnly)
+                            |> Seq.toList
+                        let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels, env, command, args, request.MemoryLimit, int64 request.CpuShares, uint32 request.PidLimit, resolvedMounts)
+                        mountedVolumes[id] <- mounted |> Seq.toList
+                        id
+                    with ex ->
+                        for v in mounted do
+                            try v.Dispose() with _ -> ()
+                        mounted.Clear()
+                        reraise ()
                 return
                     { CreateContainerResponse.Id = id
                       Name = request.Name
@@ -93,6 +123,12 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
                 client.DeleteContainer(DefaultNamespace, request.Id, request.Force)
+                match mountedVolumes.TryRemove(request.Id) with
+                | true, volumes ->
+                    for v in volumes do
+                        try v.Dispose()
+                        with ex -> Log.Warning(ex, "Erreur lors de la libération du volume du conteneur {ContainerId}", request.Id)
+                | false, _ -> ()
                 return { DeleteContainerResponse.Success = true; Message = "Conteneur supprimé" }
             }
 

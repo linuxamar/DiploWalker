@@ -37,7 +37,7 @@ type ContainerdClientTests() =
         let runner = createRunner ()
         runner.OnCommand("container create", "abc123")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
-        let result = client.CreateContainer("default", "test-123", "mcr.microsoft.com/dotnet/runtime:10.0", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u)
+        let result = client.CreateContainer("default", "test-123", "mcr.microsoft.com/dotnet/runtime:10.0", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, [])
         result |> should equal "abc123"
         let cmd = runner.SecureCommands |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains("container create"))
         cmd.IsSome |> should be True
@@ -52,11 +52,26 @@ type ContainerdClientTests() =
         runner.OnCommand("container create", "xyz")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
         let labels = Map.ofList [ "app", "web"; "env", "prod" ]
-        client.CreateContainer("moby", "c-1", "nginx:latest", labels, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u) |> ignore
+        client.CreateContainer("moby", "c-1", "nginx:latest", labels, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
         let (_, args) = runner.SecureCommands |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("container create"))
         let joined = args |> String.concat " "
         joined |> shouldContain "--label app=web"
         joined |> shouldContain "--label env=prod"
+
+    [<Fact>]
+    member _.``CreateContainer avec montages ajoute les --mount``() =
+        let runner = createRunner ()
+        runner.OnCommand("container create", "abc123")
+        let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+        let dataSrc = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "diplo-data")
+        let keysSrc = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "diplo-keys")
+        let mounts = [ (dataSrc, "C:\\app", false); (keysSrc, "C:\\keys", true) ]
+        client.CreateContainer("default", "m-1", "nginx:latest", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, mounts) |> ignore
+        let (_, args) = runner.SecureCommands |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("container create"))
+        let joined = args |> String.concat " "
+        joined |> shouldContain "--mount"
+        joined |> shouldContain (sprintf "type=bind,src=%s,dst=C:\\app,options=rbind" dataSrc)
+        joined |> shouldContain (sprintf "type=bind,src=%s,dst=C:\\keys,options=rbind,ro" keysSrc)
 
     [<Fact>]
     member _.``StartContainer appelle task start``() =

@@ -4,6 +4,7 @@ module ContainerIntegrationTests =
 
     open System
     open System.Collections.Generic
+    open System.IO
     open System.Threading
     open System.Text.Json
     open System.Threading.Tasks
@@ -20,20 +21,29 @@ module ContainerIntegrationTests =
     open Diplo.Grpc.Container
     open Diplo.Container.Services
     open Diplo.Abstractions.Interfaces
+    open Diplo.Disk
+    open DiscUtils
+    open DiscUtils.Fat
+    open DiscUtils.Partitions
+    open DiscUtils.Streams
 
     type private MockContainerdClient() =
 
         let mutable containers = Map.empty<string, Map<string, string>>
         let mutable started = Set.empty<string>
+        let mutable mountsById = Map.empty<string, (string * string * bool) list>
         let ownedDocs = List<JsonDocument>()
 
         let keepDoc (doc: JsonDocument) =
             ownedDocs.Add(doc)
             doc
 
+        member _.MountsById = mountsById
+
         interface IContainerdClient with
-            member _.CreateContainer(_ns, id, image, _labels, _env, _command, _args, _mem, _cpu, _pid) =
+            member _.CreateContainer(_ns, id, image, _labels, _env, _command, _args, _mem, _cpu, _pid, mounts) =
                 containers <- containers |> Map.add id (Map.ofList ["image", image; "id", id])
+                mountsById <- mountsById |> Map.add id mounts
                 id
 
             member _.StartContainer(_ns, id) =
@@ -89,11 +99,11 @@ module ContainerIntegrationTests =
     let private createChannel (address: string) =
         GrpcChannel.ForAddress(address, GrpcChannelOptions())
 
-    let private startApp () =
-        let mock = MockContainerdClient()
+    let private startAppWith (mock: MockContainerdClient) () =
         let builder = WebApplication.CreateBuilder()
         builder.Services.AddCodeFirstGrpc() |> ignore
         builder.Services.AddSingleton<IContainerdClient>(mock) |> ignore
+        builder.Services.AddSingleton<IDiskMounter>(Diplo.Disk.DiskMounter()) |> ignore
         builder.Services.AddSingleton<ContainerServiceImpl>() |> ignore
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(System.Net.IPAddress.Loopback, 0, fun lo ->
@@ -104,9 +114,34 @@ module ContainerIntegrationTests =
         let address = app.Urls |> Seq.head
         app, address
 
+    let private startApp () =
+        let mock = MockContainerdClient()
+        startAppWith mock ()
+
+    let private startAppWithMock () =
+        let mock = MockContainerdClient()
+        let app, address = startAppWith mock ()
+        app, address, mock
+
     let private stopApp (app: WebApplication) =
         app.StopAsync().GetAwaiter().GetResult()
         (app :> IAsyncDisposable).DisposeAsync().AsTask().GetAwaiter().GetResult()
+
+    /// Crée une image disque FAT 64 Mo (table de partitions BIOS) contenant
+    /// les fichiers (chemin relatif, contenu texte) fournis.
+    let private createFatImage (path: string) (contents: (string * string) list) =
+        use fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite)
+        use disk = Raw.Disk.Initialize(fs, Ownership.None, 64L * 1024L * 1024L)
+        BiosPartitionTable.Initialize(disk, WellKnownPartitionType.WindowsFat) |> ignore
+        use fat = FatFileSystem.FormatPartition(disk, 0, "DIPLO")
+        for (relPath, content) in contents do
+            let parent = Path.GetDirectoryName(relPath)
+            if not (String.IsNullOrEmpty parent) && not (fat.DirectoryExists parent) then
+                fat.CreateDirectory(parent)
+            use w = fat.OpenFile(relPath, FileMode.Create, FileAccess.ReadWrite)
+            use sw = new StreamWriter(w)
+            sw.Write(content)
+            sw.Flush()
 
     [<Fact>]
     let ``CreateContainer via gRPC retourne l'ID`` () =
@@ -118,7 +153,7 @@ module ContainerIntegrationTests =
                 { Name = "ctn-grpc"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0 }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             let result = client.CreateContainer(req, CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
             result.State |> should equal ContainerState.Created
@@ -136,12 +171,39 @@ module ContainerIntegrationTests =
                 { Name = "to-start"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0 }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             let startReq: StartContainerRequest = { Id = createResult.Id }
             let startResult = client.StartContainer(startReq, CancellationToken.None).Result
             startResult.State |> should equal ContainerState.Running
             startResult.Message |> should equal "Conteneur démarré"
+        finally
+            stopApp app
+
+    [<Fact>]
+    let ``CreateContainer avec montage d'un repertoire via gRPC`` () =
+        let app, address = startApp ()
+        try
+            use channel = createChannel address
+            let client = channel.CreateGrpcService<IContainerService>()
+            let mountDir = Path.Combine(Path.GetTempPath(), "diplo-int-mount-" + Guid.NewGuid().ToString("N"))
+            Directory.CreateDirectory(mountDir) |> ignore
+            try
+                let createReq: CreateContainerRequest =
+                    { Name = "avec-mount"; Image = "test:latest"
+                      Command = List<string>(); Args = List<string>()
+                      Env = Dictionary(); Labels = Dictionary()
+                      MemoryLimit = 0L; CpuShares = 0; PidLimit = 0
+                      Mounts = List<ContainerMount>() }
+                createReq.Mounts.Add({ Source = mountDir; Destination = "C:\\data"; ReadOnly = false })
+                let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
+                String.IsNullOrEmpty(createResult.Id) |> should equal false
+                createResult.State |> should equal ContainerState.Created
+                let delReq: DeleteContainerRequest = { Id = createResult.Id; Force = false }
+                let delResult = client.DeleteContainer(delReq, CancellationToken.None).Result
+                delResult.Success |> should equal true
+            finally
+                try Directory.Delete(mountDir, true) with _ -> ()
         finally
             stopApp app
 
@@ -155,7 +217,7 @@ module ContainerIntegrationTests =
                 { Name = "to-inspect"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0 }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             let inspectReq: InspectContainerRequest = { Id = createResult.Id }
             let inspectResult = client.InspectContainer(inspectReq, CancellationToken.None).Result
@@ -174,7 +236,7 @@ module ContainerIntegrationTests =
                 { Name = ""; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0 }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             client.CreateContainer(createReq, CancellationToken.None).Result |> ignore
             client.CreateContainer(createReq, CancellationToken.None).Result |> ignore
             let listReq: ListContainersRequest = { All = false; Filters = Dictionary() }
@@ -217,7 +279,7 @@ module ContainerIntegrationTests =
                 { Name = ""; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0 }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             let result = client.CreateContainer(req, CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
         finally
@@ -233,7 +295,7 @@ module ContainerIntegrationTests =
                 { Name = "to-delete"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0 }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             let deleteReq: DeleteContainerRequest = { Id = createResult.Id; Force = false }
             let deleteResult = client.DeleteContainer(deleteReq, CancellationToken.None).Result
@@ -251,7 +313,7 @@ module ContainerIntegrationTests =
                 { Name = "to-stop"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0 }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             let stopReq: StopContainerRequest = { Id = createResult.Id; TimeoutSeconds = 5 }
             let stopResult = client.StopContainer(stopReq, CancellationToken.None).Result
@@ -270,8 +332,46 @@ module ContainerIntegrationTests =
                 { Name = "no-image"; Image = ""
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0 }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             let ex = Assert.Throws<AggregateException>(fun () -> client.CreateContainer(req, CancellationToken.None).Result |> ignore)
             ex.InnerException.Message |> should haveSubstring "L'image du conteneur"
         finally
             stopApp app
+
+    [<Fact>]
+    let ``CreateContainer avec une image disque montee via gRPC puis DeleteContainer reecrit l'image`` () =
+        let app, address, mock = startAppWithMock ()
+        let root = Path.Combine(Path.GetTempPath(), "diplo-int-image-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory root |> ignore
+        let imagePath = Path.Combine(root, "data.img")
+        try
+            createFatImage imagePath [ "hello.txt", "v1" ]
+            use channel = createChannel address
+            let client = channel.CreateGrpcService<IContainerService>()
+            let createReq: CreateContainerRequest =
+                { Name = "avec-image"; Image = "test:latest"
+                  Command = List<string>(); Args = List<string>()
+                  Env = Dictionary(); Labels = Dictionary()
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0
+                  Mounts = List<ContainerMount>() }
+            createReq.Mounts.Add({ Source = imagePath; Destination = "C:\\data"; ReadOnly = false })
+            let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
+            String.IsNullOrEmpty(createResult.Id) |> should equal false
+            let mounts = mock.MountsById |> Map.tryFind createResult.Id
+            mounts.IsSome |> should equal true
+            let (hostPath, dest, ro) = mounts.Value |> List.head
+            dest |> should equal "C:\\data"
+            ro |> should equal false
+            Directory.Exists hostPath |> should equal true
+            File.ReadAllText(Path.Combine(hostPath, "hello.txt")) |> should equal "v1"
+            File.WriteAllText(Path.Combine(hostPath, "hello.txt"), "v2")
+            let delReq: DeleteContainerRequest = { Id = createResult.Id; Force = false }
+            let delResult = client.DeleteContainer(delReq, CancellationToken.None).Result
+            delResult.Success |> should equal true
+            let re = Path.Combine(root, "re")
+            Diplo.Disk.FsImage.extract imagePath re false |> ignore
+            File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2"
+        finally
+            try Directory.Delete(root, true) with _ -> ()
+            stopApp app
+

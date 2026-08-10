@@ -69,6 +69,13 @@
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Montages:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.ContainerMounts}" Width="560"
+                                 AcceptsReturn="True" TextWrapping="Wrap" Height="56"
+                                 PlaceholderText="src=C:\donnees,dst=C:\conteneur\donnees[,ro] — un montage par ligne (ou séparé par ;)" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Nouveau nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerTab.ContainerNewName}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="renommer" />

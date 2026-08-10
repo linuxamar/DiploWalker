@@ -125,6 +125,7 @@ $testProjects = @(
     "Diplo.Core.Tests",
     "Diplo.Contracts.Tests",
     "Diplo.Installer.Tests",
+    "Diplo.Disk.Tests",
     "Diplo.Cli.Tests",
     "Diplo.Gui.Tests",
     "Diplo.Integration.Tests"

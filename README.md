@@ -8,7 +8,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 | Service | Port | Description |
 |---------|------|-------------|
-| **Diplo.Container** | 5001 | Gestion du cycle de vie des conteneurs (création, démarrage, arrêt, suppression) via containerd |
+| **Diplo.Container** | 5001 | Cycle de vie des conteneurs via containerd — création, démarrage, arrêt, suppression et montage de volumes |
 | **Diplo.Volume** | 5002 | Gestion des volumes persistants |
 | **Diplo.Network** | 5003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge) |
 | **Diplo.Installer** | — | Installation et configuration de l'ensemble du système |
@@ -24,7 +24,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (plus de 580 tests)
+- **Tests** : xUnit (546 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -133,6 +133,7 @@ Diplo/
 │   ├── Diplo.Grpc/             # Types messages et services gRPC (protobuf-net)
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, abstraction IOutputPort
+│   ├── Diplo.Disk/             # Montage d'images disque (qcow2, raw, vhd, vhdx, vmdk)
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
 │   └── Diplo.Gui/              # Interface graphique Avalonia
 ├── tests/
@@ -143,6 +144,7 @@ Diplo/
 │   ├── Diplo.Installer.Tests/
 │   ├── Diplo.Network.Tests/
 │   ├── Diplo.Volume.Tests/
+│   ├── Diplo.Disk.Tests/
 │   ├── Diplo.Cli.Tests/
 │   ├── Diplo.Gui.Tests/
 │   └── Diplo.Integration.Tests/
@@ -168,3 +170,46 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 - Compatible avec Windows Server 2016+
 - Ne nécessite pas de virtualisation matérielle
 - Partage le noyau hôte avec les conteneurs
+
+## Montage de volumes et d'images disque
+
+À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** (qcow2, raw, vhd, vhdx, vmdk) gérées par `Diplo.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
+
+### CLI
+
+```powershell
+diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees"
+diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees,ro"
+```
+
+- `src` : répertoire de l'hôte ou chemin vers une image disque
+- `dst` : destination dans le conteneur
+- `ro` (optionnel) : montage en lecture seule
+
+Les sources sont restreintes aux répertoires autorisés par la validation de sécurité (`%TEMP%`, `%ProgramData%\Diplo`, `%ProgramFiles%\Diplo`). Une image disque est montée via un répertoire de préparation pour la durée de vie du conteneur, puis réécrite à la suppression.
+
+### GUI
+
+L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
+
+### Validation manuelle sur un hôte containerd réel
+
+Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable dans les tests : il nécessite un hôte Windows avec containerd installé. Procédure de validation manuelle :
+
+1. **Images de test** — créer une image FAT à partir du répertoire de travail :
+   ```powershell
+   $img = "$env:TEMP\diplo-test.img"
+   # Fabriquer l'image : prévoir un utilitaire (ex. DiscUtils) ou un outil
+   # externe ; une image qcow2 peut être créée avec qemu-img.
+   qemu-img create -f qcow2 $img 64M
+   ```
+2. **Démarrer le service** :
+   ```powershell
+   dotnet run --project src\Diplo.Container -p:Platform=x64
+   ```
+3. **Créer un conteneur avec l'image montée** :
+   ```powershell
+   dotnet run --project src\Diplo.Cli -p:Platform=x64 -- container create mcr.microsoft.com/windows/nanoserver:ltsc2022 mon-conteneur --mount "src=$img,dst=C:\data"
+   ```
+4. **Vérifier** que `ctr --mount type=bind,src=<staging>,dst=C:\data,options=rbind` est bien passé à containerd (trace du service) et que le contenu de l'image est visible dans `C:\data` du conteneur.
+5. **Supprimer le conteneur** (`diplo container delete mon-conteneur`) et vérifier que l'image a été réécrite : le contenu produit dans le conteneur (ex. `C:\data\resultat.txt`) est relu dans l'image via un nouvel `extract`.

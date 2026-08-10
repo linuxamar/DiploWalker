@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open Diplo.Core.Clients
+open Diplo.Core.Mounts
 open Diplo.Core.Output
 open Spectre.Console.Cli
 
@@ -160,6 +161,7 @@ type CreateContainerSettings() =
     [<CommandOption("--env")>] member val Env: string[] = [||] with get, set
     [<CommandOption("--command")>] member val Command: string[] = [||] with get, set
     [<CommandOption("--label")>] member val Labels: string[] = [||] with get, set
+    [<CommandOption("--mount")>] member val Mounts: string[] = [||] with get, set
     [<CommandOption("--pid-limit")>] member val PidLimit = 0u with get, set
     [<CommandOption("--memory-limit")>] member val MemoryLimit = 0L with get, set
     [<CommandOption("--cpu-shares")>] member val CpuShares = 0L with get, set
@@ -192,6 +194,7 @@ type CreateContainerCommand(output: IOutputPort) =
                         | _ -> None)
                     |> dict
                 let command = settings.Command |> Array.toList
+                let mounts = MountParser.parseArray settings.Mounts
                 let! response =
                     client.CreateAsync(
                         name = settings.Name,
@@ -201,7 +204,8 @@ type CreateContainerCommand(output: IOutputPort) =
                         ?labels = (if labels.Count > 0 then Some labels else None),
                         ?pidLimit = (if settings.PidLimit > 0u then Some(int settings.PidLimit) else None),
                         ?memoryLimit = (if settings.MemoryLimit > 0L then Some settings.MemoryLimit else None),
-                        ?cpuShares = (if settings.CpuShares > 0L then Some(int settings.CpuShares) else None))
+                        ?cpuShares = (if settings.CpuShares > 0L then Some(int settings.CpuShares) else None),
+                        ?mounts = (if mounts.IsEmpty then None else Some mounts))
                 output.WriteSuccess(sprintf "Conteneur %s créé (%s)" response.Name (response.State.ToString()))
                 output.WriteLine(sprintf "  ID      : %s" response.Id)
                 output.WriteLine(sprintf "  Créé    : %s" response.CreatedAt)

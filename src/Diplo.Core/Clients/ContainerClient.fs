@@ -33,11 +33,12 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
           ?pidLimit: int,
           ?memoryLimit: int64,
           ?cpuShares: int,
+          ?mounts: (string * string * bool) list,
           ?ct: CancellationToken ) =
         task {
             if String.IsNullOrEmpty(name) then invalidArg (nameof name) "Le nom du conteneur est requis"
             if String.IsNullOrEmpty(image) then invalidArg (nameof image) "L'image est requise"
-            let request = { Name = name; Image = image; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0 }
+            let request = { Name = name; Image = image; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>() }
             env |> Option.iter (fun e -> for kv in e do request.Env.[kv.Key] <- kv.Value)
             command |> Option.iter (fun c -> c |> List.iter (fun s -> request.Command.Add(s)))
             args |> Option.iter (fun a -> a |> List.iter (fun s -> request.Args.Add(s)))
@@ -45,6 +46,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             pidLimit |> Option.iter (fun v -> request.PidLimit <- v)
             memoryLimit |> Option.iter (fun v -> request.MemoryLimit <- v)
             cpuShares |> Option.iter (fun v -> request.CpuShares <- v)
+            mounts |> Option.iter (fun ms -> for (s, d, ro) in ms do request.Mounts.Add({ Source = s; Destination = d; ReadOnly = ro }))
             let ct = defaultArg ct CancellationToken.None
             let! response = client.CreateContainer(request, ct)
             return response

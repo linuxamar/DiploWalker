@@ -22,6 +22,13 @@ type ContainerState =
 
 [<ProtoContract>]
 [<CLIMutable>]
+type ContainerMount =
+    { [<ProtoMember(1)>] mutable Source : string
+      [<ProtoMember(2)>] mutable Destination : string
+      [<ProtoMember(3)>] mutable ReadOnly : bool }
+
+[<ProtoContract>]
+[<CLIMutable>]
 type CreateContainerRequest =
     { [<ProtoMember(1)>] mutable Name : string
       [<ProtoMember(2)>] mutable Image : string
@@ -31,13 +38,15 @@ type CreateContainerRequest =
       [<ProtoMember(6)>] mutable Labels : System.Collections.Generic.Dictionary<string, string>
       [<ProtoMember(7)>] mutable PidLimit : int
       [<ProtoMember(8)>] mutable MemoryLimit : int64
-      [<ProtoMember(9)>] mutable CpuShares : int }
+      [<ProtoMember(9)>] mutable CpuShares : int
+      [<ProtoMember(10)>] mutable Mounts : System.Collections.Generic.List<ContainerMount> }
     [<ProtoAfterDeserialization>]
     member this.EnsureCollections() =
         if isNull this.Env then this.Env <- System.Collections.Generic.Dictionary<string, string>()
         if isNull this.Command then this.Command <- System.Collections.Generic.List<string>()
         if isNull this.Args then this.Args <- System.Collections.Generic.List<string>()
         if isNull this.Labels then this.Labels <- System.Collections.Generic.Dictionary<string, string>()
+        if isNull this.Mounts then this.Mounts <- System.Collections.Generic.List<ContainerMount>()
 
 [<ProtoContract>]
 [<CLIMutable>]
