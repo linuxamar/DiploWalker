@@ -68,3 +68,6 @@ eng/Diplo_dev.pfx
 # Publications locales
 publish/
 publish-cli/
+
+# Raccourci de lancement local de l'agent (non versionné)
+ai.cmd

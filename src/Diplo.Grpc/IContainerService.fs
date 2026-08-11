@@ -46,3 +46,39 @@ type IContainerService =
     abstract member RemoveImage: request: RemoveImageRequest * ct: CancellationToken -> Task<RemoveImageResponse>
 
     abstract member TagImage: request: TagImageRequest * ct: CancellationToken -> Task<TagImageResponse>
+
+    abstract member PauseContainer: request: PauseContainerRequest * ct: CancellationToken -> Task<PauseContainerResponse>
+
+    abstract member UnpauseContainer: request: UnpauseContainerRequest * ct: CancellationToken -> Task<UnpauseContainerResponse>
+
+    abstract member WaitContainer: request: WaitContainerRequest * ct: CancellationToken -> Task<WaitContainerResponse>
+
+    abstract member UpdateContainer: request: UpdateContainerRequest * ct: CancellationToken -> Task<UpdateContainerResponse>
+
+    abstract member PruneContainers: request: PruneContainersRequest * ct: CancellationToken -> Task<PruneContainersResponse>
+
+    abstract member PruneImages: request: PruneImagesRequest * ct: CancellationToken -> Task<PruneImagesResponse>
+
+    abstract member GetContainerStatsStream: request: GetContainerStatsStreamRequest * ct: CancellationToken -> IAsyncEnumerable<GetContainerStatsResponse>
+
+    abstract member WatchEvents: request: WatchEventsRequest * ct: CancellationToken -> IAsyncEnumerable<ContainerEvent>
+
+    abstract member ExecContainerStream: request: IAsyncEnumerable<ExecMessage> * ct: CancellationToken -> IAsyncEnumerable<ExecOutput>
+
+    abstract member ReadFile: request: ReadFileRequest * ct: CancellationToken -> Task<ReadFileResponse>
+
+    abstract member WriteFile: request: WriteFileRequest * ct: CancellationToken -> Task<WriteFileResponse>
+
+    abstract member CommitImage: request: CommitImageRequest * ct: CancellationToken -> Task<CommitImageResponse>
+
+    abstract member ExportImage: request: ExportImageRequest * ct: CancellationToken -> IAsyncEnumerable<ImageChunk>
+
+    abstract member ImportImage: request: IAsyncEnumerable<ImageChunk> * ct: CancellationToken -> Task<ImportImageResponse>
+
+    abstract member LoginRegistry: request: LoginRegistryRequest * ct: CancellationToken -> Task<LoginRegistryResponse>
+
+    abstract member LogoutRegistry: request: LogoutRegistryRequest * ct: CancellationToken -> Task<LogoutRegistryResponse>
+
+    abstract member CreateNamespace: request: CreateNamespaceRequest * ct: CancellationToken -> Task<CreateNamespaceResponse>
+
+    abstract member DeleteNamespace: request: DeleteNamespaceRequest * ct: CancellationToken -> Task<DeleteNamespaceResponse>

@@ -29,6 +29,21 @@ type ContainerMount =
 
 [<ProtoContract>]
 [<CLIMutable>]
+type PortMapping =
+    { [<ProtoMember(1)>] mutable HostPort : int
+      [<ProtoMember(2)>] mutable ContainerPort : int
+      [<ProtoMember(3)>] mutable Protocol : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type HealthCheckConfig =
+    { [<ProtoMember(1)>] mutable Command : string
+      [<ProtoMember(2)>] mutable IntervalSeconds : int
+      [<ProtoMember(3)>] mutable TimeoutSeconds : int
+      [<ProtoMember(4)>] mutable Retries : int }
+
+[<ProtoContract>]
+[<CLIMutable>]
 type CreateContainerRequest =
     { [<ProtoMember(1)>] mutable Name : string
       [<ProtoMember(2)>] mutable Image : string
@@ -39,7 +54,13 @@ type CreateContainerRequest =
       [<ProtoMember(7)>] mutable PidLimit : int
       [<ProtoMember(8)>] mutable MemoryLimit : int64
       [<ProtoMember(9)>] mutable CpuShares : int
-      [<ProtoMember(10)>] mutable Mounts : System.Collections.Generic.List<ContainerMount> }
+      [<ProtoMember(10)>] mutable Mounts : System.Collections.Generic.List<ContainerMount>
+      /// Politique de redémarrage : "" (aucun), "always", "on-failure".
+      [<ProtoMember(11)>] mutable RestartPolicy : string
+      /// Nombre max de redémarrages pour on-failure (0 = illimité).
+      [<ProtoMember(12)>] mutable RestartMaxCount : int
+      [<ProtoMember(13)>] mutable Ports : System.Collections.Generic.List<PortMapping>
+      [<ProtoMember(14)>] mutable HealthCheck : HealthCheckConfig }
     [<ProtoAfterDeserialization>]
     member this.EnsureCollections() =
         if isNull this.Env then this.Env <- System.Collections.Generic.Dictionary<string, string>()
@@ -47,6 +68,7 @@ type CreateContainerRequest =
         if isNull this.Args then this.Args <- System.Collections.Generic.List<string>()
         if isNull this.Labels then this.Labels <- System.Collections.Generic.Dictionary<string, string>()
         if isNull this.Mounts then this.Mounts <- System.Collections.Generic.List<ContainerMount>()
+        if isNull this.Ports then this.Ports <- System.Collections.Generic.List<PortMapping>()
 
 [<ProtoContract>]
 [<CLIMutable>]
@@ -128,11 +150,18 @@ type InspectContainerResponse =
       [<ProtoMember(8)>] mutable Labels : System.Collections.Generic.Dictionary<string, string>
       [<ProtoMember(9)>] mutable Env : System.Collections.Generic.Dictionary<string, string>
       [<ProtoMember(10)>] mutable Pid : int
-      [<ProtoMember(11)>] mutable ExitCode : int }
+      [<ProtoMember(11)>] mutable ExitCode : int
+      [<ProtoMember(12)>] mutable RestartPolicy : string
+      [<ProtoMember(13)>] mutable Ports : System.Collections.Generic.List<PortMapping>
+      /// Santé : "", "starting", "healthy", "unhealthy".
+      [<ProtoMember(14)>] mutable Health : string
+      [<ProtoMember(15)>] mutable Mounts : System.Collections.Generic.List<string> }
     [<ProtoAfterDeserialization>]
     member this.EnsureCollections() =
         if isNull this.Labels then this.Labels <- System.Collections.Generic.Dictionary<string, string>()
         if isNull this.Env then this.Env <- System.Collections.Generic.Dictionary<string, string>()
+        if isNull this.Ports then this.Ports <- System.Collections.Generic.List<PortMapping>()
+        if isNull this.Mounts then this.Mounts <- System.Collections.Generic.List<string>()
 
 // ═══════════════════════════════════════════════
 // ListContainers
@@ -216,7 +245,8 @@ type ExecOutput =
 [<ProtoContract>]
 [<CLIMutable>]
 type PullImageRequest =
-    { [<ProtoMember(1)>] mutable Image : string }
+    { [<ProtoMember(1)>] mutable Image : string
+      [<ProtoMember(2)>] mutable User : string }
 
 [<ProtoContract>]
 [<CLIMutable>]
@@ -405,3 +435,279 @@ type TagImageResponse =
     { [<ProtoMember(1)>] mutable Source : string
       [<ProtoMember(2)>] mutable Target : string
       [<ProtoMember(3)>] mutable Message : string }
+
+// ═══════════════════════════════════════════════
+// Pause / UnpauseContainer
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type PauseContainerRequest =
+    { [<ProtoMember(1)>] mutable Id : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type PauseContainerResponse =
+    { [<ProtoMember(1)>] mutable State : ContainerState
+      [<ProtoMember(2)>] mutable Message : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type UnpauseContainerRequest =
+    { [<ProtoMember(1)>] mutable Id : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type UnpauseContainerResponse =
+    { [<ProtoMember(1)>] mutable State : ContainerState
+      [<ProtoMember(2)>] mutable Message : string }
+
+// ═══════════════════════════════════════════════
+// WaitContainer
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type WaitContainerRequest =
+    { [<ProtoMember(1)>] mutable Id : string
+      /// 0 = attente illimitée.
+      [<ProtoMember(2)>] mutable TimeoutSeconds : int }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type WaitContainerResponse =
+    { [<ProtoMember(1)>] mutable ExitCode : int
+      [<ProtoMember(2)>] mutable State : ContainerState
+      [<ProtoMember(3)>] mutable Message : string }
+
+// ═══════════════════════════════════════════════
+// UpdateContainer
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type UpdateContainerRequest =
+    { [<ProtoMember(1)>] mutable Id : string
+      /// 0 = inchangé.
+      [<ProtoMember(2)>] mutable MemoryLimit : int64
+      /// 0 = inchangé.
+      [<ProtoMember(3)>] mutable CpuShares : int
+      /// 0 = inchangé.
+      [<ProtoMember(4)>] mutable PidLimit : int
+      /// Nouvelle politique de redémarrage ("" = inchangée).
+      [<ProtoMember(5)>] mutable RestartPolicy : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type UpdateContainerResponse =
+    { [<ProtoMember(1)>] mutable Success : bool
+      [<ProtoMember(2)>] mutable Message : string }
+
+// ═══════════════════════════════════════════════
+// PruneContainers / PruneImages
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type PruneContainersRequest =
+    { [<ProtoMember(1)>] mutable Placeholder : bool }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type PruneContainersResponse =
+    { [<ProtoMember(1)>] mutable Deleted : System.Collections.Generic.List<string> }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Deleted then this.Deleted <- System.Collections.Generic.List<string>()
+
+[<ProtoContract>]
+[<CLIMutable>]
+type PruneImagesRequest =
+    { [<ProtoMember(1)>] mutable Placeholder : bool }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type PruneImagesResponse =
+    { [<ProtoMember(1)>] mutable Deleted : System.Collections.Generic.List<string> }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Deleted then this.Deleted <- System.Collections.Generic.List<string>()
+
+// ═══════════════════════════════════════════════
+// GetContainerStatsStream (server streaming)
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type GetContainerStatsStreamRequest =
+    { [<ProtoMember(1)>] mutable Id : string
+      /// 0 = défaut (2 s).
+      [<ProtoMember(2)>] mutable IntervalSeconds : int }
+
+// ═══════════════════════════════════════════════
+// WatchEvents (server streaming)
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type WatchEventsRequest =
+    { [<ProtoMember(1)>] mutable Placeholder : bool }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type ContainerEvent =
+    { [<ProtoMember(1)>] mutable Timestamp : string
+      /// create, start, stop, exit, pause, unpause, delete.
+      [<ProtoMember(2)>] mutable EventType : string
+      [<ProtoMember(3)>] mutable Id : string
+      [<ProtoMember(4)>] mutable Status : string
+      [<ProtoMember(5)>] mutable ExitCode : int }
+
+// ═══════════════════════════════════════════════
+// ExecContainerStream (bidirectionnel)
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type ExecMessage =
+    { [<ProtoMember(1)>] mutable Id : string
+      [<ProtoMember(2)>] mutable Command : System.Collections.Generic.List<string>
+      /// Données envoyées vers l'entrée standard du processus.
+      [<ProtoMember(3)>] mutable Data : byte[]
+      /// true : fermeture du flux d'entrée.
+      [<ProtoMember(4)>] mutable Eof : bool }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Command then this.Command <- System.Collections.Generic.List<string>()
+
+// ═══════════════════════════════════════════════
+// ReadFile / WriteFile (copie de fichiers)
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type ReadFileRequest =
+    { [<ProtoMember(1)>] mutable Id : string
+      [<ProtoMember(2)>] mutable Path : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type ReadFileResponse =
+    { [<ProtoMember(1)>] mutable Data : byte[]
+      [<ProtoMember(2)>] mutable Success : bool
+      [<ProtoMember(3)>] mutable Message : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type WriteFileRequest =
+    { [<ProtoMember(1)>] mutable Id : string
+      [<ProtoMember(2)>] mutable Path : string
+      [<ProtoMember(3)>] mutable Data : byte[] }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type WriteFileResponse =
+    { [<ProtoMember(1)>] mutable Success : bool
+      [<ProtoMember(2)>] mutable Message : string }
+
+// ═══════════════════════════════════════════════
+// CommitImage
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type CommitImageRequest =
+    { [<ProtoMember(1)>] mutable ContainerId : string
+      [<ProtoMember(2)>] mutable ImageRef : string
+      [<ProtoMember(3)>] mutable Message : string
+      [<ProtoMember(4)>] mutable Author : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type CommitImageResponse =
+    { [<ProtoMember(1)>] mutable ImageRef : string
+      [<ProtoMember(2)>] mutable Success : bool
+      [<ProtoMember(3)>] mutable Message : string }
+
+// ═══════════════════════════════════════════════
+// ExportImage / ImportImage
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type ExportImageRequest =
+    { [<ProtoMember(1)>] mutable ImageRef : string
+      [<ProtoMember(2)>] mutable NamespaceName : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type ImageChunk =
+    { [<ProtoMember(1)>] mutable Data : byte[] }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type ImportImageRequest =
+    { [<ProtoMember(1)>] mutable NamespaceName : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type ImportImageResponse =
+    { [<ProtoMember(1)>] mutable ImageRefs : System.Collections.Generic.List<string>
+      [<ProtoMember(2)>] mutable Message : string }
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.ImageRefs then this.ImageRefs <- System.Collections.Generic.List<string>()
+
+// ═══════════════════════════════════════════════
+// LoginRegistry / LogoutRegistry
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type LoginRegistryRequest =
+    { [<ProtoMember(1)>] mutable Registry : string
+      [<ProtoMember(2)>] mutable Username : string
+      [<ProtoMember(3)>] mutable Password : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type LoginRegistryResponse =
+    { [<ProtoMember(1)>] mutable Success : bool
+      [<ProtoMember(2)>] mutable Message : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type LogoutRegistryRequest =
+    { [<ProtoMember(1)>] mutable Registry : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type LogoutRegistryResponse =
+    { [<ProtoMember(1)>] mutable Success : bool
+      [<ProtoMember(2)>] mutable Message : string }
+
+// ═══════════════════════════════════════════════
+// CreateNamespace / DeleteNamespace
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type CreateNamespaceRequest =
+    { [<ProtoMember(1)>] mutable Name : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type CreateNamespaceResponse =
+    { [<ProtoMember(1)>] mutable Success : bool
+      [<ProtoMember(2)>] mutable Message : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type DeleteNamespaceRequest =
+    { [<ProtoMember(1)>] mutable Name : string }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type DeleteNamespaceResponse =
+    { [<ProtoMember(1)>] mutable Success : bool
+      [<ProtoMember(2)>] mutable Message : string }

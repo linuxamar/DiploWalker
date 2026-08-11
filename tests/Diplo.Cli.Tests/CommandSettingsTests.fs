@@ -40,6 +40,28 @@ module ``Vérification de la structure des commandes CLI`` =
         |> should be True
 
     [<Fact>]
+    let ``RegistryLoginCommand hérite de AsyncCommand<RegistryLoginSettings>`` () =
+        typeof<RegistryLoginCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<RegistryLoginSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``RegistryLogoutCommand hérite de AsyncCommand<RegistryLogoutSettings>`` () =
+        typeof<RegistryLogoutCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<RegistryLogoutSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``PullSettings porte l'option --user`` () =
+        let attr =
+            typeof<PullSettings>.GetProperty("User")
+                .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+        let longNames =
+            attr
+            |> Array.tryPick (function
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | _ -> None)
+        longNames |> should equal (Some [| "user" |])
+
+    [<Fact>]
     let ``VersionCommand hérite de AsyncCommand<VersionSettings>`` () =
         typeof<VersionCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<VersionSettings>>)
         |> should be True
@@ -260,6 +282,52 @@ module ``Vérification des paramètres des commandes`` =
     let ``ImageTagSettings.Target est null par défaut`` () =
         let settings = ImageTagSettings()
         settings.Target |> should be Null
+
+    open Diplo.Cli.Container
+
+    [<Fact>]
+    let ``RegistryLoginSettings.Registry est null par défaut`` () =
+        let settings = RegistryLoginSettings()
+        settings.Registry |> should be Null
+
+    [<Fact>]
+    let ``RegistryLoginSettings.Username est null par défaut`` () =
+        let settings = RegistryLoginSettings()
+        settings.Username |> should be Null
+
+    [<Fact>]
+    let ``RegistryLoginSettings.Password est null par défaut`` () =
+        let settings = RegistryLoginSettings()
+        settings.Password |> should be Null
+
+    [<Fact>]
+    let ``RegistryLoginSettings porte l'option --username`` () =
+        let attr =
+            typeof<RegistryLoginSettings>.GetProperty("Username")
+                .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+        let longNames =
+            attr
+            |> Array.tryPick (function
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | _ -> None)
+        longNames |> should equal (Some [| "username" |])
+
+    [<Fact>]
+    let ``RegistryLoginSettings porte l'option --password`` () =
+        let attr =
+            typeof<RegistryLoginSettings>.GetProperty("Password")
+                .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+        let longNames =
+            attr
+            |> Array.tryPick (function
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | _ -> None)
+        longNames |> should equal (Some [| "password" |])
+
+    [<Fact>]
+    let ``RegistryLogoutSettings.Registry est null par défaut`` () =
+        let settings = RegistryLogoutSettings()
+        settings.Registry |> should be Null
 
     // --- New container commands ---
     open Diplo.Cli.Container

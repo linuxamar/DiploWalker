@@ -38,7 +38,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
         task {
             if String.IsNullOrEmpty(name) then invalidArg (nameof name) "Le nom du conteneur est requis"
             if String.IsNullOrEmpty(image) then invalidArg (nameof image) "L'image est requise"
-            let request = { Name = name; Image = image; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>() }
+            let request : CreateContainerRequest = { Name = name; Image = image; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>(); RestartPolicy = ""; RestartMaxCount = 0; Ports = ResizeArray<PortMapping>(); HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             env |> Option.iter (fun e -> for kv in e do request.Env.[kv.Key] <- kv.Value)
             command |> Option.iter (fun c -> c |> List.iter (fun s -> request.Command.Add(s)))
             args |> Option.iter (fun a -> a |> List.iter (fun s -> request.Args.Add(s)))
@@ -142,11 +142,30 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             return outputs :> seq<ExecOutput>
         }
 
-    member _.PullImageAsync(image: string, ?ct: CancellationToken) =
+    member _.PullImageAsync(image: string, ?user: string, ?ct: CancellationToken) =
         task {
             if String.IsNullOrEmpty(image) then invalidArg (nameof image) "L'image est requise"
             let ct = defaultArg ct CancellationToken.None
-            let! response = client.PullImage({ Image = image }, ct)
+            let request : PullImageRequest = { Image = image; User = defaultArg user "" }
+            let! response = client.PullImage(request, ct)
+            return response
+        }
+
+    member _.LoginRegistryAsync(registry: string, username: string, password: string, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrEmpty(registry) then invalidArg (nameof registry) "Le registre est requis"
+            if String.IsNullOrEmpty(username) then invalidArg (nameof username) "Le nom d'utilisateur est requis"
+            if String.IsNullOrEmpty(password) then invalidArg (nameof password) "Le mot de passe est requis"
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.LoginRegistry({ Registry = registry; Username = username; Password = password }, ct)
+            return response
+        }
+
+    member _.LogoutRegistryAsync(registry: string, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrEmpty(registry) then invalidArg (nameof registry) "Le registre est requis"
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.LogoutRegistry({ Registry = registry }, ct)
             return response
         }
 
@@ -193,7 +212,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
         task {
             let ns = defaultArg namespaceName ""
             let ct = defaultArg ct CancellationToken.None
-            let request = { NamespaceName = "" }
+            let request : ListImagesRequest = { NamespaceName = "" }
             if not (String.IsNullOrEmpty(ns)) then
                 request.NamespaceName <- ns
             let! response = client.ListImages(request, ct)

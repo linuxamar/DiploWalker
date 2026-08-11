@@ -98,6 +98,8 @@ let ``ContainerTabViewModel expose les commandes ICommand`` () =
     vm.InspectImageCommand       :> ICommand |> should not' (be Null)
     vm.RemoveImageCommand        :> ICommand |> should not' (be Null)
     vm.TagImageCommand           :> ICommand |> should not' (be Null)
+    vm.RegistryLoginCommand      :> ICommand |> should not' (be Null)
+    vm.RegistryLogoutCommand     :> ICommand |> should not' (be Null)
 
 [<Fact>]
 let ``ContainerTabViewModel etat initial`` () =
@@ -109,6 +111,27 @@ let ``ContainerTabViewModel etat initial`` () =
     vm.ContainerTimeout     |> should equal 10
     vm.Containers.Count     |> should equal 0
     vm.Images.Count         |> should equal 0
+
+[<Fact>]
+let ``ContainerTabViewModel registres etat initial`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port)
+    vm.RegistryInput           |> should equal ""
+    vm.RegistryUsernameInput   |> should equal ""
+    vm.RegistryPasswordInput   |> should equal ""
+
+[<Fact>]
+let ``ContainerTabViewModel proprietes registres declenchent PropertyChanged`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port)
+    let mutable changed = []
+    vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
+    vm.RegistryInput <- "myregistry.azurecr.io"
+    vm.RegistryUsernameInput <- "user"
+    vm.RegistryPasswordInput <- "secret"
+    changed |> should contain "RegistryInput"
+    changed |> should contain "RegistryUsernameInput"
+    changed |> should contain "RegistryPasswordInput"
 
 [<Fact>]
 let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =

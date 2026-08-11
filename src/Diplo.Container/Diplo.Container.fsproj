@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="RegistryAuth.fs" />
     <Compile Include="Clients\ProcessRunner.fs" />
     <Compile Include="Clients\ContainerdClient.fs" />
     <Compile Include="Services\ContainerServiceImpl.fs" />
@@ -16,6 +17,7 @@
   <ItemGroup>
     <PackageReference Include="protobuf-net.Grpc.AspNetCore" />
     <PackageReference Include="Grpc.Core.Api" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
 
   <ItemGroup>

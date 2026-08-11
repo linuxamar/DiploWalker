@@ -43,6 +43,9 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     let mutable containerSince = ""
     let mutable containerExecCommand = ""
     let mutable containerMounts = ""
+    let mutable registryInput = ""
+    let mutable registryUsernameInput = ""
+    let mutable registryPasswordInput = ""
 
     member _.Containers = containers
     member _.Images = images
@@ -62,6 +65,9 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member _.ContainerSince with get () = containerSince and set v = containerSince <- v; this.OnPropertyChanged()
     member _.ContainerExecCommand with get () = containerExecCommand and set v = containerExecCommand <- v; this.OnPropertyChanged()
     member _.ContainerMounts with get () = containerMounts and set v = containerMounts <- v; this.OnPropertyChanged()
+    member _.RegistryInput with get () = registryInput and set v = registryInput <- v; this.OnPropertyChanged()
+    member _.RegistryUsernameInput with get () = registryUsernameInput and set v = registryUsernameInput <- v; this.OnPropertyChanged()
+    member _.RegistryPasswordInput with get () = registryPasswordInput and set v = registryPasswordInput <- v; this.OnPropertyChanged()
 
     member _.ListContainersCommand = RelayCommand(Action(fun () -> this.ListContainers() |> ignore))
     member _.InspectContainerCommand = RelayCommand(Action(fun () -> this.InspectContainer() |> ignore))
@@ -81,6 +87,8 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member _.GetContainerLogsCommand = RelayCommand(Action(fun () -> this.GetContainerLogs() |> ignore))
     member _.ExecInContainerCommand = RelayCommand(Action(fun () -> this.ExecInContainer() |> ignore))
     member _.ListNamespacesCommand = RelayCommand(Action(fun () -> this.ListNamespaces() |> ignore))
+    member _.RegistryLoginCommand = RelayCommand(Action(fun () -> this.RegistryLogin() |> ignore))
+    member _.RegistryLogoutCommand = RelayCommand(Action(fun () -> this.RegistryLogout() |> ignore))
 
     member private this.ListContainers() =
         task {
@@ -311,5 +319,44 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
                 let! response = client.ListNamespacesAsync()
                 let nsList = String.Join(", ", response.Namespaces)
                 outputPort.WriteSuccess(sprintf "Namespaces: %s" nsList)
+            with ex -> outputPort.WriteError(ex.Message)
+        }
+
+    member private this.RegistryLogin() =
+        task {
+            try
+                if String.IsNullOrEmpty(this.RegistryInput) then
+                    outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                elif String.IsNullOrEmpty(this.RegistryUsernameInput) then
+                    outputPort.WriteError("Le nom d'utilisateur est requis")
+                elif String.IsNullOrEmpty(this.RegistryPasswordInput) then
+                    outputPort.WriteError("Le mot de passe est requis")
+                else
+                    use client = new ContainerClient()
+                    let! response =
+                        client.LoginRegistryAsync(
+                            registry = this.RegistryInput,
+                            username = this.RegistryUsernameInput,
+                            password = this.RegistryPasswordInput)
+                    if response.Success then
+                        outputPort.WriteSuccess(response.Message)
+                        this.RegistryPasswordInput <- ""
+                    else
+                        outputPort.WriteError(response.Message)
+            with ex -> outputPort.WriteError(ex.Message)
+        }
+
+    member private this.RegistryLogout() =
+        task {
+            try
+                if String.IsNullOrEmpty(this.RegistryInput) then
+                    outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                else
+                    use client = new ContainerClient()
+                    let! response = client.LogoutRegistryAsync(registry = this.RegistryInput)
+                    if response.Success then
+                        outputPort.WriteSuccess(response.Message)
+                    else
+                        outputPort.WriteError(response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }

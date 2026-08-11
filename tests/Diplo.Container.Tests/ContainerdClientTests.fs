@@ -3,7 +3,9 @@ namespace Diplo.Container.Tests
 open Xunit
 open FsUnit.Xunit
 open Diplo.Container.Clients
+open Diplo.Container
 
+[<Collection("registry-state")>]
 type ContainerdClientTests() =
 
     let createRunner () =
@@ -14,6 +16,9 @@ type ContainerdClientTests() =
 
     let shouldContain (substring: string) (text: string) =
         Assert.Contains(substring, text)
+
+    let shouldNotContain (substring: string) (text: string) =
+        Assert.DoesNotContain(substring, text)
 
     [<Fact>]
     member _.``Version retourne version et revision``() =
@@ -186,3 +191,76 @@ type ContainerdClientTests() =
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
         let result = client.Version()
         result |> shouldContain "Version inconnue"
+
+    [<Fact>]
+    member _.``PullImage sans identifiant n'ajoute pas --user``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+        let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+        let result = client.PullImage("nginx:latest", None)
+        result |> should equal "resolved"
+        let (_, args) = runner.SecureCommands |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
+        (args |> String.concat " ") |> shouldNotContain "--user"
+
+    [<Fact>]
+    member _.``PullImage avec --user inline utilise l'identifiant explicite``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+        let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+        let result = client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret")
+        result |> should equal "resolved"
+        let (_, args) = runner.SecureCommands |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
+        let joined = args |> String.concat " "
+        joined |> shouldContain "--user"
+        joined |> shouldContain "inline:secret"
+
+    [<Fact>]
+    member _.``PullImage --user inline prime sur l'identifiant enregistre``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+        let stateFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "diplo-pull-" + System.Guid.NewGuid().ToString("N") + ".json")
+        try
+            RegistryAuth.setStateFile stateFile
+            RegistryAuth.add stateFile "myregistry.azurecr.io" "stored" "pass"
+            let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+            let result = client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret")
+            result |> should equal "resolved"
+            let (_, args) = runner.SecureCommands |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
+            let joined = args |> String.concat " "
+            joined |> shouldContain "inline:secret"
+            joined |> shouldNotContain "stored:pass"
+        finally
+            try System.IO.File.Delete stateFile with _ -> ()
+
+    [<Fact>]
+    member _.``PullImage utilise --user quand un identifiant est enregistre``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+        let stateFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "diplo-pull-" + System.Guid.NewGuid().ToString("N") + ".json")
+        try
+            RegistryAuth.setStateFile stateFile
+            RegistryAuth.add stateFile "myregistry.azurecr.io" "user" "secret"
+            let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+            let result = client.PullImage("myregistry.azurecr.io/team/app:latest", None)
+            result |> should equal "resolved"
+            let (_, args) = runner.SecureCommands |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
+            let joined = args |> String.concat " "
+            joined |> shouldContain "--user"
+            joined |> shouldContain "user:secret"
+        finally
+            try System.IO.File.Delete stateFile with _ -> ()
+
+    [<Fact>]
+    member _.``PullImage de Docker Hub consulte le registre docker.io``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+        let stateFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "diplo-pull-" + System.Guid.NewGuid().ToString("N") + ".json")
+        try
+            RegistryAuth.setStateFile stateFile
+            RegistryAuth.add stateFile "docker.io" "hubuser" "hubpass"
+            let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+            client.PullImage("library/nginx:latest", None) |> ignore
+            let (_, args) = runner.SecureCommands |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
+            (args |> String.concat " ") |> shouldContain "hubuser:hubpass"
+        finally
+            try System.IO.File.Delete stateFile with _ -> ()

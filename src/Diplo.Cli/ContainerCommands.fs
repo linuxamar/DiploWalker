@@ -8,6 +8,7 @@ open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
 open Spectre.Console.Cli
+open Spectre.Console
 
 // ── list ──────────────────────────────────────────────────────────
 type ListSettings() =
@@ -139,6 +140,7 @@ type DeleteContainerCommand(output: IOutputPort) =
 type PullSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<IMAGE>")>] member val Image: string = null with get, set
+    [<CommandOption("--user")>] member val User: string = null with get, set
 
 type PullImageCommand(output: IOutputPort) =
     inherit AsyncCommand<PullSettings>()
@@ -150,8 +152,67 @@ type PullImageCommand(output: IOutputPort) =
                 return 1
             else
                 use client = new ContainerClient()
-                let! response = client.PullImageAsync(settings.Image)
+                let! response =
+                    client.PullImageAsync(
+                        settings.Image,
+                        ?user = (if String.IsNullOrEmpty(settings.User) then None else Some settings.User))
                 output.WriteSuccess(response.Message)
+                return 0
+        }
+
+// ── login / logout (registres) ────────────────────────────────────
+type RegistryLoginSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<REGISTRY>")>] member val Registry: string = null with get, set
+    [<CommandOption("--username")>] member val Username: string = null with get, set
+    [<CommandOption("--password")>] member val Password: string = null with get, set
+
+type RegistryLoginCommand(output: IOutputPort) =
+    inherit AsyncCommand<RegistryLoginSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrEmpty(settings.Registry) then
+                output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                return 1
+            elif String.IsNullOrEmpty(settings.Username) then
+                output.WriteError("Le nom d'utilisateur est requis (--username)")
+                return 1
+            else
+                let password =
+                    if String.IsNullOrEmpty(settings.Password) then
+                        AnsiConsole.Prompt(
+                            TextPrompt<string>("Mot de passe :").Secret())
+                    else
+                        settings.Password
+                use client = new ContainerClient()
+                let! response = client.LoginRegistryAsync(settings.Registry, settings.Username, password)
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                else
+                    output.WriteError(response.Message)
+                return 0
+        }
+
+type RegistryLogoutSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<REGISTRY>")>] member val Registry: string = null with get, set
+
+type RegistryLogoutCommand(output: IOutputPort) =
+    inherit AsyncCommand<RegistryLogoutSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrEmpty(settings.Registry) then
+                output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                return 1
+            else
+                use client = new ContainerClient()
+                let! response = client.LogoutRegistryAsync(settings.Registry)
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                else
+                    output.WriteError(response.Message)
                 return 0
         }
 

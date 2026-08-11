@@ -92,6 +92,20 @@
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Registre:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.RegistryInput}" Width="200" Margin="0,0,12,0"
+                                 PlaceholderText="ex. myregistry.azurecr.io" />
+                        <TextBlock Text="Utilisateur:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.RegistryUsernameInput}" Width="120" Margin="0,0,12,0"
+                                 PlaceholderText="utilisateur" />
+                        <TextBlock Text="Mot de passe:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.RegistryPasswordInput}" Width="160" Margin="0,0,12,0"
+                                 PasswordChar="●" PlaceholderText="mot de passe" />
+                        <Button Content="🔐 Se connecter" Command="{Binding ContainerTab.RegistryLoginCommand}" Margin="0,0,4,0" />
+                        <Button Content="🚪 Se déconnecter" Command="{Binding ContainerTab.RegistryLogoutCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button Content="📜 Journaux" Command="{Binding ContainerTab.GetContainerLogsCommand}" Margin="0,0,4,0" />
                         <CheckBox Content="Suivre" IsChecked="{Binding ContainerTab.ContainerFollow}" Margin="8,0,0,0" VerticalAlignment="Center" />
                         <TextBlock Text="Lignes:" VerticalAlignment="Center" Margin="8,0,4,0" />

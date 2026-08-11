@@ -176,6 +176,22 @@ module SecurityValidation =
                     if Array.exists (fun dc -> dc = c) dangerousChars then
                         raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'argument de commande contient un caractère interdit: '%c' dans '%s'" c arg)))
 
+    /// Vérifie qu'un chemin de fichier cible dans un conteneur est sûr.
+    /// S'utilise quand le chemin est intégré dans une commande interne (ex. redirection
+    /// shell de WriteFile) : seules les parties issues de l'utilisateur sont contrôlées.
+    let validateContainerPath (path: string) (label: string) =
+        if String.IsNullOrEmpty(path) then
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s ne peut pas être vide" label)))
+        if path.Length > 1024 then
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s dépasse 1024 caractères" label)))
+        if path.Contains("..") then
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient une traversée de répertoire interdite: '%s'" label path)))
+        if path.Contains("\0") then
+            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul" label)))
+        for c in path do
+            if Array.exists (fun dc -> dc = c) dangerousChars then
+                raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère interdit: '%c' dans '%s'" label c path)))
+
     /// Vérifie qu'un chemin est sûr (pas de traversée via ..).
     /// Résout les symlinks pour empêcher les contournements via liens symboliques.
     let validatePath (path: string) (baseDir: string) (label: string) =

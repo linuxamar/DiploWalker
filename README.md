@@ -24,7 +24,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (553 tests)
+- **Tests** : xUnit (614 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -192,6 +192,24 @@ Les sources sont restreintes aux répertoires autorisés par la validation de s�
 
 L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
 
+## Authentification aux registres
+
+Les identifiants des registres privés sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) dans `%ProgramData%\Diplo\registry-auth.json`. Ils sont automatiquement fournis à containerd lors du `pull` d'une image du registre correspondant (registres nommés ou `docker.io` pour Docker Hub).
+
+### CLI
+
+```powershell
+diplo container login myregistry.azurecr.io --username user          # le mot de passe est demandé en mode masqué
+diplo container login myregistry.azurecr.io --username user --password secret
+diplo container logout myregistry.azurecr.io
+diplo container pull myregistry.azurecr.io/team/app:latest           # utilise l'identifiant enregistré
+diplo container pull myregistry.azurecr.io/team/app:latest --user inline:secret   # identifiant explicite (prime sur l'enregistré)
+```
+
+### GUI
+
+L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de passe » avec les boutons **Se connecter** et **Se déconnecter**. Le pull utilise ensuite l'identifiant enregistré automatiquement.
+
 ### Validation manuelle sur un hôte containerd réel
 
 Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable dans les tests : il nécessite un hôte Windows avec containerd installé. Procédure validée le 11/08/2026 contre containerd **v2.3.3** (namespace `default`) :
@@ -201,7 +219,7 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
    $img = "C:\ProgramData\Diplo\validate\data.img"
    # Fabriquer une image FAT 64 Mo avec DiscUtils (script fsi ou utilitaire dédié).
    ```
-2. **Publier et démarrer le service en TCP** (le transport par named pipes est inopérant sur ce build Windows — voir ci-dessous) :
+2. **Publier et démarrer le service en TCP** (la validation a été effectuée en TCP ; le transport par named pipes est corrigé dans `ServerConfig` — voir ci-dessous) :
    ```powershell
    dotnet publish src\Diplo.Container -c Release -r win-x64 -p:Platform=x64 --self-contained true -o publish\WindowsServices\x64\Diplo.Container
    & publish\WindowsServices\x64\Diplo.Container\Diplo.Container.exe   # service : http://127.0.0.1:5001
@@ -212,7 +230,7 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
    ```
 4. **Démarrer, exécuter, écrire** :
    ```powershell
-   & ...\Diplo.Cli.exe container start mon-conteneur        # s'attache au stdio (comme `ctr tasks start`)
+   & ...\Diplo.Cli.exe container start mon-conteneur        # démarre la tâche détachée (le stdio n'est plus attaché)
    & ...\Diplo.Cli.exe container exec mon-conteneur cmd /c dir C:\data
    & ...\Diplo.Cli.exe container exec mon-conteneur cmd /c copy nul C:\data\ecrit.txt
    ```
@@ -235,9 +253,9 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
 - `exec` est `tasks exec` ; `task info` et `task logs` ont été **supprimés** en v2 : `task info` est remplacé par le parsing de `tasks list`, et les logs ne sont plus récupérables via `ctr` (le service renvoie un message explicite).
 - `PullImage` n'utilise volontairement pas de namespace : `ctr image pull` s'applique au namespace courant.
 
-**Constats et limites de l'environnement de validation** :
+**Points corrigés au fil des validations** :
 
-- Le transport Kestrel par named pipes est inopérant sur ce build (échec de `NamedPipeServerStreamAcl.Create` → « adresse déjà utilisée » / « accès refusé » lors de la liaison `http://pipe:/...`) ; validation effectuée en TCP (`UseNamedPipes: false`, port 5001). Le correctif `CurrentUserOnly=false` (`ServerConfig`) reste requis : fournir une `PipeSecurity` explicite avec le flag par défaut lève une `ArgumentException` partout.
-- `container start` s'attache au stdio et bloque (comportement `ctr tasks start`) — à améliorer pour un usage non interactif.
-- `container exec` rejette les arguments contenant des espaces (validation de sécurité) : utiliser des commandes sans espaces (ex. `copy nul ...`).
-- L'état des volumes montés est conservé **en mémoire** : après un redémarrage du service, les volumes créés avant ne sont plus associés (pas de write-back à la suppression).
+- Transport Kestrel par named pipes : le flag par défaut de `NamedPipeServerStreamAcl.Create` levait une `ArgumentException` ; `ServerConfig` fournit désormais une `PipeSecurity` explicite (`CurrentUserOnly=false`). La validation ci-dessus reste effectuée en TCP (`UseNamedPipes: false`, port 5001).
+- `container start` démarre la tâche de manière détachée (`ctr tasks start` sans attache au stdio), ce qui permet une utilisation non interactive.
+- `container exec` accepte désormais les arguments contenant des espaces (reconstruction de la ligne de commande avec échappement).
+- L'état des volumes montés est persisté (`MountState`) : après un redémarrage du service, les associations sont restaurées et le write-back à la suppression conserve son comportement.

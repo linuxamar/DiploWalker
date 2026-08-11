@@ -1,6 +1,7 @@
 namespace Diplo.Container.Tests
 
 open System
+open System.IO
 open System.Text.Json
 open System.Threading.Tasks
 open Diplo.Abstractions.Interfaces
@@ -9,10 +10,15 @@ type MockContainerdClient() =
 
     let mutable containers = Map.empty<string, Map<string, string>>
     let mutable startedContainers = Set.empty<string>
+    let mutable stoppedContainers = Set.empty<string>
+    let mutable pausedContainers = Set.empty<string>
+    let mutable updatedContainers = Set.empty<string>
     let mutable deletedContainers = Set.empty<string>
     let mutable stopCalled = Map.empty<string, int>
     let mutable pulledImages = Set.empty<string>
     let mutable removedImages = Set.empty<string>
+    let mutable createdNamespaces = Set.empty<string>
+    let mutable removedNamespaces = Set.empty<string>
     let mutable recordedMounts = Map.empty<string, (string * string * bool) list>
     let ownedDocs = System.Collections.Generic.List<JsonDocument>()
 
@@ -41,6 +47,7 @@ type MockContainerdClient() =
 
         member _.StopContainer(_namespaceName, id, timeoutSeconds) =
             stopCalled <- stopCalled |> Map.add id timeoutSeconds
+            stoppedContainers <- stoppedContainers |> Set.add id
             Task.CompletedTask
 
         member _.DeleteContainer(_namespaceName, id, _force) =
@@ -54,7 +61,10 @@ type MockContainerdClient() =
             doc.RootElement
 
         member _.TaskInfo(_namespaceName, id) =
-            if startedContainers |> Set.contains id then
+            if stoppedContainers |> Set.contains id then
+                let doc = JsonDocument.Parse(sprintf """{"pid":0,"status":"stopped"}""") |> keepDoc
+                doc.RootElement
+            elif startedContainers |> Set.contains id then
                 let doc = JsonDocument.Parse(sprintf """{"pid":1234,"status":"running"}""") |> keepDoc
                 doc.RootElement
             else
@@ -69,12 +79,15 @@ type MockContainerdClient() =
               "2025-01-15T10:30:02Z Listening on port 8080" ]
 
         member _.ExecInContainer(_namespaceName, _id, command) =
-            sprintf "Output of: %s" (command |> String.concat " ")
+            if command.Length >= 2 && command.[0] = "base64" then
+                Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("contenu-du-fichier"))
+            else
+                sprintf "Output of: %s" (command |> String.concat " ")
 
         member _.Version() =
             "1.7.27 (revision: abc123)"
 
-        member _.PullImage(image) =
+        member _.PullImage(image, _userArg) =
             pulledImages <- pulledImages |> Set.add image
             sprintf "image pulled: %s" image
 
@@ -108,10 +121,49 @@ type MockContainerdClient() =
         member _.TagImage(_namespaceName, _source, _target) =
             ()
 
+        member _.StartContainerWithLogs(_namespaceName, id, logFile) =
+            startedContainers <- startedContainers |> Set.add id
+            File.WriteAllText(logFile, "2025-01-15T10:30:01Z Application started" + Environment.NewLine)
+
+        member _.PauseContainer(_namespaceName, id) =
+            pausedContainers <- pausedContainers |> Set.add id
+
+        member _.ResumeContainer(_namespaceName, id) =
+            pausedContainers <- pausedContainers |> Set.remove id
+
+        member _.WaitForContainerExit(_namespaceName, _id, _timeoutSeconds) =
+            if startedContainers |> Set.isEmpty then -1 else 0
+
+        member _.UpdateContainer(_namespaceName, id, _memoryLimit, _cpuShares, _pidLimit) =
+            updatedContainers <- updatedContainers |> Set.add id
+
+        member _.CreateNamespace(name) =
+            createdNamespaces <- createdNamespaces |> Set.add name
+
+        member _.DeleteNamespace(name) =
+            removedNamespaces <- removedNamespaces |> Set.add name
+
+        member _.ExportImage(_namespaceName, _imageRef, tarFile) =
+            File.WriteAllText(tarFile, "fake-image-archive")
+
+        member _.ImportImage(_namespaceName, tarFile) =
+            use fs = File.Open(tarFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+            use reader = new StreamReader(fs)
+            [ reader.ReadToEnd() ]
+
+        member _.StartExec(_namespaceName, _id, _command, stdin, stdout, _stderr) =
+            stdin.CopyTo(stdout)
+            0
+
     member this.Mock : IContainerdClient = this :> IContainerdClient
     member _.StopCalled = stopCalled
+    member _.StoppedContainers = stoppedContainers
     member _.DeletedContainers = deletedContainers
     member _.StartedContainers = startedContainers
+    member _.PausedContainers = pausedContainers
+    member _.UpdatedContainers = updatedContainers
     member _.PulledImages = pulledImages
     member _.RemovedImages = removedImages
+    member _.CreatedNamespaces = createdNamespaces
+    member _.RemovedNamespaces = removedNamespaces
     member _.RecordedMounts = recordedMounts

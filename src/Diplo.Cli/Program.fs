@@ -27,6 +27,8 @@ let main argv =
             addCmd c "stop" typeof<StopContainerCommand>
             addCmd c "delete" typeof<DeleteContainerCommand>
             addCmd c "pull" typeof<PullImageCommand>
+            addCmd c "login" typeof<RegistryLoginCommand>
+            addCmd c "logout" typeof<RegistryLogoutCommand>
             addCmd c "create" typeof<CreateContainerCommand>
             addCmd c "logs" typeof<LogsContainerCommand>
             addCmd c "exec" typeof<ExecContainerCommand>

@@ -4,9 +4,12 @@ open System
 open System.ServiceModel
 open System.Collections.Generic
 open System.Collections.Concurrent
+open System.IO
 open System.Linq
 open System.Text
 open System.Text.Json
+open System.Threading
+open System.Threading.Channels
 open System.Threading.Tasks
 open Grpc.Core
 open Serilog
@@ -15,6 +18,96 @@ open Diplo.Grpc.Container
 open Diplo.Abstractions.Interfaces
 open Diplo.Abstractions
 open Diplo.Disk
+open Diplo.Container
+
+/// Aides au streaming gRPC basées sur System.Threading.Channels.
+module private ContainerStreaming =
+
+    /// Flux basé sur un canal : connecte un flux entrant gRPC (entrée standard
+    /// du processus) et les flux sortants (stdout/stderr) sans buffer
+    /// intermédiaire.
+    type ChannelStream() =
+        inherit Stream()
+
+        let channel = Channel.CreateUnbounded<byte>(UnboundedChannelOptions(SingleReader = false, SingleWriter = false))
+        let reader = channel.Reader
+        let writer = channel.Writer
+
+        interface IDisposable with
+            member _.Dispose() = writer.TryComplete() |> ignore
+
+        member _.Complete() = writer.TryComplete() |> ignore
+
+        override _.CanRead = true
+        override _.CanWrite = true
+        override _.CanSeek = false
+
+        override _.Flush() = ()
+        override _.Length = raise (NotSupportedException())
+        override _.SetLength(_) = raise (NotSupportedException())
+        override _.Position with get () = raise (NotSupportedException()) and set _ = raise (NotSupportedException())
+        override _.Seek(_, _) = raise (NotSupportedException())
+
+        override _.Read(buffer: byte[], offset: int, count: int) : int =
+            let mutable total = 0
+            let mutable cont = true
+            while cont && total < count do
+                let has = reader.WaitToReadAsync().AsTask().GetAwaiter().GetResult()
+                if has then
+                    let mutable b = 0uy
+                    if reader.TryRead(&b) then
+                        buffer[offset + total] <- b
+                        total <- total + 1
+                else cont <- false
+            total
+
+        override _.Write(buffer: byte[], offset: int, count: int) =
+            for i in 0 .. count - 1 do
+                writer.WriteAsync(buffer[offset + i]).AsTask().GetAwaiter().GetResult() |> ignore
+
+        override _.ReadAsync(buffer, offset, count, ct) =
+            task {
+                let mutable total = 0
+                let mutable cont = true
+                while cont && total < count do
+                    let! has = reader.WaitToReadAsync(ct).AsTask()
+                    if has then
+                        let mutable b = 0uy
+                        if reader.TryRead(&b) then
+                            buffer[offset + total] <- b
+                            total <- total + 1
+                    else cont <- false
+                return total
+            }
+
+        override _.WriteAsync(buffer, offset, count, ct) =
+            task {
+                for i in 0 .. count - 1 do
+                    do! writer.WriteAsync(buffer[offset + i], ct).AsTask()
+            }
+
+    /// Convertit un lecteur de canal en IAsyncEnumerable (streaming gRPC).
+    let toAsyncEnumerable (reader: ChannelReader<'T>) : IAsyncEnumerable<'T> =
+        { new IAsyncEnumerable<'T> with
+            member _.GetAsyncEnumerator(_ct) =
+                let mutable current = Unchecked.defaultof<'T>
+                { new IAsyncEnumerator<'T> with
+                    member _.Current = current
+                    member this.MoveNextAsync() =
+                        let t =
+                            task {
+                                try
+                                    let! item = reader.ReadAsync(_ct).AsTask()
+                                    current <- item
+                                    return true
+                                with
+                                | :? ChannelClosedException -> return false
+                                | :? OperationCanceledException -> return false
+                            }
+                        ValueTask<bool>(t)
+                    member _.DisposeAsync() = ValueTask() } }
+
+open ContainerStreaming
 
 [<ServiceContract(Name = "IContainerService")>]
 type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
@@ -70,6 +163,48 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
     let tryGetDouble (el: JsonElement) (prop: string) =
         let mutable v = Unchecked.defaultof<JsonElement>
         if el.TryGetProperty(prop, &v) then v.GetDouble() else 0.0
+
+    let stateString (s: ContainerState) =
+        match s with
+        | ContainerState.Running -> "running"
+        | ContainerState.Created -> "created"
+        | ContainerState.Paused -> "paused"
+        | ContainerState.Stopped -> "stopped"
+        | ContainerState.Failed -> "dead"
+        | _ -> "unknown"
+
+    let buildStats (json: JsonElement) =
+        let cpuUsage =
+            try
+                let mutable cpu = Unchecked.defaultof<JsonElement>
+                if json.TryGetProperty("cpu", &cpu) then tryGetDouble cpu "usage" else 0.0
+            with ex ->
+                Log.Warning(ex, "Erreur lors du parsing CPU")
+                0.0
+        let memoryUsage, memoryLimit =
+            try
+                let mutable mem = Unchecked.defaultof<JsonElement>
+                if json.TryGetProperty("memory", &mem) then
+                    tryGetInt64 mem "usage", tryGetInt64 mem "limit"
+                else 0L, 0L
+            with ex ->
+                Log.Warning(ex, "Erreur lors du parsing mémoire")
+                0L, 0L
+        let pids =
+            try
+                let mutable p = Unchecked.defaultof<JsonElement>
+                if json.TryGetProperty("pids", &p) then tryGetInt64 p "current" |> int else 0
+            with ex ->
+                Log.Warning(ex, "Erreur lors du parsing PIDs")
+                0
+        { GetContainerStatsResponse.CpuUsage = cpuUsage
+          MemoryUsage = memoryUsage
+          MemoryLimit = memoryLimit
+          NetworkRx = 0L
+          NetworkTx = 0L
+          DiskRead = 0L
+          DiskWrite = 0L
+          Pids = pids }
 
     let mapState (status: string) =
         match status.ToLowerInvariant() with
@@ -202,6 +337,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                     with ex ->
                         Log.Warning(ex, "Erreur lors du parsing de la tâche")
                         ContainerState.Unknown, 0, ""
+                let mountPaths =
+                    match mountedVolumes.TryGetValue(request.Id) with
+                    | true, vols -> vols |> List.map (fun v -> v.HostPath) |> List<string>
+                    | false, _ -> List<string>()
                 return
                     { InspectContainerResponse.Id = request.Id
                       Name = tryGetString info "id"
@@ -213,7 +352,11 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                       Labels = labels
                       Env = env
                       Pid = pid
-                      ExitCode = tryGetInt64 info "exit_code" |> int }
+                      ExitCode = tryGetInt64 info "exit_code" |> int
+                      RestartPolicy = tryGetString info "restart_policy"
+                      Ports = List<PortMapping>()
+                      Health = tryGetString info "health"
+                      Mounts = mountPaths }
             }
 
         member _.ListContainers(request, _context) =
@@ -268,7 +411,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
             task {
                 if String.IsNullOrEmpty(request.Image) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'image à télécharger est requise")))
-                let result = client.PullImage(request.Image)
+                let userArg = if String.IsNullOrEmpty request.User then None else Some request.User
+                let result = client.PullImage(request.Image, userArg)
                 return { PullImageResponse.Image = request.Image; Message = result }
             }
 
@@ -339,38 +483,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
                 let json = client.GetContainerStats(DefaultNamespace, request.Id)
-                let cpuUsage =
-                    try
-                        let mutable cpu = Unchecked.defaultof<JsonElement>
-                        if json.TryGetProperty("cpu", &cpu) then tryGetDouble cpu "usage" else 0.0
-                    with ex ->
-                        Log.Warning(ex, "Erreur lors du parsing CPU")
-                        0.0
-                let memoryUsage, memoryLimit =
-                    try
-                        let mutable mem = Unchecked.defaultof<JsonElement>
-                        if json.TryGetProperty("memory", &mem) then
-                            tryGetInt64 mem "usage", tryGetInt64 mem "limit"
-                        else 0L, 0L
-                    with ex ->
-                        Log.Warning(ex, "Erreur lors du parsing mémoire")
-                        0L, 0L
-                let pids =
-                    try
-                        let mutable p = Unchecked.defaultof<JsonElement>
-                        if json.TryGetProperty("pids", &p) then tryGetInt64 p "current" |> int else 0
-                    with ex ->
-                        Log.Warning(ex, "Erreur lors du parsing PIDs")
-                        0
-                return
-                    { GetContainerStatsResponse.CpuUsage = cpuUsage
-                      MemoryUsage = memoryUsage
-                      MemoryLimit = memoryLimit
-                      NetworkRx = 0L
-                      NetworkTx = 0L
-                      DiskRead = 0L
-                      DiskWrite = 0L
-                      Pids = pids }
+                return buildStats json
             }
 
         member _.ListImages(request, _context) =
@@ -433,4 +546,408 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                     { TagImageResponse.Source = request.Source
                       Target = request.Target
                       Message = sprintf "Image marquée de '%s' vers '%s'" request.Source request.Target }
+            }
+
+        // ─── Pause / Unpause ────────────────────────────────────────────────
+
+        member _.PauseContainer(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Id) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                client.PauseContainer(DefaultNamespace, request.Id)
+                return { PauseContainerResponse.State = ContainerState.Paused; Message = "Conteneur en pause" }
+            }
+
+        member _.UnpauseContainer(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Id) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                client.ResumeContainer(DefaultNamespace, request.Id)
+                return { UnpauseContainerResponse.State = ContainerState.Running; Message = "Conteneur repris" }
+            }
+
+        // ─── Wait ───────────────────────────────────────────────────────────
+
+        member _.WaitContainer(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Id) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                let exitCode = client.WaitForContainerExit(DefaultNamespace, request.Id, request.TimeoutSeconds)
+                if exitCode = -1 then
+                    return { WaitContainerResponse.ExitCode = -1; State = ContainerState.Running; Message = "Timeout en attendant la sortie du conteneur" }
+                else
+                    return { WaitContainerResponse.ExitCode = exitCode; State = ContainerState.Stopped; Message = "Conteneur terminé" }
+            }
+
+        // ─── Update ─────────────────────────────────────────────────────────
+
+        member _.UpdateContainer(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Id) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                client.UpdateContainer(DefaultNamespace, request.Id, request.MemoryLimit, request.CpuShares, request.PidLimit)
+                return { UpdateContainerResponse.Success = true; Message = "Conteneur mis à jour" }
+            }
+
+        // ─── Prune ──────────────────────────────────────────────────────────
+
+        member _.PruneContainers(request, _context) =
+            task {
+                let deleted = List<string>()
+                let ids = client.ListContainers(DefaultNamespace, true)
+                for id in ids do
+                    let state =
+                        try mapState (tryGetString (client.TaskInfo(DefaultNamespace, id)) "status")
+                        with ex ->
+                            Log.Warning(ex, "Erreur lors de l'inspection du conteneur {ContainerId} pour PruneContainers", id)
+                            ContainerState.Unknown
+                    if state = ContainerState.Stopped then
+                        client.DeleteContainer(DefaultNamespace, id, false)
+                        deleted.Add(id)
+                return { PruneContainersResponse.Deleted = deleted }
+            }
+
+        member _.PruneImages(request, _context) =
+            task {
+                let deleted = List<string>()
+                let images = client.ListImages(DefaultNamespace)
+                for img in images do
+                    let refValue = tryGetString img "ref"
+                    let tag = tryGetString img "tag"
+                    if not (String.IsNullOrEmpty refValue) && String.IsNullOrEmpty tag then
+                        client.RemoveImage(DefaultNamespace, refValue) |> ignore
+                        deleted.Add(refValue)
+                return { PruneImagesResponse.Deleted = deleted }
+            }
+
+        // ─── Stats streaming ────────────────────────────────────────────────
+
+        member _.GetContainerStatsStream(request, _context) =
+            if String.IsNullOrEmpty(request.Id) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            let channel = Channel.CreateUnbounded<GetContainerStatsResponse>()
+            let intervalMs = if request.IntervalSeconds > 0 then request.IntervalSeconds * 1000 else 2000
+            let run () =
+                task {
+                    try
+                        while not _context.IsCancellationRequested do
+                            let json = client.GetContainerStats(DefaultNamespace, request.Id)
+                            do! channel.Writer.WriteAsync(buildStats json, _context)
+                            do! Task.Delay(intervalMs, _context)
+                        channel.Writer.TryComplete() |> ignore
+                    with
+                    | :? OperationCanceledException -> channel.Writer.TryComplete() |> ignore
+                    | ex ->
+                        Log.Error(ex, "Erreur lors du streaming des stats du conteneur {ContainerId}", request.Id)
+                        channel.Writer.TryComplete(ex) |> ignore
+                }
+            Task.Run(fun () -> run() |> ignore) |> ignore
+            toAsyncEnumerable channel.Reader
+
+        // ─── Événements ─────────────────────────────────────────────────────
+
+        member _.WatchEvents(request, _context) =
+            let channel = Channel.CreateUnbounded<ContainerEvent>()
+            let run () =
+                task {
+                    let mutable previous = Map.empty<string, ContainerState>
+                    try
+                        while not _context.IsCancellationRequested do
+                            let current = Dictionary<string, ContainerState>()
+                            for id in client.ListContainers(DefaultNamespace, true) do
+                                let state =
+                                    try mapState (tryGetString (client.TaskInfo(DefaultNamespace, id)) "status")
+                                    with _ -> ContainerState.Unknown
+                                current[id] <- state
+                            for kv in current do
+                                match previous.TryGetValue(kv.Key) with
+                                | true, oldState when oldState <> kv.Value ->
+                                    let evtType =
+                                        match oldState, kv.Value with
+                                        | ContainerState.Created, ContainerState.Running -> "start"
+                                        | ContainerState.Running, ContainerState.Paused -> "pause"
+                                        | ContainerState.Paused, ContainerState.Running -> "unpause"
+                                        | ContainerState.Running, ContainerState.Stopped -> "stop"
+                                        | _, ContainerState.Stopped -> "exit"
+                                        | _ -> "update"
+                                    do! channel.Writer.WriteAsync(
+                                        { ContainerEvent.Timestamp = DateTime.UtcNow.ToString("o")
+                                          EventType = evtType
+                                          Id = kv.Key
+                                          Status = stateString kv.Value
+                                          ExitCode = 0 }, _context)
+                                | true, _ -> ()
+                                | false, _ ->
+                                    do! channel.Writer.WriteAsync(
+                                        { ContainerEvent.Timestamp = DateTime.UtcNow.ToString("o")
+                                          EventType = "create"
+                                          Id = kv.Key
+                                          Status = stateString kv.Value
+                                          ExitCode = 0 }, _context)
+                            for id in previous.Keys do
+                                if not (current.ContainsKey id) then
+                                    do! channel.Writer.WriteAsync(
+                                        { ContainerEvent.Timestamp = DateTime.UtcNow.ToString("o")
+                                          EventType = "delete"
+                                          Id = id
+                                          Status = "deleted"
+                                          ExitCode = 0 }, _context)
+                            previous <- current |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
+                            do! Task.Delay(2000, _context)
+                        channel.Writer.TryComplete() |> ignore
+                    with
+                    | :? OperationCanceledException -> channel.Writer.TryComplete() |> ignore
+                    | ex ->
+                        Log.Error(ex, "Erreur lors du suivi des événements")
+                        channel.Writer.TryComplete(ex) |> ignore
+                }
+            Task.Run(fun () -> run() |> ignore) |> ignore
+            toAsyncEnumerable channel.Reader
+
+        // ─── Exec bidirectionnel ────────────────────────────────────────────
+
+        member _.ExecContainerStream(requests, _context) =
+            let channel = Channel.CreateUnbounded<ExecOutput>()
+            let run () =
+                task {
+                    let enumerator = requests.GetAsyncEnumerator(_context)
+                    try
+                        let! hasFirst = enumerator.MoveNextAsync().AsTask()
+                        if not hasFirst then
+                            channel.Writer.TryComplete() |> ignore
+                        else
+                            let first = enumerator.Current
+                            if String.IsNullOrEmpty(first.Id) then
+                                channel.Writer.TryComplete(RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis"))) |> ignore
+                            elif first.Command.Count = 0 then
+                                channel.Writer.TryComplete(RpcException(Status(StatusCode.InvalidArgument, "Au moins une commande est requise"))) |> ignore
+                            else
+                                let id = first.Id
+                                let command = first.Command |> Seq.toArray
+                                SecurityValidation.validateContainerId id
+                                SecurityValidation.validateCommand command
+                                use inputStream = new ChannelStream()
+                                use outputStream = new ChannelStream()
+                                use errorStream = new ChannelStream()
+                                if not (isNull first.Data) && first.Data.Length > 0 then
+                                    do! inputStream.WriteAsync(first.Data, 0, first.Data.Length, _context)
+                                if first.Eof then
+                                    inputStream.Complete()
+                                let pump (label: string) (stream: ChannelStream) =
+                                    task {
+                                        let buffer = Array.zeroCreate<byte> 8192
+                                        let mutable cont = true
+                                        while cont do
+                                            let! n = stream.ReadAsync(buffer, 0, buffer.Length, _context)
+                                            if n > 0 then
+                                                let data = if n = buffer.Length then buffer else buffer[0 .. n - 1]
+                                                do! channel.Writer.WriteAsync({ ExecOutput.Stream = label; Data = data }, _context)
+                                            else cont <- false
+                                    }
+                                let pumpTask =
+                                    task {
+                                        let! _ = pump "stdout" outputStream
+                                        let! _ = pump "stderr" errorStream
+                                        channel.Writer.TryComplete() |> ignore
+                                    }
+                                let execTask =
+                                    Task.Run(fun () ->
+                                        try
+                                            client.StartExec(DefaultNamespace, id, command, inputStream, outputStream, errorStream)
+                                        finally
+                                            outputStream.Complete()
+                                            errorStream.Complete())
+                                let mutable cont = true
+                                while cont do
+                                    let! has = enumerator.MoveNextAsync().AsTask()
+                                    if has then
+                                        let m = enumerator.Current
+                                        if not (isNull m.Data) && m.Data.Length > 0 then
+                                            do! inputStream.WriteAsync(m.Data, 0, m.Data.Length, _context)
+                                        if m.Eof then
+                                            inputStream.Complete()
+                                    else cont <- false
+                                inputStream.Complete()
+                                let! _ = execTask
+                                let! _ = pumpTask
+                                return ()
+                    finally
+                        enumerator.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
+                        channel.Writer.TryComplete() |> ignore
+                }
+            Task.Run(fun () -> run() |> ignore) |> ignore
+            toAsyncEnumerable channel.Reader
+
+        // ─── Copie de fichiers ──────────────────────────────────────────────
+
+        member _.ReadFile(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Id) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                if String.IsNullOrEmpty(request.Path) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin du fichier est requis")))
+                let command = [| "base64"; request.Path |]
+                SecurityValidation.validateCommand command
+                let output = client.ExecInContainer(DefaultNamespace, request.Id, command)
+                try
+                    let data = Convert.FromBase64String(output.Trim())
+                    return { ReadFileResponse.Data = data; Success = true; Message = "" }
+                with ex ->
+                    Log.Warning(ex, "Impossible de lire le fichier {Path} dans le conteneur {ContainerId}", request.Path, request.Id)
+                    return { ReadFileResponse.Data = Array.empty; Success = false; Message = "Impossible de lire le fichier : " + ex.Message }
+            }
+
+        member _.WriteFile(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Id) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                if String.IsNullOrEmpty(request.Path) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin du fichier est requis")))
+                let command = [| "sh"; "-c"; "base64 -d > " + request.Path |]
+                SecurityValidation.validateContainerPath request.Path "Le chemin du fichier"
+                try
+                    let base64 = Convert.ToBase64String(request.Data)
+                    use stdin = new MemoryStream(Encoding.UTF8.GetBytes(base64))
+                    use stdout = new MemoryStream()
+                    use stderr = new MemoryStream()
+                    let exitCode = client.StartExec(DefaultNamespace, request.Id, command, stdin, stdout, stderr)
+                    if exitCode = 0 then
+                        return { WriteFileResponse.Success = true; Message = "Fichier écrit" }
+                    else
+                        let err = Encoding.UTF8.GetString(stderr.ToArray())
+                        return { WriteFileResponse.Success = false; Message = sprintf "Échec de l'écriture du fichier (code %d) : %s" exitCode err }
+                with ex ->
+                    Log.Warning(ex, "Impossible d'écrire le fichier {Path} dans le conteneur {ContainerId}", request.Path, request.Id)
+                    return { WriteFileResponse.Success = false; Message = "Impossible d'écrire le fichier : " + ex.Message }
+            }
+
+        // ─── Commit ─────────────────────────────────────────────────────────
+
+        member _.CommitImage(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.ContainerId) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                if String.IsNullOrEmpty(request.ImageRef) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
+                SecurityValidation.validateImage request.ImageRef
+                try
+                    let info = client.InspectContainer(DefaultNamespace, request.ContainerId)
+                    let sourceRef = tryGetString info "image"
+                    if String.IsNullOrEmpty sourceRef then
+                        return { CommitImageResponse.ImageRef = ""; Success = false; Message = "Aucune image source trouvée pour le conteneur" }
+                    else
+                        let tmp = Path.Combine(Path.GetTempPath(), "diplo-commit-" + Guid.NewGuid().ToString("N") + ".tar")
+                        try
+                            client.ExportImage(DefaultNamespace, sourceRef, tmp)
+                            client.ImportImage(DefaultNamespace, tmp) |> ignore
+                            client.TagImage(DefaultNamespace, sourceRef, request.ImageRef)
+                            return { CommitImageResponse.ImageRef = request.ImageRef; Success = true; Message = sprintf "Image '%s' créée depuis le conteneur" request.ImageRef }
+                        finally
+                            try File.Delete(tmp) with _ -> ()
+                with ex ->
+                    Log.Warning(ex, "Erreur lors du commit de l'image depuis le conteneur {ContainerId}", request.ContainerId)
+                    return { CommitImageResponse.ImageRef = ""; Success = false; Message = "Erreur lors du commit : " + ex.Message }
+            }
+
+        // ─── Export / Import ────────────────────────────────────────────────
+
+        member _.ExportImage(request, _context) =
+            if String.IsNullOrEmpty(request.ImageRef) then
+                raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
+            let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
+            SecurityValidation.validateImage request.ImageRef
+            let channel = Channel.CreateUnbounded<ImageChunk>()
+            let run () =
+                task {
+                    let tmp = Path.Combine(Path.GetTempPath(), "diplo-export-" + Guid.NewGuid().ToString("N") + ".tar")
+                    try
+                        try
+                            client.ExportImage(ns, request.ImageRef, tmp)
+                            use fs = new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read)
+                            let buffer = Array.zeroCreate<byte> (64 * 1024)
+                            let mutable cont = true
+                            while cont do
+                                _context.ThrowIfCancellationRequested()
+                                let! n = fs.ReadAsync(buffer, 0, buffer.Length, _context)
+                                if n = 0 then cont <- false
+                                else
+                                    let data = if n = buffer.Length then buffer else buffer[0 .. n - 1]
+                                    do! channel.Writer.WriteAsync({ ImageChunk.Data = data }, _context)
+                            channel.Writer.TryComplete() |> ignore
+                        with
+                        | :? OperationCanceledException -> channel.Writer.TryComplete() |> ignore
+                        | ex ->
+                            Log.Error(ex, "Erreur lors de l'export de l'image {ImageRef}", request.ImageRef)
+                            channel.Writer.TryComplete(ex) |> ignore
+                    finally
+                        try File.Delete(tmp) with _ -> ()
+                }
+            Task.Run(fun () -> run() |> ignore) |> ignore
+            toAsyncEnumerable channel.Reader
+
+        member _.ImportImage(requests, _context) =
+            task {
+                let tmp = Path.Combine(Path.GetTempPath(), "diplo-import-" + Guid.NewGuid().ToString("N") + ".tar")
+                try
+                    let fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.Read)
+                    try
+                        let enumerator = requests.GetAsyncEnumerator(_context)
+                        try
+                            let mutable cont = true
+                            while cont do
+                                let! has = enumerator.MoveNextAsync().AsTask()
+                                if has then
+                                    let chunk = enumerator.Current
+                                    if not (isNull chunk.Data) && chunk.Data.Length > 0 then
+                                        do! fs.WriteAsync(chunk.Data, 0, chunk.Data.Length, _context)
+                                else cont <- false
+                        finally
+                            enumerator.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
+                        fs.Flush()
+                    finally
+                        fs.Dispose()
+                    let refs = client.ImportImage(DefaultNamespace, tmp)
+                    return { ImportImageResponse.ImageRefs = List<string>(refs); Message = sprintf "%d image(s) import�e(s)" refs.Length }
+                finally
+                    try File.Delete(tmp) with _ -> ()
+            }
+
+        // ─── Registres ──────────────────────────────────────────────────────
+
+        member _.LoginRegistry(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Registry) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'adresse du registre est requise")))
+                if String.IsNullOrEmpty(request.Username) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom d'utilisateur est requis")))
+                RegistryAuth.add (RegistryAuth.stateFile ()) request.Registry request.Username request.Password
+                return { LoginRegistryResponse.Success = true; Message = sprintf "Authentification configurée pour le registre '%s'" request.Registry }
+            }
+
+        member _.LogoutRegistry(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Registry) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'adresse du registre est requise")))
+                RegistryAuth.remove (RegistryAuth.stateFile ()) request.Registry
+                return { LogoutRegistryResponse.Success = true; Message = sprintf "Déconnexion du registre '%s' effectuée" request.Registry }
+            }
+
+        // ─── Namespaces ─────────────────────────────────────────────────────
+
+        member _.CreateNamespace(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Name) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom du namespace est requis")))
+                SecurityValidation.validateId request.Name "Le namespace"
+                client.CreateNamespace(request.Name)
+                return { CreateNamespaceResponse.Success = true; Message = sprintf "Namespace '%s' créé" request.Name }
+            }
+
+        member _.DeleteNamespace(request, _context) =
+            task {
+                if String.IsNullOrEmpty(request.Name) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom du namespace est requis")))
+                SecurityValidation.validateId request.Name "Le namespace"
+                client.DeleteNamespace(request.Name)
+                return { DeleteNamespaceResponse.Success = true; Message = sprintf "Namespace '%s' supprimé" request.Name }
             }
