@@ -1,5 +1,7 @@
 namespace Diplo.Container.Tests
 
+open System
+open System.IO
 open Xunit
 open FsUnit.Xunit
 open Diplo.Container.Clients
@@ -164,13 +166,60 @@ type ContainerdClientTests() =
         cmd.IsSome |> should be False
 
     [<Fact>]
-    member _.``GetContainerLogs indique la non-disponibilite en v2``() =
-        let runner = createRunner ()
-        let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
-        let result = client.GetContainerLogs("default", "c-1", 100, false, "")
-        result |> should haveLength 1
-        result.Head |> shouldContain "non disponibles"
-        runner.SecureCommands |> should be Empty
+    member _.``GetContainerLogs lit le journal du conteneur``() =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            File.WriteAllText(
+                ContainerLogs.fileFor "c-1",
+                "2026-08-11T10:30:01Z line 1" + Environment.NewLine +
+                "2026-08-11T10:30:02Z line 2" + Environment.NewLine +
+                "2026-08-11T10:30:03Z line 3")
+            let runner = createRunner ()
+            let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+            let result = client.GetContainerLogs("default", "c-1", 100, false, "")
+            result |> should haveLength 3
+            result.Head |> shouldContain "line 1"
+            runner.SecureCommands |> should be Empty
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
+
+    [<Fact>]
+    member _.``GetContainerLogs applique le tail et le filtre since``() =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            File.WriteAllText(
+                ContainerLogs.fileFor "c-1",
+                "2026-08-11T10:30:01Z line 1" + Environment.NewLine +
+                "2026-08-11T10:30:02Z line 2" + Environment.NewLine +
+                "2026-08-11T10:30:03Z line 3")
+            let runner = createRunner ()
+            let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+            let result = client.GetContainerLogs("default", "c-1", 2, false, "")
+            result |> should haveLength 2
+            result.Head |> shouldContain "line 2"
+            result.[1] |> shouldContain "line 3"
+            let since = client.GetContainerLogs("default", "c-1", 100, false, "2026-08-11T10:30:02Z")
+            since |> should haveLength 2
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
+
+    [<Fact>]
+    member _.``GetContainerLogs sans journal renvoie un message explicite``() =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let runner = createRunner ()
+            let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+            let result = client.GetContainerLogs("default", "c-1", 100, false, "")
+            result |> should haveLength 1
+            result.Head |> shouldContain "Aucun journal"
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
 
     [<Fact>]
     member _.``ExecInContainer retourne la sortie``() =

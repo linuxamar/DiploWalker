@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="RegistryAuth.fs" />
+    <Compile Include="ContainerLogs.fs" />
     <Compile Include="Clients\ProcessRunner.fs" />
     <Compile Include="Clients\ContainerdClient.fs" />
     <Compile Include="Services\ContainerServiceImpl.fs" />

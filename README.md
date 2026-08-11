@@ -24,7 +24,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (614 tests)
+- **Tests** : xUnit (620 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -250,12 +250,12 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
 
 - `--namespace`/`-n` est une option **globale** (avant la sous-commande), et non locale.
 - `container create` attend `<IMAGE> <CONTAINER>` (ordre inversé par rapport à v1) et ne produit **aucune sortie** en cas de succès.
-- `exec` est `tasks exec` ; `task info` et `task logs` ont été **supprimés** en v2 : `task info` est remplacé par le parsing de `tasks list`, et les logs ne sont plus récupérables via `ctr` (le service renvoie un message explicite).
+- `exec` est `tasks exec` ; `task info` et `task logs` ont été **supprimés** en v2 : `task info` est remplacé par le parsing de `tasks list`. Les logs sont capturés par le service lors du démarrage détaché dans `%ProgramData%\Diplo\logs\<id>.log` et relus par `container logs` (`tail`, `since` ; `--follow` renvoie l'instantané courant).
 - `PullImage` n'utilise volontairement pas de namespace : `ctr image pull` s'applique au namespace courant.
 
 **Points corrigés au fil des validations** :
 
 - Transport Kestrel par named pipes : le flag par défaut de `NamedPipeServerStreamAcl.Create` levait une `ArgumentException` ; `ServerConfig` fournit désormais une `PipeSecurity` explicite (`CurrentUserOnly=false`). La validation ci-dessus reste effectuée en TCP (`UseNamedPipes: false`, port 5001).
-- `container start` démarre la tâche de manière détachée (`ctr tasks start` sans attache au stdio), ce qui permet une utilisation non interactive.
+- `container start` démarre la tâche de manière détachée (`ctr tasks start` sans attache au stdio) et capture les logs dans un fichier par conteneur, ce qui permet une utilisation non interactive.
 - `container exec` accepte désormais les arguments contenant des espaces (reconstruction de la ligne de commande avec échappement).
 - L'état des volumes montés est persisté (`MountState`) : après un redémarrage du service, les associations sont restaurées et le write-back à la suppression conserve son comportement.

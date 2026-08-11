@@ -93,13 +93,53 @@ module ContainerServiceImplTests =
 
     [<Fact>]
     let ``StartContainer retourne Running`` () =
-        let svc, mock, _ = createService ()
-        let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
-        let req : StartContainerRequest = { Id = "c1"; Attach = false }
-        let result = (svc :> IContainerService).StartContainer(req, ctx).Result
-        result.State |> should equal ContainerState.Running
-        result.Message |> should equal "Conteneur démarré"
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let svc, mock, _ = createService ()
+            let ctx = createCtx ()
+            mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+            let req : StartContainerRequest = { Id = "c1"; Attach = false }
+            let result = (svc :> IContainerService).StartContainer(req, ctx).Result
+            result.State |> should equal ContainerState.Running
+            result.Message |> should equal "Conteneur démarré"
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
+
+    [<Fact>]
+    let ``StartContainer detache capture les logs du conteneur`` () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let svc, mock, _ = createService ()
+            let ctx = createCtx ()
+            mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+            let req : StartContainerRequest = { Id = "c1"; Attach = false }
+            (svc :> IContainerService).StartContainer(req, ctx).Result |> ignore
+            let logFile = ContainerLogs.fileFor "c1"
+            File.Exists logFile |> should be True
+            let content = File.ReadAllText logFile
+            content |> shouldContain "Application started"
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
+
+    [<Fact>]
+    let ``StartContainer attache ne cree pas de journal`` () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let svc, mock, _ = createService ()
+            let ctx = createCtx ()
+            mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+            let req : StartContainerRequest = { Id = "c1"; Attach = true }
+            let result = (svc :> IContainerService).StartContainer(req, ctx).Result
+            result.State |> should equal ContainerState.Running
+            File.Exists(ContainerLogs.fileFor "c1") |> should be False
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
 
     [<Fact>]
     let ``StopContainer avec timeout par defaut utilise 10`` () =

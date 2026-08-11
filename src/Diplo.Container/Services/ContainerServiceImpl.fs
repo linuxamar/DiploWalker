@@ -274,7 +274,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
             task {
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-                client.StartContainer(DefaultNamespace, request.Id, not request.Attach)
+                if request.Attach then
+                    client.StartContainer(DefaultNamespace, request.Id, false)
+                else
+                    client.StartContainerWithLogs(DefaultNamespace, request.Id, ContainerLogs.fileFor request.Id)
                 return { StartContainerResponse.State = ContainerState.Running; Message = "Conteneur démarré" }
             }
 

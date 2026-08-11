@@ -133,12 +133,24 @@ type ContainerdClient(runner: IProcessRunner) =
                 let proc = Process.Start(psi)
                 let dir = Path.GetDirectoryName(logFile)
                 if not (String.IsNullOrEmpty(dir)) then Directory.CreateDirectory(dir) |> ignore
-                use writer = new StreamWriter(logFile, true)
-                proc.OutputDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> if not (isNull e.Data) then lock writer (fun () -> writer.WriteLine(e.Data))))
-                proc.ErrorDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> if not (isNull e.Data) then lock writer (fun () -> writer.WriteLine(e.Data))))
+                let writer = new StreamWriter(logFile, true)
+                let mutable disposed = false
+                let append (data: string) =
+                    if not (isNull data) then
+                        lock writer (fun () ->
+                            if not disposed then writer.WriteLine(data))
+                let closeWriter () =
+                    lock writer (fun () ->
+                        if not disposed then
+                            writer.Flush()
+                            writer.Dispose()
+                            disposed <- true)
+                proc.OutputDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> append e.Data))
+                proc.ErrorDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> append e.Data))
+                proc.EnableRaisingEvents <- true
+                proc.Exited.AddHandler(EventHandler(fun _ _ -> closeWriter ()))
                 proc.BeginOutputReadLine()
                 proc.BeginErrorReadLine()
-                proc.EnableRaisingEvents <- true
                 Log.Information("Conteneur {ContainerId} démarré, logs capturés dans {LogFile}", id, logFile)
             with ex ->
                 Log.Error(ex, "Erreur lors du démarrage avec capture des logs du conteneur {ContainerId}", id)
@@ -248,8 +260,11 @@ type ContainerdClient(runner: IProcessRunner) =
         member _.GetContainerLogs(namespaceName, id, tail, follow, since) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
-            Log.Warning("La commande 'ctr tasks logs' a été supprimée dans containerd v2 : les logs ne sont pas récupérables via ctr (Conteneur {ContainerId})", id)
-            [ "Logs non disponibles : 'ctr tasks logs' a été supprimé dans containerd v2" ]
+            let lines = ContainerLogs.read id tail since
+            if lines.Length = 0 then
+                [ "Aucun journal pour ce conteneur (le conteneur doit être démarré en mode détaché pour capturer ses logs)" ]
+            else
+                lines |> Array.toList
 
         member _.ExecInContainer(namespaceName, id, command) =
             SecurityValidation.validateId namespaceName "Le namespace"

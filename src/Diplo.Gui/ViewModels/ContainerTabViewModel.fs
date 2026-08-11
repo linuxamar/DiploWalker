@@ -31,6 +31,7 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     let mutable containerIdInput = ""
     let mutable containerNameInput = ""
     let mutable containerImageInput = ""
+    let mutable containerImageUser = ""
     let mutable containerNamespace = ""
     let mutable containerAll = false
     let mutable containerTimeout = 10
@@ -53,6 +54,7 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member _.ContainerIdInput with get () = containerIdInput and set v = containerIdInput <- v; this.OnPropertyChanged()
     member _.ContainerNameInput with get () = containerNameInput and set v = containerNameInput <- v; this.OnPropertyChanged()
     member _.ContainerImageInput with get () = containerImageInput and set v = containerImageInput <- v; this.OnPropertyChanged()
+    member _.ContainerImageUser with get () = containerImageUser and set v = containerImageUser <- v; this.OnPropertyChanged()
     member _.ContainerNamespace with get () = containerNamespace and set v = containerNamespace <- v; this.OnPropertyChanged()
     member _.ContainerAll with get () = containerAll and set v = containerAll <- v; this.OnPropertyChanged()
     member _.ContainerTimeout with get () = containerTimeout and set v = containerTimeout <- v; this.OnPropertyChanged()
@@ -165,7 +167,10 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
         task {
             try
                 use client = new ContainerClient()
-                let! response = client.PullImageAsync(image = this.ContainerImageInput)
+                let! response =
+                    client.PullImageAsync(
+                        image = this.ContainerImageInput,
+                        ?user = (if String.IsNullOrEmpty(this.ContainerImageUser) then None else Some this.ContainerImageUser))
                 outputPort.WriteSuccess(sprintf "Image %s téléchargée - %s" this.ContainerImageInput response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }

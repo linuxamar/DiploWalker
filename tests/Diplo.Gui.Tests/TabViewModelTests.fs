@@ -113,6 +113,21 @@ let ``ContainerTabViewModel etat initial`` () =
     vm.Images.Count         |> should equal 0
 
 [<Fact>]
+let ``ContainerTabViewModel user pull etat initial`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port)
+    vm.ContainerImageUser |> should equal ""
+
+[<Fact>]
+let ``ContainerTabViewModel user pull declenche PropertyChanged`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port)
+    let mutable changed = []
+    vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
+    vm.ContainerImageUser <- "inline:secret"
+    changed |> should contain "ContainerImageUser"
+
+[<Fact>]
 let ``ContainerTabViewModel registres etat initial`` () =
     let port = FakeOutputPort.FakeOutputPort()
     let vm = ContainerTabViewModel(port)

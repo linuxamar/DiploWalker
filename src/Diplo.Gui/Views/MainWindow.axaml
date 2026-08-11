@@ -56,6 +56,9 @@
                         <TextBlock Text="Image:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerTab.ContainerImageInput}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="nom:tag" />
+                        <TextBlock Text="User (pull):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.ContainerImageUser}" Width="140" Margin="0,0,12,0"
+                                 PlaceholderText="user:pass (optionnel)" />
                         <TextBlock Text="Espace:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerTab.ContainerNamespace}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="namespace (optionnel)" />
