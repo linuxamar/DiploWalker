@@ -36,7 +36,7 @@ type MockContainerdClient() =
             recordedMounts <- recordedMounts |> Map.add id mounts
             id
 
-        member _.StartContainer(_namespaceName, id) =
+        member _.StartContainer(_namespaceName, id, _detach) =
             startedContainers <- startedContainers |> Set.add id
 
         member _.StopContainer(_namespaceName, id, timeoutSeconds) =

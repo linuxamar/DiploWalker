@@ -108,10 +108,13 @@ type ContainerdClient(runner: IProcessRunner) =
                 | Some p -> try File.Delete(p) with _ -> ()
                 | None -> ()
 
-        member _.StartContainer(namespaceName, id) =
+        member _.StartContainer(namespaceName, id, detach) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
-            runCtr (nsArgs namespaceName [ "task"; "start"; id ]) |> ignore
+            let args =
+                if detach then nsArgs namespaceName [ "task"; "start"; "--detach"; id ]
+                else nsArgs namespaceName [ "task"; "start"; id ]
+            runCtr args |> ignore
 
         member _.StopContainer(namespaceName, id, timeoutSeconds) : Task =
             SecurityValidation.validateId namespaceName "Le namespace"

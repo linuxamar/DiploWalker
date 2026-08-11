@@ -9,6 +9,7 @@
     <Compile Include="Qcow2.fs" />
     <Compile Include="FsImage.fs" />
     <Compile Include="DiskMounter.fs" />
+    <Compile Include="MountState.fs" />
   </ItemGroup>
 
   <ItemGroup>

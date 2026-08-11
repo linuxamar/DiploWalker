@@ -52,11 +52,11 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
-    member _.StartAsync(id: string, ?ct: CancellationToken) =
+    member _.StartAsync(id: string, ?attach: bool, ?ct: CancellationToken) =
         task {
             if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
             let ct = defaultArg ct CancellationToken.None
-            let! response = client.StartContainer({ Id = id }, ct)
+            let! response = client.StartContainer({ Id = id; Attach = defaultArg attach false }, ct)
             return response
         }
 

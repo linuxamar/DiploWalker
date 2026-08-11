@@ -74,15 +74,27 @@ type ContainerdClientTests() =
         joined |> shouldContain (sprintf "type=bind,src=%s,dst=C:\\keys,options=rbind,ro" keysSrc)
 
     [<Fact>]
-    member _.``StartContainer appelle task start``() =
+    member _.``StartContainer detache passe --detach``() =
         let runner = createRunner ()
         runner.OnCommand("task start", "")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
-        client.StartContainer("default", "my-container")
+        client.StartContainer("default", "my-container", true)
         let cmd = runner.SecureCommands |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains("task start"))
         cmd.IsSome |> should be True
         let (_, args) = cmd.Value
+        (args |> String.concat " ") |> shouldContain "--detach"
         (args |> String.concat " ") |> shouldContain "my-container"
+
+    [<Fact>]
+    member _.``StartContainer attache n'ajoute pas --detach``() =
+        let runner = createRunner ()
+        runner.OnCommand("task start", "")
+        let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+        client.StartContainer("default", "my-container", false)
+        let cmd = runner.SecureCommands |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains("task start"))
+        cmd.IsSome |> should be True
+        let (_, args) = cmd.Value
+        Assert.DoesNotContain("--detach", args |> String.concat " ")
 
     [<Fact>]
     member _.``StopContainer appelle task kill avec SIGTERM``() =

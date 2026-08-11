@@ -5,8 +5,11 @@ open System.IO
 
 /// Volume monté pour un conteneur : chemin hôte à bind-mounter dans le
 /// conteneur (`ctr --mount type=bind,src=...`) et action de libération.
+/// `Source` est la source d'origine (répertoire hôte ou image disque) et
+/// permet de restaurer le write-back après un redémarrage du service.
 type MountedVolume =
-    { HostPath: string
+    { Source: string
+      HostPath: string
       Destination: string
       ReadOnly: bool
       Dispose: unit -> unit }
@@ -43,7 +46,7 @@ module DiskMounter =
 
     let mount (source: string) (destination: string) (readOnly: bool) : MountedVolume =
         if Directory.Exists source then
-            { HostPath = source; Destination = destination; ReadOnly = readOnly; Dispose = fun () -> () }
+            { Source = source; HostPath = source; Destination = destination; ReadOnly = readOnly; Dispose = fun () -> () }
         elif File.Exists source then
             let format = DiskFormat.detect source
             match format with
@@ -60,9 +63,25 @@ module DiskMounter =
                         if not readOnly then FsImage.writeBack source staging
                     finally
                         try Directory.Delete(staging, true) with _ -> ()
-                { HostPath = staging; Destination = destination; ReadOnly = readOnly; Dispose = dispose }
+                { Source = source; HostPath = staging; Destination = destination; ReadOnly = readOnly; Dispose = dispose }
         else
             failwithf "La source du volume n'existe pas : '%s'" source
+
+    /// Reconstruit un volume monté à partir de l'état persisté (après un
+    /// redémarrage du service) : réutilise le dossier de staging existant et
+    /// restaure le write-back sans ré-extraire l'image. Pour un bind mount de
+    /// répertoire (Source est un dossier), la libération reste sans effet.
+    let rehydrate (source: string) (hostPath: string) (destination: string) (readOnly: bool) : MountedVolume =
+        let dispose =
+            if Directory.Exists source then fun () -> ()
+            elif not (Directory.Exists hostPath) then fun () -> ()
+            else
+                fun () ->
+                    try
+                        if not readOnly then FsImage.writeBack source hostPath
+                    finally
+                        try Directory.Delete(hostPath, true) with _ -> ()
+        { Source = source; HostPath = hostPath; Destination = destination; ReadOnly = readOnly; Dispose = dispose }
 
 /// Implémentation concrète d'IDiskMounter pour l'injection de dépendances.
 type DiskMounter() =

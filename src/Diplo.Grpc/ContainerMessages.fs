@@ -63,7 +63,10 @@ type CreateContainerResponse =
 [<ProtoContract>]
 [<CLIMutable>]
 type StartContainerRequest =
-    { [<ProtoMember(1)>] mutable Id : string }
+    { [<ProtoMember(1)>] mutable Id : string
+      /// true : la console du client reste attachée au conteneur ;
+      /// false : le démarrage est non interactif (détaché).
+      [<ProtoMember(2)>] mutable Attach : bool }
 
 [<ProtoContract>]
 [<CLIMutable>]

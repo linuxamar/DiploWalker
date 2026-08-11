@@ -24,7 +24,8 @@ module ContainerServiceImplTests =
         interface IDiskMounter with
             member _.Mount(source, destination, readOnly) =
                 mounted.Add(source, destination, readOnly)
-                { HostPath = source + "-staging"
+                { Source = source
+                  HostPath = source + "-staging"
                   Destination = destination
                   ReadOnly = readOnly
                   Dispose = fun () -> disposed.Add(source) }
@@ -79,7 +80,7 @@ module ContainerServiceImplTests =
         let svc, mock, _ = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
-        let req : StartContainerRequest = { Id = "c1" }
+        let req : StartContainerRequest = { Id = "c1"; Attach = false }
         let result = (svc :> IContainerService).StartContainer(req, ctx).Result
         result.State |> should equal ContainerState.Running
         result.Message |> should equal "Conteneur démarré"
@@ -121,7 +122,7 @@ module ContainerServiceImplTests =
         let svc, mock, _ = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "my-app", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
-        mock.Mock.StartContainer("default", "my-app")
+        mock.Mock.StartContainer("default", "my-app", true)
         let req : InspectContainerRequest = { Id = "my-app" }
         let result = (svc :> IContainerService).InspectContainer(req, ctx).Result
         result.Id |> should equal "my-app"
@@ -282,7 +283,7 @@ module ContainerServiceImplTests =
         let svc, mock, _ = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
-        mock.Mock.StartContainer("default", "c1")
+        mock.Mock.StartContainer("default", "c1", true)
         let req : TopContainerRequest = { Id = "c1" }
         let result = (svc :> IContainerService).TopContainer(req, ctx).Result
         result.Processes.Count |> should equal 1

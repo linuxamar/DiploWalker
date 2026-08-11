@@ -72,6 +72,8 @@ type InspectContainerCommand(output: IOutputPort) =
 type StartSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+    /// Démarre en attaché à la console (sinon non interactif, en arrière-plan).
+    [<CommandOption("-a|--attach")>] member val Attach = false with get, set
 
 type StartContainerCommand(output: IOutputPort) =
     inherit AsyncCommand<StartSettings>()
@@ -83,7 +85,7 @@ type StartContainerCommand(output: IOutputPort) =
                 return 1
             else
                 use client = new ContainerClient()
-                let! response = client.StartAsync(settings.Id)
+                let! response = client.StartAsync(settings.Id, attach = settings.Attach)
                 output.WriteSuccess(sprintf "Conteneur %s démarré (%s)" settings.Id (response.State.ToString()))
                 return 0
         }

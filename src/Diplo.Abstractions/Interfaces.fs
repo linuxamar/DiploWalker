@@ -12,7 +12,7 @@ module Interfaces =
     /// Client pour interagir avec containerd
     type IContainerdClient =
         abstract member CreateContainer: namespaceName: string * id: string * image: string * labels: Map<string, string> * env: Map<string, string> * command: string array * args: string array * memoryLimit: int64 * cpuShares: int64 * pidLimit: uint32 * mounts: (string * string * bool) list -> string
-        abstract member StartContainer: namespaceName: string * id: string -> unit
+        abstract member StartContainer: namespaceName: string * id: string * detach: bool -> unit
         abstract member StopContainer: namespaceName: string * id: string * timeoutSeconds: int -> System.Threading.Tasks.Task
         abstract member DeleteContainer: namespaceName: string * id: string * force: bool -> unit
         abstract member InspectContainer: namespaceName: string * id: string -> JsonElement

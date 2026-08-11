@@ -76,8 +76,13 @@ module SecurityValidationTests =
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec espace dans argument lève une exception`` () =
-        (fun () -> validateCommand [| "ls -la" |])
+    let ``validateCommand avec espace dans argument passe`` () =
+        validateCommand [| "ls"; "-la" |]
+        validateCommand [| "echo"; "bonjour monde" |]
+
+    [<Fact>]
+    let ``validateCommand avec espace suivi de caractere dangereux leve une exception`` () =
+        (fun () -> validateCommand [| "echo"; "bonjour; monde" |])
         |> should throw typeof<Exception>
 
     [<Fact>]

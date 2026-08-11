@@ -46,7 +46,7 @@ module ContainerIntegrationTests =
                 mountsById <- mountsById |> Map.add id mounts
                 id
 
-            member _.StartContainer(_ns, id) =
+            member _.StartContainer(_ns, id, _detach) =
                 started <- started |> Set.add id
 
             member _.StopContainer(_ns, _id, _timeout) =
@@ -173,7 +173,7 @@ module ContainerIntegrationTests =
                   Env = Dictionary(); Labels = Dictionary()
                   MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
-            let startReq: StartContainerRequest = { Id = createResult.Id }
+            let startReq: StartContainerRequest = { Id = createResult.Id; Attach = false }
             let startResult = client.StartContainer(startReq, CancellationToken.None).Result
             startResult.State |> should equal ContainerState.Running
             startResult.Message |> should equal "Conteneur démarré"

@@ -26,6 +26,39 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
     /// conteneur, où les modifications sont réécrites dans l'image source.
     let mountedVolumes = ConcurrentDictionary<string, MountedVolume list>()
 
+    let persistMounts () =
+        mountedVolumes
+        |> Seq.map (fun kv ->
+            kv.Key,
+            kv.Value
+            |> List.map (fun v ->
+                { MountState.Source = v.Source
+                  MountState.HostPath = v.HostPath
+                  MountState.Destination = v.Destination
+                  MountState.ReadOnly = v.ReadOnly }))
+        |> MountState.save (MountState.stateFile ())
+
+    let tryPersistMounts () =
+        try persistMounts ()
+        with ex -> Log.Warning(ex, "Erreur lors de la persistance de l'état des volumes montés")
+
+    do
+        // Restauration des volumes montés persistés après un redémarrage du
+        // service : le write-back redevient actif sans ré-extraire l'image.
+        try
+            MountState.load (MountState.stateFile ())
+            |> Map.iter (fun id entries ->
+                let volumes =
+                    entries
+                    |> List.choose (fun e ->
+                        try Some (DiskMounter.rehydrate e.Source e.HostPath e.Destination e.ReadOnly)
+                        with ex ->
+                            Log.Warning(ex, "Erreur lors de la réhydratation du volume {HostPath}", e.HostPath)
+                            None)
+                if not (List.isEmpty volumes) then mountedVolumes[id] <- volumes)
+        with ex ->
+            Log.Warning(ex, "Erreur lors de la restauration des volumes montés au démarrage")
+
     let tryGetString (el: JsonElement) (prop: string) =
         let mutable v = Unchecked.defaultof<JsonElement>
         if el.TryGetProperty(prop, &v) then v.GetString() else ""
@@ -88,6 +121,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                             |> Seq.toList
                         let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels, env, command, args, request.MemoryLimit, int64 request.CpuShares, uint32 request.PidLimit, resolvedMounts)
                         mountedVolumes[id] <- mounted |> Seq.toList
+                        tryPersistMounts ()
                         id
                     with ex ->
                         for v in mounted do
@@ -105,7 +139,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
             task {
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-                client.StartContainer(DefaultNamespace, request.Id)
+                client.StartContainer(DefaultNamespace, request.Id, not request.Attach)
                 return { StartContainerResponse.State = ContainerState.Running; Message = "Conteneur démarré" }
             }
 
@@ -129,6 +163,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                         try v.Dispose()
                         with ex -> Log.Warning(ex, "Erreur lors de la libération du volume du conteneur {ContainerId}", request.Id)
                 | false, _ -> ()
+                tryPersistMounts ()
                 return { DeleteContainerResponse.Success = true; Message = "Conteneur supprimé" }
             }
 
