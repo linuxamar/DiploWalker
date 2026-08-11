@@ -253,8 +253,11 @@ type RunCniPluginCommand(output: IOutputPort) =
         }
 
 // ── prune ─────────────────────────────────────────────────────────
+type PruneNetworksSettings() =
+    inherit CommandSettings()
+
 type PruneNetworksCommand(output: IOutputPort) =
-    inherit AsyncCommand<CommandSettings>()
+    inherit AsyncCommand<PruneNetworksSettings>()
 
     override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {

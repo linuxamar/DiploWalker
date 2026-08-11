@@ -125,8 +125,10 @@ $testProjects = @(
     "Diplo.Core.Tests",
     "Diplo.Contracts.Tests",
     "Diplo.Installer.Tests",
+    "Diplo.Disk.Tests",
     "Diplo.Cli.Tests",
-    "Diplo.Gui.Tests"
+    "Diplo.Gui.Tests",
+    "Diplo.Integration.Tests"
 )
 
 $totalSteps = 0
@@ -201,7 +203,15 @@ if ($runTests) {
             Write-Host "  ✗ Échec des tests : $test" -ForegroundColor Red
             $allPassed = $false
         } else {
-            Write-Host "  ✓ OK" -ForegroundColor Green
+            # Un projet non restauré peut sortir en code 0 sans exécuter les tests :
+            # on vérifie que la DLL de test a réellement été produite.
+            $testDll = Get-ChildItem -Path (Join-Path $PSScriptRoot "tests\$test\bin") -Filter "$test.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($null -eq $testDll) {
+                Write-Host "  ✗ Aucune DLL de test produite : $test — exécutez -Restore avant -DoTests" -ForegroundColor Red
+                $allPassed = $false
+            } else {
+                Write-Host "  ✓ OK" -ForegroundColor Green
+            }
         }
     }
 

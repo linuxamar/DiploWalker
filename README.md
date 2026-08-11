@@ -8,7 +8,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 | Service | Port | Description |
 |---------|------|-------------|
-| **Diplo.Container** | 5001 | Gestion du cycle de vie des conteneurs (création, démarrage, arrêt, suppression) via containerd |
+| **Diplo.Container** | 5001 | Cycle de vie des conteneurs via containerd — création, démarrage, arrêt, suppression et montage de volumes |
 | **Diplo.Volume** | 5002 | Gestion des volumes persistants |
 | **Diplo.Network** | 5003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge) |
 | **Diplo.Installer** | — | Installation et configuration de l'ensemble du système |
@@ -24,7 +24,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (plus de 580 tests)
+- **Tests** : xUnit (553 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -133,6 +133,7 @@ Diplo/
 │   ├── Diplo.Grpc/             # Types messages et services gRPC (protobuf-net)
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, abstraction IOutputPort
+│   ├── Diplo.Disk/             # Montage d'images disque (qcow2, raw, vhd, vhdx, vmdk)
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
 │   └── Diplo.Gui/              # Interface graphique Avalonia
 ├── tests/
@@ -143,6 +144,7 @@ Diplo/
 │   ├── Diplo.Installer.Tests/
 │   ├── Diplo.Network.Tests/
 │   ├── Diplo.Volume.Tests/
+│   ├── Diplo.Disk.Tests/
 │   ├── Diplo.Cli.Tests/
 │   ├── Diplo.Gui.Tests/
 │   └── Diplo.Integration.Tests/
@@ -168,3 +170,74 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 - Compatible avec Windows Server 2016+
 - Ne nécessite pas de virtualisation matérielle
 - Partage le noyau hôte avec les conteneurs
+
+## Montage de volumes et d'images disque
+
+À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** (qcow2, raw, vhd, vhdx, vmdk) gérées par `Diplo.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
+
+### CLI
+
+```powershell
+diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees"
+diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees,ro"
+```
+
+- `src` : répertoire de l'hôte ou chemin vers une image disque
+- `dst` : destination dans le conteneur
+- `ro` (optionnel) : montage en lecture seule
+
+Les sources sont restreintes aux répertoires autorisés par la validation de sécurité (`%TEMP%`, `%ProgramData%\Diplo`, `%ProgramFiles%\Diplo`). Une image disque est montée via un répertoire de préparation pour la durée de vie du conteneur, puis réécrite à la suppression.
+
+### GUI
+
+L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
+
+### Validation manuelle sur un hôte containerd réel
+
+Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable dans les tests : il nécessite un hôte Windows avec containerd installé. Procédure validée le 11/08/2026 contre containerd **v2.3.3** (namespace `default`) :
+
+1. **Image de test** — créer une image FAT brute (format détecté par `DiskFormat`) contenant `bonjour.txt` :
+   ```powershell
+   $img = "C:\ProgramData\Diplo\validate\data.img"
+   # Fabriquer une image FAT 64 Mo avec DiscUtils (script fsi ou utilitaire dédié).
+   ```
+2. **Publier et démarrer le service en TCP** (le transport par named pipes est inopérant sur ce build Windows — voir ci-dessous) :
+   ```powershell
+   dotnet publish src\Diplo.Container -c Release -r win-x64 -p:Platform=x64 --self-contained true -o publish\WindowsServices\x64\Diplo.Container
+   & publish\WindowsServices\x64\Diplo.Container\Diplo.Container.exe   # service : http://127.0.0.1:5001
+   ```
+3. **Créer un conteneur avec l'image montée** (le CLI résout l'adresse depuis le token d'auth) :
+   ```powershell
+   & publish\WindowsServices\x64\Diplo.Cli\Diplo.Cli.exe container create mcr.microsoft.com/windows/nanoserver:ltsc2025 mon-conteneur --mount "src=$img,dst=C:\data"
+   ```
+4. **Démarrer, exécuter, écrire** :
+   ```powershell
+   & ...\Diplo.Cli.exe container start mon-conteneur        # s'attache au stdio (comme `ctr tasks start`)
+   & ...\Diplo.Cli.exe container exec mon-conteneur cmd /c dir C:\data
+   & ...\Diplo.Cli.exe container exec mon-conteneur cmd /c copy nul C:\data\ecrit.txt
+   ```
+5. **Supprimer le conteneur** — le write-back réécrit `data.img` depuis le staging et nettoie `%ProgramData%\Diplo\volumes` :
+   ```powershell
+   & ...\Diplo.Cli.exe container delete mon-conteneur -f
+   ```
+
+**Résultats de la validation (11/08/2026, containerd v2.3.3, Windows 11 26200)** :
+
+- `container create` avec image FAT montée en `type=bind,src=<staging>,dst=C:\data,options=rbind` : le staging (`%ProgramData%\Diplo\volumes\<guid>`) est extrait de l'image, le contenu est visible dans le conteneur (`dir C:\data` → `bonjour.txt`) et la réponse porte bien l'ID du conteneur.
+- Le bind mount est bidirectionnel : `ecrit.txt` créé dans le conteneur apparaît dans le staging hôte.
+- `container delete -f` : conteneur et tâche supprimés, staging purgé, et `data.img` réécrit — un nouvel extract relit `bonjour.txt` **et** `ecrit.txt`.
+- `ctr tasks exec` s'exécute dans le conteneur (le top-level `ctr exec` n'existe pas en v2).
+
+**Compatibilité ctr v2 (≥ v2.0) — écarts corrigés au fil de la validation** :
+
+- `--namespace`/`-n` est une option **globale** (avant la sous-commande), et non locale.
+- `container create` attend `<IMAGE> <CONTAINER>` (ordre inversé par rapport à v1) et ne produit **aucune sortie** en cas de succès.
+- `exec` est `tasks exec` ; `task info` et `task logs` ont été **supprimés** en v2 : `task info` est remplacé par le parsing de `tasks list`, et les logs ne sont plus récupérables via `ctr` (le service renvoie un message explicite).
+- `PullImage` n'utilise volontairement pas de namespace : `ctr image pull` s'applique au namespace courant.
+
+**Constats et limites de l'environnement de validation** :
+
+- Le transport Kestrel par named pipes est inopérant sur ce build (échec de `NamedPipeServerStreamAcl.Create` → « adresse déjà utilisée » / « accès refusé » lors de la liaison `http://pipe:/...`) ; validation effectuée en TCP (`UseNamedPipes: false`, port 5001). Le correctif `CurrentUserOnly=false` (`ServerConfig`) reste requis : fournir une `PipeSecurity` explicite avec le flag par défaut lève une `ArgumentException` partout.
+- `container start` s'attache au stdio et bloque (comportement `ctr tasks start`) — à améliorer pour un usage non interactif.
+- `container exec` rejette les arguments contenant des espaces (validation de sécurité) : utiliser des commandes sans espaces (ex. `copy nul ...`).
+- L'état des volumes montés est conservé **en mémoire** : après un redémarrage du service, les volumes créés avant ne sont plus associés (pas de write-back à la suppression).

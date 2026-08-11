@@ -37,6 +37,9 @@ let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
             listenOpts.Protocols <- HttpProtocols.Http2) |> ignore
 
 let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
+    // Kestrel active CurrentUserOnly par défaut ; il faut le désactiver pour
+    // fournir une PipeSecurity explicite (utilisateur courant + refus Everyone).
+    opts.CurrentUserOnly <- false
     let pipeSecurity = PipeSecurity()
     let currentUser = WindowsIdentity.GetCurrent()
     let allowRule = PipeAccessRule(

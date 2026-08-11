@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="DiskFormat.fs" />
+    <Compile Include="Qcow2.fs" />
+    <Compile Include="FsImage.fs" />
+    <Compile Include="DiskMounter.fs" />
+    <Compile Include="MountState.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LTRData.DiscUtils" />
+  </ItemGroup>
+
+</Project>

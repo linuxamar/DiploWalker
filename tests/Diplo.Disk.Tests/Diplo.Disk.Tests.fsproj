@@ -6,12 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="DiploChannelTests.fs" />
-    <Compile Include="ContainerClientTests.fs" />
-    <Compile Include="VolumeClientTests.fs" />
-    <Compile Include="NetworkClientTests.fs" />
-    <Compile Include="ComposeTests.fs" />
-    <Compile Include="MountParserTests.fs" />
+    <Compile Include="TestImage.fs" />
+    <Compile Include="DiskFormatTests.fs" />
+    <Compile Include="FsImageTests.fs" />
+    <Compile Include="Qcow2Tests.fs" />
+    <Compile Include="DiskMounterTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,14 +21,10 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FsUnit.xUnit"  />
-    <PackageReference Include="Grpc.Core.Testing"  />
-    <PackageReference Include="Grpc.Net.Client"  />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
-    <ProjectReference Include="..\..\src\Diplo.Core\Diplo.Core.fsproj" />
-    <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.fsproj" />
+    <ProjectReference Include="..\..\src\Diplo.Disk\Diplo.Disk.fsproj" />
   </ItemGroup>
 
 </Project>

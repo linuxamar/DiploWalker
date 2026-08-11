@@ -13,6 +13,7 @@ type MockContainerdClient() =
     let mutable stopCalled = Map.empty<string, int>
     let mutable pulledImages = Set.empty<string>
     let mutable removedImages = Set.empty<string>
+    let mutable recordedMounts = Map.empty<string, (string * string * bool) list>
     let ownedDocs = System.Collections.Generic.List<JsonDocument>()
 
     let keepDoc (doc: JsonDocument) =
@@ -30,11 +31,12 @@ type MockContainerdClient() =
         doc.RootElement
 
     interface IContainerdClient with
-        member _.CreateContainer(_namespaceName, id, image, _labels, _env, _command, _args, _memoryLimit, _cpuShares, _pidLimit) =
+        member _.CreateContainer(_namespaceName, id, image, _labels, _env, _command, _args, _memoryLimit, _cpuShares, _pidLimit, mounts) =
             containers <- containers |> Map.add id (Map.ofList [ "image", image; "id", id ])
+            recordedMounts <- recordedMounts |> Map.add id mounts
             id
 
-        member _.StartContainer(_namespaceName, id) =
+        member _.StartContainer(_namespaceName, id, _detach) =
             startedContainers <- startedContainers |> Set.add id
 
         member _.StopContainer(_namespaceName, id, timeoutSeconds) =
@@ -112,3 +114,4 @@ type MockContainerdClient() =
     member _.StartedContainers = startedContainers
     member _.PulledImages = pulledImages
     member _.RemovedImages = removedImages
+    member _.RecordedMounts = recordedMounts

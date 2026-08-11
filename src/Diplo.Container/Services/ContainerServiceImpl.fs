@@ -3,6 +3,7 @@ namespace Diplo.Container.Services
 open System
 open System.ServiceModel
 open System.Collections.Generic
+open System.Collections.Concurrent
 open System.Linq
 open System.Text
 open System.Text.Json
@@ -13,12 +14,50 @@ open Diplo.Grpc
 open Diplo.Grpc.Container
 open Diplo.Abstractions.Interfaces
 open Diplo.Abstractions
+open Diplo.Disk
 
 [<ServiceContract(Name = "IContainerService")>]
-type ContainerServiceImpl(client: IContainerdClient) =
+type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
     [<Literal>]
     static let DefaultNamespace = "default"
+
+    /// Volumes montés par conteneur : retenus jusqu'à la suppression du
+    /// conteneur, où les modifications sont réécrites dans l'image source.
+    let mountedVolumes = ConcurrentDictionary<string, MountedVolume list>()
+
+    let persistMounts () =
+        mountedVolumes
+        |> Seq.map (fun kv ->
+            kv.Key,
+            kv.Value
+            |> List.map (fun v ->
+                { MountState.Source = v.Source
+                  MountState.HostPath = v.HostPath
+                  MountState.Destination = v.Destination
+                  MountState.ReadOnly = v.ReadOnly }))
+        |> MountState.save (MountState.stateFile ())
+
+    let tryPersistMounts () =
+        try persistMounts ()
+        with ex -> Log.Warning(ex, "Erreur lors de la persistance de l'état des volumes montés")
+
+    do
+        // Restauration des volumes montés persistés après un redémarrage du
+        // service : le write-back redevient actif sans ré-extraire l'image.
+        try
+            MountState.load (MountState.stateFile ())
+            |> Map.iter (fun id entries ->
+                let volumes =
+                    entries
+                    |> List.choose (fun e ->
+                        try Some (DiskMounter.rehydrate e.Source e.HostPath e.Destination e.ReadOnly)
+                        with ex ->
+                            Log.Warning(ex, "Erreur lors de la réhydratation du volume {HostPath}", e.HostPath)
+                            None)
+                if not (List.isEmpty volumes) then mountedVolumes[id] <- volumes)
+        with ex ->
+            Log.Warning(ex, "Erreur lors de la restauration des volumes montés au démarrage")
 
     let tryGetString (el: JsonElement) (prop: string) =
         let mutable v = Unchecked.defaultof<JsonElement>
@@ -63,7 +102,32 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 let env = request.Env |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
                 let command = request.Command |> Seq.toArray
                 let args = request.Args |> Seq.toArray
-                let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels, env, command, args, request.MemoryLimit, int64 request.CpuShares, uint32 request.PidLimit)
+                let requestedMounts =
+                    request.Mounts
+                    |> Seq.map (fun m ->
+                        SecurityValidation.validateVolumePath m.Source "La source du volume"
+                        if String.IsNullOrEmpty(m.Destination) then
+                            raise (RpcException(Status(StatusCode.InvalidArgument, "La destination du montage ne peut pas être vide")))
+                        m.Source, m.Destination, m.ReadOnly)
+                    |> Seq.toList
+                let mounted = ResizeArray<MountedVolume>()
+                let id =
+                    try
+                        for (source, destination, readOnly) in requestedMounts do
+                            mounted.Add(mounter.Mount(source, destination, readOnly))
+                        let resolvedMounts =
+                            mounted
+                            |> Seq.map (fun v -> v.HostPath, v.Destination, v.ReadOnly)
+                            |> Seq.toList
+                        let id = client.CreateContainer(DefaultNamespace, name, request.Image, labels, env, command, args, request.MemoryLimit, int64 request.CpuShares, uint32 request.PidLimit, resolvedMounts)
+                        mountedVolumes[id] <- mounted |> Seq.toList
+                        tryPersistMounts ()
+                        id
+                    with ex ->
+                        for v in mounted do
+                            try v.Dispose() with _ -> ()
+                        mounted.Clear()
+                        reraise ()
                 return
                     { CreateContainerResponse.Id = id
                       Name = request.Name
@@ -75,7 +139,7 @@ type ContainerServiceImpl(client: IContainerdClient) =
             task {
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-                client.StartContainer(DefaultNamespace, request.Id)
+                client.StartContainer(DefaultNamespace, request.Id, not request.Attach)
                 return { StartContainerResponse.State = ContainerState.Running; Message = "Conteneur démarré" }
             }
 
@@ -93,6 +157,13 @@ type ContainerServiceImpl(client: IContainerdClient) =
                 if String.IsNullOrEmpty(request.Id) then
                     raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
                 client.DeleteContainer(DefaultNamespace, request.Id, request.Force)
+                match mountedVolumes.TryRemove(request.Id) with
+                | true, volumes ->
+                    for v in volumes do
+                        try v.Dispose()
+                        with ex -> Log.Warning(ex, "Erreur lors de la libération du volume du conteneur {ContainerId}", request.Id)
+                | false, _ -> ()
+                tryPersistMounts ()
                 return { DeleteContainerResponse.Success = true; Message = "Conteneur supprimé" }
             }
 
@@ -203,10 +274,20 @@ type ContainerServiceImpl(client: IContainerdClient) =
 
         member _.GetVersion(request, _context) =
             task {
-                let version = client.Version()
+                let versionString = client.Version()
+                let version, revision =
+                    let idx = versionString.IndexOf("(revision: ", StringComparison.Ordinal)
+                    if idx >= 0 then
+                        let v = versionString.Substring(0, idx).Trim()
+                        let start = idx + "(revision: ".Length
+                        let rest = versionString.Substring(start)
+                        let endIdx = rest.IndexOf(')')
+                        let rev = if endIdx >= 0 then rest.Substring(0, endIdx).Trim() else rest.Trim()
+                        (v, rev)
+                    else (versionString, "")
                 return
                     { GetVersionResponse.Version = version
-                      Revision = ""
+                      Revision = revision
                       GoVersion = ""
                       Os = ""
                       Arch = "" }

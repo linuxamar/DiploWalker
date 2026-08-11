@@ -24,7 +24,7 @@ module SecurityValidation =
     let private labelPattern = Regex(@"^[a-zA-Z0-9][a-zA-Z0-9._\-]{0,63}$", RegexOptions.Compiled)
 
     /// Caractères interdits dans les commandes exécutées dans les conteneurs.
-    let private dangerousChars = [| ';'; '|'; '&'; '`'; '$'; ' '; '\t'; '\n'; '\r'; '<'; '>'; '('; ')' |]
+    let private dangerousChars = [| ';'; '|'; '&'; '`'; '$'; '\t'; '\n'; '\r'; '<'; '>'; '('; ')' |]
 
     /// Préfixes dangereux interdits dans les commandes (contournements shell Windows).
     let private dangerousPrefixes = [| "\\\\"; "//" |]

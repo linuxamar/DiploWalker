@@ -4,6 +4,7 @@ open Diplo.Abstractions.Interfaces
 open Diplo.Abstractions.ServerConfig
 open Diplo.Container.Clients
 open Diplo.Container.Services
+open Diplo.Disk
 open ProtoBuf.Grpc.Server
 
 [<EntryPoint>]
@@ -15,5 +16,6 @@ let main args =
             builder.Services.AddSingleton<IContainerdClient>(fun sp ->
                 let runner = sp.GetRequiredService<IProcessRunner>()
                 ContainerdClient(runner) :> IContainerdClient) |> ignore
+            builder.Services.AddSingleton<IDiskMounter>(DiskMounter()) |> ignore
             builder.Services.AddSingleton<ContainerServiceImpl>() |> ignore)
         (fun app -> app.MapGrpcService<ContainerServiceImpl>() |> ignore)

@@ -1,12 +1,16 @@
 namespace Diplo.Cli
 
+open System
 open System.Threading.Tasks
 open Spectre.Console.Cli
 open Diplo.Core.Clients
 open Diplo.Core.Output
 
+type StatusSettings() =
+    inherit CommandSettings()
+
 type StatusCommand(output: IOutputPort) =
-    inherit AsyncCommand<CommandSettings>()
+    inherit AsyncCommand<StatusSettings>()
 
     override _.ExecuteAsync(_ctx, _settings, _ct) =
         task {
@@ -21,7 +25,10 @@ type StatusCommand(output: IOutputPort) =
                 task {
                     try
                         let! v = containerClient.GetVersionAsync()
-                        return (true, sprintf "v%s (%s/%s)" v.Version v.Os v.Arch)
+                        let info =
+                            if String.IsNullOrEmpty v.Os then v.Version
+                            else sprintf "%s (%s/%s)" v.Version v.Os v.Arch
+                        return (true, info)
                     with ex ->
                         return (false, ex.Message)
                 }

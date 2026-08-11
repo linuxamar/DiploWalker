@@ -105,6 +105,7 @@ let ``ContainerTabViewModel etat initial`` () =
     let vm = ContainerTabViewModel(port)
     vm.ContainerIdInput     |> should equal ""
     vm.ContainerNameInput   |> should equal ""
+    vm.ContainerMounts      |> should equal ""
     vm.ContainerTimeout     |> should equal 10
     vm.Containers.Count     |> should equal 0
     vm.Images.Count         |> should equal 0
@@ -117,8 +118,10 @@ let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
     vm.ContainerIdInput <- "abc123"
     vm.ContainerNameInput <- "mon-srv"
+    vm.ContainerMounts <- @"src=C:\donnees,dst=C:\conteneur\donnees"
     changed |> should contain "ContainerIdInput"
     changed |> should contain "ContainerNameInput"
+    changed |> should contain "ContainerMounts"
 
 // ── VolumeTabViewModel ──────────────────────────────────────
 

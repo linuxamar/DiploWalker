@@ -4,6 +4,7 @@ open System
 open System.Collections.ObjectModel
 open Avalonia.Threading
 open Diplo.Core.Clients
+open Diplo.Core.Mounts
 open Diplo.Core.Output
 
 type ContainerInfo = {
@@ -41,6 +42,7 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     let mutable containerTail = 100
     let mutable containerSince = ""
     let mutable containerExecCommand = ""
+    let mutable containerMounts = ""
 
     member _.Containers = containers
     member _.Images = images
@@ -59,6 +61,7 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member _.ContainerTail with get () = containerTail and set v = containerTail <- v; this.OnPropertyChanged()
     member _.ContainerSince with get () = containerSince and set v = containerSince <- v; this.OnPropertyChanged()
     member _.ContainerExecCommand with get () = containerExecCommand and set v = containerExecCommand <- v; this.OnPropertyChanged()
+    member _.ContainerMounts with get () = containerMounts and set v = containerMounts <- v; this.OnPropertyChanged()
 
     member _.ListContainersCommand = RelayCommand(Action(fun () -> this.ListContainers() |> ignore))
     member _.InspectContainerCommand = RelayCommand(Action(fun () -> this.InspectContainer() |> ignore))
@@ -266,7 +269,12 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
         task {
             try
                 use client = new ContainerClient()
-                let! response = client.CreateAsync(name = this.ContainerNameInput, image = this.ContainerImageInput)
+                let mounts = MountParser.parse this.ContainerMounts
+                let! response =
+                    client.CreateAsync(
+                        name = this.ContainerNameInput,
+                        image = this.ContainerImageInput,
+                        ?mounts = (if mounts.IsEmpty then None else Some mounts))
                 outputPort.WriteSuccess(sprintf "Conteneur créé : %s (ID: %s)" response.Name response.Id)
             with ex -> outputPort.WriteError(ex.Message)
         }
