@@ -40,8 +40,8 @@ module ``Vérification de la structure des commandes CLI`` =
         |> should be True
 
     [<Fact>]
-    let ``VersionCommand hérite de AsyncCommand<CommandSettings>`` () =
-        typeof<VersionCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+    let ``VersionCommand hérite de AsyncCommand<VersionSettings>`` () =
+        typeof<VersionCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<VersionSettings>>)
         |> should be True
 
     // --- Volume commands ---
@@ -73,8 +73,8 @@ module ``Vérification de la structure des commandes CLI`` =
         |> should be True
 
     [<Fact>]
-    let ``PruneVolumesCommand hérite de AsyncCommand<CommandSettings>`` () =
-        typeof<PruneVolumesCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+    let ``PruneVolumesCommand hérite de AsyncCommand<PruneVolumesSettings>`` () =
+        typeof<PruneVolumesCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<PruneVolumesSettings>>)
         |> should be True
 
     // --- Network commands ---
@@ -122,8 +122,8 @@ module ``Vérification de la structure des commandes CLI`` =
         |> should be True
 
     [<Fact>]
-    let ``NamespacesCommand hérite de AsyncCommand<CommandSettings>`` () =
-        typeof<NamespacesCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+    let ``NamespacesCommand hérite de AsyncCommand<NamespacesSettings>`` () =
+        typeof<NamespacesCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<NamespacesSettings>>)
         |> should be True
 
     // --- New network commands ---
@@ -133,16 +133,16 @@ module ``Vérification de la structure des commandes CLI`` =
         |> should be True
 
     [<Fact>]
-    let ``PruneNetworksCommand hérite de AsyncCommand<CommandSettings>`` () =
-        typeof<PruneNetworksCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+    let ``PruneNetworksCommand hérite de AsyncCommand<PruneNetworksSettings>`` () =
+        typeof<PruneNetworksCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<PruneNetworksSettings>>)
         |> should be True
 
     // --- Status / Config commands ---
     open Diplo.Cli
 
     [<Fact>]
-    let ``StatusCommand hérite de AsyncCommand<CommandSettings>`` () =
-        typeof<StatusCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<Spectre.Console.Cli.CommandSettings>>)
+    let ``StatusCommand hérite de AsyncCommand<StatusSettings>`` () =
+        typeof<StatusCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<StatusSettings>>)
         |> should be True
 
     [<Fact>]

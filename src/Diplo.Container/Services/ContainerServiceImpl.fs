@@ -239,10 +239,20 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.GetVersion(request, _context) =
             task {
-                let version = client.Version()
+                let versionString = client.Version()
+                let version, revision =
+                    let idx = versionString.IndexOf("(revision: ", StringComparison.Ordinal)
+                    if idx >= 0 then
+                        let v = versionString.Substring(0, idx).Trim()
+                        let start = idx + "(revision: ".Length
+                        let rest = versionString.Substring(start)
+                        let endIdx = rest.IndexOf(')')
+                        let rev = if endIdx >= 0 then rest.Substring(0, endIdx).Trim() else rest.Trim()
+                        (v, rev)
+                    else (versionString, "")
                 return
                     { GetVersionResponse.Version = version
-                      Revision = ""
+                      Revision = revision
                       GoVersion = ""
                       Os = ""
                       Arch = "" }

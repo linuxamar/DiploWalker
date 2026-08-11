@@ -8,7 +8,7 @@ type ContainerdClientTests() =
 
     let createRunner () =
         let runner = MockProcessRunner()
-        runner.OnCommand("version", """{"Version":"1.7.27","Revision":"abc123","Go":"go1.22.5","OS":"windows","Arch":"amd64"}""")
+        runner.OnCommand("version", "Client:\n  Version:  v1.7.27\n  Revision: abc123\n  Go version: go1.22.5\n\nServer:\n  Version:  v1.7.27\n  Revision: abc123")
         runner.OnCommand("namespace list --quiet", "default\nmoby")
         runner
 
@@ -20,7 +20,7 @@ type ContainerdClientTests() =
         let runner = createRunner ()
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
         let result = client.Version()
-        result |> should startWith "1.7.27"
+        result |> should startWith "v1.7.27"
         result |> shouldContain "abc123"
 
     [<Fact>]
@@ -135,31 +135,34 @@ type ContainerdClientTests() =
         result |> should contain "c-1"
 
     [<Fact>]
-    member _.``ListContainers sans all utilise --running``() =
+    member _.``ListContainers sans all filtre les taches RUNNING``() =
         let runner = createRunner ()
-        runner.OnCommand("container list", "c-1")
+        runner.OnCommand("container list", "c-1\nc-2")
+        runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 1234 RUNNING\nc-2 0 STOPPED")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
         let result = client.ListContainers("default", false)
         result |> should haveLength 1
+        result.Head |> should equal "c-1"
         let cmd = runner.SecureCommands |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains("--running"))
-        cmd.IsSome |> should be True
+        cmd.IsSome |> should be False
 
     [<Fact>]
-    member _.``GetContainerLogs retourne les lignes``() =
+    member _.``GetContainerLogs indique la non-disponibilite en v2``() =
         let runner = createRunner ()
-        runner.OnCommand("task logs", "line1\nline2\nline3")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
         let result = client.GetContainerLogs("default", "c-1", 100, false, "")
-        result |> should haveLength 3
+        result |> should haveLength 1
+        result.Head |> shouldContain "non disponibles"
+        runner.SecureCommands |> should be Empty
 
     [<Fact>]
     member _.``ExecInContainer retourne la sortie``() =
         let runner = createRunner ()
-        runner.OnCommand("exec", "output data")
+        runner.OnCommand("tasks exec", "output data")
         let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
         let result = client.ExecInContainer("default", "c-1", [| "ls"; "-la" |])
         result |> should equal "output data"
-        let cmd = runner.SecureCommands |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains("exec"))
+        let cmd = runner.SecureCommands |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains("tasks exec"))
         cmd.IsSome |> should be True
         let (_, args) = cmd.Value
         (args |> String.concat " ") |> shouldContain "ls"

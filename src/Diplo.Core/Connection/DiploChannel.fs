@@ -22,6 +22,7 @@ module DiploChannel =
         let channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
         let options = GrpcChannelOptions()
         options.Credentials <- channelCredentials
+        options.UnsafeUseInsecureChannelCallCredentials <- true
         GrpcChannel.ForAddress(address, options)
 
     let forContainer (port: int) = create $"http://localhost:{port}"

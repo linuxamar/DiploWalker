@@ -171,7 +171,7 @@ module ContainerServiceImplTests =
         let req : GetVersionRequest = { Placeholder = false }
         let result = (svc :> IContainerService).GetVersion(req, ctx).Result
         result.Version |> shouldContain "1.7.27"
-        result.Version |> shouldContain "abc123"
+        result.Revision |> shouldContain "abc123"
 
     [<Fact>]
     let ``ListNamespaces retourne les namespaces`` () =

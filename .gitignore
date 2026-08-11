@@ -64,3 +64,7 @@ Diplo-Setup-*.exe
 
 # Code signing certificate (development)
 eng/Diplo_dev.pfx
+
+# Publications locales
+publish/
+publish-cli/

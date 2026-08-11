@@ -263,8 +263,11 @@ type ExecContainerCommand(output: IOutputPort) =
         }
 
 // ── namespaces ────────────────────────────────────────────────────
+type NamespacesSettings() =
+    inherit CommandSettings()
+
 type NamespacesCommand(output: IOutputPort) =
-    inherit AsyncCommand<CommandSettings>()
+    inherit AsyncCommand<NamespacesSettings>()
 
     override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
@@ -280,8 +283,11 @@ type NamespacesCommand(output: IOutputPort) =
         }
 
 // ── version ───────────────────────────────────────────────────────
+type VersionSettings() =
+    inherit CommandSettings()
+
 type VersionCommand(output: IOutputPort) =
-    inherit AsyncCommand<CommandSettings>()
+    inherit AsyncCommand<VersionSettings>()
 
     override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {

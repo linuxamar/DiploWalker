@@ -197,8 +197,11 @@ type UnmountVolumeCommand(output: IOutputPort) =
         }
 
 // ── prune ─────────────────────────────────────────────────────────
+type PruneVolumesSettings() =
+    inherit CommandSettings()
+
 type PruneVolumesCommand(output: IOutputPort) =
-    inherit AsyncCommand<CommandSettings>()
+    inherit AsyncCommand<PruneVolumesSettings>()
 
     override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
