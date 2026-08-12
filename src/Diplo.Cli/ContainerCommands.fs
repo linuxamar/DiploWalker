@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
+open Diplo.Cli
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
@@ -321,8 +322,11 @@ type LogsContainerCommand(output: IOutputPort) =
                 let since = if isNull settings.Since then "" else settings.Since
                 try
                     if settings.Follow then
-                        let stream = client.GetLogsStream(settings.Id, follow = true, tail = settings.Tail, since = since, ct = ct)
-                        let enumerator = stream.GetAsyncEnumerator(ct)
+                        use ctrlC = new CtrlCHandler()
+                        use linked = CancellationTokenSource.CreateLinkedTokenSource(ct, ctrlC.Token)
+                        let followCt = linked.Token
+                        let stream = client.GetLogsStream(settings.Id, follow = true, tail = settings.Tail, since = since, ct = followCt)
+                        let enumerator = stream.GetAsyncEnumerator(followCt)
                         try
                             let mutable moving = true
                             while moving do
@@ -339,6 +343,8 @@ type LogsContainerCommand(output: IOutputPort) =
                             output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
                     return 0
                 with
+                | :? Grpc.Core.RpcException as rex when rex.StatusCode = Grpc.Core.StatusCode.Cancelled ->
+                    return 0
                 | :? OperationCanceledException ->
                     return 0
                 | ex ->

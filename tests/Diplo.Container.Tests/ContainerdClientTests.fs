@@ -6,6 +6,7 @@ open System.Threading
 open System.Threading.Tasks
 open Xunit
 open FsUnit.Xunit
+open Grpc.Core
 open Diplo.Container.Clients
 open Diplo.Container
 
@@ -382,3 +383,24 @@ type ContainerdClientTests() =
             (args |> String.concat " ") |> shouldContain "hubuser:hubpass"
         finally
             try System.IO.File.Delete stateFile with _ -> ()
+
+    [<Fact>]
+    member _.``DeleteContainer avec force sur conteneur inexistant ne leve pas``() =
+        let runner = createRunner ()
+        runner.SetFail("ctr a échoué")
+        let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+        // ne doit pas lever malgré l'échec du kill et du delete
+        client.DeleteContainer("default", "absent-1", true)
+
+    [<Fact>]
+    member _.``UpdateContainer avec limites demandees leve Unimplemented``() =
+        let runner = createRunner ()
+        let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+        let ex = Assert.Throws<Grpc.Core.RpcException>(fun () -> client.UpdateContainer("default", "c-1", 512L, 1024, 64))
+        ex.StatusCode |> should equal StatusCode.Unimplemented
+
+    [<Fact>]
+    member _.``UpdateContainer sans limite reste un succes silencieux``() =
+        let runner = createRunner ()
+        let client = ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+        client.UpdateContainer("default", "c-1", 0L, 0, 0)

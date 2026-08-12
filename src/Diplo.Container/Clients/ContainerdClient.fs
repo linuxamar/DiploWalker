@@ -8,6 +8,7 @@ open System.Text.Json
 open System.Threading
 open System.Threading.Tasks
 open Serilog
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 open Diplo.Container
@@ -126,7 +127,10 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
             if force then
                 try runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGKILL"; id ]) |> ignore
                 with ex -> Log.Warning(ex, "Erreur lors de l'arrêt forcé du conteneur {ContainerId}", id)
-            runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
+                try runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
+                with ex -> Log.Warning(ex, "Erreur lors de la suppression du conteneur {ContainerId}", id)
+            else
+                runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
 
         member _.PauseContainer(namespaceName, id) =
             SecurityValidation.validateId namespaceName "Le namespace"
@@ -173,19 +177,10 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
         member _.UpdateContainer(namespaceName, id, memoryLimit, cpuShares, pidLimit) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
-            let args = ResizeArray()
-            args.AddRange(nsArgs namespaceName [ "task"; "update" ])
-            if memoryLimit > 0L then
-                args.Add("--memory")
-                args.Add(string memoryLimit)
-            if cpuShares > 0 then
-                args.Add("--cpu-shares")
-                args.Add(string cpuShares)
-            if pidLimit > 0 then
-                args.Add("--pids-limit")
-                args.Add(string pidLimit)
-            args.Add(id)
-            runCtr (args |> Seq.toList) |> ignore
+            if memoryLimit > 0L || cpuShares > 0 || pidLimit > 0 then
+                raise (RpcException(Status(
+                    StatusCode.Unimplemented,
+                    "La mise à jour des limites d'un conteneur n'est pas disponible avec cette version de ctr : la sous-commande `ctr task update` est absente")))
 
         member _.InspectContainer(namespaceName, id) =
             SecurityValidation.validateId namespaceName "Le namespace"
