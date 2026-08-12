@@ -310,3 +310,100 @@ module Qcow2Tests =
             s.Position <- 16L * 1024L * 1024L
             let ex = captureException (fun () -> s.Write(b, 0, b.Length) |> ignore)
             ex.Message |> should haveSubstring "saturée")
+
+    // ── redimensionnement ───────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``grow etend la taille virtuelle et permet d'ecrire au-dela`` () =
+        run (fun root img ->
+            TestImage.createQcow2 img [ "a.txt", "a" ]
+            do
+                use fs = new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
+                let h = Qcow2.resize fs (72L * 1024L * 1024L)
+                h.VirtualSize |> should equal (72L * 1024L * 1024L)
+            use s = new Qcow2Stream(img, FileAccess.ReadWrite)
+            s.Length |> should equal (72L * 1024L * 1024L)
+            // la région au-delà de 64 Mo est nulle
+            s.Position <- 65L * 1024L * 1024L
+            let zeros = Array.zeroCreate<byte> 4096
+            let buf = Array.zeroCreate<byte> 4096
+            s.Read(buf, 0, buf.Length) |> ignore
+            buf |> should equal zeros
+            // écriture puis relecture dans la région étendue
+            let payload = Array.create 4096 0x5Auy
+            s.Position <- 70L * 1024L * 1024L
+            s.Write(payload, 0, payload.Length)
+            s.Position <- 70L * 1024L * 1024L
+            let back = Array.zeroCreate<byte> 4096
+            s.Read(back, 0, back.Length) |> ignore
+            back |> should equal payload)
+
+    [<Fact>]
+    let ``grow avec expansion de la table L1 relocalise et conserve les donnees`` () =
+        run (fun root img ->
+            // image vide de 1 Go : la table L1 occupe un cluster (512 entrées)
+            TestImage.createEmptyQcow2 img 1024L
+            let l1Before = readUInt64AtFile img 40L
+            do
+                use fs = new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
+                let h = Qcow2.resize fs (1152L * 1024L * 1024L)
+                h.VirtualSize |> should equal (1152L * 1024L * 1024L)
+                h.L1Size |> should equal 576
+            let l1After = readUInt64AtFile img 40L
+            l1After |> should not' (equal l1Before)
+            use s = new Qcow2Stream(img, FileAccess.ReadWrite)
+            s.Length |> should equal (1152L * 1024L * 1024L)
+            // écriture puis relecture dans la partie étendue
+            let payload = Array.create 4096 0x3Cuy
+            s.Position <- 1024L * 1024L * 1024L
+            s.Write(payload, 0, payload.Length)
+            s.Position <- 1024L * 1024L * 1024L
+            let back = Array.zeroCreate<byte> 4096
+            s.Read(back, 0, back.Length) |> ignore
+            back |> should equal payload)
+
+    [<Fact>]
+    let ``shrink reduit la taille, libere les clusters et tronque le fichier`` () =
+        run (fun root img ->
+            TestImage.createQcow2 img [ "a.txt", "a" ]
+            // occupe des clusters élevés (50 Mo)
+            do
+                use s = new Qcow2Stream(img, FileAccess.ReadWrite)
+                let payload = Array.create 4096 0x21uy
+                s.Position <- 50L * 1024L * 1024L
+                s.Write(payload, 0, payload.Length)
+            let sizeBefore = FileInfo(img).Length
+            do
+                use fs = new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
+                let h = Qcow2.resize fs (32L * 1024L * 1024L)
+                h.VirtualSize |> should equal (32L * 1024L * 1024L)
+                h.L1Size |> should equal 16
+            use s = new Qcow2Stream(img, FileAccess.Read)
+            s.Length |> should equal (32L * 1024L * 1024L)
+            // au-delà de la nouvelle taille, la lecture est vide
+            let b = Array.zeroCreate<byte> 4096
+            s.Position <- 40L * 1024L * 1024L
+            s.Read(b, 0, b.Length) |> should equal 0
+            // le fichier est tronqué à la dernière position utile
+            FileInfo(img).Length |> should be (lessThan sizeBefore)
+            s.Dispose()
+            // après un nouvel agrandissement, la zone libérée est réutilisable (zéros)
+            do
+                use fs = new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
+                Qcow2.resize fs (64L * 1024L * 1024L) |> ignore
+            use s2 = new Qcow2Stream(img, FileAccess.Read)
+            s2.Position <- 50L * 1024L * 1024L
+            let back = Array.zeroCreate<byte> 4096
+            s2.Read(back, 0, back.Length) |> ignore
+            back |> Array.forall ((=) 0uy) |> should equal true)
+
+    [<Fact>]
+    let ``Qcow2Stream.SetLength redimensionne l'image`` () =
+        run (fun root img ->
+            TestImage.createQcow2 img [ "a.txt", "a" ]
+            use s = new Qcow2Stream(img, FileAccess.ReadWrite)
+            s.Length |> should equal (64L * 1024L * 1024L)
+            s.SetLength(80L * 1024L * 1024L)
+            s.Length |> should equal (80L * 1024L * 1024L)
+            s.SetLength(16L * 1024L * 1024L)
+            s.Length |> should equal (16L * 1024L * 1024L))

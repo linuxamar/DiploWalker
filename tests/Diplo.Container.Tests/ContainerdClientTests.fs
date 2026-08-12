@@ -2,6 +2,8 @@ namespace Diplo.Container.Tests
 
 open System
 open System.IO
+open System.Threading
+open System.Threading.Tasks
 open Xunit
 open FsUnit.Xunit
 open Diplo.Container.Clients
@@ -218,6 +220,73 @@ type ContainerdClientTests() =
             let result = client.GetContainerLogs("default", "c-1", 100, false, "")
             result |> should haveLength 1
             result.Head |> shouldContain "Aucun journal"
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
+
+    [<Fact>]
+    member _.``readIncremental retourne les lignes completes et avance l'offset``() =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let file = ContainerLogs.fileFor "c-1"
+            File.WriteAllText(file, "l1" + Environment.NewLine + "l2" + Environment.NewLine)
+            let lines, offset = ContainerLogs.readIncremental "c-1" 0L
+            lines |> should equal [| "l1"; "l2" |]
+            offset |> should equal (FileInfo(file).Length)
+            let lines2, offset2 = ContainerLogs.readIncremental "c-1" offset
+            lines2 |> should equal [||]
+            offset2 |> should equal offset
+            File.AppendAllText(file, "l3" + Environment.NewLine)
+            let lines3, offset3 = ContainerLogs.readIncremental "c-1" offset
+            lines3 |> should equal [| "l3" |]
+            File.AppendAllText(file, "l4")
+            let lines4, offset4 = ContainerLogs.readIncremental "c-1" offset3
+            lines4 |> should equal [||]
+            offset4 |> should equal offset3
+            File.AppendAllText(file, Environment.NewLine + "l5" + Environment.NewLine)
+            let lines5, _ = ContainerLogs.readIncremental "c-1" offset3
+            lines5 |> should equal [| "l4"; "l5" |]
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
+
+    [<Fact>]
+    member _.``GetContainerLogsStream suit les nouvelles lignes jusqu'a la sortie du conteneur``() =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let file = ContainerLogs.fileFor "c-1"
+            File.WriteAllText(file, "l1" + Environment.NewLine + "l2" + Environment.NewLine)
+            let runner = createRunner ()
+            runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 1234 RUNNING")
+            let client = ContainerdClient(runner, logPollIntervalMs = 50) :> Diplo.Abstractions.Interfaces.IContainerdClient
+            let collected = System.Collections.Concurrent.ConcurrentQueue<string>()
+            let completed = TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let consumer =
+                task {
+                    let enumerable = client.GetContainerLogsStream("default", "c-1", 100, "", CancellationToken.None)
+                    let enumerator = enumerable.GetAsyncEnumerator(CancellationToken.None)
+                    try
+                        let mutable moving = true
+                        while moving do
+                            let! hasNext = enumerator.MoveNextAsync().AsTask()
+                            if hasNext then collected.Enqueue(enumerator.Current)
+                            else moving <- false
+                        completed.TrySetResult(true) |> ignore
+                    finally
+                        (enumerator :> IAsyncDisposable).DisposeAsync().AsTask().Wait()
+                }
+            let mutable waited = 0
+            while waited < 3000 && collected.Count < 2 do
+                Thread.Sleep 50
+                waited <- waited + 50
+            collected.Count |> should equal 2
+            File.AppendAllText(file, "l3" + Environment.NewLine + "l4" + Environment.NewLine)
+            runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 0 STOPPED")
+            completed.Task.Wait(5000) |> should equal true
+            (collected |> Seq.toList) |> should equal [ "l1"; "l2"; "l3"; "l4" ]
+            consumer.Wait()
         finally
             try Directory.Delete(dir, true) with _ -> ()
 

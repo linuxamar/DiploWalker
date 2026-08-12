@@ -1,6 +1,7 @@
 namespace Diplo.Container.Clients
 
 open System
+open System.Collections.Generic
 open System.Diagnostics
 open System.IO
 open System.Text.Json
@@ -37,7 +38,9 @@ type private OciSpec =
     { ``process``: string
       linux: OciLinux }
 
-type ContainerdClient(runner: IProcessRunner) =
+type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
+
+    let logPollIntervalMs = defaultArg logPollIntervalMs 500
 
     let runCtr (args: string list) =
         runner.RunWithArgs("ctr", args)
@@ -265,6 +268,68 @@ type ContainerdClient(runner: IProcessRunner) =
                 [ "Aucun journal pour ce conteneur (le conteneur doit être démarré en mode détaché pour capturer ses logs)" ]
             else
                 lines |> Array.toList
+
+        member _.GetContainerLogsStream(namespaceName, id, tail, since, ct) =
+            SecurityValidation.validateId namespaceName "Le namespace"
+            SecurityValidation.validateContainerId id
+            let channel = System.Threading.Channels.Channel.CreateUnbounded<string>()
+            let writer = channel.Writer
+            let isContainerRunning () =
+                try
+                    runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+                    |> fun output ->
+                        output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+                        |> Array.exists (fun line ->
+                            let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                            parts.Length >= 3
+                            && parts[0].Equals(id, StringComparison.OrdinalIgnoreCase)
+                            && parts[2].Equals("RUNNING", StringComparison.OrdinalIgnoreCase))
+                with ex ->
+                    Log.Warning(ex, "Erreur lors du suivi des logs du conteneur {ContainerId}", id)
+                    false
+            let producer (cancel: CancellationToken) =
+                async {
+                    try
+                        let snapshot = ContainerLogs.read id tail since
+                        for l in snapshot do writer.TryWrite(l) |> ignore
+                        let mutable lastOffset = ContainerLogs.fileLength id
+                        let mutable running = true
+                        while running && not cancel.IsCancellationRequested do
+                            let lines, offset = ContainerLogs.readIncremental id lastOffset
+                            lastOffset <- offset
+                            for l in lines do writer.TryWrite(l) |> ignore
+                            if isContainerRunning () then
+                                do! Async.Sleep logPollIntervalMs
+                            else
+                                // courte grâce au writer pour vider les derniers octets
+                                do! Async.Sleep 150
+                                let fin, _ = ContainerLogs.readIncremental id lastOffset
+                                for l in fin do writer.TryWrite(l) |> ignore
+                                running <- false
+                        writer.TryComplete() |> ignore
+                    with ex ->
+                        writer.TryComplete(ex) |> ignore
+                }
+            { new IAsyncEnumerable<string> with
+                member _.GetAsyncEnumerator(ct2) =
+                    let cts = CancellationTokenSource.CreateLinkedTokenSource(ct, ct2)
+                    producer cts.Token |> Async.StartAsTask |> ignore
+                    let mutable current = ""
+                    { new IAsyncEnumerator<string> with
+                        member _.Current = current
+                        member _.MoveNextAsync() =
+                            let read = channel.Reader.ReadAsync(cts.Token)
+                            let task =
+                                read.AsTask().ContinueWith(fun (t: Task<string>) ->
+                                    if t.IsCompletedSuccessfully then
+                                        current <- t.Result
+                                        true
+                                    else
+                                        false)
+                            ValueTask<bool>(task)
+                        member _.DisposeAsync() =
+                            writer.TryComplete() |> ignore
+                            ValueTask() } }
 
         member _.ExecInContainer(namespaceName, id, command) =
             SecurityValidation.validateId namespaceName "Le namespace"

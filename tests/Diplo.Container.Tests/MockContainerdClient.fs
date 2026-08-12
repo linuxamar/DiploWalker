@@ -78,6 +78,19 @@ type MockContainerdClient() =
             [ "2025-01-15T10:30:01Z Application started"
               "2025-01-15T10:30:02Z Listening on port 8080" ]
 
+        member _.GetContainerLogsStream(_namespaceName, _id, _tail, _since, _ct) =
+            let mutable yielded = false
+            { new System.Collections.Generic.IAsyncEnumerable<string> with
+                member _.GetAsyncEnumerator(_ct) =
+                    { new System.Collections.Generic.IAsyncEnumerator<string> with
+                        member _.Current = if yielded then "2025-01-15T10:30:02Z Listening on port 8080" else "2025-01-15T10:30:01Z Application started"
+                        member _.MoveNextAsync() =
+                            if yielded then ValueTask<bool>(false)
+                            else
+                                yielded <- true
+                                ValueTask<bool>(true)
+                        member _.DisposeAsync() = ValueTask() } }
+
         member _.ExecInContainer(_namespaceName, _id, command) =
             if command.Length >= 2 && command.[0] = "base64" then
                 Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("contenu-du-fichier"))

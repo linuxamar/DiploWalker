@@ -388,17 +388,23 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                 return { ListContainersResponse.Containers = List<ContainerInfo>(containers) }
             }
 
-        member _.GetContainerLogs(request, _context) =
+        member _.GetContainerLogs(request, context) =
             if String.IsNullOrEmpty(request.Id) then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
             let tail = if request.Tail > 0 then min request.Tail 10_000 else 100
             let follow = request.Follow
             let since = if String.IsNullOrEmpty(request.Since) then "" else request.Since
-            let logs = client.GetContainerLogs(DefaultNamespace, request.Id, tail, follow, since)
-            logs.Select(fun line ->
+            let toEntry (line: string) =
                 { ContainerLogEntry.Timestamp = DateTime.UtcNow.ToString("o")
                   Stream = "stdout"
-                  Log = line }).ToAsyncEnumerable()
+                  Log = line }
+            if follow then
+                client.GetContainerLogsStream(DefaultNamespace, request.Id, tail, since, context)
+                |> fun e -> e.Select(toEntry)
+            else
+                client.GetContainerLogs(DefaultNamespace, request.Id, tail, false, since)
+                |> List.toSeq
+                |> fun l -> l.Select(toEntry).ToAsyncEnumerable()
 
         member _.ExecInContainer(request, _context) =
             if String.IsNullOrEmpty(request.Id) then

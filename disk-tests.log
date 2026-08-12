@@ -1,0 +1,8 @@
+  Identification des projets ├á restaurer...
+  Tous les projets sont ├á jour pour la restauration.
+  Diplo.Disk -> D:\projects\Diplo\src\Diplo.Disk\bin\x64\Debug\net10.0\Diplo.Disk.dll
+  Diplo.Disk.Tests -> D:\projects\Diplo\tests\Diplo.Disk.Tests\bin\x64\Debug\net10.0\Diplo.Disk.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Disk.Tests\bin\x64\Debug\net10.0\Diplo.Disk.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    51, ignor├®e(s)┬á:     0, total┬á:    51, dur├®e┬á: 4 s - Diplo.Disk.Tests.dll (net10.0)

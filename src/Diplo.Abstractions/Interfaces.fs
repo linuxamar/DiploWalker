@@ -28,6 +28,10 @@ module Interfaces =
         abstract member TaskInfo: namespaceName: string * id: string -> JsonElement
         abstract member ListContainers: namespaceName: string * all: bool -> string list
         abstract member GetContainerLogs: namespaceName: string * id: string * tail: int * follow: bool * since: string -> string list
+        /// Suit les journaux d'un conteneur en continu : émet l'instantané
+        /// (tail/since) puis les nouvelles lignes au fil de leur écriture,
+        /// jusqu'à la sortie du conteneur ou l'annulation.
+        abstract member GetContainerLogsStream: namespaceName: string * id: string * tail: int * since: string * ct: System.Threading.CancellationToken -> System.Collections.Generic.IAsyncEnumerable<string>
         abstract member ExecInContainer: namespaceName: string * id: string * command: string array -> string
         abstract member PullImage: image: string * userArg: string option -> string
         abstract member Version: unit -> string

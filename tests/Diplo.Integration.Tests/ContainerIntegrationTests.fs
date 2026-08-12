@@ -69,6 +69,20 @@ module ContainerIntegrationTests =
             member _.GetContainerLogs(_ns, _id, _tail, _follow, _since) =
                 ["log line 1"; "log line 2"]
 
+            member _.GetContainerLogsStream(_ns, _id, _tail, _since, _ct) =
+                let mutable index = 0
+                { new System.Collections.Generic.IAsyncEnumerable<string> with
+                    member _.GetAsyncEnumerator(_ct) =
+                        { new System.Collections.Generic.IAsyncEnumerator<string> with
+                            member _.Current =
+                                if index = 0 then "log line 1" else "log line 2"
+                            member _.MoveNextAsync() =
+                                if index >= 2 then ValueTask<bool>(false)
+                                else
+                                    index <- index + 1
+                                    ValueTask<bool>(true)
+                            member _.DisposeAsync() = ValueTask() } }
+
             member _.ExecInContainer(_ns, _id, command) =
                 sprintf "exec: %s" (command |> String.concat " ")
 

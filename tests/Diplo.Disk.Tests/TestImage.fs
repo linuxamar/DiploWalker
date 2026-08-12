@@ -41,10 +41,9 @@ module TestImage =
     /// QEMU : en-tête (cluster 0), table L1 (cluster 1), table de refcounts
     /// (cluster 2) et blocs de refcounts pré-alloués (clusters 3..11) avec un
     /// refcount de 1 pour les clusters structurels. Image vide, taille
-    /// virtuelle 64 Mo, clusters de 4 Ko.
-    let private writeQcow2Skeleton (path: string) =
+    /// virtuelle 64 Mo (ou `virtualSize`), clusters de 4 Ko.
+    let private writeQcow2Skeleton (path: string) (virtualSize: int64) =
         let clusterSize = 4096L
-        let virtualSize = 64L * 1024L * 1024L
         let l1Size = int (virtualSize / (clusterSize * 512L))
         let l1Offset = clusterSize
         let refcountTableOffset = 2L * clusterSize
@@ -106,16 +105,28 @@ module TestImage =
         use fat = FatFileSystem.FormatPartition(disk, 0, "DIPLO")
         writeContents fat contents
 
+    /// Crée une image disque qcow2 (version 2) de `virtualSize` Mo contenant
+    /// un système de fichiers FAT formaté via DiscUtils, puis y écrit le
+    /// contenu (chemin relatif, contenu texte) fourni.
+    let createQcow2WithSize (path: string) (virtualSizeMb: int64) (contents: (string * string) list) =
+        writeQcow2Skeleton path (virtualSizeMb * 1024L * 1024L)
+        use stream = new Qcow2TestStream(path, FileAccess.ReadWrite)
+        use disk = Raw.Disk.Initialize(stream, Ownership.None, virtualSizeMb * 1024L * 1024L)
+        BiosPartitionTable.Initialize(disk, WellKnownPartitionType.WindowsFat) |> ignore
+        use fat = FatFileSystem.FormatPartition(disk, 0, "DIPLO")
+        writeContents fat contents
+
     /// Crée une image disque qcow2 (version 2) contenant un système de
     /// fichiers FAT 64 Mo formaté via DiscUtils, puis y écrit le contenu
     /// (chemin relatif, contenu texte) fourni.
     let createQcow2 (path: string) (contents: (string * string) list) =
-        writeQcow2Skeleton path
-        use stream = new Qcow2TestStream(path, FileAccess.ReadWrite)
-        use disk = Raw.Disk.Initialize(stream, Ownership.None, 64L * 1024L * 1024L)
-        BiosPartitionTable.Initialize(disk, WellKnownPartitionType.WindowsFat) |> ignore
-        use fat = FatFileSystem.FormatPartition(disk, 0, "DIPLO")
-        writeContents fat contents
+        createQcow2WithSize path 64L (contents)
+
+    /// Crée une image qcow2 (version 2) vide de `virtualSizeMo` Mo, sans
+    /// système de fichiers (squelette seul) : utile pour les tests de
+    /// redimensionnement sans coût de formatage.
+    let createEmptyQcow2 (path: string) (virtualSizeMb: int64) =
+        writeQcow2Skeleton path (virtualSizeMb * 1024L * 1024L)
 
     /// Répertoire temporaire unique.
     let createTempDir () =

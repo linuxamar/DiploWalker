@@ -1,0 +1,69 @@
+  Identification des projets ├á restaurer...
+  Tous les projets sont ├á jour pour la restauration.
+  Diplo.Contracts -> D:\projects\Diplo\src\Diplo.Contracts\bin\Debug\net10.0\Diplo.Contracts.dll
+  Diplo.Disk -> D:\projects\Diplo\src\Diplo.Disk\bin\Debug\net10.0\Diplo.Disk.dll
+  Diplo.Abstractions -> D:\projects\Diplo\src\Diplo.Abstractions\bin\Debug\net10.0\Diplo.Abstractions.dll
+  Diplo.Grpc -> D:\projects\Diplo\src\Diplo.Grpc\bin\Debug\net10.0\Diplo.Grpc.dll
+  Diplo.Disk.Tests -> D:\projects\Diplo\tests\Diplo.Disk.Tests\bin\Debug\net10.0\Diplo.Disk.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Disk.Tests\bin\Debug\net10.0\Diplo.Disk.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+  Diplo.Installer -> D:\projects\Diplo\src\Diplo.Installer\bin\Debug\net10.0\Diplo.Installer.dll
+  Diplo.Abstractions.Tests -> D:\projects\Diplo\tests\Diplo.Abstractions.Tests\bin\x64\Debug\net10.0\Diplo.Abstractions.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Abstractions.Tests\bin\x64\Debug\net10.0\Diplo.Abstractions.Tests.dll (.NETCoreApp,Version=v10.0)
+  Diplo.Core -> D:\projects\Diplo\src\Diplo.Core\bin\Debug\net10.0\Diplo.Core.dll
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+  Diplo.Installer.Tests -> D:\projects\Diplo\tests\Diplo.Installer.Tests\bin\Debug\net10.0\Diplo.Installer.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Installer.Tests\bin\Debug\net10.0\Diplo.Installer.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+  Diplo.Core.Tests -> D:\projects\Diplo\tests\Diplo.Core.Tests\bin\Debug\net10.0\Diplo.Core.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Core.Tests\bin\Debug\net10.0\Diplo.Core.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+  Diplo.Cli -> D:\projects\Diplo\src\Diplo.Cli\bin\Debug\net10.0\Diplo.Cli.dll
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:   107, ignor├®e(s)┬á:     0, total┬á:   107, dur├®e┬á: 1 s - Diplo.Abstractions.Tests.dll (net10.0)
+  Diplo.Gui -> D:\projects\Diplo\src\Diplo.Gui\bin\x64\Debug\net10.0\Diplo.Gui.dll
+  Diplo.Cli.Tests -> D:\projects\Diplo\tests\Diplo.Cli.Tests\bin\x64\Debug\net10.0\Diplo.Cli.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Cli.Tests\bin\x64\Debug\net10.0\Diplo.Cli.Tests.dll (.NETCoreApp,Version=v10.0)
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    10, ignor├®e(s)┬á:     0, total┬á:    10, dur├®e┬á: 735 ms - Diplo.Installer.Tests.dll (net10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+  Diplo.Gui.Tests -> D:\projects\Diplo\tests\Diplo.Gui.Tests\bin\x64\Debug\net10.0\Diplo.Gui.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Gui.Tests\bin\x64\Debug\net10.0\Diplo.Gui.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    37, ignor├®e(s)┬á:     0, total┬á:    37, dur├®e┬á: 3 s - Diplo.Core.Tests.dll (net10.0)
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    51, ignor├®e(s)┬á:     0, total┬á:    51, dur├®e┬á: 16 s - Diplo.Disk.Tests.dll (net10.0)
+  Diplo.Volume -> D:\projects\Diplo\src\Diplo.Volume\bin\Debug\net10.0\Diplo.Volume.dll
+  Diplo.Container -> D:\projects\Diplo\src\Diplo.Container\bin\Debug\net10.0\Diplo.Container.dll
+  Diplo.Contracts.Tests -> D:\projects\Diplo\tests\Diplo.Contracts.Tests\bin\Debug\net10.0\Diplo.Contracts.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Contracts.Tests\bin\Debug\net10.0\Diplo.Contracts.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    69, ignor├®e(s)┬á:     0, total┬á:    69, dur├®e┬á: 847 ms - Diplo.Cli.Tests.dll (net10.0)
+  Diplo.Network -> D:\projects\Diplo\src\Diplo.Network\bin\Debug\net10.0\Diplo.Network.dll
+D:\projects\Diplo\tests\Diplo.Container.Tests\ContainerServiceImplTests.fs(648,10): warning FS0066: Ce cast d'un type d├®riv├® en l'une de ses classes de base est inutile┬á-┬áles types sont identiques [D:\projects\Diplo\tests\Diplo.Container.Tests\Diplo.Container.Tests.fsproj]
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    39, ignor├®e(s)┬á:     0, total┬á:    39, dur├®e┬á: 531 ms - Diplo.Gui.Tests.dll (net10.0)
+  Diplo.Container.Tests -> D:\projects\Diplo\tests\Diplo.Container.Tests\bin\Debug\net10.0\Diplo.Container.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Container.Tests\bin\Debug\net10.0\Diplo.Container.Tests.dll (.NETCoreApp,Version=v10.0)
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    11, ignor├®e(s)┬á:     0, total┬á:    11, dur├®e┬á: 266 ms - Diplo.Contracts.Tests.dll (net10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+  Diplo.Network.Tests -> D:\projects\Diplo\tests\Diplo.Network.Tests\bin\Debug\net10.0\Diplo.Network.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Network.Tests\bin\Debug\net10.0\Diplo.Network.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+  Diplo.Volume.Tests -> D:\projects\Diplo\tests\Diplo.Volume.Tests\bin\Debug\net10.0\Diplo.Volume.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Volume.Tests\bin\Debug\net10.0\Diplo.Volume.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:   113, ignor├®e(s)┬á:     0, total┬á:   113, dur├®e┬á: 1 s - Diplo.Network.Tests.dll (net10.0)
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:   103, ignor├®e(s)┬á:     0, total┬á:   103, dur├®e┬á: 2 s - Diplo.Container.Tests.dll (net10.0)
+  Diplo.Integration.Tests -> D:\projects\Diplo\tests\Diplo.Integration.Tests\bin\Debug\net10.0\Diplo.Integration.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Integration.Tests\bin\Debug\net10.0\Diplo.Integration.Tests.dll (.NETCoreApp,Version=v10.0)
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    57, ignor├®e(s)┬á:     0, total┬á:    57, dur├®e┬á: 1 s - Diplo.Volume.Tests.dll (net10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:    29, ignor├®e(s)┬á:     0, total┬á:    29, dur├®e┬á: 11 s - Diplo.Integration.Tests.dll (net10.0)

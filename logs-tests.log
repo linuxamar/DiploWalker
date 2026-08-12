@@ -1,0 +1,13 @@
+  Identification des projets ├á restaurer...
+  Tous les projets sont ├á jour pour la restauration.
+  Diplo.Grpc -> D:\projects\Diplo\src\Diplo.Grpc\bin\x64\Debug\net10.0\Diplo.Grpc.dll
+  Diplo.Contracts -> D:\projects\Diplo\src\Diplo.Contracts\bin\x64\Debug\net10.0\Diplo.Contracts.dll
+  Diplo.Disk -> D:\projects\Diplo\src\Diplo.Disk\bin\x64\Debug\net10.0\Diplo.Disk.dll
+  Diplo.Abstractions -> D:\projects\Diplo\src\Diplo.Abstractions\bin\x64\Debug\net10.0\Diplo.Abstractions.dll
+  Diplo.Container -> D:\projects\Diplo\src\Diplo.Container\bin\x64\Debug\net10.0\Diplo.Container.dll
+D:\projects\Diplo\tests\Diplo.Container.Tests\ContainerServiceImplTests.fs(648,10): warning FS0066: Ce cast d'un type d├®riv├® en l'une de ses classes de base est inutile┬á-┬áles types sont identiques [D:\projects\Diplo\tests\Diplo.Container.Tests\Diplo.Container.Tests.fsproj]
+  Diplo.Container.Tests -> D:\projects\Diplo\tests\Diplo.Container.Tests\bin\x64\Debug\net10.0\Diplo.Container.Tests.dll
+S├®rie de tests pour D:\projects\Diplo\tests\Diplo.Container.Tests\bin\x64\Debug\net10.0\Diplo.Container.Tests.dll (.NETCoreApp,Version=v10.0)
+Au total, 1 fichiers de test ont correspondu au mod├¿le sp├®cifi├®.
+
+R├®ussi!  - ├®chec┬á:     0, r├®ussite┬á:   103, ignor├®e(s)┬á:     0, total┬á:   103, dur├®e┬á: 2 s - Diplo.Container.Tests.dll (net10.0)
