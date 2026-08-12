@@ -246,6 +246,11 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
 - `container delete -f` : conteneur et tâche supprimés, staging purgé, et `data.img` réécrit — un nouvel extract relit `bonjour.txt` **et** `ecrit.txt`.
 - `ctr tasks exec` s'exécute dans le conteneur (le top-level `ctr exec` n'existe pas en v2).
 
+**Résultats de la validation (12/08/2026)** :
+
+- `container logs --follow` validé de bout en bout en conditions réelles : conteneur `ping 127.0.0.1 -t` (une ligne par seconde) démarré détaché, puis `container logs --follow --tail 3` → instantané de 3 lignes puis ~1 nouvelle ligne par seconde reçue au fil de l'eau, suivi actif jusqu'à Ctrl+C. Cela a nécessité trois corrections : (1) `ContainerLogs.read` ouvrait le fichier avec `FileShare.Read` strict, incompatible avec le handle d'écriture du conteneur en cours d'exécution (IOException) — passage à `FileShare.ReadWrite ||| FileShare.Delete` ; (2) le `StreamWriter` de capture n'avait pas `AutoFlush` : les lignes restaient en mémoire tant que le conteneur tournait — `AutoFlush <- true` ; (3) `container create --cmd` : la commande était passée via un spec OCI avec l'option `--spec`, absente de `ctr v2.3.3` (d'où l'échec silencieux) — la commande est désormais passée en positionnel (`ctr container create <image> <id> <cmd> [args...]`) avec `--env`, `--mount`, `--memory-limit`, `--cpu-shares` en flags.
+- Le CLI expose `container create -c|--cmd "<ligne de commande>"` (découpage respectant les guillemets) en plus de `--command` (arguments répétés) ; les tests unitaires du flux (`getContainerLogs stream émet les nouvelles lignes au fil de l'eau et se termine à l'arrêt`) et de création renforcés.
+
 **Compatibilité ctr v2 (≥ v2.0) — écarts corrigés au fil de la validation** :
 
 - `--namespace`/`-n` est une option **globale** (avant la sous-commande), et non locale.

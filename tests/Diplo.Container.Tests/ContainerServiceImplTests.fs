@@ -645,7 +645,7 @@ module ContainerServiceImplTests =
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
         mock.Mock.CreateContainer("default", "c2", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
         mock.Mock.StartContainer("default", "c2", true)
-        (mock.Mock :> IContainerdClient).StopContainer("default", "c1", 10).GetAwaiter().GetResult()
+        mock.Mock.StopContainer("default", "c1", 10).GetAwaiter().GetResult()
         let req : PruneContainersRequest = { Placeholder = false }
         let result = (svc :> IContainerService).PruneContainers(req, ctx).Result
         result.Deleted.Count |> should equal 1

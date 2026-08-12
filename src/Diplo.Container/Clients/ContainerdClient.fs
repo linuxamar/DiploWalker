@@ -12,32 +12,6 @@ open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 open Diplo.Container
 
-[<Struct>]
-type private OciProcess = { args: string array option; env: string array }
-
-[<Struct>]
-type private OciMemoryLimit = { limit: int64 }
-
-[<Struct>]
-type private OciCpuShares = { shares: int64 }
-
-[<Struct>]
-type private OciPidsLimit = { limit: int }
-
-[<Struct>]
-type private OciResourceEntry =
-    { memory: OciMemoryLimit option
-      cpu: OciCpuShares option
-      pids: OciPidsLimit option }
-
-[<Struct>]
-type private OciLinux = { resources: OciResourceEntry }
-
-[<Struct>]
-type private OciSpec =
-    { ``process``: string
-      linux: OciLinux }
-
 type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
 
     let logPollIntervalMs = defaultArg logPollIntervalMs 500
@@ -51,21 +25,6 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
     let parseJson (text: string) =
         use doc = JsonDocument.Parse(text, JsonDocumentOptions(MaxDepth = 32))
         doc.RootElement.Clone()
-
-    let buildOciSpecJson (env: Map<string, string>) (command: string array) (args: string array) (memoryLimit: int64) (cpuShares: int64) (pidLimit: uint32) =
-        let envArray = env |> Map.toList |> List.map (fun (k, v) -> sprintf "%s=%s" k v)
-        let processObj =
-            let allArgs = if command.Length > 0 || args.Length > 0 then Array.append command args |> Some else None
-            let envList = if envArray.IsEmpty then null else envArray |> List.toArray
-            let proc: OciProcess = { args = allArgs; env = envList }
-            JsonSerializer.Serialize(proc)
-        let resources =
-            { memory = if memoryLimit > 0L then Some { limit = memoryLimit } else None
-              cpu = if cpuShares > 0L then Some { shares = cpuShares } else None
-              pids = if pidLimit > 0u then Some { limit = int pidLimit } else None }
-        let linux: OciLinux = { resources = resources }
-        let spec: OciSpec = { ``process`` = processObj; linux = linux }
-        JsonSerializer.Serialize(spec)
 
     interface IContainerdClient with
         member _.CreateContainer(namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit, mounts) =
@@ -90,29 +49,21 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
                 ctrArgs.Add("--mount")
                 let options = if readOnly then "rbind,ro" else "rbind"
                 ctrArgs.Add(sprintf "type=bind,src=%s,dst=%s,options=%s" src dst options)
-            let hasSpecContent =
-                command.Length > 0 || args.Length > 0 ||
-                memoryLimit > 0L || cpuShares > 0L || pidLimit > 0u
-            let specPath =
-                if hasSpecContent then
-                    let json = buildOciSpecJson env command args memoryLimit cpuShares pidLimit
-                    let tempFile = Path.Combine(Path.GetTempPath(), sprintf "diplo-spec-%s.json" (Guid.NewGuid().ToString("N")))
-                    File.WriteAllText(tempFile, json)
-                    Some tempFile
-                else None
-            try
-                match specPath with
-                | Some p -> ctrArgs.Add("--spec"); ctrArgs.Add(p)
-                | None -> ()
-                ctrArgs.Add(image)
-                ctrArgs.Add(id)
-                let output = runCtr (ctrArgs |> Seq.toList)
-                let trimmed = output.Trim()
-                if String.IsNullOrEmpty(trimmed) then id else trimmed
-            finally
-                match specPath with
-                | Some p -> try File.Delete(p) with _ -> ()
-                | None -> ()
+            if memoryLimit > 0L then
+                ctrArgs.Add("--memory-limit")
+                ctrArgs.Add(string memoryLimit)
+            if cpuShares > 0L then
+                ctrArgs.Add("--cpu-shares")
+                ctrArgs.Add(string cpuShares)
+            if pidLimit > 0u then
+                Log.Warning("Limite de processus ({PidLimit}) ignorée à la création : non prise en charge par `ctr container create` de cette version", pidLimit)
+            ctrArgs.Add(image)
+            ctrArgs.Add(id)
+            for c in command do ctrArgs.Add(c)
+            for a in args do ctrArgs.Add(a)
+            let output = runCtr (ctrArgs |> Seq.toList)
+            let trimmed = output.Trim()
+            if String.IsNullOrEmpty(trimmed) then id else trimmed
 
         member _.StartContainer(namespaceName, id, detach) =
             SecurityValidation.validateId namespaceName "Le namespace"
@@ -137,6 +88,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
                 let dir = Path.GetDirectoryName(logFile)
                 if not (String.IsNullOrEmpty(dir)) then Directory.CreateDirectory(dir) |> ignore
                 let writer = new StreamWriter(logFile, true)
+                writer.AutoFlush <- true
                 let mutable disposed = false
                 let append (data: string) =
                     if not (isNull data) then

@@ -7,6 +7,7 @@ open Avalonia.Threading
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
+open Diplo.Gui.Services
 
 type ContainerInfo = {
     Id: string
@@ -23,8 +24,10 @@ type ImageInfo = {
     CrééLe: string
 }
 
-type ContainerTabViewModel(outputPort: IOutputPort) as this =
+type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> IContainerLogsSource) as this =
     inherit ViewModelBase()
+
+    let logsSourceFactory = defaultArg logsSourceFactory (fun () -> new GrpcContainerLogsSource() :> IContainerLogsSource)
 
     let containers = ObservableCollection<ContainerInfo>()
     let images = ObservableCollection<ImageInfo>()
@@ -296,9 +299,9 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member private this.GetContainerLogs() =
         task {
             try
-                use client = new ContainerClient()
+                use source = logsSourceFactory ()
                 if this.ContainerFollow then
-                    let stream = client.GetLogsStream(id = this.ContainerIdInput, follow = true, tail = this.ContainerTail, since = this.ContainerSince)
+                    let stream = source.GetStream(this.ContainerIdInput, true, this.ContainerTail, this.ContainerSince, CancellationToken.None)
                     let enumerator = stream.GetAsyncEnumerator(CancellationToken.None)
                     try
                         let mutable moving = true
@@ -311,7 +314,7 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
                     finally
                         enumerator.DisposeAsync().AsTask() |> ignore
                 else
-                    let! entries = client.GetLogs(id = this.ContainerIdInput, tail = this.ContainerTail, since = this.ContainerSince)
+                    let! entries = source.GetSnapshot(this.ContainerIdInput, this.ContainerTail, this.ContainerSince, CancellationToken.None)
                     let sb = Text.StringBuilder()
                     for entry in entries do
                         sb.AppendLine(sprintf "[%s] %s" entry.Timestamp entry.Log) |> ignore

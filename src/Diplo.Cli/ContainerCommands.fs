@@ -217,12 +217,33 @@ type RegistryLogoutCommand(output: IOutputPort) =
         }
 
 // ── create ────────────────────────────────────────────────────────
+
+/// Découpe une ligne de commande en arguments en respectant les guillemets
+/// doubles (ex. `cmd /c "echo bonjour le monde"`).
+module CommandLine =
+    let split (line: string) : string list =
+        let tokens = ResizeArray()
+        let current = Text.StringBuilder()
+        let mutable inQuotes = false
+        for c in line do
+            match c with
+            | '"' -> inQuotes <- not inQuotes
+            | ' ' when not inQuotes ->
+                if current.Length > 0 then
+                    tokens.Add(current.ToString())
+                    current.Clear() |> ignore
+            | c -> current.Append(c) |> ignore
+        if current.Length > 0 then
+            tokens.Add(current.ToString())
+        tokens |> List.ofSeq
+
 type CreateContainerSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<IMAGE>")>] member val Image: string = null with get, set
     [<CommandArgument(1, "<NAME>")>] member val Name: string = null with get, set
     [<CommandOption("--env")>] member val Env: string[] = [||] with get, set
     [<CommandOption("--command")>] member val Command: string[] = [||] with get, set
+    [<CommandOption("-c|--cmd")>] member val CommandLine: string = null with get, set
     [<CommandOption("--label")>] member val Labels: string[] = [||] with get, set
     [<CommandOption("--mount")>] member val Mounts: string[] = [||] with get, set
     [<CommandOption("--pid-limit")>] member val PidLimit = 0u with get, set
@@ -256,7 +277,11 @@ type CreateContainerCommand(output: IOutputPort) =
                         | [| k; v |] -> Some (k, v)
                         | _ -> None)
                     |> dict
-                let command = settings.Command |> Array.toList
+                let command =
+                    if not (String.IsNullOrEmpty settings.CommandLine) then
+                        CommandLine.split settings.CommandLine
+                    else
+                        settings.Command |> Array.toList
                 let mounts = MountParser.parseArray settings.Mounts
                 let! response =
                     client.CreateAsync(
