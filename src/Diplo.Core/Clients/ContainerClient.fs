@@ -12,7 +12,7 @@ open Diplo.Grpc.Container
 open Grpc.Net.Client
 open ProtoBuf.Grpc.Client
 
-type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
+type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
     inherit GrpcClientBase(channel, ownsChannel)
 
     let client = channel.CreateGrpcService<IContainerService>()
@@ -38,7 +38,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
         task {
             if String.IsNullOrEmpty(name) then invalidArg (nameof name) "Le nom du conteneur est requis"
             if String.IsNullOrEmpty(image) then invalidArg (nameof image) "L'image est requise"
-            let request = { Name = name; Image = image; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>() }
+            let request : CreateContainerRequest = { Name = name; Image = image; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>(); RestartPolicy = ""; RestartMaxCount = 0; Ports = ResizeArray<PortMapping>(); HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             env |> Option.iter (fun e -> for kv in e do request.Env.[kv.Key] <- kv.Value)
             command |> Option.iter (fun c -> c |> List.iter (fun s -> request.Command.Add(s)))
             args |> Option.iter (fun a -> a |> List.iter (fun s -> request.Args.Add(s)))
@@ -96,26 +96,30 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
+    /// Flux des journaux d'un conteneur, émis au fil de l'eau : l'instantané
+    /// (tail/since) puis, si `follow` est vrai, les nouvelles lignes jusqu'à la
+    /// sortie du conteneur ou l'annulation via `ct`.
+    member _.GetLogsStream(id: string, ?follow: bool, ?tail: int, ?since: string, ?ct: CancellationToken) : IAsyncEnumerable<ContainerLogEntry> =
+        if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+        let request = { Id = id; Follow = defaultArg follow false; Tail = defaultArg tail 100; Since = defaultArg since "" }
+        client.GetContainerLogs(request, defaultArg ct CancellationToken.None)
+
     member _.GetLogs(id: string, ?follow: bool, ?tail: int, ?since: string, ?ct: CancellationToken) =
         task {
             if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
-            let f = defaultArg follow false
-            let t = defaultArg tail 100
-            let s = defaultArg since ""
             let ct = defaultArg ct CancellationToken.None
-            let request = { Id = id; Follow = f; Tail = t; Since = s }
             let entries = ResizeArray()
-            do!
-                task {
-                    let enumerator = client.GetContainerLogs(request, ct).GetAsyncEnumerator(ct)
-                    let mutable moving = true
-                    while moving do
-                        let! hasNext = enumerator.MoveNextAsync().AsTask()
-                        if hasNext then
-                            entries.Add(enumerator.Current)
-                        else
-                            moving <- false
-                }
+            let enumerator = (this.GetLogsStream(id, ?follow = follow, ?tail = tail, ?since = since, ?ct = Some ct)).GetAsyncEnumerator(ct)
+            try
+                let mutable moving = true
+                while moving do
+                    let! hasNext = enumerator.MoveNextAsync().AsTask()
+                    if hasNext then
+                        entries.Add(enumerator.Current)
+                    else
+                        moving <- false
+            finally
+                enumerator.DisposeAsync().AsTask() |> ignore
             return entries :> seq<ContainerLogEntry>
         }
 
@@ -142,11 +146,30 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             return outputs :> seq<ExecOutput>
         }
 
-    member _.PullImageAsync(image: string, ?ct: CancellationToken) =
+    member _.PullImageAsync(image: string, ?user: string, ?ct: CancellationToken) =
         task {
             if String.IsNullOrEmpty(image) then invalidArg (nameof image) "L'image est requise"
             let ct = defaultArg ct CancellationToken.None
-            let! response = client.PullImage({ Image = image }, ct)
+            let request : PullImageRequest = { Image = image; User = defaultArg user "" }
+            let! response = client.PullImage(request, ct)
+            return response
+        }
+
+    member _.LoginRegistryAsync(registry: string, username: string, password: string, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrEmpty(registry) then invalidArg (nameof registry) "Le registre est requis"
+            if String.IsNullOrEmpty(username) then invalidArg (nameof username) "Le nom d'utilisateur est requis"
+            if String.IsNullOrEmpty(password) then invalidArg (nameof password) "Le mot de passe est requis"
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.LoginRegistry({ Registry = registry; Username = username; Password = password }, ct)
+            return response
+        }
+
+    member _.LogoutRegistryAsync(registry: string, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrEmpty(registry) then invalidArg (nameof registry) "Le registre est requis"
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.LogoutRegistry({ Registry = registry }, ct)
             return response
         }
 
@@ -193,7 +216,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
         task {
             let ns = defaultArg namespaceName ""
             let ct = defaultArg ct CancellationToken.None
-            let request = { NamespaceName = "" }
+            let request : ListImagesRequest = { NamespaceName = "" }
             if not (String.IsNullOrEmpty(ns)) then
                 request.NamespaceName <- ns
             let! response = client.ListImages(request, ct)

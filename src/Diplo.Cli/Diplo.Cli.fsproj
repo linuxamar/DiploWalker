@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="SpectreOutputPort.fs" />
     <Compile Include="TypeRegistrar.fs" />
+    <Compile Include="CtrlCHandler.fs" />
     <Compile Include="ContainerCommands.fs" />
     <Compile Include="VolumeCommands.fs" />
     <Compile Include="NetworkCommands.fs" />

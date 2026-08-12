@@ -2,10 +2,12 @@ namespace Diplo.Gui.ViewModels
 
 open System
 open System.Collections.ObjectModel
+open System.Threading
 open Avalonia.Threading
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
+open Diplo.Gui.Services
 
 type ContainerInfo = {
     Id: string
@@ -22,8 +24,10 @@ type ImageInfo = {
     CrééLe: string
 }
 
-type ContainerTabViewModel(outputPort: IOutputPort) as this =
+type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> IContainerLogsSource) as this =
     inherit ViewModelBase()
+
+    let logsSourceFactory = defaultArg logsSourceFactory (fun () -> new GrpcContainerLogsSource() :> IContainerLogsSource)
 
     let containers = ObservableCollection<ContainerInfo>()
     let images = ObservableCollection<ImageInfo>()
@@ -31,6 +35,7 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     let mutable containerIdInput = ""
     let mutable containerNameInput = ""
     let mutable containerImageInput = ""
+    let mutable containerImageUser = ""
     let mutable containerNamespace = ""
     let mutable containerAll = false
     let mutable containerTimeout = 10
@@ -43,6 +48,9 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     let mutable containerSince = ""
     let mutable containerExecCommand = ""
     let mutable containerMounts = ""
+    let mutable registryInput = ""
+    let mutable registryUsernameInput = ""
+    let mutable registryPasswordInput = ""
 
     member _.Containers = containers
     member _.Images = images
@@ -50,6 +58,7 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member _.ContainerIdInput with get () = containerIdInput and set v = containerIdInput <- v; this.OnPropertyChanged()
     member _.ContainerNameInput with get () = containerNameInput and set v = containerNameInput <- v; this.OnPropertyChanged()
     member _.ContainerImageInput with get () = containerImageInput and set v = containerImageInput <- v; this.OnPropertyChanged()
+    member _.ContainerImageUser with get () = containerImageUser and set v = containerImageUser <- v; this.OnPropertyChanged()
     member _.ContainerNamespace with get () = containerNamespace and set v = containerNamespace <- v; this.OnPropertyChanged()
     member _.ContainerAll with get () = containerAll and set v = containerAll <- v; this.OnPropertyChanged()
     member _.ContainerTimeout with get () = containerTimeout and set v = containerTimeout <- v; this.OnPropertyChanged()
@@ -62,6 +71,9 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member _.ContainerSince with get () = containerSince and set v = containerSince <- v; this.OnPropertyChanged()
     member _.ContainerExecCommand with get () = containerExecCommand and set v = containerExecCommand <- v; this.OnPropertyChanged()
     member _.ContainerMounts with get () = containerMounts and set v = containerMounts <- v; this.OnPropertyChanged()
+    member _.RegistryInput with get () = registryInput and set v = registryInput <- v; this.OnPropertyChanged()
+    member _.RegistryUsernameInput with get () = registryUsernameInput and set v = registryUsernameInput <- v; this.OnPropertyChanged()
+    member _.RegistryPasswordInput with get () = registryPasswordInput and set v = registryPasswordInput <- v; this.OnPropertyChanged()
 
     member _.ListContainersCommand = RelayCommand(Action(fun () -> this.ListContainers() |> ignore))
     member _.InspectContainerCommand = RelayCommand(Action(fun () -> this.InspectContainer() |> ignore))
@@ -81,6 +93,8 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member _.GetContainerLogsCommand = RelayCommand(Action(fun () -> this.GetContainerLogs() |> ignore))
     member _.ExecInContainerCommand = RelayCommand(Action(fun () -> this.ExecInContainer() |> ignore))
     member _.ListNamespacesCommand = RelayCommand(Action(fun () -> this.ListNamespaces() |> ignore))
+    member _.RegistryLoginCommand = RelayCommand(Action(fun () -> this.RegistryLogin() |> ignore))
+    member _.RegistryLogoutCommand = RelayCommand(Action(fun () -> this.RegistryLogout() |> ignore))
 
     member private this.ListContainers() =
         task {
@@ -157,7 +171,10 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
         task {
             try
                 use client = new ContainerClient()
-                let! response = client.PullImageAsync(image = this.ContainerImageInput)
+                let! response =
+                    client.PullImageAsync(
+                        image = this.ContainerImageInput,
+                        ?user = (if String.IsNullOrEmpty(this.ContainerImageUser) then None else Some this.ContainerImageUser))
                 outputPort.WriteSuccess(sprintf "Image %s téléchargée - %s" this.ContainerImageInput response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }
@@ -282,12 +299,26 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
     member private this.GetContainerLogs() =
         task {
             try
-                use client = new ContainerClient()
-                let! entries = client.GetLogs(id = this.ContainerIdInput, follow = this.ContainerFollow, tail = this.ContainerTail, since = this.ContainerSince)
-                let sb = Text.StringBuilder()
-                for entry in entries do
-                    sb.AppendLine(sprintf "[%s] %s" entry.Timestamp entry.Log) |> ignore
-                outputPort.WriteSuccess(sb.ToString())
+                use source = logsSourceFactory ()
+                if this.ContainerFollow then
+                    let stream = source.GetStream(this.ContainerIdInput, true, this.ContainerTail, this.ContainerSince, CancellationToken.None)
+                    let enumerator = stream.GetAsyncEnumerator(CancellationToken.None)
+                    try
+                        let mutable moving = true
+                        while moving do
+                            let! hasNext = enumerator.MoveNextAsync().AsTask()
+                            if hasNext then
+                                outputPort.WriteLine(sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log)
+                            else
+                                moving <- false
+                    finally
+                        enumerator.DisposeAsync().AsTask() |> ignore
+                else
+                    let! entries = source.GetSnapshot(this.ContainerIdInput, this.ContainerTail, this.ContainerSince, CancellationToken.None)
+                    let sb = Text.StringBuilder()
+                    for entry in entries do
+                        sb.AppendLine(sprintf "[%s] %s" entry.Timestamp entry.Log) |> ignore
+                    outputPort.WriteSuccess(sb.ToString())
             with ex -> outputPort.WriteError(ex.Message)
         }
 
@@ -311,5 +342,44 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
                 let! response = client.ListNamespacesAsync()
                 let nsList = String.Join(", ", response.Namespaces)
                 outputPort.WriteSuccess(sprintf "Namespaces: %s" nsList)
+            with ex -> outputPort.WriteError(ex.Message)
+        }
+
+    member private this.RegistryLogin() =
+        task {
+            try
+                if String.IsNullOrEmpty(this.RegistryInput) then
+                    outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                elif String.IsNullOrEmpty(this.RegistryUsernameInput) then
+                    outputPort.WriteError("Le nom d'utilisateur est requis")
+                elif String.IsNullOrEmpty(this.RegistryPasswordInput) then
+                    outputPort.WriteError("Le mot de passe est requis")
+                else
+                    use client = new ContainerClient()
+                    let! response =
+                        client.LoginRegistryAsync(
+                            registry = this.RegistryInput,
+                            username = this.RegistryUsernameInput,
+                            password = this.RegistryPasswordInput)
+                    if response.Success then
+                        outputPort.WriteSuccess(response.Message)
+                        this.RegistryPasswordInput <- ""
+                    else
+                        outputPort.WriteError(response.Message)
+            with ex -> outputPort.WriteError(ex.Message)
+        }
+
+    member private this.RegistryLogout() =
+        task {
+            try
+                if String.IsNullOrEmpty(this.RegistryInput) then
+                    outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                else
+                    use client = new ContainerClient()
+                    let! response = client.LogoutRegistryAsync(registry = this.RegistryInput)
+                    if response.Success then
+                        outputPort.WriteSuccess(response.Message)
+                    else
+                        outputPort.WriteError(response.Message)
             with ex -> outputPort.WriteError(ex.Message)
         }

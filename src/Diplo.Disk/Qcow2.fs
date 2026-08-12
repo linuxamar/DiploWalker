@@ -293,14 +293,158 @@ module Qcow2 =
             remaining <- remaining - toWrite
         s.Flush()
 
+    // ── redimensionnement ──────────────────────────────────────────────────
+
+    let private ceilDiv (a: int64) (b: int64) = (a + b - 1L) / b
+
+    /// Nombre d'entrées L1 nécessaires pour couvrir `virtualSize`.
+    let private l1EntriesNeeded (h: Header) (virtualSize: int64) =
+        let coverage = int64 (l2Entries h) * int64 h.ClusterSize
+        int (ceilDiv virtualSize coverage)
+
+    /// Nombre de clusters hôtes couverts par la table de refcounts.
+    let private refcountedClusters (h: Header) =
+        int64 h.RefcountTableClusters * int64 (refcountsPerBlock h)
+
+    /// Décrémente le refcount du cluster hôte `n` (jamais sous zéro).
+    let private freeCluster (s: Stream) (h: Header) (n: int64) =
+        let rc = readRefcount s h n
+        if rc <= 0 then failwithf "Refcount incohérent pour le cluster %d (valeur %d)" n rc
+        writeRefcount s h n (rc - 1)
+
+    /// Libère un cluster de données référencé par un descripteur L2 et remet
+    /// le descripteur à zéro. Les clusters compressés sont laissés intacts.
+    let private freeDataEntry (s: Stream) (h: Header) (entryPos: int64) =
+        let desc = readUInt64At s entryPos
+        if desc <> 0L && desc &&& compressedFlag = 0L then
+            let host = desc &&& hostOffsetMask
+            if host <> 0L then freeCluster s h (host / int64 h.ClusterSize)
+            writeUInt64At s entryPos 0L
+
+    /// Recherche `count` clusters hôtes libres contigus (évite le cluster 0).
+    /// Retourne l'offset hôte du premier cluster, ou -1.
+    let private findFreeContiguous (s: Stream) (h: Header) (count: int) : int64 =
+        let maxClusters = refcountedClusters h
+        let mutable n = 1L
+        let mutable found = -1L
+        while found < 0L && n + int64 count - 1L < maxClusters do
+            let mutable ok = true
+            let mutable i = 0
+            while ok && i < count do
+                if readRefcount s h (n + int64 i) <> 0 then ok <- false
+                i <- i + 1
+            if ok then found <- n
+            n <- n + 1L
+        if found >= 0L then found * int64 h.ClusterSize else -1L
+
+    /// Libère les clusters de données et les tables L2 au-delà de
+    /// `newVirtualSize` (utilisé lors d'une réduction).
+    let private freeBeyond (s: Stream) (h: Header) (newVirtualSize: int64) =
+        let l2Entries = l2Entries h
+        let coverage = int64 l2Entries * int64 h.ClusterSize
+        let firstFullL1 = int (newVirtualSize / coverage)
+        // tables L2 entièrement au-delà de la nouvelle taille
+        for l1Index in firstFullL1 .. h.L1Size - 1 do
+            let l1Pos = h.L1TableOffset + int64 l1Index * 8L
+            let l2Offset = readUInt64At s l1Pos &&& hostOffsetMask
+            if l2Offset <> 0L then
+                for l2Index in 0 .. l2Entries - 1 do
+                    freeDataEntry s h (l2Offset + int64 l2Index * 8L)
+                freeCluster s h (l2Offset / int64 h.ClusterSize)
+                writeUInt64At s l1Pos 0L
+        // table L2 partiellement couverte par la nouvelle taille
+        let inCoverage = newVirtualSize % coverage
+        if inCoverage <> 0L && firstFullL1 < h.L1Size then
+            let l1Pos = h.L1TableOffset + int64 firstFullL1 * 8L
+            let l2Offset = readUInt64At s l1Pos &&& hostOffsetMask
+            if l2Offset <> 0L then
+                let startL2 = int (inCoverage / int64 h.ClusterSize)
+                for l2Index in startL2 .. l2Entries - 1 do
+                    freeDataEntry s h (l2Offset + int64 l2Index * 8L)
+
+    /// Cluster hôte le plus élevé dont le refcount est non nul (0 si aucun).
+    let private highestUsedCluster (s: Stream) (h: Header) : int64 =
+        let mutable n = refcountedClusters h - 1L
+        let mutable found = 0L
+        while found = 0L && n >= 0L do
+            if readRefcount s h n <> 0 then found <- n
+            n <- n - 1L
+        found
+
+    /// Redimensionne l'image qcow2 à `newVirtualSize` octets (agrandissement
+    /// ou réduction). Une réduction libère les clusters de données et les
+    /// tables L2 au-delà de la nouvelle taille (refcounts décrémentés) puis
+    /// tronque le fichier à la dernière position utile. La table L1 est
+    /// relocalisée (bloc contigu) lorsque sa taille change de nombre de
+    /// clusters. Retourne l'en-tête relu après modification.
+    let resize (s: Stream) (newVirtualSize: int64) : Header =
+        if newVirtualSize <= 0L then
+            invalidArg (nameof newVirtualSize) "La nouvelle taille virtuelle doit être positive"
+        let h = readHeader s
+        if newVirtualSize = h.VirtualSize then h
+        else
+            let newL1Size = l1EntriesNeeded h newVirtualSize
+            let oldClusters = int (ceilDiv (int64 h.L1Size * 8L) (int64 h.ClusterSize))
+            let newClusters = int (ceilDiv (int64 newL1Size * 8L) (int64 h.ClusterSize))
+
+            if newVirtualSize < h.VirtualSize then
+                freeBeyond s h newVirtualSize
+
+            let mutable newL1Offset = h.L1TableOffset
+            if newClusters <> oldClusters then
+                let offset = findFreeContiguous s h newClusters
+                if offset < 0L then
+                    failwith "Aucun espace libre contigu pour la table L1 (limite du pilote MVP)"
+                let copyCount = min h.L1Size newL1Size
+                let entryBytes = copyCount * 8
+                if entryBytes > 0 then
+                    let buffer = Array.zeroCreate<byte> entryBytes
+                    readAt s h.L1TableOffset buffer 0 entryBytes
+                    s.Position <- offset
+                    s.Write(buffer, 0, entryBytes)
+                let totalBytes = newClusters * h.ClusterSize
+                if totalBytes > entryBytes then
+                    let zeros = Array.zeroCreate<byte> (totalBytes - entryBytes)
+                    s.Write(zeros, 0, zeros.Length)
+                s.Flush()
+                for i in 0 .. newClusters - 1 do
+                    writeRefcount s h (offset / int64 h.ClusterSize + int64 i) 1
+                for i in 0 .. oldClusters - 1 do
+                    freeCluster s h (h.L1TableOffset / int64 h.ClusterSize + int64 i)
+                newL1Offset <- offset
+
+            // croissance sans relocalisation : zéro sur les nouvelles entrées L1
+            if newVirtualSize > h.VirtualSize && newClusters = oldClusters then
+                for i in h.L1Size .. newL1Size - 1 do
+                    writeUInt64At s (newL1Offset + int64 i * 8L) 0L
+
+            // mise à jour de l'en-tête (taille virtuelle, table L1)
+            let header = Array.zeroCreate<byte> 104
+            readAt s 0L header 0 104
+            putBe64 newVirtualSize header 24
+            putBe32 newL1Size header 36
+            putBe64 newL1Offset header 40
+            s.Position <- 0L
+            s.Write(header, 0, header.Length)
+            s.Flush()
+
+            // troncature du fichier à la dernière position utile
+            let endOffset = (highestUsedCluster s h + 1L) * int64 h.ClusterSize
+            if s.Length > endOffset then
+                s.SetLength(endOffset)
+                s.Flush()
+
+            readHeader s
+
 /// Flux d'accès aléatoire (lecture/écriture) sur une image qcow2, exploité
 /// par DiscUtils pour accéder au système de fichiers contenu dans l'image.
 type Qcow2Stream(path: string, access: FileAccess) =
     inherit Stream()
 
     let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
-    let header = Qcow2.readHeader fs
+    let mutable header = Qcow2.readHeader fs
     let mutable position = 0L
+    let mutable released = false
 
     member _.Header = header
 
@@ -339,10 +483,13 @@ type Qcow2Stream(path: string, access: FileAccess) =
             | _ -> header.VirtualSize + offset
         position
 
-    override _.SetLength _ = raise (NotSupportedException "Le redimensionnement d'image qcow2 n'est pas pris en charge")
+    override _.SetLength(value: int64) =
+        if value <> header.VirtualSize then
+            header <- Qcow2.resize fs value
 
     override _.Dispose(disposing) =
-        if disposing then
-            fs.Flush()
-            fs.Dispose()
+        if not released then
+            released <- true
+            if disposing then
+                try fs.Flush() finally fs.Dispose()
         base.Dispose(disposing)

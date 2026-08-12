@@ -1,10 +1,15 @@
 module Diplo.Gui.Tests.TabViewModelTests
 
 open System
+open System.Collections.Generic
+open System.Threading
+open System.Threading.Tasks
 open System.Windows.Input
 open Xunit
 open FsUnit.Xunit
 open Diplo.Core.Output
+open Diplo.Grpc.Container
+open Diplo.Gui.Services
 open Diplo.Gui.ViewModels
 
 // ── FakeOutputPort ──────────────────────────────────────────
@@ -98,6 +103,8 @@ let ``ContainerTabViewModel expose les commandes ICommand`` () =
     vm.InspectImageCommand       :> ICommand |> should not' (be Null)
     vm.RemoveImageCommand        :> ICommand |> should not' (be Null)
     vm.TagImageCommand           :> ICommand |> should not' (be Null)
+    vm.RegistryLoginCommand      :> ICommand |> should not' (be Null)
+    vm.RegistryLogoutCommand     :> ICommand |> should not' (be Null)
 
 [<Fact>]
 let ``ContainerTabViewModel etat initial`` () =
@@ -109,6 +116,42 @@ let ``ContainerTabViewModel etat initial`` () =
     vm.ContainerTimeout     |> should equal 10
     vm.Containers.Count     |> should equal 0
     vm.Images.Count         |> should equal 0
+
+[<Fact>]
+let ``ContainerTabViewModel user pull etat initial`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port)
+    vm.ContainerImageUser |> should equal ""
+
+[<Fact>]
+let ``ContainerTabViewModel user pull declenche PropertyChanged`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port)
+    let mutable changed = []
+    vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
+    vm.ContainerImageUser <- "inline:secret"
+    changed |> should contain "ContainerImageUser"
+
+[<Fact>]
+let ``ContainerTabViewModel registres etat initial`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port)
+    vm.RegistryInput           |> should equal ""
+    vm.RegistryUsernameInput   |> should equal ""
+    vm.RegistryPasswordInput   |> should equal ""
+
+[<Fact>]
+let ``ContainerTabViewModel proprietes registres declenchent PropertyChanged`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port)
+    let mutable changed = []
+    vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
+    vm.RegistryInput <- "myregistry.azurecr.io"
+    vm.RegistryUsernameInput <- "user"
+    vm.RegistryPasswordInput <- "secret"
+    changed |> should contain "RegistryInput"
+    changed |> should contain "RegistryUsernameInput"
+    changed |> should contain "RegistryPasswordInput"
 
 [<Fact>]
 let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
@@ -167,3 +210,56 @@ let ``NetworkTabViewModel etat initial`` () =
     vm.NetworkIdInput   |> should equal ""
     vm.NetworkNameInput |> should equal ""
     vm.Networks.Count   |> should equal 0
+
+// ── Journaux (source injectée) ─────────────────────────────────
+
+let private fakeEntry (line: string) =
+    { ContainerLogEntry.Timestamp = "2026-08-12T10:00:00Z"
+      Stream = "stdout"
+      Log = line }
+
+let private streamOf (lines: string list) : IAsyncEnumerable<ContainerLogEntry> =
+    { new IAsyncEnumerable<ContainerLogEntry> with
+        member _.GetAsyncEnumerator(_ct) =
+            let e = (lines |> List.map fakeEntry |> Seq.ofList).GetEnumerator()
+            { new IAsyncEnumerator<ContainerLogEntry> with
+                member _.Current = e.Current
+                member _.MoveNextAsync() = ValueTask<bool>(e.MoveNext())
+                member _.DisposeAsync() = e.Dispose(); ValueTask() } }
+
+let private fakeLogsSource () : IContainerLogsSource =
+    { new IContainerLogsSource with
+        member _.GetStream(id, follow, tail, since, ct) = streamOf [ "ligne 1"; "ligne 2" ]
+        member _.GetSnapshot(id, tail, since, ct) =
+            task { return seq { fakeEntry "ligne 1"; fakeEntry "ligne 2" } :> seq<ContainerLogEntry> }
+      interface IDisposable with
+        member _.Dispose() = () }
+
+let private waitUntil (predicate: unit -> bool) =
+    let sw = Diagnostics.Stopwatch.StartNew()
+    while not (predicate ()) && sw.ElapsedMilliseconds < 2000L do
+        Thread.Sleep(20)
+    predicate ()
+
+[<Fact>]
+let ``ContainerTabViewModel GetContainerLogs en mode suivi emet chaque ligne au fil de l'eau`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
+    vm.ContainerIdInput <- "c1"
+    vm.ContainerFollow <- true
+    (vm.GetContainerLogsCommand :> ICommand).Execute(null)
+    // le flux émet 2 lignes : chacune est écrite immédiatement
+    waitUntil (fun () -> port.Messages.Length = 2) |> should equal true
+    port.Messages |> should contain "[2026-08-12T10:00:00Z] ligne 1"
+    port.Messages |> should contain "[2026-08-12T10:00:00Z] ligne 2"
+
+[<Fact>]
+let ``ContainerTabViewModel GetContainerLogs sans suivi affiche l'instantané en bloc`` () =
+    let port = FakeOutputPort.FakeOutputPort()
+    let vm = ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
+    vm.ContainerIdInput <- "c1"
+    vm.ContainerFollow <- false
+    (vm.GetContainerLogsCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> port.Successes.Length = 1) |> should equal true
+    Assert.Contains("[2026-08-12T10:00:00Z] ligne 1", port.Successes.Head)
+    Assert.Contains("ligne 2", port.Successes.Head)

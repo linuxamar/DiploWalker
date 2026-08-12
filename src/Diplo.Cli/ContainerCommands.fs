@@ -4,10 +4,12 @@ open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
+open Diplo.Cli
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
 open Spectre.Console.Cli
+open Spectre.Console
 
 // ── list ──────────────────────────────────────────────────────────
 type ListSettings() =
@@ -139,6 +141,7 @@ type DeleteContainerCommand(output: IOutputPort) =
 type PullSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<IMAGE>")>] member val Image: string = null with get, set
+    [<CommandOption("--user")>] member val User: string = null with get, set
 
 type PullImageCommand(output: IOutputPort) =
     inherit AsyncCommand<PullSettings>()
@@ -150,18 +153,98 @@ type PullImageCommand(output: IOutputPort) =
                 return 1
             else
                 use client = new ContainerClient()
-                let! response = client.PullImageAsync(settings.Image)
+                let! response =
+                    client.PullImageAsync(
+                        settings.Image,
+                        ?user = (if String.IsNullOrEmpty(settings.User) then None else Some settings.User))
                 output.WriteSuccess(response.Message)
                 return 0
         }
 
+// ── login / logout (registres) ────────────────────────────────────
+type RegistryLoginSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<REGISTRY>")>] member val Registry: string = null with get, set
+    [<CommandOption("--username")>] member val Username: string = null with get, set
+    [<CommandOption("--password")>] member val Password: string = null with get, set
+
+type RegistryLoginCommand(output: IOutputPort) =
+    inherit AsyncCommand<RegistryLoginSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrEmpty(settings.Registry) then
+                output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                return 1
+            elif String.IsNullOrEmpty(settings.Username) then
+                output.WriteError("Le nom d'utilisateur est requis (--username)")
+                return 1
+            else
+                let password =
+                    if String.IsNullOrEmpty(settings.Password) then
+                        AnsiConsole.Prompt(
+                            TextPrompt<string>("Mot de passe :").Secret())
+                    else
+                        settings.Password
+                use client = new ContainerClient()
+                let! response = client.LoginRegistryAsync(settings.Registry, settings.Username, password)
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                else
+                    output.WriteError(response.Message)
+                return 0
+        }
+
+type RegistryLogoutSettings() =
+    inherit CommandSettings()
+    [<CommandArgument(0, "<REGISTRY>")>] member val Registry: string = null with get, set
+
+type RegistryLogoutCommand(output: IOutputPort) =
+    inherit AsyncCommand<RegistryLogoutSettings>()
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrEmpty(settings.Registry) then
+                output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                return 1
+            else
+                use client = new ContainerClient()
+                let! response = client.LogoutRegistryAsync(settings.Registry)
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                else
+                    output.WriteError(response.Message)
+                return 0
+        }
+
 // ── create ────────────────────────────────────────────────────────
+
+/// Découpe une ligne de commande en arguments en respectant les guillemets
+/// doubles (ex. `cmd /c "echo bonjour le monde"`).
+module CommandLine =
+    let split (line: string) : string list =
+        let tokens = ResizeArray()
+        let current = Text.StringBuilder()
+        let mutable inQuotes = false
+        for c in line do
+            match c with
+            | '"' -> inQuotes <- not inQuotes
+            | ' ' when not inQuotes ->
+                if current.Length > 0 then
+                    tokens.Add(current.ToString())
+                    current.Clear() |> ignore
+            | c -> current.Append(c) |> ignore
+        if current.Length > 0 then
+            tokens.Add(current.ToString())
+        tokens |> List.ofSeq
+
 type CreateContainerSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<IMAGE>")>] member val Image: string = null with get, set
     [<CommandArgument(1, "<NAME>")>] member val Name: string = null with get, set
     [<CommandOption("--env")>] member val Env: string[] = [||] with get, set
     [<CommandOption("--command")>] member val Command: string[] = [||] with get, set
+    [<CommandOption("-c|--cmd")>] member val CommandLine: string = null with get, set
     [<CommandOption("--label")>] member val Labels: string[] = [||] with get, set
     [<CommandOption("--mount")>] member val Mounts: string[] = [||] with get, set
     [<CommandOption("--pid-limit")>] member val PidLimit = 0u with get, set
@@ -195,7 +278,11 @@ type CreateContainerCommand(output: IOutputPort) =
                         | [| k; v |] -> Some (k, v)
                         | _ -> None)
                     |> dict
-                let command = settings.Command |> Array.toList
+                let command =
+                    if not (String.IsNullOrEmpty settings.CommandLine) then
+                        CommandLine.split settings.CommandLine
+                    else
+                        settings.Command |> Array.toList
                 let mounts = MountParser.parseArray settings.Mounts
                 let! response =
                     client.CreateAsync(
@@ -225,7 +312,7 @@ type LogsContainerSettings() =
 type LogsContainerCommand(output: IOutputPort) =
     inherit AsyncCommand<LogsContainerSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+    override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
                 output.WriteError("L'identifiant du conteneur est requis")
@@ -233,10 +320,36 @@ type LogsContainerCommand(output: IOutputPort) =
             else
                 use client = new ContainerClient()
                 let since = if isNull settings.Since then "" else settings.Since
-                let! entries = client.GetLogs(settings.Id, follow = settings.Follow, tail = settings.Tail, since = since)
-                for entry in entries do
-                    output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
-                return 0
+                try
+                    if settings.Follow then
+                        use ctrlC = new CtrlCHandler()
+                        use linked = CancellationTokenSource.CreateLinkedTokenSource(ct, ctrlC.Token)
+                        let followCt = linked.Token
+                        let stream = client.GetLogsStream(settings.Id, follow = true, tail = settings.Tail, since = since, ct = followCt)
+                        let enumerator = stream.GetAsyncEnumerator(followCt)
+                        try
+                            let mutable moving = true
+                            while moving do
+                                let! hasNext = enumerator.MoveNextAsync().AsTask()
+                                if hasNext then
+                                    output.WriteLine(sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log)
+                                else
+                                    moving <- false
+                        finally
+                            enumerator.DisposeAsync().AsTask() |> ignore
+                    else
+                        let! entries = client.GetLogs(settings.Id, tail = settings.Tail, since = since, ct = ct)
+                        for entry in entries do
+                            output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
+                    return 0
+                with
+                | :? Grpc.Core.RpcException as rex when rex.StatusCode = Grpc.Core.StatusCode.Cancelled ->
+                    return 0
+                | :? OperationCanceledException ->
+                    return 0
+                | ex ->
+                    output.WriteError(ex.Message)
+                    return 1
         }
 
 // ── exec ──────────────────────────────────────────────────────────

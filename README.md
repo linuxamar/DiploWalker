@@ -24,7 +24,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (553 tests)
+- **Tests** : xUnit (626 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -192,6 +192,24 @@ Les sources sont restreintes aux répertoires autorisés par la validation de s�
 
 L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
 
+## Authentification aux registres
+
+Les identifiants des registres privés sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) dans `%ProgramData%\Diplo\registry-auth.json`. Ils sont automatiquement fournis à containerd lors du `pull` d'une image du registre correspondant (registres nommés ou `docker.io` pour Docker Hub).
+
+### CLI
+
+```powershell
+diplo container login myregistry.azurecr.io --username user          # le mot de passe est demandé en mode masqué
+diplo container login myregistry.azurecr.io --username user --password secret
+diplo container logout myregistry.azurecr.io
+diplo container pull myregistry.azurecr.io/team/app:latest           # utilise l'identifiant enregistré
+diplo container pull myregistry.azurecr.io/team/app:latest --user inline:secret   # identifiant explicite (prime sur l'enregistré)
+```
+
+### GUI
+
+L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de passe » avec les boutons **Se connecter** et **Se déconnecter**. Le pull utilise ensuite l'identifiant enregistré automatiquement.
+
 ### Validation manuelle sur un hôte containerd réel
 
 Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable dans les tests : il nécessite un hôte Windows avec containerd installé. Procédure validée le 11/08/2026 contre containerd **v2.3.3** (namespace `default`) :
@@ -201,7 +219,7 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
    $img = "C:\ProgramData\Diplo\validate\data.img"
    # Fabriquer une image FAT 64 Mo avec DiscUtils (script fsi ou utilitaire dédié).
    ```
-2. **Publier et démarrer le service en TCP** (le transport par named pipes est inopérant sur ce build Windows — voir ci-dessous) :
+2. **Publier et démarrer le service en TCP** (la validation a été effectuée en TCP ; le transport par named pipes est corrigé dans `ServerConfig` — voir ci-dessous) :
    ```powershell
    dotnet publish src\Diplo.Container -c Release -r win-x64 -p:Platform=x64 --self-contained true -o publish\WindowsServices\x64\Diplo.Container
    & publish\WindowsServices\x64\Diplo.Container\Diplo.Container.exe   # service : http://127.0.0.1:5001
@@ -212,7 +230,7 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
    ```
 4. **Démarrer, exécuter, écrire** :
    ```powershell
-   & ...\Diplo.Cli.exe container start mon-conteneur        # s'attache au stdio (comme `ctr tasks start`)
+   & ...\Diplo.Cli.exe container start mon-conteneur        # démarre la tâche détachée (le stdio n'est plus attaché)
    & ...\Diplo.Cli.exe container exec mon-conteneur cmd /c dir C:\data
    & ...\Diplo.Cli.exe container exec mon-conteneur cmd /c copy nul C:\data\ecrit.txt
    ```
@@ -228,16 +246,29 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
 - `container delete -f` : conteneur et tâche supprimés, staging purgé, et `data.img` réécrit — un nouvel extract relit `bonjour.txt` **et** `ecrit.txt`.
 - `ctr tasks exec` s'exécute dans le conteneur (le top-level `ctr exec` n'existe pas en v2).
 
+**Résultats de la validation (12/08/2026)** :
+
+- `container logs --follow` validé de bout en bout en conditions réelles : conteneur `ping 127.0.0.1 -t` (une ligne par seconde) démarré détaché, puis `container logs --follow --tail 3` → instantané de 3 lignes puis ~1 nouvelle ligne par seconde reçue au fil de l'eau, suivi actif jusqu'à Ctrl+C. Cela a nécessité trois corrections : (1) `ContainerLogs.read` ouvrait le fichier avec `FileShare.Read` strict, incompatible avec le handle d'écriture du conteneur en cours d'exécution (IOException) — passage à `FileShare.ReadWrite ||| FileShare.Delete` ; (2) le `StreamWriter` de capture n'avait pas `AutoFlush` : les lignes restaient en mémoire tant que le conteneur tournait — `AutoFlush <- true` ; (3) `container create --cmd` : la commande était passée via un spec OCI avec l'option `--spec`, absente de `ctr v2.3.3` (d'où l'échec silencieux) — la commande est désormais passée en positionnel (`ctr container create <image> <id> <cmd> [args...]`) avec `--env`, `--mount`, `--memory-limit`, `--cpu-shares` en flags.
+- Le CLI expose `container create -c|--cmd "<ligne de commande>"` (découpage respectant les guillemets) en plus de `--command` (arguments répétés) ; les tests unitaires du flux (`getContainerLogs stream émet les nouvelles lignes au fil de l'eau et se termine à l'arrêt`) et de création renforcés.
+
+**Points en suspens résolus (12/08/2026)** :
+
+1. **Limites de ressources non prises en charge** : `ctr container create` (v2.3.3) ne propose pas `--pids-limit`, et `ctr task update`/`ctr container update` **n'existent pas** (« No help topic for 'update' »). `UpdateContainer` lève désormais une `RpcException` claire (`Unimplemented`) quand une limite est demandée (no-op sinon) — il n'était utilisé ni par le CLI ni par la GUI.
+2. **`container delete -f` tolérant** : la suppression forcée d'un conteneur inexistant échouait par une erreur gRPC (« Exception was thrown by handler ») ; elle retourne désormais un succès (les échecs de `task kill` et `container delete` sont journalisés en avertissement) — l'arrêt forcé devient idempotent.
+3. **Source de logs GUI validée en conditions réelles** : `GrpcContainerLogsSource` (`GetSnapshot` → 3 lignes avec `tail=3` ; `GetStream` en `follow` → 67 lignes reçues au fil de l'eau) testé contre le service réel, mêmes endpoints gRPC que le CLI.
+4. **Arrêt propre sur Ctrl+C du `container logs --follow`** : validation réelle dans une console dédiée (`AttachConsole` + `GenerateConsoleCtrlEvent`) — le CLI sortait brutalement avec `STATUS_CONTROL_C_EXIT` (0xC000013A). Spectre.Console.Cli 0.55 ne pose pas `e.Cancel` et n'annule pas le jeton : ajout de `CtrlCHandler` (pose `e.Cancel=true` + annulation) et rattrapage de `RpcException` de statut `Cancelled` — `EXIT_CODE=0` désormais.
+6. **Transport par named pipes revalidé en direct** : `GetVersion` et `ListContainers` confirmés sur `http://pipe:/diplo-container-validate` (requêtes HTTP/2 200 dans les logs du service) en plus du TCP (port 5001). Au passage, correction d'un vrai bug : la `PipeSecurity` contenait une règle « Deny Everyone » qui empêchait la création du pipe (sur Windows les règles Deny priment sur les Allow, or l'utilisateur courant est membre de Everyone) → échec de liaison et crash du service ; la règle a été retirée et l'accès passe par un `Allow` `FullControl` pour l'utilisateur courant (comme le fait Kestrel avec `CurrentUserOnly`).
+
 **Compatibilité ctr v2 (≥ v2.0) — écarts corrigés au fil de la validation** :
 
 - `--namespace`/`-n` est une option **globale** (avant la sous-commande), et non locale.
 - `container create` attend `<IMAGE> <CONTAINER>` (ordre inversé par rapport à v1) et ne produit **aucune sortie** en cas de succès.
-- `exec` est `tasks exec` ; `task info` et `task logs` ont été **supprimés** en v2 : `task info` est remplacé par le parsing de `tasks list`, et les logs ne sont plus récupérables via `ctr` (le service renvoie un message explicite).
+- `exec` est `tasks exec` ; `task info` et `task logs` ont été **supprimés** en v2 : `task info` est remplacé par le parsing de `tasks list`. Les logs sont capturés par le service lors du démarrage détaché dans `%ProgramData%\Diplo\logs\<id>.log` et relus par `container logs` (`tail`, `since` ; `--follow` suit le fichier et émet les nouvelles lignes au fil de l'eau jusqu'à la sortie du conteneur ou Ctrl+C).
 - `PullImage` n'utilise volontairement pas de namespace : `ctr image pull` s'applique au namespace courant.
 
-**Constats et limites de l'environnement de validation** :
+**Points corrigés au fil des validations** :
 
-- Le transport Kestrel par named pipes est inopérant sur ce build (échec de `NamedPipeServerStreamAcl.Create` → « adresse déjà utilisée » / « accès refusé » lors de la liaison `http://pipe:/...`) ; validation effectuée en TCP (`UseNamedPipes: false`, port 5001). Le correctif `CurrentUserOnly=false` (`ServerConfig`) reste requis : fournir une `PipeSecurity` explicite avec le flag par défaut lève une `ArgumentException` partout.
-- `container start` s'attache au stdio et bloque (comportement `ctr tasks start`) — à améliorer pour un usage non interactif.
-- `container exec` rejette les arguments contenant des espaces (validation de sécurité) : utiliser des commandes sans espaces (ex. `copy nul ...`).
-- L'état des volumes montés est conservé **en mémoire** : après un redémarrage du service, les volumes créés avant ne sont plus associés (pas de write-back à la suppression).
+- Transport Kestrel par named pipes : le flag par défaut de `NamedPipeServerStreamAcl.Create` levait une `ArgumentException` ; `ServerConfig` fournit désormais une `PipeSecurity` explicite (`CurrentUserOnly=false`). **Procédure de validation du transport par named pipes** : (1) dans `ServerConfig`, publier avec `UseNamedPipes: true` et `ListenUrls: http://pipe:/Diplo.Container`, puis publier/démarrer le service ; (2) exécuter `diplo container version` et vérifier que le canal `http://pipe:/Diplo.Container` est bien écouté ; (3) exécuter `diplo container list` — une réponse confirme la liaison par named pipes ; (4) si une `ArgumentException` subsiste, vérifier que la `PipeSecurity` explicite (`CurrentUserOnly=false`) est appliquée dans `ServerConfig`. Le transport par named pipes est également couvert par un test d'intégration automatisé (Kestrel `ListenNamedPipe`, canal `npipe://`) en plus des tests TCP (`UseNamedPipes: false`, port 5001).
+- `container start` démarre la tâche de manière détachée (`ctr tasks start` sans attache au stdio) et capture les logs dans un fichier par conteneur, ce qui permet une utilisation non interactive.
+- `container exec` accepte désormais les arguments contenant des espaces (reconstruction de la ligne de commande avec échappement).
+- L'état des volumes montés est persisté (`MountState`) : après un redémarrage du service, les associations sont restaurées et le write-back à la suppression conserve son comportement.

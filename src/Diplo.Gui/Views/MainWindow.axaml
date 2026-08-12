@@ -56,6 +56,9 @@
                         <TextBlock Text="Image:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerTab.ContainerImageInput}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="nom:tag" />
+                        <TextBlock Text="User (pull):" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.ContainerImageUser}" Width="140" Margin="0,0,12,0"
+                                 PlaceholderText="user:pass (optionnel)" />
                         <TextBlock Text="Espace:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ContainerTab.ContainerNamespace}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="namespace (optionnel)" />
@@ -89,6 +92,20 @@
                         <Button Content="🔍 Inspecter img" Command="{Binding ContainerTab.InspectImageCommand}" Margin="0,0,4,0" />
                         <Button Content="🗑 Supprimer img" Command="{Binding ContainerTab.RemoveImageCommand}" Margin="0,0,4,0" />
                         <Button Content="🏷 Étiqueter" Command="{Binding ContainerTab.TagImageCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Registre:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.RegistryInput}" Width="200" Margin="0,0,12,0"
+                                 PlaceholderText="ex. myregistry.azurecr.io" />
+                        <TextBlock Text="Utilisateur:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.RegistryUsernameInput}" Width="120" Margin="0,0,12,0"
+                                 PlaceholderText="utilisateur" />
+                        <TextBlock Text="Mot de passe:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ContainerTab.RegistryPasswordInput}" Width="160" Margin="0,0,12,0"
+                                 PasswordChar="●" PlaceholderText="mot de passe" />
+                        <Button Content="🔐 Se connecter" Command="{Binding ContainerTab.RegistryLoginCommand}" Margin="0,0,4,0" />
+                        <Button Content="🚪 Se déconnecter" Command="{Binding ContainerTab.RegistryLogoutCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">

@@ -38,21 +38,17 @@ let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
 
 let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
     // Kestrel active CurrentUserOnly par défaut ; il faut le désactiver pour
-    // fournir une PipeSecurity explicite (utilisateur courant + refus Everyone).
+    // fournir une PipeSecurity explicite (utilisateur courant uniquement).
+    // NB : une règle "Deny Everyone" bloquerait aussi l'utilisateur courant
+    // (sur Windows, les règles Deny priment sur les règles Allow).
     opts.CurrentUserOnly <- false
     let pipeSecurity = PipeSecurity()
     let currentUser = WindowsIdentity.GetCurrent()
     let allowRule = PipeAccessRule(
         currentUser.User,
-        PipeAccessRights.ReadWrite,
+        PipeAccessRights.FullControl,
         AccessControlType.Allow)
     pipeSecurity.AddAccessRule(allowRule)
-    let everyone = SecurityIdentifier(WellKnownSidType.WorldSid, null)
-    let denyRule = PipeAccessRule(
-        everyone,
-        PipeAccessRights.FullControl,
-        AccessControlType.Deny)
-    pipeSecurity.AddAccessRule(denyRule)
     opts.PipeSecurity <- pipeSecurity
 
 let runGrpcHost (serviceName: string) (args: string[]) (configureServices: WebApplicationBuilder -> unit) (mapGrpcService: WebApplication -> unit) =

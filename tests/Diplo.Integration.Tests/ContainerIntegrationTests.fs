@@ -69,12 +69,26 @@ module ContainerIntegrationTests =
             member _.GetContainerLogs(_ns, _id, _tail, _follow, _since) =
                 ["log line 1"; "log line 2"]
 
+            member _.GetContainerLogsStream(_ns, _id, _tail, _since, _ct) =
+                let mutable index = 0
+                { new System.Collections.Generic.IAsyncEnumerable<string> with
+                    member _.GetAsyncEnumerator(_ct) =
+                        { new System.Collections.Generic.IAsyncEnumerator<string> with
+                            member _.Current =
+                                if index = 0 then "log line 1" else "log line 2"
+                            member _.MoveNextAsync() =
+                                if index >= 2 then ValueTask<bool>(false)
+                                else
+                                    index <- index + 1
+                                    ValueTask<bool>(true)
+                            member _.DisposeAsync() = ValueTask() } }
+
             member _.ExecInContainer(_ns, _id, command) =
                 sprintf "exec: %s" (command |> String.concat " ")
 
             member _.Version() = "1.0.0-test"
 
-            member _.PullImage(_image) = "pulled"
+            member _.PullImage(_image, _userArg) = "pulled"
 
             member _.Namespaces() = ["default"]
 
@@ -95,6 +109,29 @@ module ContainerIntegrationTests =
             member _.RemoveImage(_ns, _imageRef) = "removed"
 
             member _.TagImage(_ns, _source, _target) = ()
+
+            member _.StartContainerWithLogs(_ns, id, _logFile) =
+                started <- started |> Set.add id
+
+            member _.PauseContainer(_ns, _id) = ()
+
+            member _.ResumeContainer(_ns, _id) = ()
+
+            member _.WaitForContainerExit(_ns, _id, _timeoutSeconds) = 0
+
+            member _.UpdateContainer(_ns, _id, _mem, _cpu, _pids) = ()
+
+            member _.CreateNamespace(_name) = ()
+
+            member _.DeleteNamespace(_name) = ()
+
+            member _.ExportImage(_ns, _imageRef, _tarFile) = ()
+
+            member _.ImportImage(_ns, _tarFile) = ["imported"]
+
+            member _.StartExec(_ns, _id, _command, stdin, stdout, _stderr) =
+                stdin.CopyTo(stdout)
+                0
 
     let private createChannel (address: string) =
         GrpcChannel.ForAddress(address, GrpcChannelOptions())
@@ -153,7 +190,9 @@ module ContainerIntegrationTests =
                 { Name = "ctn-grpc"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let result = client.CreateContainer(req, CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
             result.State |> should equal ContainerState.Created
@@ -171,7 +210,9 @@ module ContainerIntegrationTests =
                 { Name = "to-start"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             let startReq: StartContainerRequest = { Id = createResult.Id; Attach = false }
             let startResult = client.StartContainer(startReq, CancellationToken.None).Result
@@ -194,7 +235,9 @@ module ContainerIntegrationTests =
                       Command = List<string>(); Args = List<string>()
                       Env = Dictionary(); Labels = Dictionary()
                       MemoryLimit = 0L; CpuShares = 0; PidLimit = 0
-                      Mounts = List<ContainerMount>() }
+                      Mounts = List<ContainerMount>()
+                      RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                      HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
                 createReq.Mounts.Add({ Source = mountDir; Destination = "C:\\data"; ReadOnly = false })
                 let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
                 String.IsNullOrEmpty(createResult.Id) |> should equal false
@@ -217,7 +260,9 @@ module ContainerIntegrationTests =
                 { Name = "to-inspect"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             let inspectReq: InspectContainerRequest = { Id = createResult.Id }
             let inspectResult = client.InspectContainer(inspectReq, CancellationToken.None).Result
@@ -236,7 +281,9 @@ module ContainerIntegrationTests =
                 { Name = ""; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             client.CreateContainer(createReq, CancellationToken.None).Result |> ignore
             client.CreateContainer(createReq, CancellationToken.None).Result |> ignore
             let listReq: ListContainersRequest = { All = false; Filters = Dictionary() }
@@ -279,7 +326,9 @@ module ContainerIntegrationTests =
                 { Name = ""; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let result = client.CreateContainer(req, CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
         finally
@@ -295,7 +344,9 @@ module ContainerIntegrationTests =
                 { Name = "to-delete"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             let deleteReq: DeleteContainerRequest = { Id = createResult.Id; Force = false }
             let deleteResult = client.DeleteContainer(deleteReq, CancellationToken.None).Result
@@ -313,7 +364,9 @@ module ContainerIntegrationTests =
                 { Name = "to-stop"; Image = "test:latest"
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             let stopReq: StopContainerRequest = { Id = createResult.Id; TimeoutSeconds = 5 }
             let stopResult = client.StopContainer(stopReq, CancellationToken.None).Result
@@ -332,7 +385,9 @@ module ContainerIntegrationTests =
                 { Name = "no-image"; Image = ""
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>() }
+                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let ex = Assert.Throws<AggregateException>(fun () -> client.CreateContainer(req, CancellationToken.None).Result |> ignore)
             ex.InnerException.Message |> should haveSubstring "L'image du conteneur"
         finally
@@ -353,7 +408,9 @@ module ContainerIntegrationTests =
                   Command = List<string>(); Args = List<string>()
                   Env = Dictionary(); Labels = Dictionary()
                   MemoryLimit = 0L; CpuShares = 0; PidLimit = 0
-                  Mounts = List<ContainerMount>() }
+                  Mounts = List<ContainerMount>()
+                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             createReq.Mounts.Add({ Source = imagePath; Destination = "C:\\data"; ReadOnly = false })
             let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
             String.IsNullOrEmpty(createResult.Id) |> should equal false

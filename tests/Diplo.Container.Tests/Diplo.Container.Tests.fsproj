@@ -9,6 +9,7 @@
     <Compile Include="MockContainerdClient.fs" />
     <Compile Include="MockProcessRunner.fs" />
     <Compile Include="ContainerdClientTests.fs" />
+    <Compile Include="RegistryAuthTests.fs" />
     <Compile Include="ContainerServiceImplTests.fs" />
   </ItemGroup>
 

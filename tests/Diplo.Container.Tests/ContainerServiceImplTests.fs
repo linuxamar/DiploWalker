@@ -1,5 +1,6 @@
 namespace Diplo.Container.Tests
 
+[<Xunit.Collection("registry-state")>]
 module ContainerServiceImplTests =
 
     open System
@@ -14,7 +15,9 @@ module ContainerServiceImplTests =
     open Diplo.Grpc
     open Diplo.Grpc.Container
     open Diplo.Container.Services
+    open Diplo.Abstractions.Interfaces
     open Diplo.Disk
+    open Diplo.Container
 
     /// Faux mounter : retourne un volume dont le HostPath dérive de la source
     /// et enregistre les libérations (writeBack) pour les assertions.
@@ -41,7 +44,20 @@ module ContainerServiceImplTests =
     let shouldContain (substring: string) (text: string) =
         Assert.Contains(substring, text)
 
+    let shouldNotContain (substring: string) (text: string) =
+        Assert.DoesNotContain(substring, text)
+
     let createCtx () = CancellationToken.None
+
+    /// Convertit une liste en IAsyncEnumerable (flux entrant gRPC bidirectionnel).
+    let toAsyncSeq (items: 'T list) : IAsyncEnumerable<'T> =
+        { new IAsyncEnumerable<'T> with
+            member _.GetAsyncEnumerator(_ct) =
+                let e = (items :> seq<'T>).GetEnumerator()
+                { new IAsyncEnumerator<'T> with
+                    member _.Current = e.Current
+                    member _.MoveNextAsync() = ValueTask<bool>(e.MoveNext())
+                    member _.DisposeAsync() = e.Dispose(); ValueTask() } }
 
     type MockServerStreamWriter<'T>() =
         let items = List<'T>()
@@ -59,7 +75,7 @@ module ContainerServiceImplTests =
     let ``CreateContainer avec nom retourne l'id et le nom`` () =
         let svc, _, _ = createService ()
         let ctx = createCtx ()
-        let req = { Name = "mon-conteneur"; Image = "mcr.microsoft.com/dotnet/runtime:10.0"; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>() }
+        let req = { Name = "mon-conteneur"; Image = "mcr.microsoft.com/dotnet/runtime:10.0"; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>(); RestartPolicy = ""; RestartMaxCount = 0; Ports = ResizeArray<PortMapping>(); HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
         let result = (svc :> IContainerService).CreateContainer(req, ctx).Result
         result.Id |> should equal "mon-conteneur"
         result.Name |> should equal "mon-conteneur"
@@ -69,7 +85,7 @@ module ContainerServiceImplTests =
     let ``CreateContainer sans nom genere un id automatiquement`` () =
         let svc, _, _ = createService ()
         let ctx = createCtx ()
-        let req = { Name = ""; Image = "nginx:latest"; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>() }
+        let req = { Name = ""; Image = "nginx:latest"; Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>(); Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0; Mounts = ResizeArray<ContainerMount>(); RestartPolicy = ""; RestartMaxCount = 0; Ports = ResizeArray<PortMapping>(); HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
         let result = (svc :> IContainerService).CreateContainer(req, ctx).Result
         String.IsNullOrEmpty(result.Id) |> should equal false
         result.Id.Length |> should equal 32
@@ -77,20 +93,60 @@ module ContainerServiceImplTests =
 
     [<Fact>]
     let ``StartContainer retourne Running`` () =
-        let svc, mock, _ = createService ()
-        let ctx = createCtx ()
-        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
-        let req : StartContainerRequest = { Id = "c1"; Attach = false }
-        let result = (svc :> IContainerService).StartContainer(req, ctx).Result
-        result.State |> should equal ContainerState.Running
-        result.Message |> should equal "Conteneur démarré"
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let svc, mock, _ = createService ()
+            let ctx = createCtx ()
+            mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+            let req : StartContainerRequest = { Id = "c1"; Attach = false }
+            let result = (svc :> IContainerService).StartContainer(req, ctx).Result
+            result.State |> should equal ContainerState.Running
+            result.Message |> should equal "Conteneur démarré"
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
+
+    [<Fact>]
+    let ``StartContainer detache capture les logs du conteneur`` () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let svc, mock, _ = createService ()
+            let ctx = createCtx ()
+            mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+            let req : StartContainerRequest = { Id = "c1"; Attach = false }
+            (svc :> IContainerService).StartContainer(req, ctx).Result |> ignore
+            let logFile = ContainerLogs.fileFor "c1"
+            File.Exists logFile |> should be True
+            let content = File.ReadAllText logFile
+            content |> shouldContain "Application started"
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
+
+    [<Fact>]
+    let ``StartContainer attache ne cree pas de journal`` () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory dir |> ignore
+        try
+            ContainerLogs.setLogsDir dir
+            let svc, mock, _ = createService ()
+            let ctx = createCtx ()
+            mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+            let req : StartContainerRequest = { Id = "c1"; Attach = true }
+            let result = (svc :> IContainerService).StartContainer(req, ctx).Result
+            result.State |> should equal ContainerState.Running
+            File.Exists(ContainerLogs.fileFor "c1") |> should be False
+        finally
+            try Directory.Delete(dir, true) with _ -> ()
 
     [<Fact>]
     let ``StopContainer avec timeout par defaut utilise 10`` () =
         let svc, mock, _ = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
-        let req = { Id = "c1"; TimeoutSeconds = 0 }
+        let req : StopContainerRequest = { Id = "c1"; TimeoutSeconds = 0 }
         let result = (svc :> IContainerService).StopContainer(req, ctx).Result
         result.State |> should equal ContainerState.Stopped
         result.Message |> should equal "Conteneur arrêté"
@@ -101,7 +157,7 @@ module ContainerServiceImplTests =
         let svc, mock, _ = createService ()
         let ctx = createCtx ()
         mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
-        let req = { Id = "c1"; TimeoutSeconds = 30 }
+        let req : StopContainerRequest = { Id = "c1"; TimeoutSeconds = 30 }
         let result = (svc :> IContainerService).StopContainer(req, ctx).Result
         result.State |> should equal ContainerState.Stopped
         mock.StopCalled.["c1"] |> should equal 30
@@ -225,24 +281,32 @@ module ContainerServiceImplTests =
     let ``PullImage avec image valide retourne succes`` () =
         let svc, mock, _ = createService ()
         let ctx = createCtx ()
-        let req = { Image = "mcr.microsoft.com/dotnet/runtime:10.0" }
+        let req : PullImageRequest = { Image = "mcr.microsoft.com/dotnet/runtime:10.0"; User = "" }
         let result = (svc :> IContainerService).PullImage(req, ctx).Result
         result.Image |> should equal "mcr.microsoft.com/dotnet/runtime:10.0"
         result.Message |> shouldContain "image pulled"
         mock.PulledImages |> should contain "mcr.microsoft.com/dotnet/runtime:10.0"
 
     [<Fact>]
+    let ``PullImage transmet le --user inline au client`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : PullImageRequest = { Image = "myregistry.azurecr.io/team/app:latest"; User = "inline:secret" }
+        let result = (svc :> IContainerService).PullImage(req, ctx).Result
+        result.Message |> shouldContain "image pulled"
+
+    [<Fact>]
     let ``PullImage avec image vide leve InvalidArgument`` () =
         let svc, _, _ = createService ()
         let ctx = createCtx ()
-        let req = { Image = "" }
+        let req : PullImageRequest = { Image = ""; User = "" }
         Assert.ThrowsAsync<RpcException>(fun () -> (svc :> IContainerService).PullImage(req, ctx)) |> ignore
 
     [<Fact>]
     let ``PullImage avec image servercore fonctionne`` () =
         let svc, mock, _ = createService ()
         let ctx = createCtx ()
-        let req = { Image = "mcr.microsoft.com/windows/servercore:ltsc2022" }
+        let req : PullImageRequest = { Image = "mcr.microsoft.com/windows/servercore:ltsc2022"; User = "" }
         let result = (svc :> IContainerService).PullImage(req, ctx).Result
         result.Image |> should equal "mcr.microsoft.com/windows/servercore:ltsc2022"
         mock.PulledImages |> should contain "mcr.microsoft.com/windows/servercore:ltsc2022"
@@ -423,7 +487,9 @@ module ContainerServiceImplTests =
               Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>()
               Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0
               Mounts = ResizeArray([ { Source = dataSrc; Destination = "C:\\app"; ReadOnly = false }
-                                     { Source = secretsSrc; Destination = "C:\\keys"; ReadOnly = true } ]) }
+                                     { Source = secretsSrc; Destination = "C:\\keys"; ReadOnly = true } ])
+              RestartPolicy = ""; RestartMaxCount = 0; Ports = ResizeArray<PortMapping>()
+              HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
         let result = (svc :> IContainerService).CreateContainer(req, ctx).Result
         result.State |> should equal ContainerState.Created
         mounter.Mounted |> should equal [ (dataSrc, "C:\\app", false); (secretsSrc, "C:\\keys", true) ]
@@ -437,7 +503,9 @@ module ContainerServiceImplTests =
             { Name = "sans-volume"; Image = "nginx:latest"
               Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>()
               Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0
-              Mounts = ResizeArray<ContainerMount>() }
+              Mounts = ResizeArray<ContainerMount>()
+              RestartPolicy = ""; RestartMaxCount = 0; Ports = ResizeArray<PortMapping>()
+              HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
         let result = (svc :> IContainerService).CreateContainer(req, ctx).Result
         mounter.Mounted |> should be Empty
 
@@ -450,7 +518,9 @@ module ContainerServiceImplTests =
             { Name = "a-supprimer"; Image = "nginx:latest"
               Env = Dictionary<string, string>(); Command = ResizeArray<string>(); Args = ResizeArray<string>()
               Labels = Dictionary<string, string>(); PidLimit = 0; MemoryLimit = 0L; CpuShares = 0
-              Mounts = ResizeArray([ { Source = dataSrc; Destination = "C:\\app"; ReadOnly = false } ]) }
+              Mounts = ResizeArray([ { Source = dataSrc; Destination = "C:\\app"; ReadOnly = false } ])
+              RestartPolicy = ""; RestartMaxCount = 0; Ports = ResizeArray<PortMapping>()
+              HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
         let result = (svc :> IContainerService).CreateContainer(req, ctx).Result
         mounter.Disposed |> should be Empty
         let delReq = { Id = result.Id; Force = false }
@@ -464,4 +534,395 @@ module ContainerServiceImplTests =
         let req = { Id = "jamais-monte"; Force = false }
         (svc :> IContainerService).DeleteContainer(req, ctx).Result |> ignore
         mounter.Disposed |> should be Empty
+
+    // ─── Pause / Unpause ────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``PauseContainer retourne Paused et appelle le client`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        mock.Mock.StartContainer("default", "c1", true)
+        let req : PauseContainerRequest = { Id = "c1" }
+        let result = (svc :> IContainerService).PauseContainer(req, ctx).Result
+        result.State |> should equal ContainerState.Paused
+        result.Message |> shouldContain "pause"
+        mock.PausedContainers |> should contain "c1"
+
+    [<Fact>]
+    let ``PauseContainer avec id vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : PauseContainerRequest = { Id = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).PauseContainer(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``UnpauseContainer retourne Running et retire de la pause`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        mock.Mock.StartContainer("default", "c1", true)
+        mock.Mock.PauseContainer("default", "c1")
+        let req : UnpauseContainerRequest = { Id = "c1" }
+        let result = (svc :> IContainerService).UnpauseContainer(req, ctx).Result
+        result.State |> should equal ContainerState.Running
+        result.Message |> shouldContain "repris"
+        mock.PausedContainers |> should not' (contain "c1")
+
+    [<Fact>]
+    let ``UnpauseContainer avec id vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : UnpauseContainerRequest = { Id = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).UnpauseContainer(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // ─── Wait ───────────────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``WaitContainer retourne le code de sortie quand le conteneur s'arrete`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        mock.Mock.StartContainer("default", "c1", true)
+        let req : WaitContainerRequest = { Id = "c1"; TimeoutSeconds = 5 }
+        let result = (svc :> IContainerService).WaitContainer(req, ctx).Result
+        result.ExitCode |> should equal 0
+        result.State |> should equal ContainerState.Stopped
+        result.Message |> shouldContain "terminé"
+
+    [<Fact>]
+    let ``WaitContainer retourne un timeout quand le conteneur tourne toujours`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        let req : WaitContainerRequest = { Id = "c1"; TimeoutSeconds = 5 }
+        let result = (svc :> IContainerService).WaitContainer(req, ctx).Result
+        result.ExitCode |> should equal -1
+        result.State |> should equal ContainerState.Running
+        result.Message |> shouldContain "Timeout"
+
+    [<Fact>]
+    let ``WaitContainer avec id vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : WaitContainerRequest = { Id = ""; TimeoutSeconds = 5 }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).WaitContainer(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // ─── Update ─────────────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``UpdateContainer retourne success et met a jour les limites`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        let req : UpdateContainerRequest = { Id = "c1"; MemoryLimit = 512L; CpuShares = 1024; PidLimit = 64; RestartPolicy = "always" }
+        let result = (svc :> IContainerService).UpdateContainer(req, ctx).Result
+        result.Success |> should equal true
+        result.Message |> shouldContain "mis à jour"
+        mock.UpdatedContainers |> should contain "c1"
+
+    [<Fact>]
+    let ``UpdateContainer avec id vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : UpdateContainerRequest = { Id = ""; MemoryLimit = 0L; CpuShares = 0; PidLimit = 0; RestartPolicy = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).UpdateContainer(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // ─── Prune ──────────────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``PruneContainers supprime uniquement les conteneurs arretes`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        mock.Mock.CreateContainer("default", "c2", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        mock.Mock.StartContainer("default", "c2", true)
+        mock.Mock.StopContainer("default", "c1", 10).GetAwaiter().GetResult()
+        let req : PruneContainersRequest = { Placeholder = false }
+        let result = (svc :> IContainerService).PruneContainers(req, ctx).Result
+        result.Deleted.Count |> should equal 1
+        result.Deleted |> should contain "c1"
+        mock.DeletedContainers |> should contain "c1"
+        mock.DeletedContainers |> should not' (contain "c2")
+
+    [<Fact>]
+    let ``PruneImages ne supprime aucune image taguee`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : PruneImagesRequest = { Placeholder = false }
+        let result = (svc :> IContainerService).PruneImages(req, ctx).Result
+        result.Deleted.Count |> should equal 0
+
+    // ─── Stats en streaming ─────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``GetContainerStatsStream ecrit les metriques dans le stream`` () =
+        let svc, mock, _ = createService ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        use cts = new CancellationTokenSource()
+        let req : GetContainerStatsStreamRequest = { Id = "c1"; IntervalSeconds = 1 }
+        let enumerable = (svc :> IContainerService).GetContainerStatsStream(req, cts.Token)
+        let enumerator = enumerable.GetAsyncEnumerator(CancellationToken.None)
+        let mutable hasNext = enumerator.MoveNextAsync().Result
+        let first = if hasNext then enumerator.Current else Unchecked.defaultof<GetContainerStatsResponse>
+        cts.Cancel()
+        while hasNext do
+            hasNext <- enumerator.MoveNextAsync().Result
+        first.CpuUsage |> should equal 123456.0
+        first.MemoryUsage |> should equal 1048576L
+        first.MemoryLimit |> should equal 536870912L
+        first.Pids |> should equal 3
+
+    [<Fact>]
+    let ``GetContainerStatsStream avec id vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : GetContainerStatsStreamRequest = { Id = ""; IntervalSeconds = 0 }
+        Assert.Throws<RpcException>(fun () -> (svc :> IContainerService).GetContainerStatsStream(req, ctx) |> ignore) |> ignore
+
+    // ─── Événements ─────────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``WatchEvents emet un evenement create pour un conteneur existant`` () =
+        let svc, mock, _ = createService ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        use cts = new CancellationTokenSource()
+        let req : WatchEventsRequest = { Placeholder = false }
+        let enumerable = (svc :> IContainerService).WatchEvents(req, cts.Token)
+        let enumerator = enumerable.GetAsyncEnumerator(CancellationToken.None)
+        let mutable hasNext = enumerator.MoveNextAsync().Result
+        let first = if hasNext then enumerator.Current else Unchecked.defaultof<ContainerEvent>
+        cts.Cancel()
+        while hasNext do
+            hasNext <- enumerator.MoveNextAsync().Result
+        first.EventType |> should equal "create"
+        first.Id |> should equal "c1"
+        first.Status |> should equal "created"
+
+    // ─── Exec bidirectionnel ────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``ExecContainerStream renvoie la sortie du processus`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        let data = System.Text.Encoding.UTF8.GetBytes("bonjour-exec")
+        let messages =
+            [ { ExecMessage.Id = "c1"; Command = ResizeArray([ "echo"; "hello" ]); Data = data; Eof = false }
+              { ExecMessage.Id = "c1"; Command = ResizeArray(); Data = Array.empty; Eof = true } ]
+        let outputs = List<ExecOutput>()
+        let enumerable = (svc :> IContainerService).ExecContainerStream(toAsyncSeq messages, ctx)
+        let enumerator = enumerable.GetAsyncEnumerator(CancellationToken.None)
+        let mutable hasNext = enumerator.MoveNextAsync().Result
+        while hasNext do
+            outputs.Add(enumerator.Current)
+            hasNext <- enumerator.MoveNextAsync().Result
+        outputs.Count |> should equal 1
+        outputs.[0].Stream |> should equal "stdout"
+        System.Text.Encoding.UTF8.GetString(outputs.[0].Data) |> should equal "bonjour-exec"
+
+    // ─── Copie de fichiers ──────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``ReadFile retourne les donnees decodees en base64`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        let req : ReadFileRequest = { Id = "c1"; Path = "C:\\app\\config.json" }
+        let result = (svc :> IContainerService).ReadFile(req, ctx).Result
+        result.Success |> should equal true
+        System.Text.Encoding.UTF8.GetString(result.Data) |> should equal "contenu-du-fichier"
+
+    [<Fact>]
+    let ``ReadFile avec id vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : ReadFileRequest = { Id = ""; Path = "C:\\app" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).ReadFile(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``WriteFile ecrit le fichier avec succes`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        let data = System.Text.Encoding.UTF8.GetBytes("contenu")
+        let req : WriteFileRequest = { Id = "c1"; Path = "C:\\app\\f.txt"; Data = data }
+        let result = (svc :> IContainerService).WriteFile(req, ctx).Result
+        result.Success |> should equal true
+        result.Message |> should equal "Fichier écrit"
+
+    [<Fact>]
+    let ``WriteFile avec chemin vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : WriteFileRequest = { Id = "c1"; Path = ""; Data = Array.empty }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).WriteFile(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // ─── Commit / Export / Import ───────────────────────────────────────────
+
+    [<Fact>]
+    let ``CommitImage cree l'image depuis le conteneur`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        mock.Mock.CreateContainer("default", "c1", "nginx", Map.empty, Map.empty, Array.empty, Array.empty, 0L, 0L, 0u, []) |> ignore
+        let req : CommitImageRequest = { ContainerId = "c1"; ImageRef = "myregistry.azurecr.io/app:v1"; Message = ""; Author = "" }
+        let result = (svc :> IContainerService).CommitImage(req, ctx).Result
+        result.Success |> should equal true
+        result.ImageRef |> should equal "myregistry.azurecr.io/app:v1"
+
+    [<Fact>]
+    let ``CommitImage avec reference vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : CommitImageRequest = { ContainerId = "c1"; ImageRef = ""; Message = ""; Author = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).CommitImage(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``ExportImage envoie les morceaux de l'image`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : ExportImageRequest = { ImageRef = "nginx:latest"; NamespaceName = "" }
+        let enumerable = (svc :> IContainerService).ExportImage(req, ctx)
+        let enumerator = enumerable.GetAsyncEnumerator(CancellationToken.None)
+        let sb = System.Text.StringBuilder()
+        let mutable hasNext = enumerator.MoveNextAsync().Result
+        while hasNext do
+            System.Text.Encoding.UTF8.GetString(enumerator.Current.Data) |> sb.Append |> ignore
+            hasNext <- enumerator.MoveNextAsync().Result
+        sb.ToString() |> should equal "fake-image-archive"
+
+    [<Fact>]
+    let ``ExportImage avec reference vide leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : ExportImageRequest = { ImageRef = ""; NamespaceName = "" }
+        let ex = Assert.Throws<RpcException>(fun () -> (svc :> IContainerService).ExportImage(req, ctx) |> ignore)
+        ex.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``ImportImage importe les morceaux et retourne les references`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let chunk = System.Text.Encoding.UTF8.GetBytes("archive-import")
+        let chunks = [ { ImageChunk.Data = chunk } ]
+        let result = (svc :> IContainerService).ImportImage(toAsyncSeq chunks, ctx).Result
+        result.ImageRefs.Count |> should equal 1
+        result.ImageRefs.[0] |> should equal "archive-import"
+        result.Message |> shouldContain "1 image"
+
+    // ─── Registres ──────────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``LoginRegistry retourne success`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : LoginRegistryRequest = { Registry = "myregistry.azurecr.io"; Username = "user"; Password = "secret" }
+        let result = (svc :> IContainerService).LoginRegistry(req, ctx).Result
+        result.Success |> should equal true
+        result.Message |> shouldContain "registre"
+
+    [<Fact>]
+    let ``LoginRegistry sans registre leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : LoginRegistryRequest = { Registry = ""; Username = "user"; Password = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).LoginRegistry(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``LogoutRegistry retourne success`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : LogoutRegistryRequest = { Registry = "myregistry.azurecr.io" }
+        let result = (svc :> IContainerService).LogoutRegistry(req, ctx).Result
+        result.Success |> should equal true
+
+    [<Fact>]
+    let ``LoginRegistry persiste l'identifiant de maniere chiffree`` () =
+        let stateFile = Path.Combine(Path.GetTempPath(), "diplo-login-" + Guid.NewGuid().ToString("N") + ".json")
+        try
+            RegistryAuth.setStateFile stateFile
+            let svc, _, _ = createService ()
+            let ctx = createCtx ()
+            let req : LoginRegistryRequest = { Registry = "myregistry.azurecr.io"; Username = "user"; Password = "secret" }
+            let result = (svc :> IContainerService).LoginRegistry(req, ctx).Result
+            result.Success |> should equal true
+            RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) "myregistry.azurecr.io"
+            |> should equal (Some "user:secret")
+            let raw = File.ReadAllText stateFile
+            raw |> shouldNotContain "secret"
+        finally
+            try File.Delete stateFile with _ -> ()
+
+    [<Fact>]
+    let ``LogoutRegistry retire l'identifiant persiste`` () =
+        let stateFile = Path.Combine(Path.GetTempPath(), "diplo-logout-" + Guid.NewGuid().ToString("N") + ".json")
+        try
+            RegistryAuth.setStateFile stateFile
+            let svc, _, _ = createService ()
+            let ctx = createCtx ()
+            let login : LoginRegistryRequest = { Registry = "myregistry.azurecr.io"; Username = "user"; Password = "secret" }
+            (svc :> IContainerService).LoginRegistry(login, ctx).Result |> ignore
+            let logout : LogoutRegistryRequest = { Registry = "myregistry.azurecr.io" }
+            let result = (svc :> IContainerService).LogoutRegistry(logout, ctx).Result
+            result.Success |> should equal true
+            RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) "myregistry.azurecr.io"
+            |> should equal None
+        finally
+            try File.Delete stateFile with _ -> ()
+
+    // ─── Namespaces ─────────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``CreateNamespace retourne success et appelle le client`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        let req : CreateNamespaceRequest = { Name = "prod" }
+        let result = (svc :> IContainerService).CreateNamespace(req, ctx).Result
+        result.Success |> should equal true
+        result.Message |> shouldContain "prod"
+        mock.CreatedNamespaces |> should contain "prod"
+
+    [<Fact>]
+    let ``CreateNamespace sans nom leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : CreateNamespaceRequest = { Name = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).CreateNamespace(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    [<Fact>]
+    let ``DeleteNamespace retourne success et appelle le client`` () =
+        let svc, mock, _ = createService ()
+        let ctx = createCtx ()
+        let req : DeleteNamespaceRequest = { Name = "prod" }
+        let result = (svc :> IContainerService).DeleteNamespace(req, ctx).Result
+        result.Success |> should equal true
+        result.Message |> shouldContain "prod"
+        mock.RemovedNamespaces |> should contain "prod"
+
+    [<Fact>]
+    let ``DeleteNamespace sans nom leve InvalidArgument`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req : DeleteNamespaceRequest = { Name = "" }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> IContainerService).DeleteNamespace(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
