@@ -2,6 +2,7 @@ namespace Diplo.Gui.ViewModels
 
 open System
 open System.Collections.ObjectModel
+open System.Threading
 open Avalonia.Threading
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
@@ -296,11 +297,25 @@ type ContainerTabViewModel(outputPort: IOutputPort) as this =
         task {
             try
                 use client = new ContainerClient()
-                let! entries = client.GetLogs(id = this.ContainerIdInput, follow = this.ContainerFollow, tail = this.ContainerTail, since = this.ContainerSince)
-                let sb = Text.StringBuilder()
-                for entry in entries do
-                    sb.AppendLine(sprintf "[%s] %s" entry.Timestamp entry.Log) |> ignore
-                outputPort.WriteSuccess(sb.ToString())
+                if this.ContainerFollow then
+                    let stream = client.GetLogsStream(id = this.ContainerIdInput, follow = true, tail = this.ContainerTail, since = this.ContainerSince)
+                    let enumerator = stream.GetAsyncEnumerator(CancellationToken.None)
+                    try
+                        let mutable moving = true
+                        while moving do
+                            let! hasNext = enumerator.MoveNextAsync().AsTask()
+                            if hasNext then
+                                outputPort.WriteLine(sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log)
+                            else
+                                moving <- false
+                    finally
+                        enumerator.DisposeAsync().AsTask() |> ignore
+                else
+                    let! entries = client.GetLogs(id = this.ContainerIdInput, tail = this.ContainerTail, since = this.ContainerSince)
+                    let sb = Text.StringBuilder()
+                    for entry in entries do
+                        sb.AppendLine(sprintf "[%s] %s" entry.Timestamp entry.Log) |> ignore
+                    outputPort.WriteSuccess(sb.ToString())
             with ex -> outputPort.WriteError(ex.Message)
         }
 

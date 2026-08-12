@@ -12,7 +12,7 @@ open Diplo.Grpc.Container
 open Grpc.Net.Client
 open ProtoBuf.Grpc.Client
 
-type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
+type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
     inherit GrpcClientBase(channel, ownsChannel)
 
     let client = channel.CreateGrpcService<IContainerService>()
@@ -96,26 +96,30 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) =
             return response
         }
 
+    /// Flux des journaux d'un conteneur, émis au fil de l'eau : l'instantané
+    /// (tail/since) puis, si `follow` est vrai, les nouvelles lignes jusqu'à la
+    /// sortie du conteneur ou l'annulation via `ct`.
+    member _.GetLogsStream(id: string, ?follow: bool, ?tail: int, ?since: string, ?ct: CancellationToken) : IAsyncEnumerable<ContainerLogEntry> =
+        if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+        let request = { Id = id; Follow = defaultArg follow false; Tail = defaultArg tail 100; Since = defaultArg since "" }
+        client.GetContainerLogs(request, defaultArg ct CancellationToken.None)
+
     member _.GetLogs(id: string, ?follow: bool, ?tail: int, ?since: string, ?ct: CancellationToken) =
         task {
             if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
-            let f = defaultArg follow false
-            let t = defaultArg tail 100
-            let s = defaultArg since ""
             let ct = defaultArg ct CancellationToken.None
-            let request = { Id = id; Follow = f; Tail = t; Since = s }
             let entries = ResizeArray()
-            do!
-                task {
-                    let enumerator = client.GetContainerLogs(request, ct).GetAsyncEnumerator(ct)
-                    let mutable moving = true
-                    while moving do
-                        let! hasNext = enumerator.MoveNextAsync().AsTask()
-                        if hasNext then
-                            entries.Add(enumerator.Current)
-                        else
-                            moving <- false
-                }
+            let enumerator = (this.GetLogsStream(id, ?follow = follow, ?tail = tail, ?since = since, ?ct = Some ct)).GetAsyncEnumerator(ct)
+            try
+                let mutable moving = true
+                while moving do
+                    let! hasNext = enumerator.MoveNextAsync().AsTask()
+                    if hasNext then
+                        entries.Add(enumerator.Current)
+                    else
+                        moving <- false
+            finally
+                enumerator.DisposeAsync().AsTask() |> ignore
             return entries :> seq<ContainerLogEntry>
         }
 

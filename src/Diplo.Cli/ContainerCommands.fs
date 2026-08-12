@@ -286,7 +286,7 @@ type LogsContainerSettings() =
 type LogsContainerCommand(output: IOutputPort) =
     inherit AsyncCommand<LogsContainerSettings>()
 
-    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+    override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
                 output.WriteError("L'identifiant du conteneur est requis")
@@ -294,10 +294,31 @@ type LogsContainerCommand(output: IOutputPort) =
             else
                 use client = new ContainerClient()
                 let since = if isNull settings.Since then "" else settings.Since
-                let! entries = client.GetLogs(settings.Id, follow = settings.Follow, tail = settings.Tail, since = since)
-                for entry in entries do
-                    output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
-                return 0
+                try
+                    if settings.Follow then
+                        let stream = client.GetLogsStream(settings.Id, follow = true, tail = settings.Tail, since = since, ct = ct)
+                        let enumerator = stream.GetAsyncEnumerator(ct)
+                        try
+                            let mutable moving = true
+                            while moving do
+                                let! hasNext = enumerator.MoveNextAsync().AsTask()
+                                if hasNext then
+                                    output.WriteLine(sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log)
+                                else
+                                    moving <- false
+                        finally
+                            enumerator.DisposeAsync().AsTask() |> ignore
+                    else
+                        let! entries = client.GetLogs(settings.Id, tail = settings.Tail, since = since, ct = ct)
+                        for entry in entries do
+                            output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
+                    return 0
+                with
+                | :? OperationCanceledException ->
+                    return 0
+                | ex ->
+                    output.WriteError(ex.Message)
+                    return 1
         }
 
 // ── exec ──────────────────────────────────────────────────────────
