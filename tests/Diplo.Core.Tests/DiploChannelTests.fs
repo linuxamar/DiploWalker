@@ -33,6 +33,21 @@ module DiploChannelTests =
         SecurityValidation.validateGrpcAddress "http://127.0.0.1:3000"
 
     [<Fact>]
+    let ``forContainer cree un canal TCP`` () =
+        use channel = DiploChannel.forContainer 5001
+        channel.Target |> should equal "localhost:5001"
+
+    [<Fact>]
+    let ``forVolume cree un canal TCP`` () =
+        use channel = DiploChannel.forVolume 5002
+        channel.Target |> should equal "localhost:5002"
+
+    [<Fact>]
+    let ``forNetwork cree un canal TCP`` () =
+        use channel = DiploChannel.forNetwork 5003
+        channel.Target |> should equal "localhost:5003"
+
+    [<Fact>]
     let ``forAddress avec adresse non autorisee lance une exception`` () =
         (fun () -> SecurityValidation.validateGrpcAddress "http://remote-server:5000" |> ignore)
         |> should throw typeof<Exception>

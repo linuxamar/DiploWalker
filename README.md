@@ -17,6 +17,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 - **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes et réseaux
 - **GUI** : `Diplo.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
+- **Résilience** : les canaux gRPC (`DiploChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
 
 ## Stack technique
 
@@ -24,7 +25,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (652 tests)
+- **Tests** : xUnit (672 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -133,6 +134,7 @@ diplo config init --path C:\etc\diplo.json --transport pipe
 - `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
 - `pipe` : adresses `http://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplo-container`, `diplo-volume`, `diplo-network`).
 - Les adresses `http://pipe:/...` sont validées (hôte local uniquement, nom de tube sans `\` ni `..`).
+- La GUI propose un onglet **Paramètres** pour éditer ces adresses (écriture de `diplo.json`, champs `namespace` et `logLevel` conservés) ; la configuration est appliquée dès les opérations suivantes, sans redémarrage.
 
 ## Développement
 

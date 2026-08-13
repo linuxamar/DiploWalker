@@ -5,6 +5,7 @@ module VolumeIntegrationTests =
     open System
     open System.IO
     open System.Collections.Generic
+    open System.ServiceModel
     open System.Threading
     open Xunit
     open FsUnit.Xunit
@@ -13,6 +14,7 @@ module VolumeIntegrationTests =
     open Microsoft.AspNetCore.Server.Kestrel.Core
     open Microsoft.Extensions.DependencyInjection
     open Grpc.Net.Client
+    open Grpc.Core
     open ProtoBuf.Grpc.Client
     open ProtoBuf.Grpc.Server
     open Diplo.Grpc
@@ -69,6 +71,55 @@ module VolumeIntegrationTests =
         app.MapGrpcService<VolumeServiceImpl>() |> ignore
         app.StartAsync().GetAwaiter().GetResult()
         app, dataRoot
+
+    [<ServiceContract(Name = "IVolumeService")>]
+    type FailingOnceVolumeService(inner: IVolumeService) =
+        let mutable _attempts = 0
+
+        member _.Attempts = _attempts
+
+        interface IVolumeService with
+            member _.CreateVolume(request, ct) =
+                _attempts <- _attempts + 1
+                if _attempts = 1 then
+                    raise (RpcException(Status(StatusCode.Unavailable, "panne simulée")))
+                inner.CreateVolume(request, ct)
+            member _.RemoveVolume(request, ct) = inner.RemoveVolume(request, ct)
+            member _.InspectVolume(request, ct) = inner.InspectVolume(request, ct)
+            member _.ListVolumes(request, ct) = inner.ListVolumes(request, ct)
+            member _.MountVolume(request, ct) = inner.MountVolume(request, ct)
+            member _.UnmountVolume(request, ct) = inner.UnmountVolume(request, ct)
+            member _.PruneVolumes(request, ct) = inner.PruneVolumes(request, ct)
+
+    let private startRetryApp (svc: FailingOnceVolumeService) =
+        let builder = WebApplication.CreateBuilder()
+        builder.Services.AddCodeFirstGrpc() |> ignore
+        builder.Services.AddSingleton<FailingOnceVolumeService>(svc) |> ignore
+        builder.WebHost.ConfigureKestrel(fun opts ->
+            opts.Listen(System.Net.IPAddress.Loopback, 0, fun lo -> lo.Protocols <- HttpProtocols.Http2)) |> ignore
+        let app = builder.Build()
+        app.MapGrpcService<FailingOnceVolumeService>() |> ignore
+        app.StartAsync().GetAwaiter().GetResult()
+        let address = app.Urls |> Seq.head
+        app, address
+
+    [<Fact>]
+    let ``CreateVolume est relance par la politique de reprise apres un echec Unavailable`` () =
+        let dataRoot = Path.Combine(Path.GetTempPath(), "diplo-int-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory(dataRoot) |> ignore
+        let reg = VolumeDriverRegistry()
+        reg.Register(StorageDriverType.Local, LocalVolumeDriver(dataRoot) :> Interfaces.IVolumeDriver)
+        let svc = FailingOnceVolumeService(VolumeServiceImpl(reg))
+        let app, address = startRetryApp svc
+        try
+            use channel = DiploChannel.forAddress address
+            let client = channel.CreateGrpcService<IVolumeService>()
+            let req = { Name = "retried-volume"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
+            let result = client.CreateVolume(req, CancellationToken.None).Result
+            result.Name |> should equal "retried-volume"
+            svc.Attempts |> should equal 2
+        finally
+            stopApp app dataRoot
 
     [<Fact>]
     let ``CreateVolume via named pipe fonctionne de bout en bout`` () =

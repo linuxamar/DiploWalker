@@ -1,12 +1,14 @@
 module Diplo.Gui.Tests.TabViewModelTests
 
 open System
+open System.IO
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open System.Windows.Input
 open Xunit
 open FsUnit.Xunit
+open Diplo.Core
 open Diplo.Core.Output
 open Diplo.Grpc.Container
 open Diplo.Gui.Services
@@ -210,6 +212,91 @@ let ``NetworkTabViewModel etat initial`` () =
     vm.NetworkIdInput   |> should equal ""
     vm.NetworkNameInput |> should equal ""
     vm.Networks.Count   |> should equal 0
+
+// ── SettingsTabViewModel ────────────────────────────────
+
+let private withConfigHome (action: string -> unit) =
+    let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
+    let home = Path.Combine(Path.GetTempPath(), "diplo-gui-config-" + Guid.NewGuid().ToString("N"))
+    Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", home)
+    try
+        action home
+    finally
+        Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
+        DiploConfig.invalidate()
+        if Directory.Exists home then Directory.Delete(home, true)
+
+[<Fact>]
+let ``SettingsTabViewModel expose les commandes ICommand`` () =
+    withConfigHome (fun _ ->
+        let port = FakeOutputPort.FakeOutputPort()
+        let vm = SettingsTabViewModel(port)
+        vm.SaveCommand     :> ICommand |> should not' (be Null)
+        vm.ReloadCommand   :> ICommand |> should not' (be Null))
+
+[<Fact>]
+let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
+    withConfigHome (fun home ->
+        let port = FakeOutputPort.FakeOutputPort()
+        let vm = SettingsTabViewModel(port)
+        vm.ConfigPath |> should equal (Path.Combine(home, "diplo.json"))
+        vm.ContainerAddress |> should equal "localhost:5001"
+        vm.VolumeAddress |> should equal "localhost:5002"
+        vm.NetworkAddress |> should equal "localhost:5003")
+
+[<Fact>]
+let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` () =
+    withConfigHome (fun home ->
+        let port = FakeOutputPort.FakeOutputPort()
+        let vm = SettingsTabViewModel(port)
+        vm.ContainerAddress <- "http://pipe:/diplo-container"
+        vm.VolumeAddress <- "localhost:9002"
+        vm.NetworkAddress <- "localhost:9003"
+        (vm.SaveCommand :> ICommand).Execute(null)
+        let path = Path.Combine(home, "diplo.json")
+        File.Exists path |> should equal true
+        let (c, v, n) = DiploConfig.load path
+        c |> should equal (Some "http://pipe:/diplo-container")
+        v |> should equal (Some "http://localhost:9002")
+        n |> should equal (Some "http://localhost:9003")
+        port.Messages |> Seq.exists (fun m -> m.Contains "Configuration client enregistrée") |> should equal true
+        vm.StatusMessage |> should haveSubstring "Configuration enregistrée")
+
+[<Fact>]
+let ``SettingsTabViewModel SaveCommand avec adresse vide signale une erreur`` () =
+    withConfigHome (fun _ ->
+        let port = FakeOutputPort.FakeOutputPort()
+        let vm = SettingsTabViewModel(port)
+        vm.ContainerAddress <- ""
+        (vm.SaveCommand :> ICommand).Execute(null)
+        vm.StatusMessage |> should haveSubstring "obligatoires")
+
+[<Fact>]
+let ``SettingsTabViewModel SaveCommand applique la configuration sans redemarrage`` () =
+    withConfigHome (fun _ ->
+        let port = FakeOutputPort.FakeOutputPort()
+        let vm = SettingsTabViewModel(port)
+        vm.ContainerAddress <- "http://pipe:/diplo-container"
+        vm.VolumeAddress <- "localhost:9002"
+        vm.NetworkAddress <- "localhost:9003"
+        (vm.SaveCommand :> ICommand).Execute(null)
+        DiploConfig.containerAddress() |> should equal (Some "http://pipe:/diplo-container")
+        DiploConfig.volumeAddress() |> should equal (Some "http://localhost:9002"))
+
+[<Fact>]
+let ``SettingsTabViewModel ReloadCommand relit la configuration depuis le disque`` () =
+    withConfigHome (fun home ->
+        let path = Path.Combine(home, "diplo.json")
+        DiploConfig.save path "localhost:7001" "localhost:7002" "localhost:7003"
+        let port = FakeOutputPort.FakeOutputPort()
+        let vm = SettingsTabViewModel(port)
+        vm.ContainerAddress |> should equal "http://localhost:7001"
+        vm.VolumeAddress |> should equal "http://localhost:7002"
+        vm.NetworkAddress |> should equal "http://localhost:7003"
+        DiploConfig.save path "localhost:8001" "localhost:8002" "localhost:8003"
+        (vm.ReloadCommand :> ICommand).Execute(null)
+        vm.ContainerAddress |> should equal "http://localhost:8001"
+        vm.StatusMessage |> should haveSubstring "relue")
 
 // ── Journaux (source injectée) ─────────────────────────────────
 
