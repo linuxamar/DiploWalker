@@ -42,17 +42,25 @@ module DiploConfig =
         with _ ->
             (None, None, None)
 
-    let private configPath () =
-        Path.Combine(Directory.GetCurrentDirectory(), configFileName)
+    /// Résout le chemin du fichier de configuration, par priorité :
+    /// 1. `DIPLO_CONFIG_HOME/diplo.json` si la variable d'environnement est définie ;
+    /// 2. `diplo.json` dans le répertoire courant.
+    let configPath () =
+        let home = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
+        if String.IsNullOrWhiteSpace(home) then
+            Path.Combine(Directory.GetCurrentDirectory(), configFileName)
+        else
+            Path.Combine(home.Trim(), configFileName)
 
-    /// Config lue une seule fois par processus (le fichier est volontairement
-    /// ignoré s'il est absent ou mal formé : repli sur les ports par défaut).
-    let private loadConfig () =
-        let p = configPath ()
-        if File.Exists p then parseConfig (File.ReadAllText p)
+    /// Lit la configuration depuis un chemin explicite : None pour chaque section
+    /// si le fichier est absent ou mal formé (repli sur les ports par défaut).
+    let load (path: string) : (string option * string option * string option) =
+        if File.Exists path then parseConfig (File.ReadAllText path)
         else (None, None, None)
 
-    let private cached = lazy (loadConfig ())
+    /// Config lue une seule fois par processus (fichier volontairement ignoré
+    /// s'il est absent ou mal formé : repli sur les ports par défaut).
+    let private cached = lazy (load (configPath ()))
 
     let containerAddress () : string option =
         let (c, _, _) = cached.Value

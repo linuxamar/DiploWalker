@@ -47,6 +47,9 @@ CodeCoverage/
 # MSBuild Binary and Structured Log
 *.binlog
 
+# Journaux d'exécution à la racine (accidents récurrents)
+*.log
+
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*

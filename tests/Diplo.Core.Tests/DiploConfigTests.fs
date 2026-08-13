@@ -2,9 +2,73 @@ namespace Diplo.Core.Tests
 
 module DiploConfigTests =
 
+    open System
+    open System.IO
     open Xunit
     open FsUnit.Xunit
     open Diplo.Core
+
+    // ── configPath ─────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``configPath sans variable d'environnement pointe vers diplo.json du répertoire courant`` () =
+        let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
+        Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", null)
+        try
+            DiploConfig.configPath()
+            |> should equal (Path.Combine(Directory.GetCurrentDirectory(), "diplo.json"))
+        finally
+            Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
+
+    [<Fact>]
+    let ``configPath honore la variable d'environnement DIPLO_CONFIG_HOME`` () =
+        let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
+        let custom = Path.Combine(Path.GetTempPath(), "diplo-config-home")
+        Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", custom)
+        try
+            DiploConfig.configPath()
+            |> should equal (Path.Combine(custom, "diplo.json"))
+        finally
+            Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
+
+    // ── load ───────────────────────────────────────────────────────
+
+    let private tempFile (content: string) =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory(dir) |> ignore
+        let path = Path.Combine(dir, "diplo.json")
+        File.WriteAllText(path, content)
+        (dir, path)
+
+    [<Fact>]
+    let ``load avec fichier valide renvoie les adresses normalisées`` () =
+        let dir, path = tempFile """{ "container": { "address": "localhost:5001" }, "network": { "address": "http://pipe:/diplo-network" } }"""
+        try
+            let (c, v, n) = DiploConfig.load path
+            c |> should equal (Some "http://localhost:5001")
+            v |> should equal None
+            n |> should equal (Some "http://pipe:/diplo-network")
+        finally
+            Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``load avec fichier absent renvoie des None (repli par défaut)`` () =
+        let path = Path.Combine(Path.GetTempPath(), "diplo-config-absente-" + Guid.NewGuid().ToString("N"), "diplo.json")
+        let (c, v, n) = DiploConfig.load path
+        c |> should equal None
+        v |> should equal None
+        n |> should equal None
+
+    [<Fact>]
+    let ``load avec fichier malformé renvoie des None (repli par défaut)`` () =
+        let dir, path = tempFile "{ pas du json ]"
+        try
+            let (c, v, n) = DiploConfig.load path
+            c |> should equal None
+            v |> should equal None
+            n |> should equal None
+        finally
+            Directory.Delete(dir, true)
 
     // ── normalizeAddress ────────────────────────────────────────────
 
