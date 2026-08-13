@@ -231,7 +231,7 @@ let private fakeLogsSource () : IContainerLogsSource =
     { new IContainerLogsSource with
         member _.GetStream(id, follow, tail, since, ct) = streamOf [ "ligne 1"; "ligne 2" ]
         member _.GetSnapshot(id, tail, since, ct) =
-            task { return seq { fakeEntry "ligne 1"; fakeEntry "ligne 2" } :> seq<ContainerLogEntry> }
+            task { return seq { fakeEntry "ligne 1"; fakeEntry "ligne 2" } }
       interface IDisposable with
         member _.Dispose() = () }
 

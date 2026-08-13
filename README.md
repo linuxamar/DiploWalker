@@ -108,7 +108,12 @@ sc.exe start "Diplo.Network"
 
 ### Configuration du client (diplo.json)
 
-Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `diplo.json` situé dans le répertoire courant. S'il est absent, ils retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003`).
+Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `diplo.json`. Le fichier est cherché par priorité :
+
+1. `%DIPLO_CONFIG_HOME%\diplo.json` si la variable d'environnement est définie (recommandé pour la GUI et les installations : chemin stable, indépendant du répertoire courant) ;
+2. `diplo.json` dans le répertoire courant.
+
+S'il est absent ou mal formé, les clients retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003`).
 
 ```powershell
 diplo config init                       # génère diplo.json avec le transport TCP par défaut
@@ -146,6 +151,12 @@ Options disponibles :
 - `-SignThumbprint <empreinte>` : signe avec un certificat du magasin (par empreinte SHA-1/SHA-256)
 
 `signtool.exe` est recherché dans le PATH puis dans les Windows Kits installés. Sans certificat disponible, la signature est ignorée (simple avertissement).
+
+### CI (GitHub Actions)
+
+`.github/workflows/ci.yml` :
+- **Build + tests** à chaque push/PR sur `dev` et `main` (`pipeline.ps1 -DoTests`) ;
+- **Publication** sur les tags `v*` : tests, publication self-contained x64/x86 et setup NSIS téléversés en artefacts.
 
 ### Structure du projet
 
