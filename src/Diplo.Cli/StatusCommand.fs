@@ -9,17 +9,18 @@ open Diplo.Core.Output
 type StatusSettings() =
     inherit CommandSettings()
 
-type StatusCommand(output: IOutputPort) =
+type StatusCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<StatusSettings>()
+    new(output: IOutputPort) = StatusCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, _settings, _ct) =
         task {
             output.WriteLine("Vérification de l'état des services Diplo...")
             output.WriteLine("")
 
-            use containerClient = new ContainerClient()
-            use volumeClient = new VolumeClient()
-            use networkClient = new NetworkClient()
+            use containerClient = clients.CreateContainerClient()
+            use volumeClient = clients.CreateVolumeClient()
+            use networkClient = clients.CreateNetworkClient()
 
             let! containerStatus =
                 task {

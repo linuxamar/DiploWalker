@@ -2,7 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/Diplo.Abstractions/Diplo.Abstractions.fsproj" />
     <Project Path="src/Diplo.Container/Diplo.Container.fsproj" />
-    <Project Path="src/Diplo.Contracts/Diplo.Contracts.fsproj" />
     <Project Path="src/Diplo.Network/Diplo.Network.fsproj" />
     <Project Path="src/Diplo.Volume/Diplo.Volume.fsproj" />
     <Project Path="src/Diplo.Gui/Diplo.Gui.fsproj">
@@ -23,7 +22,6 @@
     </Project>
     <Project Path="tests/Diplo.Container.Tests/Diplo.Container.Tests.fsproj" />
     <Project Path="tests/Diplo.Core.Tests/Diplo.Core.Tests.fsproj" />
-    <Project Path="tests/Diplo.Contracts.Tests/Diplo.Contracts.Tests.fsproj" />
     <Project Path="tests/Diplo.Disk.Tests/Diplo.Disk.Tests.fsproj" />
     <Project Path="tests/Diplo.Network.Tests/Diplo.Network.Tests.fsproj" />
     <Project Path="tests/Diplo.Volume.Tests/Diplo.Volume.Tests.fsproj" />

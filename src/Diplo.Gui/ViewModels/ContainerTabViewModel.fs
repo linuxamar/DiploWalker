@@ -52,6 +52,14 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
     let mutable registryUsernameInput = ""
     let mutable registryPasswordInput = ""
 
+    let mutable logCts: CancellationTokenSource = null
+
+    let cancelPreviousLogStream () =
+        if logCts <> null then
+            logCts.Cancel()
+            logCts.Dispose()
+            logCts <- null
+
     member _.Containers = containers
     member _.Images = images
 
@@ -91,6 +99,9 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
     member _.TagImageCommand = RelayCommand(Action(fun () -> this.TagImage() |> ignore))
     member _.CreateContainerCommand = RelayCommand(Action(fun () -> this.CreateContainer() |> ignore))
     member _.GetContainerLogsCommand = RelayCommand(Action(fun () -> this.GetContainerLogs() |> ignore))
+    member _.StopFollowLogsCommand = RelayCommand(Action(fun () ->
+        this.ContainerFollow <- false
+        cancelPreviousLogStream ()))
     member _.ExecInContainerCommand = RelayCommand(Action(fun () -> this.ExecInContainer() |> ignore))
     member _.ListNamespacesCommand = RelayCommand(Action(fun () -> this.ListNamespaces() |> ignore))
     member _.RegistryLoginCommand = RelayCommand(Action(fun () -> this.RegistryLogin() |> ignore))
@@ -301,32 +312,41 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
             try
                 use source = logsSourceFactory ()
                 if this.ContainerFollow then
-                    let stream = source.GetStream(this.ContainerIdInput, true, this.ContainerTail, this.ContainerSince, CancellationToken.None)
-                    let enumerator = stream.GetAsyncEnumerator(CancellationToken.None)
+                    cancelPreviousLogStream ()
+                    let cts = new CancellationTokenSource()
+                    logCts <- cts
                     try
-                        let mutable moving = true
-                        while moving do
-                            let! hasNext = enumerator.MoveNextAsync().AsTask()
-                            if hasNext then
-                                outputPort.WriteLine(sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log)
-                            else
-                                moving <- false
+                        let stream = source.GetStream(this.ContainerIdInput, true, this.ContainerTail, this.ContainerSince, cts.Token)
+                        let enumerator = stream.GetAsyncEnumerator(cts.Token)
+                        try
+                            let mutable moving = true
+                            while moving do
+                                let! hasNext = enumerator.MoveNextAsync().AsTask()
+                                if hasNext then
+                                    outputPort.WriteLine(sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log)
+                                else
+                                    moving <- false
+                        finally
+                            enumerator.DisposeAsync().AsTask() |> ignore
                     finally
-                        enumerator.DisposeAsync().AsTask() |> ignore
+                        if logCts = cts then logCts <- null
+                        cts.Dispose()
                 else
                     let! entries = source.GetSnapshot(this.ContainerIdInput, this.ContainerTail, this.ContainerSince, CancellationToken.None)
                     let sb = Text.StringBuilder()
                     for entry in entries do
                         sb.AppendLine(sprintf "[%s] %s" entry.Timestamp entry.Log) |> ignore
                     outputPort.WriteSuccess(sb.ToString())
-            with ex -> outputPort.WriteError(ex.Message)
+            with
+            | :? OperationCanceledException -> ()
+            | ex -> outputPort.WriteError(ex.Message)
         }
 
     member private this.ExecInContainer() =
         task {
             try
                 use client = new ContainerClient()
-                let parts = this.ContainerExecCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                let parts = Diplo.Core.CommandLine.split this.ContainerExecCommand |> Array.ofList
                 let! entries = client.Exec(id = this.ContainerIdInput, command = parts)
                 let sb = Text.StringBuilder()
                 for entry in entries do

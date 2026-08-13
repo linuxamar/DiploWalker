@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Security.Cryptography
 open System.Text.Json
+open Diplo.Abstractions
 
 /// Persistance des identifiants de registres de conteneurs (login/logout).
 /// Le mot de passe est chiffré avec DPAPI (portée utilisateur courant) sous
@@ -60,15 +61,10 @@ module RegistryAuth =
                 entries |> Seq.map (fun e -> e.Registry, e) |> Map.ofSeq
         with _ -> Map.empty
 
-    /// Enregistre les identifiants (écriture atomique : fichier temporaire puis déplacement).
+    /// Enregistre les identifiants (écriture atomique : fichier temporaire puis remplacement).
     let save (path: string) (entries: seq<RegistryEntry>) =
-        let dir = Path.GetDirectoryName path
-        if not (String.IsNullOrEmpty dir) then Directory.CreateDirectory dir |> ignore
         let json = JsonSerializer.Serialize(entries |> Seq.toList, JsonSerializerOptions(WriteIndented = true))
-        let tmp = path + ".tmp"
-        File.WriteAllText(tmp, json)
-        if File.Exists path then File.Delete path
-        File.Move(tmp, path)
+        AtomicFile.write path json
 
     /// Ajoute ou met à jour l'identifiant d'un registre (mot de passe chiffré).
     let add (path: string) (registry: string) (username: string) (password: string) =

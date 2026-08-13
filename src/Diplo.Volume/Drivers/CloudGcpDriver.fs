@@ -1,7 +1,6 @@
 namespace Diplo.Volume.Drivers
 
 open System
-open System.Diagnostics
 open System.Text.Json
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
@@ -9,25 +8,6 @@ open Diplo.Abstractions.Interfaces
 type CloudGcpDriver(dataRoot: string) =
 
     let store = RemoteVolumeStore(dataRoot, "gcp")
-
-    let runProcess (fileName: string) (args: string list) =
-        let psi = ProcessStartInfo()
-        psi.FileName <- fileName
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        for arg in args do psi.ArgumentList.Add(arg)
-        use proc = Process.Start(psi)
-        if proc |> isNull then failwithf "Impossible de démarrer '%s'" fileName
-        let stdout = proc.StandardOutput.ReadToEnd()
-        let stderr = proc.StandardError.ReadToEnd()
-        if not (proc.WaitForExit(30_000)) then
-            try proc.Kill(true) with _ -> ()
-            failwithf "Délai d'attente dépassé pour '%s'" fileName
-        if proc.ExitCode <> 0 then
-            failwithf "La commande '%s' a échoué (code %d): %s" fileName proc.ExitCode stderr
-        stdout
 
     let buildFilestorePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "ipAddress", driverOpts |> Map.tryFind "volumeName" with
@@ -60,16 +40,16 @@ type CloudGcpDriver(dataRoot: string) =
                 let remotePath =
                     if info.TryGetProperty("remotePath", &v) then v.GetString()
                     else failwithf "Aucun chemin distant pour le volume %s" id
-                runProcess "mount" [ "-o"; "nolock"; remotePath; targetPath ] |> ignore
+                ProcessExec.run "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some 30_000) None |> ignore
                 (true, targetPath)
 
         member _.UnmountVolume(id, targetPath) =
             SecurityValidation.validateId id "L'identifiant du volume"
             SecurityValidation.validateVolumePath targetPath "Le chemin cible"
             try
-                runProcess "umount" [ targetPath ] |> ignore
+                ProcessExec.run "umount" [ targetPath ] (Some 30_000) None |> ignore
             with _ ->
-                try runProcess "mount" [ "-u"; targetPath ] |> ignore
+                try ProcessExec.run "mount" [ "-u"; targetPath ] (Some 30_000) None |> ignore
                 with _ -> ()
             (true, "Démonté")
 

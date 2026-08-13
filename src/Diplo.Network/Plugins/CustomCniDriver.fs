@@ -1,7 +1,6 @@
 namespace Diplo.Network.Plugins
 
 open System
-open System.Diagnostics
 open System.Text.Json
 open Serilog
 open Diplo.Abstractions
@@ -11,25 +10,6 @@ open Diplo.Grpc.Network
 type CustomCniDriver() =
 
     let networks = System.Collections.Concurrent.ConcurrentDictionary<string, NetworkDriverInfo>()
-
-    let runProcess (fileName: string) (args: string list) (timeoutMs: int option) =
-        let timeout = defaultArg timeoutMs 60_000
-        let psi = ProcessStartInfo()
-        psi.FileName <- fileName
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        for arg in args do
-            psi.ArgumentList.Add(arg) |> ignore
-        use proc = Process.Start(psi)
-        if proc |> isNull then failwithf "Impossible de démarrer %s" fileName
-        let stdout = proc.StandardOutput.ReadToEnd()
-        let stderr = proc.StandardError.ReadToEnd()
-        if not (proc.WaitForExit(timeout)) then
-            try proc.Kill(true) with _ -> ()
-            failwithf "Délai d'attente dépassé pour %s (%dms)" fileName timeout
-        (proc.ExitCode, stdout, stderr)
 
     member _.GetAvailableSubnet() =
         let config = loadConfig None
@@ -112,10 +92,11 @@ type CustomCniDriver() =
                         let (_exitCode, stdout, _stderr) =
                             // REMARQUE : le chemin /proc/<pid>/ns/net est spécifique à Linux.
                             // Sur Windows, le driver CNI doit utiliser un mécanisme différent (ex. HNSEndpoint).
-                            runProcess resolvedPluginPath [ "ADD"; "--container-id"; containerId; "--netns"; sprintf "/proc/%s/ns/net" containerId ] None
+                            ProcessExec.runWithResult resolvedPluginPath [ "ADD"; "--container-id"; containerId; "--netns"; sprintf "/proc/%s/ns/net" containerId ] None (Some configJson)
                         if _exitCode = 0 then
-                            let (ifname, ipv4, gw) = parseCniResult stdout
-                            if not (String.IsNullOrEmpty(ifname)) then assignedIp <- ipv4
+                            let (_ifname, ipv4, _gw) = parseCniResult stdout
+                            // L'adresse IP allouée est celle qui compte (le ifname n'est pas un critère).
+                            if not (String.IsNullOrEmpty(ipv4)) then assignedIp <- ipv4
                     | _ -> ()
                     Ok {
                         EndpointId = actualEndpointId
@@ -139,7 +120,7 @@ type CustomCniDriver() =
                             let (_exitCode, _stdout, _stderr) =
                                 // REMARQUE : le chemin /proc/<pid>/ns/net est spécifique à Linux.
                                 // Sur Windows, le driver CNI doit utiliser un mécanisme différent (ex. HNSEndpoint).
-                                runProcess resolvedPluginPath [ "DEL"; "--container-id"; endpointId; "--netns"; sprintf "/proc/%s/ns/net" endpointId ] None
+                                ProcessExec.runWithResult resolvedPluginPath [ "DEL"; "--container-id"; endpointId; "--netns"; sprintf "/proc/%s/ns/net" endpointId ] None None
                             if _exitCode = 0 then Ok ()
                             else Error (sprintf "Échec de la déconnexion CNI (code %d)" _exitCode)
                         with ex ->

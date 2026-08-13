@@ -617,15 +617,6 @@ module IsoDriverTests =
         finally cleanupDir tempRoot
 
     [<Fact>]
-    let ``DUMP temporaire images pour validation 7z`` () =
-        let dumpDir = @"C:\Users\a.marlier\AppData\Local\Temp\opencode\udf-dump"
-        Directory.CreateDirectory(dumpDir) |> ignore
-        File.WriteAllBytes(Path.Combine(dumpDir, "iso9660.iso"), buildIso ())
-        File.WriteAllBytes(Path.Combine(dumpDir, "udf-dvd.iso"), buildUdfDvd ())
-        File.WriteAllBytes(Path.Combine(dumpDir, "udf-nsr02.iso"), buildUdfNsr02 ())
-        File.WriteAllBytes(Path.Combine(dumpDir, "udf-multiblock.iso"), buildUdfMultiBlock ())
-
-    [<Fact>]
     let ``IsoImage.readFile lit un fichier ISO9660 par son chemin`` () =
         let tempRoot = createTempDir ()
         try

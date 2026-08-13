@@ -11,7 +11,7 @@ open Diplo.Grpc.Network
 open Grpc.Net.Client
 open ProtoBuf.Grpc.Client
 
-type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
+type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
     inherit GrpcClientBase(channel, ownsChannel)
 
     let client = channel.CreateGrpcService<INetworkService>()
@@ -119,3 +119,28 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
             let! response = client.PruneNetworks({ Placeholder = false }, ct)
             return response
         }
+
+    interface INetworkClient with
+        member _.CreateAsync(name, ?driver, ?subnet, ?gateway, ?ipRange, ?options, ?labels, ?cniPluginPath, ?ct) =
+            this.CreateAsync(name, ?driver = driver, ?subnet = subnet, ?gateway = gateway, ?ipRange = ipRange, ?options = options, ?labels = labels, ?cniPluginPath = cniPluginPath, ?ct = ct)
+
+        member _.RemoveAsync(id, ?force, ?ct) =
+            this.RemoveAsync(id, ?force = force, ?ct = ct)
+
+        member _.InspectAsync(id, ?ct) =
+            this.InspectAsync(id, ?ct = ct)
+
+        member _.ListAsync(?filters, ?ct) =
+            this.ListAsync(?filters = filters, ?ct = ct)
+
+        member _.ConnectAsync(networkId, containerId, ?endpointId, ?ipv4Address, ?options, ?ct) =
+            this.ConnectAsync(networkId, containerId, ?endpointId = endpointId, ?ipv4Address = ipv4Address, ?options = options, ?ct = ct)
+
+        member _.DisconnectAsync(networkId, containerId, ?endpointId, ?force, ?ct) =
+            this.DisconnectAsync(networkId, containerId, ?endpointId = endpointId, ?force = force, ?ct = ct)
+
+        member _.RunCniPluginAsync(pluginPath, command, containerId, netnsPath, ?config, ?ct) =
+            this.RunCniPluginAsync(pluginPath, command, containerId, netnsPath, ?config = config, ?ct = ct)
+
+        member _.PruneNetworksAsync(?ct) =
+            this.PruneNetworksAsync(?ct = ct)

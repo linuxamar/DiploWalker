@@ -11,7 +11,7 @@ open Diplo.Grpc.Volume
 open Grpc.Net.Client
 open ProtoBuf.Grpc.Client
 
-type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
+type VolumeClient(channel: GrpcChannel, ownsChannel: bool) as this =
     inherit GrpcClientBase(channel, ownsChannel)
 
     let client = channel.CreateGrpcService<IVolumeService>()
@@ -89,3 +89,25 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
             let! response = client.PruneVolumes({ Placeholder = false }, ct)
             return response
         }
+
+    interface IVolumeClient with
+        member _.CreateAsync(name, ?driver, ?driverOpts, ?labels, ?ct) =
+            this.CreateAsync(name, ?driver = driver, ?driverOpts = driverOpts, ?labels = labels, ?ct = ct)
+
+        member _.RemoveAsync(id, ?force, ?ct) =
+            this.RemoveAsync(id, ?force = force, ?ct = ct)
+
+        member _.InspectAsync(id, ?ct) =
+            this.InspectAsync(id, ?ct = ct)
+
+        member _.ListAsync(?filters, ?ct) =
+            this.ListAsync(?filters = filters, ?ct = ct)
+
+        member _.MountAsync(id, targetPath, ?options, ?ct) =
+            this.MountAsync(id, targetPath, ?options = options, ?ct = ct)
+
+        member _.UnmountAsync(id, targetPath, ?ct) =
+            this.UnmountAsync(id, targetPath, ?ct = ct)
+
+        member _.PruneVolumesAsync(?ct) =
+            this.PruneVolumesAsync(?ct = ct)

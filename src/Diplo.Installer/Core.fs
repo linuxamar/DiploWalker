@@ -1,7 +1,6 @@
 module Diplo.Installer.Core
 
 open System
-open System.Diagnostics
 open System.IO
 open System.IO.Compression
 open System.Net.Http
@@ -10,6 +9,7 @@ open System.Security.Cryptography
 open System.ServiceProcess
 open System.Text.Json
 open System.Text.Json.Nodes
+open Diplo.Abstractions
 
 // ─── Configuration ───────────────────────────────────────────────────────
 
@@ -32,27 +32,10 @@ let services =
 // ─── Utilitaires ─────────────────────────────────────────────────────────
 
 let runProcess (exe: string) (args: string list) : int =
-    let psi = ProcessStartInfo(exe)
-    psi.UseShellExecute <- false
-    psi.RedirectStandardOutput <- true
-    psi.RedirectStandardError <- true
-    psi.CreateNoWindow <- true
-    for arg in args do
-        psi.ArgumentList.Add(arg) |> ignore
-    use proc = Process.Start(psi)
-    let stdout = proc.StandardOutput.ReadToEnd()
-    let stderr = proc.StandardError.ReadToEnd()
-    if not (proc.WaitForExit(60_000)) then
-        try proc.Kill(true) with _ -> ()
-        failwithf "Délai d'attente dépassé pour %s (60s)" exe
+    let code, stdout, stderr = ProcessExec.runWithResult exe args None None
     if stdout.Length > 0 then printfn "%s" stdout
     if stderr.Length > 0 then eprintfn "%s" stderr
-    proc.ExitCode
-
-let runCommand (exe: string) (args: string) : int =
-    let parts = args.Split([| ' ' |], System.StringSplitOptions.RemoveEmptyEntries)
-    let cleaned = parts |> Array.map (fun p -> p.Trim('"')) |> Array.toList
-    runProcess exe cleaned
+    code
 
 let runCommandWithArgs (exe: string) (args: string list) : int =
     runProcess exe args

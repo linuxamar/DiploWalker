@@ -1,7 +1,6 @@
 namespace Diplo.Volume.Drivers
 
 open System
-open System.Diagnostics
 open System.Text.Json
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
@@ -10,43 +9,31 @@ type SmbDriver(dataRoot: string) =
 
     let store = RemoteVolumeStore(dataRoot, "smb")
 
-    let runProcess (fileName: string) (args: string list) =
-        let psi = ProcessStartInfo()
-        psi.FileName <- fileName
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        for arg in args do psi.ArgumentList.Add(arg)
-        use proc = Process.Start(psi)
-        if proc |> isNull then failwithf "Impossible de démarrer '%s'" fileName
-        let stdout = proc.StandardOutput.ReadToEnd()
-        let stderr = proc.StandardError.ReadToEnd()
-        if not (proc.WaitForExit(30_000)) then
-            try proc.Kill(true) with _ -> ()
-            failwithf "Délai d'attente dépassé pour '%s'" fileName
-        if proc.ExitCode <> 0 then
-            failwithf "La commande '%s' a échoué (code %d): %s" fileName proc.ExitCode stderr
-        stdout
-
     let extractSharePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "server", driverOpts |> Map.tryFind "share" with
         | Some server, Some share -> sprintf "\\\\%s\\%s" server share
         | _ -> failwith "Les options 'server' et 'share' sont requises pour le driver SMB"
 
-    let buildNetUseArgs (sharePath: string) (targetPath: string) (driverOpts: Map<string, string>) =
-        let args = ResizeArray<string>()
-        args.Add(targetPath)
-        args.Add(sharePath)
-        match driverOpts |> Map.tryFind "username" with
-        | Some user ->
-            args.Add("/user:" + user)
-            match driverOpts |> Map.tryFind "password" with
-            | Some pass -> args.Add(pass)
-            | None -> ()
-        | None -> ()
-        args.Add("/persistent:no")
-        args |> Seq.toList
+    /// Monte le partage : l'identifiant est enregistré dans le gestionnaire
+    /// d'identifiants Windows (cmdkey) puis retiré, afin que le mot de passe
+    /// n'apparaisse jamais sur la ligne de commande de `net use` (visible dans
+    /// le gestionnaire de tâches et les journaux d'audit).
+    let mountShare (remotePath: string) (targetPath: string) (user: string option) (password: string option) =
+        match user, password with
+        | Some user, Some password ->
+            let server = remotePath.TrimStart('\\') |> fun p -> p.Split('\\').[0]
+            try
+                ProcessExec.run "cmdkey" [ "/add:" + server; "/user:" + user; "/pass:" + password ] (Some 30_000) None |> ignore
+                try
+                    ProcessExec.run "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None |> ignore
+                finally
+                    try ProcessExec.run "cmdkey" [ "/delete:" + server ] (Some 30_000) None |> ignore
+                    with _ -> ()
+            with _ -> reraise ()
+        | Some user, None ->
+            ProcessExec.run "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None |> ignore
+        | None, _ ->
+            ProcessExec.run "net" [ "use"; targetPath; remotePath; "/persistent:no" ] (Some 30_000) None |> ignore
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =
@@ -91,14 +78,15 @@ type SmbDriver(dataRoot: string) =
                                 existing <- existing |> Map.add prop.Name (prop.Value.GetString())
                         existing
                     else optsMap
-                let args = buildNetUseArgs remotePath targetPath mergedOpts
-                runProcess "net" ("use" :: args) |> ignore
+                mountShare remotePath targetPath
+                    (mergedOpts |> Map.tryFind "username")
+                    (mergedOpts |> Map.tryFind "password")
                 (true, targetPath)
 
         member _.UnmountVolume(id, targetPath) =
             SecurityValidation.validateId id "L'identifiant du volume"
             SecurityValidation.validateVolumePath targetPath "Le chemin cible"
-            runProcess "net" [ "use"; targetPath; "/delete"; "/y" ] |> ignore
+            ProcessExec.run "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None |> ignore
             (true, "Démonté")
 
         member _.PruneVolumes() =

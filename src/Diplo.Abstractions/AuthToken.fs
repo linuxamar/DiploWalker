@@ -10,7 +10,9 @@ open Serilog
 
 let authTokenDir = @"C:\ProgramData\Diplo"
 
-let authTokenPath = Path.Combine(authTokenDir, "auth-token.json")
+/// Chemin du fichier de token. Mutable pour permettre aux tests
+/// de rediriger vers un répertoire temporaire.
+let mutable authTokenPath = Path.Combine(authTokenDir, "auth-token.json")
 
 let private jsonOptions = JsonSerializerOptions(WriteIndented = true, PropertyNameCaseInsensitive = true, MaxDepth = 32)
 

@@ -31,7 +31,7 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
             driverOpts = driverOpts
             createdAt = DateTime.UtcNow
         |}
-        File.WriteAllText(metaPath id, JsonSerializer.Serialize(meta))
+        AtomicFile.write (metaPath id) (JsonSerializer.Serialize(meta))
         (id, remotePath)
 
     member _.RemoveVolume(id: string) =

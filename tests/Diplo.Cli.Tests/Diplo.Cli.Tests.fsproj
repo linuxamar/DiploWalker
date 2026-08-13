@@ -7,7 +7,10 @@
 
   <ItemGroup>
     <Compile Include="MockOutputPort.fs" />
+    <Compile Include="FakeClients.fs" />
     <Compile Include="CommandSettingsTests.fs" />
+    <Compile Include="ExitCodeTests.fs" />
+    <Compile Include="SuccessPathTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

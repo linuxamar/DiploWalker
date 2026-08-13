@@ -13,12 +13,13 @@ open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 open Diplo.Container
 
-type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
+type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath: string) =
 
     let logPollIntervalMs = defaultArg logPollIntervalMs 500
+    let ctrPath = defaultArg ctrPath "ctr"
 
     let runCtr (args: string list) =
-        runner.RunWithArgs("ctr", args)
+        runner.RunWithArgs(ctrPath, args)
 
     let nsArgs (namespaceName: string) (subcommand: string list) =
         "--namespace" :: namespaceName :: subcommand
@@ -78,7 +79,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
             SecurityValidation.validateId namespaceName "Le namespace"
             SecurityValidation.validateContainerId id
             try
-                let psi = ProcessStartInfo("ctr")
+                let psi = ProcessStartInfo(ctrPath)
                 for a in nsArgs namespaceName [ "task"; "start"; id ] do
                     psi.ArgumentList.Add(a)
                 psi.RedirectStandardOutput <- true
@@ -104,7 +105,9 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
                 proc.OutputDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> append e.Data))
                 proc.ErrorDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> append e.Data))
                 proc.EnableRaisingEvents <- true
-                proc.Exited.AddHandler(EventHandler(fun _ _ -> closeWriter ()))
+                proc.Exited.AddHandler(EventHandler(fun _ _ ->
+                    closeWriter ()
+                    proc.Dispose()))
                 proc.BeginOutputReadLine()
                 proc.BeginErrorReadLine()
                 Log.Information("Conteneur {ContainerId} démarré, logs capturés dans {LogFile}", id, logFile)
@@ -302,7 +305,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
                   yield "tasks"; yield "exec"; yield "--exec-id"; yield sprintf "exec-%s" (Guid.NewGuid().ToString("N")); yield id ]
                 @ (command |> Array.toList)
             try
-                let psi = ProcessStartInfo("ctr")
+                let psi = ProcessStartInfo(ctrPath)
                 for a in args do psi.ArgumentList.Add(a)
                 psi.RedirectStandardInput <- true
                 psi.RedirectStandardOutput <- true
@@ -437,7 +440,12 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int) =
             try
                 let output = runCtr (nsArgs namespaceName [ "image"; "list" ])
                 let lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
-                lines
+                // Filtre la ligne d'en-tête "REF TYPE DIGEST ..." de `ctr image list`.
+                let dataLines =
+                    lines |> Array.filter (fun line ->
+                        let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                        not (parts.Length >= 1 && parts[0].Equals("REF", StringComparison.OrdinalIgnoreCase)))
+                dataLines
                 |> Array.map (fun line ->
                     let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
                     let json =

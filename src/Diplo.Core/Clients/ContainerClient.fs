@@ -257,3 +257,67 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
             let! response = client.TagImage(request, ct)
             return response
         }
+
+    interface IContainerClient with
+        member _.CreateAsync(name, image, ?env, ?command, ?args, ?labels, ?pidLimit, ?memoryLimit, ?cpuShares, ?mounts, ?ct) =
+            this.CreateAsync(name, image, ?env = env, ?command = command, ?args = args, ?labels = labels, ?pidLimit = pidLimit, ?memoryLimit = memoryLimit, ?cpuShares = cpuShares, ?mounts = mounts, ?ct = ct)
+
+        member _.StartAsync(id, ?attach, ?ct) =
+            this.StartAsync(id, ?attach = attach, ?ct = ct)
+
+        member _.StopAsync(id, ?timeoutSeconds, ?ct) =
+            this.StopAsync(id, ?timeoutSeconds = timeoutSeconds, ?ct = ct)
+
+        member _.DeleteAsync(id, ?force, ?ct) =
+            this.DeleteAsync(id, ?force = force, ?ct = ct)
+
+        member _.InspectAsync(id, ?ct) =
+            this.InspectAsync(id, ?ct = ct)
+
+        member _.ListAsync(?all, ?filters, ?ct) =
+            this.ListAsync(?all = all, ?filters = filters, ?ct = ct)
+
+        member _.GetLogsStream(id, ?follow, ?tail, ?since, ?ct) =
+            this.GetLogsStream(id, ?follow = follow, ?tail = tail, ?since = since, ?ct = ct)
+
+        member _.GetLogs(id, ?follow, ?tail, ?since, ?ct) =
+            this.GetLogs(id, ?follow = follow, ?tail = tail, ?since = since, ?ct = ct)
+
+        member _.Exec(id, command, ?attachStdout, ?attachStderr, ?ct) =
+            this.Exec(id, command, ?attachStdout = attachStdout, ?attachStderr = attachStderr, ?ct = ct)
+
+        member _.PullImageAsync(image, ?user, ?ct) =
+            this.PullImageAsync(image, ?user = user, ?ct = ct)
+
+        member _.LoginRegistryAsync(registry, username, password, ?ct) =
+            this.LoginRegistryAsync(registry, username, password, ?ct = ct)
+
+        member _.LogoutRegistryAsync(registry, ?ct) =
+            this.LogoutRegistryAsync(registry, ?ct = ct)
+
+        member _.GetVersionAsync(?ct) =
+            this.GetVersionAsync(?ct = ct)
+
+        member _.ListNamespacesAsync(?ct) =
+            this.ListNamespacesAsync(?ct = ct)
+
+        member _.RenameContainerAsync(id, newName, ?ct) =
+            this.RenameContainerAsync(id, newName, ?ct = ct)
+
+        member _.TopContainerAsync(id, ?ct) =
+            this.TopContainerAsync(id, ?ct = ct)
+
+        member _.GetContainerStatsAsync(id, ?ct) =
+            this.GetContainerStatsAsync(id, ?ct = ct)
+
+        member _.ListImagesAsync(?namespaceName, ?ct) =
+            this.ListImagesAsync(?namespaceName = namespaceName, ?ct = ct)
+
+        member _.InspectImageAsync(ref, ?namespaceName, ?ct) =
+            this.InspectImageAsync(ref, ?namespaceName = namespaceName, ?ct = ct)
+
+        member _.RemoveImageAsync(ref, ?namespaceName, ?ct) =
+            this.RemoveImageAsync(ref, ?namespaceName = namespaceName, ?ct = ct)
+
+        member _.TagImageAsync(source, target, ?namespaceName, ?ct) =
+            this.TagImageAsync(source, target, ?namespaceName = namespaceName, ?ct = ct)

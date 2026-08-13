@@ -55,12 +55,12 @@ let ``FakeOutputPort.Clear remet tout à zéro`` () =
 let ``ComposeTabViewModel expose les 6 commandes ICommand`` () =
     let port = FakeOutputPort.FakeOutputPort()
     let vm = ComposeTabViewModel(port)
-    vm.ComposeUpCommand     :> ICommand |> should not' (be Null)
-    vm.ComposeDownCommand   :> ICommand |> should not' (be Null)
-    vm.ComposePsCommand     :> ICommand |> should not' (be Null)
-    vm.ComposeLogsCommand   :> ICommand |> should not' (be Null)
-    vm.ComposePullCommand   :> ICommand |> should not' (be Null)
-    vm.ComposeBuildCommand  :> ICommand |> should not' (be Null)
+    vm.ComposeUpCommand     |> should not' (be Null)
+    vm.ComposeDownCommand   |> should not' (be Null)
+    vm.ComposePsCommand     |> should not' (be Null)
+    vm.ComposeLogsCommand   |> should not' (be Null)
+    vm.ComposePullCommand   |> should not' (be Null)
+    vm.ComposeBuildCommand  |> should not' (be Null)
 
 [<Fact>]
 let ``ComposeTabViewModel etat initial`` () =
@@ -87,26 +87,26 @@ let ``ComposeTabViewModel proprietes declenchent PropertyChanged`` () =
 let ``ContainerTabViewModel expose les commandes ICommand`` () =
     let port = FakeOutputPort.FakeOutputPort()
     let vm = ContainerTabViewModel(port)
-    vm.ListContainersCommand     :> ICommand |> should not' (be Null)
-    vm.StartContainerCommand     :> ICommand |> should not' (be Null)
-    vm.StopContainerCommand      :> ICommand |> should not' (be Null)
-    vm.DeleteContainerCommand    :> ICommand |> should not' (be Null)
-    vm.InspectContainerCommand   :> ICommand |> should not' (be Null)
-    vm.CreateContainerCommand    :> ICommand |> should not' (be Null)
-    vm.RenameContainerCommand    :> ICommand |> should not' (be Null)
-    vm.PullImageCommand          :> ICommand |> should not' (be Null)
-    vm.VersionCommand            :> ICommand |> should not' (be Null)
-    vm.TopContainerCommand       :> ICommand |> should not' (be Null)
-    vm.StatsContainerCommand     :> ICommand |> should not' (be Null)
-    vm.GetContainerLogsCommand   :> ICommand |> should not' (be Null)
-    vm.ExecInContainerCommand    :> ICommand |> should not' (be Null)
-    vm.ListNamespacesCommand     :> ICommand |> should not' (be Null)
-    vm.ListImagesCommand         :> ICommand |> should not' (be Null)
-    vm.InspectImageCommand       :> ICommand |> should not' (be Null)
-    vm.RemoveImageCommand        :> ICommand |> should not' (be Null)
-    vm.TagImageCommand           :> ICommand |> should not' (be Null)
-    vm.RegistryLoginCommand      :> ICommand |> should not' (be Null)
-    vm.RegistryLogoutCommand     :> ICommand |> should not' (be Null)
+    vm.ListContainersCommand     |> should not' (be Null)
+    vm.StartContainerCommand     |> should not' (be Null)
+    vm.StopContainerCommand      |> should not' (be Null)
+    vm.DeleteContainerCommand    |> should not' (be Null)
+    vm.InspectContainerCommand   |> should not' (be Null)
+    vm.CreateContainerCommand    |> should not' (be Null)
+    vm.RenameContainerCommand    |> should not' (be Null)
+    vm.PullImageCommand          |> should not' (be Null)
+    vm.VersionCommand            |> should not' (be Null)
+    vm.TopContainerCommand       |> should not' (be Null)
+    vm.StatsContainerCommand     |> should not' (be Null)
+    vm.GetContainerLogsCommand   |> should not' (be Null)
+    vm.ExecInContainerCommand    |> should not' (be Null)
+    vm.ListNamespacesCommand     |> should not' (be Null)
+    vm.ListImagesCommand         |> should not' (be Null)
+    vm.InspectImageCommand       |> should not' (be Null)
+    vm.RemoveImageCommand        |> should not' (be Null)
+    vm.TagImageCommand           |> should not' (be Null)
+    vm.RegistryLoginCommand      |> should not' (be Null)
+    vm.RegistryLogoutCommand     |> should not' (be Null)
 
 [<Fact>]
 let ``ContainerTabViewModel etat initial`` () =
@@ -174,13 +174,13 @@ let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
 let ``VolumeTabViewModel expose les 7 commandes ICommand`` () =
     let port = FakeOutputPort.FakeOutputPort()
     let vm = VolumeTabViewModel(port)
-    vm.ListVolumesCommand     :> ICommand |> should not' (be Null)
-    vm.InspectVolumeCommand   :> ICommand |> should not' (be Null)
-    vm.CreateVolumeCommand    :> ICommand |> should not' (be Null)
-    vm.RemoveVolumeCommand    :> ICommand |> should not' (be Null)
-    vm.MountVolumeCommand     :> ICommand |> should not' (be Null)
-    vm.UnmountVolumeCommand   :> ICommand |> should not' (be Null)
-    vm.PruneVolumesCommand    :> ICommand |> should not' (be Null)
+    vm.ListVolumesCommand     |> should not' (be Null)
+    vm.InspectVolumeCommand   |> should not' (be Null)
+    vm.CreateVolumeCommand    |> should not' (be Null)
+    vm.RemoveVolumeCommand    |> should not' (be Null)
+    vm.MountVolumeCommand     |> should not' (be Null)
+    vm.UnmountVolumeCommand   |> should not' (be Null)
+    vm.PruneVolumesCommand    |> should not' (be Null)
 
 [<Fact>]
 let ``VolumeTabViewModel etat initial`` () =
@@ -196,14 +196,14 @@ let ``VolumeTabViewModel etat initial`` () =
 let ``NetworkTabViewModel expose les 8 commandes ICommand`` () =
     let port = FakeOutputPort.FakeOutputPort()
     let vm = NetworkTabViewModel(port)
-    vm.ListNetworksCommand       :> ICommand |> should not' (be Null)
-    vm.InspectNetworkCommand     :> ICommand |> should not' (be Null)
-    vm.CreateNetworkCommand      :> ICommand |> should not' (be Null)
-    vm.RemoveNetworkCommand      :> ICommand |> should not' (be Null)
-    vm.ConnectNetworkCommand     :> ICommand |> should not' (be Null)
-    vm.DisconnectNetworkCommand  :> ICommand |> should not' (be Null)
-    vm.RunCniPluginCommand       :> ICommand |> should not' (be Null)
-    vm.PruneNetworksCommand      :> ICommand |> should not' (be Null)
+    vm.ListNetworksCommand       |> should not' (be Null)
+    vm.InspectNetworkCommand     |> should not' (be Null)
+    vm.CreateNetworkCommand      |> should not' (be Null)
+    vm.RemoveNetworkCommand      |> should not' (be Null)
+    vm.ConnectNetworkCommand     |> should not' (be Null)
+    vm.DisconnectNetworkCommand  |> should not' (be Null)
+    vm.RunCniPluginCommand       |> should not' (be Null)
+    vm.PruneNetworksCommand      |> should not' (be Null)
 
 [<Fact>]
 let ``NetworkTabViewModel etat initial`` () =
@@ -231,8 +231,8 @@ let ``SettingsTabViewModel expose les commandes ICommand`` () =
     withConfigHome (fun _ ->
         let port = FakeOutputPort.FakeOutputPort()
         let vm = SettingsTabViewModel(port)
-        vm.SaveCommand     :> ICommand |> should not' (be Null)
-        vm.ReloadCommand   :> ICommand |> should not' (be Null))
+        vm.SaveCommand     |> should not' (be Null)
+        vm.ReloadCommand   |> should not' (be Null))
 
 [<Fact>]
 let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
@@ -252,7 +252,7 @@ let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` ()
         vm.ContainerAddress <- "http://pipe:/diplo-container"
         vm.VolumeAddress <- "localhost:9002"
         vm.NetworkAddress <- "localhost:9003"
-        (vm.SaveCommand :> ICommand).Execute(null)
+        (vm.SaveCommand).Execute(null)
         let path = Path.Combine(home, "diplo.json")
         File.Exists path |> should equal true
         let (c, v, n) = DiploConfig.load path
@@ -268,7 +268,7 @@ let ``SettingsTabViewModel SaveCommand avec adresse vide signale une erreur`` ()
         let port = FakeOutputPort.FakeOutputPort()
         let vm = SettingsTabViewModel(port)
         vm.ContainerAddress <- ""
-        (vm.SaveCommand :> ICommand).Execute(null)
+        (vm.SaveCommand).Execute(null)
         vm.StatusMessage |> should haveSubstring "obligatoires")
 
 [<Fact>]
@@ -279,7 +279,7 @@ let ``SettingsTabViewModel SaveCommand applique la configuration sans redemarrag
         vm.ContainerAddress <- "http://pipe:/diplo-container"
         vm.VolumeAddress <- "localhost:9002"
         vm.NetworkAddress <- "localhost:9003"
-        (vm.SaveCommand :> ICommand).Execute(null)
+        (vm.SaveCommand).Execute(null)
         DiploConfig.containerAddress() |> should equal (Some "http://pipe:/diplo-container")
         DiploConfig.volumeAddress() |> should equal (Some "http://localhost:9002"))
 
@@ -294,7 +294,7 @@ let ``SettingsTabViewModel ReloadCommand relit la configuration depuis le disque
         vm.VolumeAddress |> should equal "http://localhost:7002"
         vm.NetworkAddress |> should equal "http://localhost:7003"
         DiploConfig.save path "localhost:8001" "localhost:8002" "localhost:8003"
-        (vm.ReloadCommand :> ICommand).Execute(null)
+        (vm.ReloadCommand).Execute(null)
         vm.ContainerAddress |> should equal "http://localhost:8001"
         vm.StatusMessage |> should haveSubstring "relue")
 

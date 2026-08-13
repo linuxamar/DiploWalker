@@ -10,6 +10,7 @@
     <Compile Include="TokenInterceptorTests.fs" />
     <Compile Include="TokenAuthMiddlewareTests.fs" />
     <Compile Include="SecurityValidationTests.fs" />
+    <Compile Include="ProcessExecTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

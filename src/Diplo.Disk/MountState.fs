@@ -1,5 +1,6 @@
 namespace Diplo.Disk
 
+open System
 open System.IO
 open System.Text.Json
 
@@ -34,11 +35,20 @@ module MountState =
                 |> Map.ofSeq
         with _ -> Map.empty
 
-    /// Enregistre l'état des volumes montés.
+    /// Enregistre l'état des volumes montés (écriture atomique : fichier
+    /// temporaire du même répertoire puis remplacement).
     let save (path: string) (mounted: seq<string * MountEntry list>) =
         let entries =
             mounted
             |> Seq.map (fun (id, mounts) -> { Id = id; Mounts = mounts })
             |> Seq.toList
         let json = JsonSerializer.Serialize(entries, JsonSerializerOptions(WriteIndented = true))
-        File.WriteAllText(path, json)
+        let dir = Path.GetDirectoryName(path)
+        if not (String.IsNullOrEmpty dir) then Directory.CreateDirectory dir |> ignore
+        let name = Path.GetFileName(path)
+        let tmp = Path.Combine(dir, name + "." + Guid.NewGuid().ToString("N") + ".tmp")
+        File.WriteAllText(tmp, json)
+        try
+            File.Replace(tmp, path, null)
+        with :? FileNotFoundException ->
+            File.Move(tmp, path)

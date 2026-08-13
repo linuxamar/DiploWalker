@@ -201,35 +201,23 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                                 |}
                                 JsonSerializer.Serialize(config)
                             else "{}"
-                        let psi = ProcessStartInfo()
-                        psi.FileName <- resolvedPluginPath
-                        psi.ArgumentList.Add(command) |> ignore
-                        psi.ArgumentList.Add("--config") |> ignore
-                        psi.RedirectStandardInput <- true
-                        psi.RedirectStandardOutput <- true
-                        psi.RedirectStandardError <- true
-                        psi.UseShellExecute <- false
-                        psi.CreateNoWindow <- true
-                        use proc = System.Diagnostics.Process.Start(psi)
-                        if proc |> isNull then failwithf "Impossible de démarrer le plugin CNI: %s" pluginPath
-                        proc.StandardInput.Write(configJson)
-                        proc.StandardInput.Close()
-                        let stdout = proc.StandardOutput.ReadToEnd()
-                        let stderr = proc.StandardError.ReadToEnd()
-                        if not (proc.WaitForExit(60_000)) then
-                            try proc.Kill(true) with _ -> ()
-                            failwith "Délai d'attente dépassé pour le plugin CNI (60s)"
+                        let args =
+                            [ command
+                              "--config"
+                              "--container-id"; request.ContainerId
+                              "--netns"; request.NetnsPath ]
+                        let code, stdout, stderr = ProcessExec.runWithResult resolvedPluginPath args (Some 60_000) (Some configJson)
                         let mutable ifname = ""
                         let mutable ipv4Addr = ""
                         let mutable gw = ""
-                        let msg = if proc.ExitCode = 0 then stdout else stderr
-                        if proc.ExitCode = 0 then
+                        let msg = if code = 0 then stdout else stderr
+                        if code = 0 then
                             let (parsedIfname, parsedIpv4, parsedGw) = Diplo.Network.Plugins.CniParsing.parseCniResult stdout
                             ifname <- parsedIfname
                             ipv4Addr <- parsedIpv4
                             gw <- parsedGw
                         return
-                            { RunCniPluginResponse.Success = (proc.ExitCode = 0)
+                            { RunCniPluginResponse.Success = (code = 0)
                               Ifname = ifname
                               Ipv4Address = ipv4Addr
                               Gateway = gw
