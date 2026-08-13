@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\src\Diplo.Core\Diplo.Core.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Volume\Diplo.Volume.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Container\Diplo.Container.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Network\Diplo.Network.fsproj" />

@@ -238,6 +238,16 @@ module ``Vérification des paramètres des commandes`` =
         settings.Path |> should equal ""
 
     [<Fact>]
+    let ``InitConfigSettings.Transport est tcp par défaut`` () =
+        let settings = InitConfigSettings()
+        settings.Transport |> should equal "tcp"
+
+    [<Fact>]
+    let ``InitConfigSettings.Transport accepte pipe`` () =
+        let settings = InitConfigSettings(Transport = "pipe")
+        settings.Transport |> should equal "pipe"
+
+    [<Fact>]
     let ``LogsContainerSettings.Follow est false par défaut`` () =
         let settings = LogsContainerSettings()
         settings.Follow |> should equal false

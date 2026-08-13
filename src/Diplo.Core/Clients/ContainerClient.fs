@@ -6,6 +6,7 @@ open System.Runtime.CompilerServices
 open System.Threading
 open System.Threading.Tasks
 open Diplo.Abstractions
+open Diplo.Core
 open Diplo.Core.Connection
 open Diplo.Grpc
 open Diplo.Grpc.Container
@@ -21,7 +22,10 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
         let ch = DiploChannel.forContainer port
         new ContainerClient(ch, true)
 
-    new() = new ContainerClient(5001)
+    new() =
+        match DiploConfig.containerAddress() with
+        | Some address -> new ContainerClient(DiploChannel.forAddress address, true)
+        | None -> new ContainerClient(5001)
 
     member _.CreateAsync
         ( name: string,

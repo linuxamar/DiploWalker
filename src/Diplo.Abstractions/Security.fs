@@ -223,16 +223,26 @@ module SecurityValidation =
 
     /// Vérifie qu'une adresse gRPC pointe vers localhost uniquement.
     /// Empêche la fuite de tokens d'authentification sur le réseau.
+    /// Les adresses par named pipe ("http://pipe:/<nom>") sont acceptées : elles
+    /// désignent un canal local, on ne fait donc qu'en valider le nom de tube.
     let validateGrpcAddress (address: string) =
         if String.IsNullOrEmpty(address) then
             raise (RpcException(Status(StatusCode.InvalidArgument, "L'adresse gRPC ne peut pas être vide")))
         match System.Uri.TryCreate(address, System.UriKind.Absolute) with
         | true, uri ->
-            let host = uri.Host.Trim('[', ']')
-            if not (allowedGrpcHosts.Contains(host)) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'adresse gRPC '%s' n'est pas autorisée. Seul l'hôte local est accepté (localhost, 127.0.0.1, ::1)" address)))
             if not (uri.Scheme = "http" || uri.Scheme = "https") then
                 raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "Le schéma '%s' n'est pas supporté. Utilisez http:// ou https://" uri.Scheme)))
+            if String.Equals(uri.Host, "pipe", System.StringComparison.OrdinalIgnoreCase) then
+                // Le Uri de .NET normalise les backslashes du chemin en slashes :
+                // on extrait le nom du pipe de la chaîne brute pour ne rien manquer.
+                let idx = address.IndexOf("pipe:", System.StringComparison.OrdinalIgnoreCase)
+                let name = address.Substring(idx + 5).TrimStart('/')
+                if String.IsNullOrEmpty(name) || name.Contains("\\") || name.Contains("..") || name.Contains("\0") then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "Le nom du pipe '%s' est invalide. Utilisez une adresse de la forme http://pipe:/<nom>" name)))
+            else
+                let host = uri.Host.Trim('[', ']')
+                if not (allowedGrpcHosts.Contains(host)) then
+                    raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'adresse gRPC '%s' n'est pas autorisée. Seul l'hôte local est accepté (localhost, 127.0.0.1, ::1)" address)))
         | false, _ ->
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "L'adresse gRPC '%s' n'est pas une URL valide" address)))
 

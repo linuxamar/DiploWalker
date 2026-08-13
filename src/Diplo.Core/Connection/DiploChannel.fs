@@ -1,5 +1,12 @@
 namespace Diplo.Core.Connection
 
+open System
+open System.IO
+open System.IO.Pipes
+open System.Net.Http
+open System.Net.Sockets
+open System.Threading
+open System.Threading.Tasks
 open Grpc.Core
 open Grpc.Net.Client
 open Diplo.Abstractions
@@ -16,14 +23,51 @@ module DiploChannel =
     [<Literal>]
     let private DefaultNetworkPort = 5003
 
-    let private create (address: string) =
-        SecurityValidation.validateGrpcAddress address
+    /// Indique si l'adresse (URL complète) désigne un canal local par named pipe,
+    /// p. ex. "http://pipe:/diplo-container".
+    let private isPipeAddress (uri: Uri) =
+        String.Equals(uri.Host, "pipe", StringComparison.OrdinalIgnoreCase)
+
+    let private buildCredentials () =
         let callCredentials = TokenInterceptor.createTokenCredentials()
         let channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
         let options = GrpcChannelOptions()
         options.Credentials <- channelCredentials
         options.UnsafeUseInsecureChannelCallCredentials <- true
+        (options, callCredentials)
+
+    /// Canal gRPC sur named pipe : grpc-dotnet exige un SocketsHttpHandler dont le
+    /// ConnectCallback ouvre un NamedPipeClientStream (le schéma http://pipe: n'est
+    /// pas reconnu nativement par le client).
+    let private createPipeChannel (pipeName: string) =
+        let options, _ = buildCredentials ()
+        let connectCallback =
+            Func<SocketsHttpConnectionContext, CancellationToken, ValueTask<Stream>>(fun _ ct ->
+                let t =
+                    task {
+                        let pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous)
+                        do! pipe.ConnectAsync(ct)
+                        return pipe :> Stream
+                    }
+                ValueTask<Stream>(t))
+        let handler = new SocketsHttpHandler()
+        handler.ConnectCallback <- connectCallback
+        handler.UseProxy <- false
+        handler.AllowAutoRedirect <- false
+        options.HttpHandler <- handler
+        GrpcChannel.ForAddress("http://localhost", options)
+
+    let private createTcpChannel (address: string) =
+        let options, _ = buildCredentials ()
         GrpcChannel.ForAddress(address, options)
+
+    let private create (address: string) =
+        SecurityValidation.validateGrpcAddress address
+        let uri = Uri(address)
+        if isPipeAddress uri then
+            createPipeChannel (uri.PathAndQuery.TrimStart('/'))
+        else
+            createTcpChannel address
 
     let forContainer (port: int) = create $"http://localhost:{port}"
     let forVolume (port: int) = create $"http://localhost:{port}"

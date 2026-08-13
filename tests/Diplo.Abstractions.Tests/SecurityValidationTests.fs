@@ -316,6 +316,29 @@ module SecurityValidationTests =
         (fun () -> validateGrpcAddress "not-a-url")
         |> should throw typeof<Exception>
 
+    [<Fact>]
+    let ``validateGrpcAddress avec adresse pipe valide passe`` () =
+        validateGrpcAddress "http://pipe:/diplo-container"
+
+    [<Fact>]
+    let ``validateGrpcAddress avec adresse pipe à plusieurs segments passe`` () =
+        validateGrpcAddress "http://pipe:/diplo/container"
+
+    [<Fact>]
+    let ``validateGrpcAddress avec nom de pipe vide lève une exception`` () =
+        (fun () -> validateGrpcAddress "http://pipe:/")
+        |> should throw typeof<Exception>
+
+    [<Fact>]
+    let ``validateGrpcAddress avec nom de pipe contenant backslash lève une exception`` () =
+        (fun () -> validateGrpcAddress @"http://pipe:/diplo\..\evil")
+        |> should throw typeof<Exception>
+
+    [<Fact>]
+    let ``validateGrpcAddress avec nom de pipe contenant traversée lève une exception`` () =
+        (fun () -> validateGrpcAddress "http://pipe:/../diplo")
+        |> should throw typeof<Exception>
+
     // ── validatePath ────────────────────────────────────────────────
 
     [<Fact>]
