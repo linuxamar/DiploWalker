@@ -17,6 +17,7 @@ module VolumeIntegrationTests =
     open ProtoBuf.Grpc.Server
     open Diplo.Grpc
     open Diplo.Grpc.Volume
+    open Diplo.Core.Connection
     open Diplo.Volume.Drivers
     open Diplo.Volume.Services
     open Diplo.Abstractions
@@ -50,6 +51,38 @@ module VolumeIntegrationTests =
         app.StopAsync().GetAwaiter().GetResult()
         (app :> IAsyncDisposable).DisposeAsync().AsTask().GetAwaiter().GetResult()
         try Directory.Delete(dataRoot, true) with _ -> ()
+
+    let private startPipeApp (pipeName: string) =
+        let dataRoot = Path.Combine(Path.GetTempPath(), "diplo-int-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory(dataRoot) |> ignore
+        let builder = WebApplication.CreateBuilder()
+        builder.Services.AddCodeFirstGrpc() |> ignore
+        builder.Services.AddSingleton<VolumeDriverRegistry>(fun _ ->
+            let reg = VolumeDriverRegistry()
+            reg.Register(StorageDriverType.Local, LocalVolumeDriver(dataRoot) :> Interfaces.IVolumeDriver)
+            reg) |> ignore
+        builder.Services.AddSingleton<VolumeServiceImpl>() |> ignore
+        builder.WebHost.ConfigureKestrel(fun opts ->
+            opts.ListenNamedPipe(pipeName, fun lo ->
+                lo.Protocols <- HttpProtocols.Http2)) |> ignore
+        let app = builder.Build()
+        app.MapGrpcService<VolumeServiceImpl>() |> ignore
+        app.StartAsync().GetAwaiter().GetResult()
+        app, dataRoot
+
+    [<Fact>]
+    let ``CreateVolume via named pipe fonctionne de bout en bout`` () =
+        let pipeName = "diplo-volume-test-" + Guid.NewGuid().ToString("N")
+        let app, dataRoot = startPipeApp pipeName
+        try
+            use channel = DiploChannel.forAddress (sprintf "http://pipe:/%s" pipeName)
+            let client = channel.CreateGrpcService<IVolumeService>()
+            let req = { Name = "pipe-volume"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
+            let result = client.CreateVolume(req, CancellationToken.None).Result
+            String.IsNullOrEmpty(result.Id) |> should equal false
+            result.Name |> should equal "pipe-volume"
+        finally
+            stopApp app dataRoot
 
     [<Fact>]
     let ``CreateVolume via gRPC retourne les informations du volume`` () =

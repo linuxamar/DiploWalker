@@ -3,6 +3,7 @@ namespace Diplo.Core.Clients
 open System
 open System.Collections.Generic
 open System.Threading
+open Diplo.Core
 open Diplo.Abstractions
 open Diplo.Core.Connection
 open Diplo.Grpc
@@ -19,7 +20,10 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) =
         let ch = DiploChannel.forNetwork port
         new NetworkClient(ch, true)
 
-    new() = new NetworkClient(5003)
+    new() =
+        match DiploConfig.networkAddress() with
+        | Some address -> new NetworkClient(DiploChannel.forAddress address, true)
+        | None -> new NetworkClient(5003)
 
     member _.CreateAsync
         ( name: string,

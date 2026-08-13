@@ -3,6 +3,7 @@ namespace Diplo.Core.Clients
 open System
 open System.Collections.Generic
 open System.Threading
+open Diplo.Core
 open Diplo.Abstractions
 open Diplo.Core.Connection
 open Diplo.Grpc
@@ -19,7 +20,10 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) =
         let ch = DiploChannel.forVolume port
         new VolumeClient(ch, true)
 
-    new() = new VolumeClient(5002)
+    new() =
+        match DiploConfig.volumeAddress() with
+        | Some address -> new VolumeClient(DiploChannel.forAddress address, true)
+        | None -> new VolumeClient(5002)
 
     member _.CreateAsync(name: string, ?driver: StorageDriverType, ?driverOpts: IDictionary<string, string>, ?labels: IDictionary<string, string>, ?ct: CancellationToken) =
         task {

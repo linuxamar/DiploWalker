@@ -11,6 +11,9 @@ type InitConfigSettings() =
     [<CommandOption("--path")>]
     member val Path = "" with get, set
 
+    [<CommandOption("--transport")>]
+    member val Transport = "tcp" with get, set
+
 type InitConfigCommand(output: IOutputPort) =
     inherit Command<InitConfigSettings>()
 
@@ -29,17 +32,43 @@ type InitConfigCommand(output: IOutputPort) =
   "logLevel": "Information"
 }"""
 
+    let pipeConfig =
+        """{
+  "container": {
+    "address": "http://pipe:/diplo-container",
+    "namespace": "default"
+  },
+  "volume": {
+    "address": "http://pipe:/diplo-volume"
+  },
+  "network": {
+    "address": "http://pipe:/diplo-network"
+  },
+  "logLevel": "Information"
+}"""
+
     override _.Execute(_ctx, settings, _ct: CancellationToken) =
-        let filePath =
-            if System.String.IsNullOrEmpty(settings.Path) then
-                Path.Combine(Directory.GetCurrentDirectory(), "diplo.json")
-            else
-                settings.Path
+        let content =
+            match settings.Transport.ToLowerInvariant() with
+            | "tcp" -> Some defaultConfig
+            | "pipe" -> Some pipeConfig
+            | other ->
+                output.WriteError(sprintf "Transport inconnu : '%s'. Valeurs acceptées : tcp, pipe" other)
+                None
 
-        let dir = Path.GetDirectoryName(filePath)
-        if not (System.String.IsNullOrEmpty(dir)) && not (Directory.Exists(dir)) then
-            Directory.CreateDirectory(dir) |> ignore
+        match content with
+        | None -> 1
+        | Some content ->
+            let filePath =
+                if System.String.IsNullOrEmpty(settings.Path) then
+                    Path.Combine(Directory.GetCurrentDirectory(), "diplo.json")
+                else
+                    settings.Path
 
-        File.WriteAllText(filePath, defaultConfig)
-        output.WriteSuccess(sprintf "Configuration écrite dans %s" filePath)
-        0
+            let dir = Path.GetDirectoryName(filePath)
+            if not (System.String.IsNullOrEmpty(dir)) && not (Directory.Exists(dir)) then
+                Directory.CreateDirectory(dir) |> ignore
+
+            File.WriteAllText(filePath, content)
+            output.WriteSuccess(sprintf "Configuration écrite dans %s" filePath)
+            0

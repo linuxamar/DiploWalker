@@ -6,6 +6,7 @@ module DiploChannelTests =
     open Xunit
     open FsUnit.Xunit
     open Diplo.Abstractions
+    open Diplo.Core.Connection
 
     [<Fact>]
     let ``forContainer valide l'adresse localhost par defaut`` () =
@@ -44,4 +45,20 @@ module DiploChannelTests =
     [<Fact>]
     let ``forAddress avec adresse vide lance une exception`` () =
         (fun () -> SecurityValidation.validateGrpcAddress "" |> ignore)
+        |> should throw typeof<Exception>
+
+    // ── Adresses par named pipe ─────────────────────────────────────
+
+    [<Fact>]
+    let ``forAddress avec adresse pipe valide ne lève pas`` () =
+        DiploChannel.forAddress "http://pipe:/diplo-container"
+
+    [<Fact>]
+    let ``forAddress avec nom de pipe vide lance une exception`` () =
+        (fun () -> DiploChannel.forAddress "http://pipe:/" |> ignore)
+        |> should throw typeof<Exception>
+
+    [<Fact>]
+    let ``forAddress avec nom de pipe contenant backslash lance une exception`` () =
+        (fun () -> DiploChannel.forAddress @"http://pipe:/diplo\evil" |> ignore)
         |> should throw typeof<Exception>
