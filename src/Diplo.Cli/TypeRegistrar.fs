@@ -7,6 +7,7 @@ open Microsoft.Extensions.DependencyInjection
 type TypeRegistrar() =
     let services = ServiceCollection()
     do services.AddSingleton<Diplo.Core.Output.IOutputPort>(SpectreOutputPort()) |> ignore
+    do services.AddSingleton<Diplo.Core.Clients.IDiploClients>(Diplo.Core.Clients.DiploClients()) |> ignore
     let mutable buildProvider: IServiceProvider option = None
 
     interface ITypeRegistrar with

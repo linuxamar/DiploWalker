@@ -1,5 +1,8 @@
 namespace Diplo.Abstractions.Tests
 
+// Sérialisé avec AuthTokenTests : les deux manipulent le chemin global
+// du fichier de token.
+[<Xunit.Collection("auth-token")>]
 module TokenAuthMiddlewareTests =
 
     open System

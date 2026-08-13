@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="FakeOutputPort.fs" />
     <Compile Include="ViewModelBaseTests.fs" />
     <Compile Include="AvaloniaOutputPortTests.fs" />
     <Compile Include="TabViewModelTests.fs" />
@@ -24,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Diplo.Gui\Diplo.Gui.fsproj" />
+    <ProjectReference Include="..\Diplo.TestHelpers\Diplo.TestHelpers.fsproj" />
   </ItemGroup>
 
 </Project>

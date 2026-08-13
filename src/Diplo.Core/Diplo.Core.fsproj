@@ -8,11 +8,14 @@
     <Compile Include="Output\IOutputPort.fs" />
     <Compile Include="DiploConfig.fs" />
     <Compile Include="Mounts\MountParser.fs" />
+    <Compile Include="CommandLine.fs" />
     <Compile Include="Connection\DiploChannel.fs" />
     <Compile Include="Clients\GrpcClientBase.fs" />
+    <Compile Include="Clients\ClientInterfaces.fs" />
     <Compile Include="Clients\ContainerClient.fs" />
     <Compile Include="Clients\VolumeClient.fs" />
     <Compile Include="Clients\NetworkClient.fs" />
+    <Compile Include="Clients\DiploClients.fs" />
     <Compile Include="Compose\ComposeModels.fs" />
     <Compile Include="Compose\ComposeOrchestrator.fs" />
   </ItemGroup>

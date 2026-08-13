@@ -18,6 +18,7 @@ type MainWindowViewModel() as this =
     let volumeTab = VolumeTabViewModel(outputPort)
     let networkTab = NetworkTabViewModel(outputPort)
     let composeTab = ComposeTabViewModel(outputPort)
+    let settingsTab = SettingsTabViewModel(outputPort)
 
     let updateLog () =
         logText.Clear() |> ignore
@@ -34,6 +35,7 @@ type MainWindowViewModel() as this =
     member _.VolumeTab = volumeTab
     member _.NetworkTab = networkTab
     member _.ComposeTab = composeTab
+    member _.SettingsTab = settingsTab
 
     member _.QuitCommand: ICommand =
         RelayCommand(Action(fun () ->

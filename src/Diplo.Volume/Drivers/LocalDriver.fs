@@ -77,7 +77,7 @@ type LocalVolumeDriver(dataRoot: string) =
             driverOpts = driverOpts
             createdAt = DateTime.UtcNow
         |}
-        File.WriteAllText(metaPath id, JsonSerializer.Serialize(meta))
+        AtomicFile.write (metaPath id) (JsonSerializer.Serialize(meta))
         (id, meta.mountpoint)
 
     member _.RemoveVolume(id: string, force: bool) =

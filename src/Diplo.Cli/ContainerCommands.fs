@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open Diplo.Cli
+open Diplo.Core
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
@@ -17,12 +18,13 @@ type ListSettings() =
     [<CommandOption("-a|--all")>] member val All = false with get, set
     [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
 
-type ListCommand(output: IOutputPort) =
+type ListCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ListSettings>()
+    new(output: IOutputPort) = ListCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            use client = new ContainerClient()
+            use client = clients.CreateContainerClient()
             let ns = if isNull settings.Namespace then "" else settings.Namespace
             let! response = client.ListAsync(all = settings.All, ct = CancellationToken.None)
 
@@ -46,8 +48,9 @@ type InspectContainerSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
 
-type InspectContainerCommand(output: IOutputPort) =
+type InspectContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<InspectContainerSettings>()
+    new(output: IOutputPort) = InspectContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -55,7 +58,7 @@ type InspectContainerCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.InspectAsync(settings.Id)
 
                 output.WriteSuccess(sprintf "Conteneur %s" response.Name)
@@ -77,8 +80,9 @@ type StartSettings() =
     /// Démarre en attaché à la console (sinon non interactif, en arrière-plan).
     [<CommandOption("-a|--attach")>] member val Attach = false with get, set
 
-type StartContainerCommand(output: IOutputPort) =
+type StartContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<StartSettings>()
+    new(output: IOutputPort) = StartContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -86,7 +90,7 @@ type StartContainerCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.StartAsync(settings.Id, attach = settings.Attach)
                 output.WriteSuccess(sprintf "Conteneur %s démarré (%s)" settings.Id (response.State.ToString()))
                 return 0
@@ -98,8 +102,9 @@ type StopSettings() =
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
     [<CommandOption("-t|--timeout")>] member val Timeout = 10 with get, set
 
-type StopContainerCommand(output: IOutputPort) =
+type StopContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<StopSettings>()
+    new(output: IOutputPort) = StopContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -107,7 +112,7 @@ type StopContainerCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.StopAsync(settings.Id, settings.Timeout)
                 output.WriteSuccess(sprintf "Conteneur %s arrêté (%s)" settings.Id (response.State.ToString()))
                 return 0
@@ -119,8 +124,9 @@ type DeleteSettings() =
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
     [<CommandOption("-f|--force")>] member val Force = false with get, set
 
-type DeleteContainerCommand(output: IOutputPort) =
+type DeleteContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<DeleteSettings>()
+    new(output: IOutputPort) = DeleteContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -128,13 +134,14 @@ type DeleteContainerCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.DeleteAsync(settings.Id, settings.Force)
                 if response.Success then
                     output.WriteSuccess(response.Message)
+                    return 0
                 else
                     output.WriteError(response.Message)
-                return 0
+                    return 1
         }
 
 // ── pull ──────────────────────────────────────────────────────────
@@ -143,8 +150,9 @@ type PullSettings() =
     [<CommandArgument(0, "<IMAGE>")>] member val Image: string = null with get, set
     [<CommandOption("--user")>] member val User: string = null with get, set
 
-type PullImageCommand(output: IOutputPort) =
+type PullImageCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<PullSettings>()
+    new(output: IOutputPort) = PullImageCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -152,7 +160,7 @@ type PullImageCommand(output: IOutputPort) =
                 output.WriteError("L'image est requise")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response =
                     client.PullImageAsync(
                         settings.Image,
@@ -168,8 +176,9 @@ type RegistryLoginSettings() =
     [<CommandOption("--username")>] member val Username: string = null with get, set
     [<CommandOption("--password")>] member val Password: string = null with get, set
 
-type RegistryLoginCommand(output: IOutputPort) =
+type RegistryLoginCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RegistryLoginSettings>()
+    new(output: IOutputPort) = RegistryLoginCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -186,21 +195,23 @@ type RegistryLoginCommand(output: IOutputPort) =
                             TextPrompt<string>("Mot de passe :").Secret())
                     else
                         settings.Password
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.LoginRegistryAsync(settings.Registry, settings.Username, password)
                 if response.Success then
                     output.WriteSuccess(response.Message)
+                    return 0
                 else
                     output.WriteError(response.Message)
-                return 0
+                    return 1
         }
 
 type RegistryLogoutSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<REGISTRY>")>] member val Registry: string = null with get, set
 
-type RegistryLogoutCommand(output: IOutputPort) =
+type RegistryLogoutCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RegistryLogoutSettings>()
+    new(output: IOutputPort) = RegistryLogoutCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -208,35 +219,17 @@ type RegistryLogoutCommand(output: IOutputPort) =
                 output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.LogoutRegistryAsync(settings.Registry)
                 if response.Success then
                     output.WriteSuccess(response.Message)
+                    return 0
                 else
                     output.WriteError(response.Message)
-                return 0
+                    return 1
         }
 
 // ── create ────────────────────────────────────────────────────────
-
-/// Découpe une ligne de commande en arguments en respectant les guillemets
-/// doubles (ex. `cmd /c "echo bonjour le monde"`).
-module CommandLine =
-    let split (line: string) : string list =
-        let tokens = ResizeArray()
-        let current = Text.StringBuilder()
-        let mutable inQuotes = false
-        for c in line do
-            match c with
-            | '"' -> inQuotes <- not inQuotes
-            | ' ' when not inQuotes ->
-                if current.Length > 0 then
-                    tokens.Add(current.ToString())
-                    current.Clear() |> ignore
-            | c -> current.Append(c) |> ignore
-        if current.Length > 0 then
-            tokens.Add(current.ToString())
-        tokens |> List.ofSeq
 
 type CreateContainerSettings() =
     inherit CommandSettings()
@@ -251,8 +244,9 @@ type CreateContainerSettings() =
     [<CommandOption("--memory-limit")>] member val MemoryLimit = 0L with get, set
     [<CommandOption("--cpu-shares")>] member val CpuShares = 0L with get, set
 
-type CreateContainerCommand(output: IOutputPort) =
+type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<CreateContainerSettings>()
+    new(output: IOutputPort) = CreateContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -263,7 +257,7 @@ type CreateContainerCommand(output: IOutputPort) =
                 output.WriteError("L'image est requise")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let env =
                     settings.Env
                     |> Array.choose (fun e ->
@@ -309,8 +303,9 @@ type LogsContainerSettings() =
     [<CommandOption("-n|--tail")>] member val Tail = 100 with get, set
     [<CommandOption("--since")>] member val Since: string = null with get, set
 
-type LogsContainerCommand(output: IOutputPort) =
+type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<LogsContainerSettings>()
+    new(output: IOutputPort) = LogsContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
@@ -318,7 +313,7 @@ type LogsContainerCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let since = if isNull settings.Since then "" else settings.Since
                 try
                     if settings.Follow then
@@ -358,8 +353,9 @@ type ExecContainerSettings() =
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
     [<CommandArgument(1, "<COMMAND>")>] member val Command: string[] = [||] with get, set
 
-type ExecContainerCommand(output: IOutputPort) =
+type ExecContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ExecContainerSettings>()
+    new(output: IOutputPort) = ExecContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -370,7 +366,7 @@ type ExecContainerCommand(output: IOutputPort) =
                 output.WriteError("Au moins une commande est requise")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! entries = client.Exec(settings.Id, settings.Command :> seq<string>)
                 for entry in entries do
                     output.WriteLine(System.Text.Encoding.UTF8.GetString(entry.Data))
@@ -381,12 +377,13 @@ type ExecContainerCommand(output: IOutputPort) =
 type NamespacesSettings() =
     inherit CommandSettings()
 
-type NamespacesCommand(output: IOutputPort) =
+type NamespacesCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<NamespacesSettings>()
+    new(output: IOutputPort) = NamespacesCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
-            use client = new ContainerClient()
+            use client = clients.CreateContainerClient()
             let! response = client.ListNamespacesAsync()
             if response.Namespaces.Count = 0 then
                 output.WriteWarning("Aucun namespace trouvé.")
@@ -401,12 +398,13 @@ type NamespacesCommand(output: IOutputPort) =
 type VersionSettings() =
     inherit CommandSettings()
 
-type VersionCommand(output: IOutputPort) =
+type VersionCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<VersionSettings>()
+    new(output: IOutputPort) = VersionCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
-            use client = new ContainerClient()
+            use client = clients.CreateContainerClient()
             let! v = client.GetVersionAsync()
             output.WriteSuccess("Diplo")
             output.WriteLine(sprintf "  Version   : %s" v.Version)
@@ -423,8 +421,9 @@ type RenameContainerSettings() =
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
     [<CommandArgument(1, "<NEW_NAME>")>] member val NewName: string = null with get, set
 
-type RenameContainerCommand(output: IOutputPort) =
+type RenameContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RenameContainerSettings>()
+    new(output: IOutputPort) = RenameContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -435,13 +434,14 @@ type RenameContainerCommand(output: IOutputPort) =
                 output.WriteError("Le nouveau nom est requis")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.RenameContainerAsync(settings.Id, settings.NewName)
                 if response.Success then
                     output.WriteSuccess(response.Message)
+                    return 0
                 else
                     output.WriteError(response.Message)
-                return 0
+                    return 1
         }
 
 // ── top ───────────────────────────────────────────────────────────
@@ -449,8 +449,9 @@ type TopContainerSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
 
-type TopContainerCommand(output: IOutputPort) =
+type TopContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<TopContainerSettings>()
+    new(output: IOutputPort) = TopContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -458,7 +459,7 @@ type TopContainerCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.TopContainerAsync(settings.Id)
                 if response.Processes.Count = 0 then
                     output.WriteWarning("Aucun processus trouvé dans le conteneur.")
@@ -478,8 +479,9 @@ type StatsContainerSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
 
-type StatsContainerCommand(output: IOutputPort) =
+type StatsContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<StatsContainerSettings>()
+    new(output: IOutputPort) = StatsContainerCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -487,7 +489,7 @@ type StatsContainerCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du conteneur est requis")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let! response = client.GetContainerStatsAsync(settings.Id)
                 output.WriteSuccess(sprintf "Métriques du conteneur %s" settings.Id)
                 output.WriteLine(sprintf "  CPU       : %.2f" response.CpuUsage)
@@ -505,12 +507,13 @@ type ImageListSettings() =
     inherit CommandSettings()
     [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
 
-type ImageListCommand(output: IOutputPort) =
+type ImageListCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ImageListSettings>()
+    new(output: IOutputPort) = ImageListCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            use client = new ContainerClient()
+            use client = clients.CreateContainerClient()
             let ns = if isNull settings.Namespace then "" else settings.Namespace
             let! response = client.ListImagesAsync(ns)
             if response.Images.Count = 0 then
@@ -534,8 +537,9 @@ type ImageInspectSettings() =
     [<CommandArgument(0, "<REF>")>] member val Ref: string = null with get, set
     [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
 
-type ImageInspectCommand(output: IOutputPort) =
+type ImageInspectCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ImageInspectSettings>()
+    new(output: IOutputPort) = ImageInspectCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -543,7 +547,7 @@ type ImageInspectCommand(output: IOutputPort) =
                 output.WriteError("La référence de l'image est requise")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let ns = if isNull settings.Namespace then "" else settings.Namespace
                 let! response = client.InspectImageAsync(settings.Ref, ns)
                 output.WriteSuccess(sprintf "Image %s" response.Ref)
@@ -564,8 +568,9 @@ type ImageRemoveSettings() =
     [<CommandArgument(0, "<REF>")>] member val Ref: string = null with get, set
     [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
 
-type ImageRemoveCommand(output: IOutputPort) =
+type ImageRemoveCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ImageRemoveSettings>()
+    new(output: IOutputPort) = ImageRemoveCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -573,14 +578,15 @@ type ImageRemoveCommand(output: IOutputPort) =
                 output.WriteError("La référence de l'image est requise")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let ns = if isNull settings.Namespace then "" else settings.Namespace
                 let! response = client.RemoveImageAsync(settings.Ref, ns)
                 if response.Success then
                     output.WriteSuccess(response.Message)
+                    return 0
                 else
                     output.WriteError(response.Message)
-                return 0
+                    return 1
         }
 
 // ── image tag ─────────────────────────────────────────────────────
@@ -590,8 +596,9 @@ type ImageTagSettings() =
     [<CommandArgument(1, "<TARGET>")>] member val Target: string = null with get, set
     [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
 
-type ImageTagCommand(output: IOutputPort) =
+type ImageTagCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ImageTagSettings>()
+    new(output: IOutputPort) = ImageTagCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -602,7 +609,7 @@ type ImageTagCommand(output: IOutputPort) =
                 output.WriteError("La référence cible est requise")
                 return 1
             else
-                use client = new ContainerClient()
+                use client = clients.CreateContainerClient()
                 let ns = if isNull settings.Namespace then "" else settings.Namespace
                 let! response = client.TagImageAsync(settings.Source, settings.Target, ns)
                 output.WriteSuccess(response.Message)

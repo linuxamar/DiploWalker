@@ -3,6 +3,7 @@ namespace Diplo.Cli.Tests
 open Xunit
 open FsUnit.Xunit
 open System.Reflection
+open Diplo.TestHelpers
 
 module ``Vérification de la structure des commandes CLI`` =
 

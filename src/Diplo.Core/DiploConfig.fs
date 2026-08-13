@@ -3,8 +3,9 @@ namespace Diplo.Core
 open System
 open System.IO
 open System.Text.Json
+open System.Text.Json.Nodes
 
-/// Lecture du fichier de configuration client `diplo.json` (adresses des services).
+/// Lecture/écriture du fichier de configuration client `diplo.json` (adresses des services).
 /// Format généré par `container config init` :
 /// { "container": { "address": "localhost:5001", "namespace": "default" },
 ///   "volume": { "address": "localhost:5002" },
@@ -23,15 +24,24 @@ module DiploConfig =
         if a.Contains("://") then a
         else "http://" + a
 
-    let private getAddress (root: JsonElement) (section: string) : string option =
+    let private getRaw (root: JsonElement) (section: string) (key: string) : string option =
         let mutable sectionEl = Unchecked.defaultof<JsonElement>
         if root.TryGetProperty(section, &sectionEl) then
-            let mutable addr = Unchecked.defaultof<JsonElement>
-            if sectionEl.TryGetProperty("address", &addr) && addr.ValueKind = JsonValueKind.String then
-                let s = addr.GetString()
-                if String.IsNullOrWhiteSpace(s) then None
-                else Some(normalizeAddress s)
+            let mutable value = Unchecked.defaultof<JsonElement>
+            if sectionEl.TryGetProperty(key, &value) && value.ValueKind = JsonValueKind.String then
+                let s = value.GetString()
+                if String.IsNullOrWhiteSpace(s) then None else Some s
             else None
+        else None
+
+    let private getAddress (root: JsonElement) (section: string) : string option =
+        getRaw root section "address" |> Option.map normalizeAddress
+
+    let private getTopLevel (root: JsonElement) (key: string) : string option =
+        let mutable value = Unchecked.defaultof<JsonElement>
+        if root.TryGetProperty(key, &value) && value.ValueKind = JsonValueKind.String then
+            let s = value.GetString()
+            if String.IsNullOrWhiteSpace(s) then None else Some s
         else None
 
     let private parseConfig (json: string) : (string option * string option * string option) =
@@ -41,6 +51,19 @@ module DiploConfig =
             (getAddress root "container", getAddress root "volume", getAddress root "network")
         with _ ->
             (None, None, None)
+
+    /// Extrait les métadonnées (namespace, logLevel) d'un fichier existant afin de les
+    /// conserver lors d'une sauvegarde.
+    let private readMeta (path: string) : (string option * string option) =
+        try
+            if File.Exists path then
+                use doc = JsonDocument.Parse(File.ReadAllText path, JsonDocumentOptions(MaxDepth = 8))
+                let root = doc.RootElement
+                (getRaw root "container" "namespace", getTopLevel root "logLevel")
+            else
+                (None, None)
+        with _ ->
+            (None, None)
 
     /// Résout le chemin du fichier de configuration, par priorité :
     /// 1. `DIPLO_CONFIG_HOME/diplo.json` si la variable d'environnement est définie ;
@@ -58,22 +81,60 @@ module DiploConfig =
         if File.Exists path then parseConfig (File.ReadAllText path)
         else (None, None, None)
 
-    /// Config lue une seule fois par processus (fichier volontairement ignoré
-    /// s'il est absent ou mal formé : repli sur les ports par défaut).
-    let private cached = lazy (load (configPath ()))
+    /// Cache de la configuration lue une seule fois par processus, vidé par
+    /// `invalidate` (fichier volontairement ignoré s'il est absent ou mal formé :
+    /// repli sur les ports par défaut).
+    let private cacheLock = obj()
+    let private cacheValue = ref None
+
+    let private readCached () =
+        lock cacheLock (fun () ->
+            match cacheValue.Value with
+            | Some value -> value
+            | None ->
+                let value = load (configPath ())
+                cacheValue.Value <- Some value
+                value)
 
     let containerAddress () : string option =
-        let (c, _, _) = cached.Value
+        let (c, _, _) = readCached ()
         c
 
     let volumeAddress () : string option =
-        let (_, v, _) = cached.Value
+        let (_, v, _) = readCached ()
         v
 
     let networkAddress () : string option =
-        let (_, _, n) = cached.Value
+        let (_, _, n) = readCached ()
         n
+
+    /// Vide le cache : la prochaine lecture relira le fichier. Utilisé par la GUI
+    /// après un enregistrement des paramètres pour appliquer la configuration
+    /// sans redémarrage.
+    let invalidate () =
+        lock cacheLock (fun () -> cacheValue.Value <- None)
 
     /// Parse un texte JSON (exposé pour les tests).
     let parse (json: string) : (string option * string option * string option) =
         parseConfig json
+
+    /// Écrit la configuration client dans `path` (le répertoire parent est créé au
+    /// besoin). Les champs `namespace` et `logLevel` déjà présents sont conservés.
+    let save (path: string) (container: string) (volume: string) (network: string) : unit =
+        let ns, logLevel = readMeta path
+        let containerSection = JsonObject()
+        containerSection["address"] <- JsonValue.Create(container)
+        ns |> Option.iter (fun n -> containerSection["namespace"] <- JsonValue.Create(n))
+        let volumeSection = JsonObject()
+        volumeSection["address"] <- JsonValue.Create(volume)
+        let networkSection = JsonObject()
+        networkSection["address"] <- JsonValue.Create(network)
+        let root = JsonObject()
+        root["container"] <- containerSection
+        root["volume"] <- volumeSection
+        root["network"] <- networkSection
+        logLevel |> Option.iter (fun l -> root["logLevel"] <- JsonValue.Create(l))
+        let dir = Path.GetDirectoryName(path)
+        if not (String.IsNullOrEmpty dir) && not (Directory.Exists dir) then
+            Directory.CreateDirectory(dir) |> ignore
+        File.WriteAllText(path, root.ToJsonString(JsonSerializerOptions(WriteIndented = true)))

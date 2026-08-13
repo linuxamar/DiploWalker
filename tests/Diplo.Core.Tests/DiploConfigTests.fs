@@ -70,6 +70,87 @@ module DiploConfigTests =
         finally
             Directory.Delete(dir, true)
 
+    // ── save ───────────────────────────────────────────────────────
+
+    let private tempDir () =
+        let dir = Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory(dir) |> ignore
+        dir
+
+    [<Fact>]
+    let ``save écrit un fichier relu par load`` () =
+        let dir = tempDir ()
+        try
+            let path = Path.Combine(dir, "diplo.json")
+            DiploConfig.save path "localhost:5001" "localhost:5002" "http://pipe:/diplo-network"
+            let (c, v, n) = DiploConfig.load path
+            c |> should equal (Some "http://localhost:5001")
+            v |> should equal (Some "http://localhost:5002")
+            n |> should equal (Some "http://pipe:/diplo-network")
+        finally
+            Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``save préserve namespace et logLevel existants`` () =
+        let dir = tempDir ()
+        try
+            let path = Path.Combine(dir, "diplo.json")
+            File.WriteAllText(path, """{ "container": { "address": "localhost:5001", "namespace": "prod" }, "volume": { "address": "localhost:5002" }, "network": { "address": "localhost:5003" }, "logLevel": "Debug" }""")
+            DiploConfig.save path "localhost:9001" "localhost:9002" "localhost:9003"
+            let content = File.ReadAllText path
+            content |> should haveSubstring "\"namespace\": \"prod\""
+            content |> should haveSubstring "\"logLevel\": \"Debug\""
+            content |> should haveSubstring "\"address\": \"localhost:9001\""
+            let (c, _, _) = DiploConfig.load path
+            c |> should equal (Some "http://localhost:9001")
+        finally
+            Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``save sans fichier existant n'ajoute pas de metadata`` () =
+        let dir = tempDir ()
+        try
+            let path = Path.Combine(dir, "diplo.json")
+            DiploConfig.save path "localhost:5001" "localhost:5002" "localhost:5003"
+            let content = File.ReadAllText path
+            content |> should not' (haveSubstring "namespace")
+            content |> should not' (haveSubstring "logLevel")
+        finally
+            Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``save crée le répertoire parent manquant`` () =
+        let dir = tempDir ()
+        try
+            let nested = Path.Combine(dir, "sous", "dossier")
+            let path = Path.Combine(nested, "diplo.json")
+            DiploConfig.save path "localhost:5001" "localhost:5002" "localhost:5003"
+            File.Exists path |> should equal true
+        finally
+            Directory.Delete(dir, true)
+
+    // ── cache / invalidate ─────────────────────────────────────────
+
+    [<Fact>]
+    let ``invalidate vide le cache et relit la configuration`` () =
+        let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
+        let home = Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory(home) |> ignore
+        Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", home)
+        try
+            let path = Path.Combine(home, "diplo.json")
+            DiploConfig.save path "localhost:5001" "localhost:5002" "localhost:5003"
+            DiploConfig.invalidate()
+            DiploConfig.containerAddress() |> should equal (Some "http://localhost:5001")
+            DiploConfig.save path "localhost:9001" "localhost:9002" "localhost:9003"
+            DiploConfig.containerAddress() |> should equal (Some "http://localhost:5001")
+            DiploConfig.invalidate()
+            DiploConfig.containerAddress() |> should equal (Some "http://localhost:9001")
+        finally
+            Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
+            DiploConfig.invalidate()
+            if Directory.Exists home then Directory.Delete(home, true)
+
     // ── normalizeAddress ────────────────────────────────────────────
 
     [<Fact>]

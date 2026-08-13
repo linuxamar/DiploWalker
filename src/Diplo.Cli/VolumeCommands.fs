@@ -13,12 +13,13 @@ open Spectre.Console.Cli
 type ListVolumesSettings() =
     inherit CommandSettings()
 
-type ListVolumesCommand(output: IOutputPort) =
+type ListVolumesCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ListVolumesSettings>()
+    new(output: IOutputPort) = ListVolumesCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
-            use client = new VolumeClient()
+            use client = clients.CreateVolumeClient()
             let! response = client.ListAsync(ct = CancellationToken.None)
 
             if response.Volumes.Count = 0 then
@@ -41,8 +42,9 @@ type InspectVolumeSettings() =
     inherit CommandSettings()
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
 
-type InspectVolumeCommand(output: IOutputPort) =
+type InspectVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<InspectVolumeSettings>()
+    new(output: IOutputPort) = InspectVolumeCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -50,7 +52,7 @@ type InspectVolumeCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
             else
-                use client = new VolumeClient()
+                use client = clients.CreateVolumeClient()
                 let! response = client.InspectAsync(settings.Id)
 
                 output.WriteSuccess(sprintf "Volume %s" response.Name)
@@ -76,8 +78,9 @@ type CreateVolumeSettings() =
     [<CommandOption("--export")>] member val Export: string = null with get, set
     [<CommandOption("--opt")>] member val Opts: string[] = [||] with get, set
 
-type CreateVolumeCommand(output: IOutputPort) =
+type CreateVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<CreateVolumeSettings>()
+    new(output: IOutputPort) = CreateVolumeCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -120,7 +123,7 @@ type CreateVolumeCommand(output: IOutputPort) =
                     | [| k; v |] when not (String.IsNullOrWhiteSpace k) -> driverOpts.[k] <- v
                     | _ -> ()
 
-                use client = new VolumeClient()
+                use client = clients.CreateVolumeClient()
                 let! response =
                     client.CreateAsync(
                         name = settings.Name,
@@ -136,8 +139,9 @@ type RemoveVolumeSettings() =
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
     [<CommandOption("-f|--force")>] member val Force = false with get, set
 
-type RemoveVolumeCommand(output: IOutputPort) =
+type RemoveVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RemoveVolumeSettings>()
+    new(output: IOutputPort) = RemoveVolumeCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -145,13 +149,14 @@ type RemoveVolumeCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
             else
-                use client = new VolumeClient()
+                use client = clients.CreateVolumeClient()
                 let! response = client.RemoveAsync(settings.Id, settings.Force)
                 if response.Success then
                     output.WriteSuccess(response.Message)
+                    return 0
                 else
                     output.WriteError(response.Message)
-                return 0
+                    return 1
         }
 
 // ── mount ─────────────────────────────────────────────────────────
@@ -160,8 +165,9 @@ type MountSettings() =
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
     [<CommandArgument(1, "<TARGET>")>] member val Target: string = null with get, set
 
-type MountVolumeCommand(output: IOutputPort) =
+type MountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<MountSettings>()
+    new(output: IOutputPort) = MountVolumeCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -169,7 +175,7 @@ type MountVolumeCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
             else
-                use client = new VolumeClient()
+                use client = clients.CreateVolumeClient()
                 let! response = client.MountAsync(settings.Id, settings.Target)
                 output.WriteSuccess(sprintf "Volume %s monté sur %s (%s)" settings.Id settings.Target response.Mountpoint)
                 return 0
@@ -181,8 +187,9 @@ type UnmountSettings() =
     [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
     [<CommandArgument(1, "<TARGET>")>] member val Target: string = null with get, set
 
-type UnmountVolumeCommand(output: IOutputPort) =
+type UnmountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<UnmountSettings>()
+    new(output: IOutputPort) = UnmountVolumeCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
@@ -190,7 +197,7 @@ type UnmountVolumeCommand(output: IOutputPort) =
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
             else
-                use client = new VolumeClient()
+                use client = clients.CreateVolumeClient()
                 let! response = client.UnmountAsync(settings.Id, settings.Target)
                 output.WriteSuccess(sprintf "Volume %s démonté de %s" settings.Id settings.Target)
                 return 0
@@ -200,12 +207,13 @@ type UnmountVolumeCommand(output: IOutputPort) =
 type PruneVolumesSettings() =
     inherit CommandSettings()
 
-type PruneVolumesCommand(output: IOutputPort) =
+type PruneVolumesCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<PruneVolumesSettings>()
+    new(output: IOutputPort) = PruneVolumesCommand(output, DiploClients())
 
     override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
         task {
-            use client = new VolumeClient()
+            use client = clients.CreateVolumeClient()
             let! response = client.PruneVolumesAsync()
             if response.Count > 0 then
                 output.WriteSuccess(response.Message)

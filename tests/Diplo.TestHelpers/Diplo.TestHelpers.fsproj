@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="MockOutputPort.fs" />
+    <Compile Include="FakeClients.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Diplo.Core\Diplo.Core.fsproj" />
+    <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.fsproj" />
+  </ItemGroup>
+
+</Project>

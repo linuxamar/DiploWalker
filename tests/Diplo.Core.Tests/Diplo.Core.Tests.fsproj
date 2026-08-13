@@ -13,6 +13,7 @@
     <Compile Include="NetworkClientTests.fs" />
     <Compile Include="ComposeTests.fs" />
     <Compile Include="MountParserTests.fs" />
+    <Compile Include="CommandLineTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
