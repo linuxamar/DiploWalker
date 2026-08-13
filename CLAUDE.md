@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Diplo.Installer | Installation Windows (services, containerd, CNI) |
 | Diplo.Grpc | Types messages et interfaces de service gRPC (protobuf-net, code-first) |
 | Diplo.Contracts | Types partagés entre services |
-| Diplo.Core | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`) |
+| Diplo.Core | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `diplo.json` et support des named pipes (`http://pipe:/<nom>`) |
 | Diplo.Disk | Montage d'images disque (qcow2 maison, raw, vhd, vhdx, vmdk) via DiscUtils |
 | Diplo.Cli | Client CLI (Spectre.Console) |
 | Diplo.Gui | Interface graphique Avalonia |
@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **.NET 10** (`dotnet 10.0.302` installé localement).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
-- **Tests** : xUnit v3 + FsUnit.xUnit — 626 tests au total (dont 29 d'intégration gRPC).
+- **Tests** : xUnit v3 + FsUnit.xUnit — 652 tests au total (dont 30 d'intégration gRPC).
 
 ## Commandes
 

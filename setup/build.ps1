@@ -16,7 +16,8 @@ param(
     [string]$PublishRoot,
     [switch]$Sign,
     [string]$SignCert,
-    [string]$SignPassword
+    [string]$SignPassword,
+    [string]$SignThumbprint
 )
 
 $ErrorActionPreference = "Stop"
@@ -79,19 +80,36 @@ if (Test-Path $defaultOut) {
 if ($Sign) {
     $signtool = Get-Command "signtool.exe" -ErrorAction SilentlyContinue
     if (-not $signtool) {
-        Write-Warning "signtool.exe introuvable — signature ignorée."
+        # signtool fait partie du SDK Windows ; on le cherche dans les kits installés.
+        $sdkSigntool = Get-ChildItem -Path (
+            "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe",
+            "C:\Program Files\Windows Kits\10\bin\*\x64\signtool.exe"
+        ) -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+        if ($sdkSigntool) {
+            $signtool = [pscustomobject]@{ Source = $sdkSigntool.FullName }
+        }
+    }
+    if (-not $signtool) {
+        Write-Warning "signtool.exe introuvable (installez le SDK Windows ou ajoutez-le au PATH) — signature ignorée."
     } else {
         Write-Host ""
         Write-Host "═══ Signature ═══" -ForegroundColor Cyan
+        Write-Host "  signtool : $($signtool.Source)"
 
         $signArgs = @("sign", "/fd", "SHA256")
 
-        if ($SignCert) {
+        if ($SignThumbprint) {
+            # Certificat du magasin désigné par son empreinte (SHA-1 ou SHA-256).
+            $signArgs += "/sha1", $SignThumbprint
+        } elseif ($SignCert) {
             $signArgs += "/f", $SignCert
             if ($SignPassword) {
                 $signArgs += "/p", $SignPassword
             }
         } else {
+            # Sélection automatique du premier certificat de signature disponible.
             $signArgs += "/a"
         }
 

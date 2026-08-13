@@ -24,7 +24,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (626 tests)
+- **Tests** : xUnit (652 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -106,6 +106,29 @@ sc.exe start "Diplo.Volume"
 sc.exe start "Diplo.Network"
 ```
 
+### Configuration du client (diplo.json)
+
+Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `diplo.json` situé dans le répertoire courant. S'il est absent, ils retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003`).
+
+```powershell
+diplo config init                       # génère diplo.json avec le transport TCP par défaut
+diplo config init --transport pipe      # génère diplo.json avec des adresses par named pipes
+diplo config init --path C:\etc\diplo.json --transport pipe
+```
+
+```json
+{
+  "container": { "address": "http://pipe:/diplo-container", "namespace": "default" },
+  "volume":    { "address": "http://pipe:/diplo-volume" },
+  "network":   { "address": "http://pipe:/diplo-network" },
+  "logLevel":  "Information"
+}
+```
+
+- `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
+- `pipe` : adresses `http://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplo-container`, `diplo-volume`, `diplo-network`).
+- Les adresses `http://pipe:/...` sont validées (hôte local uniquement, nom de tube sans `\` ni `..`).
+
 ## Développement
 
 ### Build
@@ -119,6 +142,10 @@ Options disponibles :
 - `-Restore` : Restauration des packages NuGet
 - `-DoTests` : Exécution des tests
 - `-DoPublish` : Publication des exécutables
+- `-SignCert <pfx> [-SignPassword <mot-de-passe>]` : signe les installateurs avec un certificat PFX
+- `-SignThumbprint <empreinte>` : signe avec un certificat du magasin (par empreinte SHA-1/SHA-256)
+
+`signtool.exe` est recherché dans le PATH puis dans les Windows Kits installés. Sans certificat disponible, la signature est ignorée (simple avertissement).
 
 ### Structure du projet
 
