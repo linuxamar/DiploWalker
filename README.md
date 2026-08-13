@@ -142,6 +142,10 @@ Options disponibles :
 - `-Restore` : Restauration des packages NuGet
 - `-DoTests` : Exécution des tests
 - `-DoPublish` : Publication des exécutables
+- `-SignCert <pfx> [-SignPassword <mot-de-passe>]` : signe les installateurs avec un certificat PFX
+- `-SignThumbprint <empreinte>` : signe avec un certificat du magasin (par empreinte SHA-1/SHA-256)
+
+`signtool.exe` est recherché dans le PATH puis dans les Windows Kits installés. Sans certificat disponible, la signature est ignorée (simple avertissement).
 
 ### Structure du projet
 

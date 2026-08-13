@@ -11,6 +11,8 @@
 #    .\pipeline.ps1 -Clean           # supprime bin/ obj/ avant publication
 #    .\pipeline.ps1 -DoTests         # lance uniquement les tests
 #    .\pipeline.ps1 -DoPublish       # publie uniquement (sans tests)
+#    .\pipeline.ps1 -DoPublish -SignCert C:\certs\code.pfx -SignPassword "***"
+#    .\pipeline.ps1 -DoPublish -SignThumbprint <SHA1-du-certificat>
 # ---------------------------------------------------------------------------
 
 [CmdletBinding()]
@@ -20,7 +22,10 @@ param(
     [switch]$Restore,
     [switch]$Clean,
     [switch]$DoTests,
-    [switch]$DoPublish
+    [switch]$DoPublish,
+    [string]$SignCert,
+    [string]$SignPassword,
+    [string]$SignThumbprint
 )
 
 # -DoTests et -DoPublish peuvent être combinés :
@@ -247,7 +252,11 @@ if ($runPublish) {
     Write-Host ""
     Write-Host "═══ Package NSIS ($plat) ═══" -ForegroundColor Cyan
             $appVersion = (Select-Xml -Path (Join-Path $PSScriptRoot "Directory.Build.props") -XPath "//Version").Node.InnerText
-            & $setupScript -Version $appVersion -Platform $plat -Sign
+            $setupArgs = @("-Version", $appVersion, "-Platform", $plat, "-Sign")
+            if ($SignCert) { $setupArgs += "-SignCert", $SignCert }
+            if ($SignPassword) { $setupArgs += "-SignPassword", $SignPassword }
+            if ($SignThumbprint) { $setupArgs += "-SignThumbprint", $SignThumbprint }
+            & $setupScript @setupArgs
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "Le packaging NSIS a échoué pour $plat."
             } else {
