@@ -6,8 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="MockOutputPort.fs" />
-    <Compile Include="FakeClients.fs" />
     <Compile Include="CommandSettingsTests.fs" />
     <Compile Include="ExitCodeTests.fs" />
     <Compile Include="SuccessPathTests.fs" />
@@ -27,6 +25,7 @@
     <ProjectReference Include="..\..\src\Diplo.Cli\Diplo.Cli.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Core\Diplo.Core.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.fsproj" />
+    <ProjectReference Include="..\Diplo.TestHelpers\Diplo.TestHelpers.fsproj" />
   </ItemGroup>
 
 </Project>

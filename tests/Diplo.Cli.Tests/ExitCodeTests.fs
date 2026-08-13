@@ -9,6 +9,7 @@ module ExitCodeTests =
     open FsUnit.Xunit
     open Diplo.Core.Output
     open Spectre.Console.Cli
+    open Diplo.TestHelpers
 
     let private run (cmd: AsyncCommand<'T>) (settings: 'T) : int =
         let command = cmd :> ICommand<'T>

@@ -1,4 +1,4 @@
-namespace Diplo.Cli.Tests
+namespace Diplo.TestHelpers
 
 open System
 open System.Collections.Generic

@@ -10,6 +10,7 @@ module SuccessPathTests =
     open FsUnit.Xunit
     open Spectre.Console.Cli
     open Diplo.Core.Clients
+    open Diplo.TestHelpers
     open Diplo.Grpc.Container
     open Diplo.Grpc.Network
     open Diplo.Grpc.Volume

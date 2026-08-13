@@ -30,5 +30,6 @@
     </Project>
     <Project Path="tests/Diplo.Installer.Tests/Diplo.Installer.Tests.fsproj" />
     <Project Path="tests/Diplo.Integration.Tests/Diplo.Integration.Tests.fsproj" />
+    <Project Path="tests/Diplo.TestHelpers/Diplo.TestHelpers.fsproj" />
   </Folder>
 </Solution>

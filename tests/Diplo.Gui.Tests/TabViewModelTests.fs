@@ -13,36 +13,37 @@ open Diplo.Core.Output
 open Diplo.Grpc.Container
 open Diplo.Gui.Services
 open Diplo.Gui.ViewModels
+open Diplo.TestHelpers
 
-// ── FakeOutputPort ──────────────────────────────────────────
+// ── MockOutputPort ──────────────────────────────────────────
 
 [<Fact>]
-let ``FakeOutputPort.WriteLine enregistre le message`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+let ``MockOutputPort.WriteLine enregistre le message`` () =
+    let port = MockOutputPort()
     (port :> IOutputPort).WriteLine("hello")
     port.Messages |> should contain "hello"
 
 [<Fact>]
-let ``FakeOutputPort.WriteError enregistre l'erreur`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+let ``MockOutputPort.WriteError enregistre l'erreur`` () =
+    let port = MockOutputPort()
     (port :> IOutputPort).WriteError("err")
     port.Errors |> should contain "err"
 
 [<Fact>]
-let ``FakeOutputPort.WriteSuccess enregistre le succes`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+let ``MockOutputPort.WriteSuccess enregistre le succes`` () =
+    let port = MockOutputPort()
     (port :> IOutputPort).WriteSuccess("ok")
     port.Successes |> should contain "ok"
 
 [<Fact>]
-let ``FakeOutputPort.WriteWarning enregistre l'avertissement`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+let ``MockOutputPort.WriteWarning enregistre l'avertissement`` () =
+    let port = MockOutputPort()
     (port :> IOutputPort).WriteWarning("warn")
     port.Warnings |> should contain "warn"
 
 [<Fact>]
-let ``FakeOutputPort.Clear remet tout à zéro`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+let ``MockOutputPort.Clear remet tout à zéro`` () =
+    let port = MockOutputPort()
     (port :> IOutputPort).WriteLine("x")
     (port :> IOutputPort).WriteError("y")
     port.Clear()
@@ -53,7 +54,7 @@ let ``FakeOutputPort.Clear remet tout à zéro`` () =
 
 [<Fact>]
 let ``ComposeTabViewModel expose les 6 commandes ICommand`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ComposeTabViewModel(port)
     vm.ComposeUpCommand     |> should not' (be Null)
     vm.ComposeDownCommand   |> should not' (be Null)
@@ -64,7 +65,7 @@ let ``ComposeTabViewModel expose les 6 commandes ICommand`` () =
 
 [<Fact>]
 let ``ComposeTabViewModel etat initial`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ComposeTabViewModel(port)
     vm.ComposeFilePath   |> should equal ""
     vm.ComposeServiceName |> should equal ""
@@ -72,7 +73,7 @@ let ``ComposeTabViewModel etat initial`` () =
 
 [<Fact>]
 let ``ComposeTabViewModel proprietes declenchent PropertyChanged`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ComposeTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
@@ -85,7 +86,7 @@ let ``ComposeTabViewModel proprietes declenchent PropertyChanged`` () =
 
 [<Fact>]
 let ``ContainerTabViewModel expose les commandes ICommand`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port)
     vm.ListContainersCommand     |> should not' (be Null)
     vm.StartContainerCommand     |> should not' (be Null)
@@ -110,7 +111,7 @@ let ``ContainerTabViewModel expose les commandes ICommand`` () =
 
 [<Fact>]
 let ``ContainerTabViewModel etat initial`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port)
     vm.ContainerIdInput     |> should equal ""
     vm.ContainerNameInput   |> should equal ""
@@ -121,13 +122,13 @@ let ``ContainerTabViewModel etat initial`` () =
 
 [<Fact>]
 let ``ContainerTabViewModel user pull etat initial`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port)
     vm.ContainerImageUser |> should equal ""
 
 [<Fact>]
 let ``ContainerTabViewModel user pull declenche PropertyChanged`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
@@ -136,7 +137,7 @@ let ``ContainerTabViewModel user pull declenche PropertyChanged`` () =
 
 [<Fact>]
 let ``ContainerTabViewModel registres etat initial`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port)
     vm.RegistryInput           |> should equal ""
     vm.RegistryUsernameInput   |> should equal ""
@@ -144,7 +145,7 @@ let ``ContainerTabViewModel registres etat initial`` () =
 
 [<Fact>]
 let ``ContainerTabViewModel proprietes registres declenchent PropertyChanged`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
@@ -157,7 +158,7 @@ let ``ContainerTabViewModel proprietes registres declenchent PropertyChanged`` (
 
 [<Fact>]
 let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
@@ -172,7 +173,7 @@ let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
 
 [<Fact>]
 let ``VolumeTabViewModel expose les 7 commandes ICommand`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = VolumeTabViewModel(port)
     vm.ListVolumesCommand     |> should not' (be Null)
     vm.InspectVolumeCommand   |> should not' (be Null)
@@ -184,7 +185,7 @@ let ``VolumeTabViewModel expose les 7 commandes ICommand`` () =
 
 [<Fact>]
 let ``VolumeTabViewModel etat initial`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = VolumeTabViewModel(port)
     vm.VolumeIdInput     |> should equal ""
     vm.VolumeNameInput   |> should equal ""
@@ -194,7 +195,7 @@ let ``VolumeTabViewModel etat initial`` () =
 
 [<Fact>]
 let ``NetworkTabViewModel expose les 8 commandes ICommand`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = NetworkTabViewModel(port)
     vm.ListNetworksCommand       |> should not' (be Null)
     vm.InspectNetworkCommand     |> should not' (be Null)
@@ -207,7 +208,7 @@ let ``NetworkTabViewModel expose les 8 commandes ICommand`` () =
 
 [<Fact>]
 let ``NetworkTabViewModel etat initial`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = NetworkTabViewModel(port)
     vm.NetworkIdInput   |> should equal ""
     vm.NetworkNameInput |> should equal ""
@@ -229,7 +230,7 @@ let private withConfigHome (action: string -> unit) =
 [<Fact>]
 let ``SettingsTabViewModel expose les commandes ICommand`` () =
     withConfigHome (fun _ ->
-        let port = FakeOutputPort.FakeOutputPort()
+        let port = MockOutputPort()
         let vm = SettingsTabViewModel(port)
         vm.SaveCommand     |> should not' (be Null)
         vm.ReloadCommand   |> should not' (be Null))
@@ -237,7 +238,7 @@ let ``SettingsTabViewModel expose les commandes ICommand`` () =
 [<Fact>]
 let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
     withConfigHome (fun home ->
-        let port = FakeOutputPort.FakeOutputPort()
+        let port = MockOutputPort()
         let vm = SettingsTabViewModel(port)
         vm.ConfigPath |> should equal (Path.Combine(home, "diplo.json"))
         vm.ContainerAddress |> should equal "localhost:5001"
@@ -247,7 +248,7 @@ let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
 [<Fact>]
 let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` () =
     withConfigHome (fun home ->
-        let port = FakeOutputPort.FakeOutputPort()
+        let port = MockOutputPort()
         let vm = SettingsTabViewModel(port)
         vm.ContainerAddress <- "http://pipe:/diplo-container"
         vm.VolumeAddress <- "localhost:9002"
@@ -265,7 +266,7 @@ let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` ()
 [<Fact>]
 let ``SettingsTabViewModel SaveCommand avec adresse vide signale une erreur`` () =
     withConfigHome (fun _ ->
-        let port = FakeOutputPort.FakeOutputPort()
+        let port = MockOutputPort()
         let vm = SettingsTabViewModel(port)
         vm.ContainerAddress <- ""
         (vm.SaveCommand).Execute(null)
@@ -274,7 +275,7 @@ let ``SettingsTabViewModel SaveCommand avec adresse vide signale une erreur`` ()
 [<Fact>]
 let ``SettingsTabViewModel SaveCommand applique la configuration sans redemarrage`` () =
     withConfigHome (fun _ ->
-        let port = FakeOutputPort.FakeOutputPort()
+        let port = MockOutputPort()
         let vm = SettingsTabViewModel(port)
         vm.ContainerAddress <- "http://pipe:/diplo-container"
         vm.VolumeAddress <- "localhost:9002"
@@ -288,7 +289,7 @@ let ``SettingsTabViewModel ReloadCommand relit la configuration depuis le disque
     withConfigHome (fun home ->
         let path = Path.Combine(home, "diplo.json")
         DiploConfig.save path "localhost:7001" "localhost:7002" "localhost:7003"
-        let port = FakeOutputPort.FakeOutputPort()
+        let port = MockOutputPort()
         let vm = SettingsTabViewModel(port)
         vm.ContainerAddress |> should equal "http://localhost:7001"
         vm.VolumeAddress |> should equal "http://localhost:7002"
@@ -330,7 +331,7 @@ let private waitUntil (predicate: unit -> bool) =
 
 [<Fact>]
 let ``ContainerTabViewModel GetContainerLogs en mode suivi emet chaque ligne au fil de l'eau`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
     vm.ContainerIdInput <- "c1"
     vm.ContainerFollow <- true
@@ -342,7 +343,7 @@ let ``ContainerTabViewModel GetContainerLogs en mode suivi emet chaque ligne au 
 
 [<Fact>]
 let ``ContainerTabViewModel GetContainerLogs sans suivi affiche l'instantané en bloc`` () =
-    let port = FakeOutputPort.FakeOutputPort()
+    let port = MockOutputPort()
     let vm = ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
     vm.ContainerIdInput <- "c1"
     vm.ContainerFollow <- false
