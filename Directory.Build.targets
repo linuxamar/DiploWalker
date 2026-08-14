@@ -1,0 +1,113 @@
+<Project>
+
+  <!--
+    Signature Authenticode des binaires à la compilation.
+    Chaque projet signe sa sortie ($(TargetPath)) avec SON certificat de
+    signature de code (certificates\codesigning\leaves\<Projet>\), via signtool
+    (SDK Windows). Les clés privées n'étant pas versionnées, il faut d'abord
+    générer les certificats : certificates\codesigning\leaves\regenerate-leaves.ps1.
+
+    Comportement :
+      - PFX du projet absent  → binaire non signé (message d'information).
+      - PFX présent, signtool introuvable → ERREUR de build (exigence stricte).
+      - Désactivation : -p:DiploSignOutputAfterBuild=false (ex. CI sans clés).
+      - Horodatage : -p:DiploCodeSigningTimestampUrl=http://timestamp.digicert.com
+    -->
+
+  <PropertyGroup>
+    <DiploCodeSigningLeaves>$(MSBuildThisFileDirectory)certificates\codesigning\leaves</DiploCodeSigningLeaves>
+    <DiploSignOutputAfterBuild>true</DiploSignOutputAfterBuild>
+    <DiploCodeSigningTimestampUrl></DiploCodeSigningTimestampUrl>
+    <DiploSigntoolExe></DiploSigntoolExe>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(DiploCodeSigningTimestampUrl)' != ''">
+    <DiploCodeSigningTimestampArgs>/tr $(DiploCodeSigningTimestampUrl) /td SHA256</DiploCodeSigningTimestampArgs>
+  </PropertyGroup>
+
+  <!-- Candidats signtool : SDK Windows installés, puis override -p:DiploSigntoolExe -->
+  <ItemGroup>
+    <DiploSigntoolCandidates Include="$(MSBuildProgramFiles32)\Windows Kits\10\bin\*\x64\signtool.exe" />
+    <DiploSigntoolCandidates Include="$(ProgramFiles)\Windows Kits\10\bin\*\x64\signtool.exe" />
+    <DiploSigntoolCandidates Include="$(DiploSigntoolExe)" Condition="'$(DiploSigntoolExe)' != ''" />
+  </ItemGroup>
+
+  <Target Name="DiploSignBinary" AfterTargets="Build"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(DiploSignOutputAfterBuild)' == 'true' and '$(TargetPath)' != ''">
+
+    <!-- Certificat de signature propre au projet en cours de compilation -->
+    <PropertyGroup>
+      <DiploCodeSigningPfx>$(DiploCodeSigningLeaves)\$(MSBuildProjectName)\$(MSBuildProjectName).pfx</DiploCodeSigningPfx>
+    </PropertyGroup>
+
+    <!-- Pas de PFX (poste non initialisé ou CI) : pas de signature -->
+    <PropertyGroup Condition="!Exists('$(DiploCodeSigningPfx)')">
+      <DiploCodeSigningDisabled>true</DiploCodeSigningDisabled>
+    </PropertyGroup>
+
+    <Message Condition="'$(DiploCodeSigningDisabled)' == 'true'"
+             Importance="normal"
+             Text="Diplo : certificat de signature absent — $(DiploCodeSigningPfx). Binaire NON signé. Générer avec certificates\codesigning\leaves\regenerate-leaves.ps1." />
+
+    <!-- Résolution de signtool : la dernière version installée est préférée -->
+    <PropertyGroup Condition="'$(DiploCodeSigningDisabled)' != 'true' and '$(DiploSigntool)' == '' and '@(DiploSigntoolCandidates)' != ''">
+      <DiploSigntoolList>@(DiploSigntoolCandidates, ';')</DiploSigntoolList>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(DiploSigntool)' == '' and '$(DiploSigntoolList)' != '' and $(DiploSigntoolList.Contains(&apos;;&apos;))">
+      <DiploSigntool>$(DiploSigntoolList.Substring($([MSBuild]::Add($(DiploSigntoolList.LastIndexOf(&apos;;&apos;)), 1))))</DiploSigntool>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(DiploSigntool)' == '' and '$(DiploSigntoolList)' != '' and !$(DiploSigntoolList.Contains(&apos;;&apos;))">
+      <DiploSigntool>$(DiploSigntoolList)</DiploSigntool>
+    </PropertyGroup>
+
+    <!-- Exigence stricte : la signature est obligatoire, signtool doit exister -->
+    <Error Condition="'$(DiploCodeSigningDisabled)' != 'true' and '$(DiploSigntool)' == ''"
+           Text="Signature de code : signtool.exe introuvable. Installez le SDK Windows ou positionnez -p:DiploSigntoolExe=... " />
+
+    <Exec Condition="'$(DiploCodeSigningDisabled)' != 'true'"
+          Command="&quot;$(DiploSigntool)&quot; sign /fd SHA256 /f &quot;$(DiploCodeSigningPfx)&quot; $(DiploCodeSigningTimestampArgs) &quot;$(TargetPath)&quot;" />
+  </Target>
+
+  <!--
+    Signature des sorties publiées (PublishDir).
+    La copie vers PublishDir se déroulant avant la cible ci-dessus, les DLL/EXE
+    publiés restaient non signés. Cette cible signe après Publish tous les
+    binaires Diplo* avec le certificat du projet publié.
+    -->
+  <Target Name="DiploSignPublishOutput" AfterTargets="Publish"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(DiploSignOutputAfterBuild)' == 'true' and '$(PublishDir)' != ''">
+
+    <PropertyGroup>
+      <DiploCodeSigningPfx>$(DiploCodeSigningLeaves)\$(MSBuildProjectName)\$(MSBuildProjectName).pfx</DiploCodeSigningPfx>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="!Exists('$(DiploCodeSigningPfx)')">
+      <DiploCodeSigningDisabled>true</DiploCodeSigningDisabled>
+    </PropertyGroup>
+
+    <Message Condition="'$(DiploCodeSigningDisabled)' == 'true'"
+             Importance="normal"
+             Text="Diplo : certificat de signature absent — publication non signée." />
+
+    <PropertyGroup Condition="'$(DiploCodeSigningDisabled)' != 'true' and '$(DiploSigntool)' == '' and '@(DiploSigntoolCandidates)' != ''">
+      <DiploSigntoolList>@(DiploSigntoolCandidates, ';')</DiploSigntoolList>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(DiploSigntool)' == '' and '$(DiploSigntoolList)' != '' and $(DiploSigntoolList.Contains(&apos;;&apos;))">
+      <DiploSigntool>$(DiploSigntoolList.Substring($([MSBuild]::Add($(DiploSigntoolList.LastIndexOf(&apos;;&apos;)), 1))))</DiploSigntool>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(DiploSigntool)' == '' and '$(DiploSigntoolList)' != '' and !$(DiploSigntoolList.Contains(&apos;;&apos;))">
+      <DiploSigntool>$(DiploSigntoolList)</DiploSigntool>
+    </PropertyGroup>
+
+    <Error Condition="'$(DiploCodeSigningDisabled)' != 'true' and '$(DiploSigntool)' == ''"
+           Text="Signature de code : signtool.exe introuvable. Installez le SDK Windows ou positionnez -p:DiploSigntoolExe=... " />
+
+    <ItemGroup Condition="'$(DiploCodeSigningDisabled)' != 'true'">
+      <DiploPublishFiles Include="$(PublishDir)Diplo*.dll;$(PublishDir)Diplo*.exe" />
+    </ItemGroup>
+
+    <Exec Condition="'$(DiploCodeSigningDisabled)' != 'true' and '@(DiploPublishFiles)' != ''"
+          Command="&quot;$(DiploSigntool)&quot; sign /fd SHA256 /f &quot;$(DiploCodeSigningPfx)&quot; $(DiploCodeSigningTimestampArgs) &quot;%(DiploPublishFiles.FullPath)&quot;" />
+  </Target>
+
+</Project>

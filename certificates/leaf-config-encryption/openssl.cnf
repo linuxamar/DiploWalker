@@ -1,0 +1,36 @@
+# Configuration du certificat de chiffrement des fichiers de configuration.
+# Parent : l'intermédiaire "System" (certificates/system/).
+# Usage : chiffrer/déchiffrer les fichiers de configuration du projet Diplo
+# (chaîne leaf-config-encryption → System → Root) et garantir leur origine.
+# Clé RSA 8192 bits, chiffrement hybride : clé AES de session (chiffrement du
+# fichier) enveloppée par la clé publique RSA (RSA-OAEP).
+#
+# Exemples :
+#   openssl req -new -config openssl.cnf -key private/leaf-config-encryption.key.pem -out csr/leaf-config-encryption.csr.pem
+#   # Signature par System (exécutée depuis system/)
+#   openssl ca -config ../system/openssl.cnf -extensions leaf_cert -batch -notext `
+#              -in ../leaf-config-encryption/csr/leaf-config-encryption.csr.pem `
+#              -out ../leaf-config-encryption/certs/leaf-config-encryption.crt.pem
+
+[ req ]
+default_bits       = 8192
+default_md         = sha384
+distinguished_name = req_distinguished_name
+string_mask        = utf8only
+prompt             = no
+req_extensions     = v3_req
+
+[ req_distinguished_name ]
+countryName            = FR
+organizationName       = Diplo
+organizationalUnitName = Diplo Chiffrement
+commonName             = leaf-config-encryption
+
+# Extensions demandées dans la CSR : recopiées dans le certificat grâce à
+# copy_extensions = copy dans la configuration de l'autorité signataire.
+# keyEncipherment : enveloppement RSA-OAEP de la clé de session AES ;
+# dataEncipherment : chiffrement direct de données avec la clé publique.
+# EKU 1.3.6.1.4.1.311.10.3.4 : chiffrement de documents/fichiers.
+[ v3_req ]
+keyUsage          = critical, keyEncipherment, dataEncipherment
+extendedKeyUsage  = 1.3.6.1.4.1.311.10.3.4

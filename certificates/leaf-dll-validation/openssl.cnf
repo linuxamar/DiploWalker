@@ -1,0 +1,32 @@
+# Configuration du certificat de signature de code "leaf-dll-validation".
+# Parent : l'intermédiaire "System" (certificates/system/).
+# Usage : signer les DLL chargées dynamiquement afin de valider qu'elles
+# proviennent bien du projet Diplo (chaîne leaf-dll-validation → System → Root).
+# Clé RSA 8192 bits, usage étendu : codeSigning.
+#
+# Exemples :
+#   openssl req -new -config openssl.cnf -key private/leaf-dll-validation.key.pem -out csr/leaf-dll-validation.csr.pem
+#   # Signature par System (exécutée depuis system/)
+#   openssl ca -config ../system/openssl.cnf -extensions leaf_cert -batch -notext `
+#              -in ../leaf-dll-validation/csr/leaf-dll-validation.csr.pem `
+#              -out ../leaf-dll-validation/certs/leaf-dll-validation.crt.pem
+
+[ req ]
+default_bits       = 8192
+default_md         = sha384
+distinguished_name = req_distinguished_name
+string_mask        = utf8only
+prompt             = no
+req_extensions     = v3_req
+
+[ req_distinguished_name ]
+countryName            = FR
+organizationName       = Diplo
+organizationalUnitName = Diplo Signature de code
+commonName             = leaf-dll-validation
+
+# Extensions demandées dans la CSR : recopiées dans le certificat grâce à
+# copy_extensions = copy dans la configuration de l'autorité signataire.
+[ v3_req ]
+keyUsage          = critical, digitalSignature
+extendedKeyUsage  = codeSigning

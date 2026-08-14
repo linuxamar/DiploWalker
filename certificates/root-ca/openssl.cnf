@@ -1,0 +1,76 @@
+# Configuration de l'autorité de certification racine (Diplo Root CA).
+# Utilisée pour générer la clé auto-signée et pour signer les intermédiaires
+# de feuilles (Authentification, System, CodeSigning).
+#
+# Exemples :
+#   openssl req  -x509 -config openssl.cnf -key private/root-ca.key.pem \
+#                -days 3650 -out certs/root-ca.crt.pem
+#   openssl ca   -config openssl.cnf -extensions v3_intermediate_leaf \
+#                -in ../codesigning/csr/codesigning.csr.pem \
+#                -out ../codesigning/certs/codesigning.crt.pem
+
+[ req ]
+default_bits       = 8192
+default_md         = sha384
+distinguished_name = req_distinguished_name
+string_mask        = utf8only
+prompt             = no
+x509_extensions    = v3_ca
+
+[ req_distinguished_name ]
+countryName            = FR
+organizationName       = Diplo
+organizationalUnitName = Diplo PKI Racine
+commonName             = Diplo Root CA
+
+# Extensions du certificat racine (auto-signé).
+# pathlen:2 autorise jusqu'à 2 niveaux d'intermédiaires en dessous.
+[ v3_ca ]
+basicConstraints       = critical, CA:TRUE, pathlen:2
+keyUsage               = critical, keyCertSign, cRLSign
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always, issuer
+
+# Extensions appliquées à l'intermédiaire niveau 1 lors de sa signature.
+[ v3_intermediate_ca ]
+basicConstraints       = critical, CA:TRUE, pathlen:1
+keyUsage               = critical, keyCertSign, cRLSign
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always, issuer
+
+# Extensions appliquées aux intermédiaires de feuilles ("Authentification",
+# "System", "CodeSigning").
+# pathlen:0 : autorités de feuilles (signent des certificats, pas d'autres CAs).
+[ v3_intermediate_leaf ]
+basicConstraints       = critical, CA:TRUE, pathlen:0
+keyUsage               = critical, keyCertSign, cRLSign
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always, issuer
+
+# Section [ ca ] utilisée par la commande "openssl ca" pour signer
+# les intermédiaires de feuilles.
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir            = .
+database       = db/index.txt
+new_certs_dir  = db/newcerts
+certificate    = certs/root-ca.crt.pem
+private_key    = private/root-ca.key.pem
+serial         = db/serial
+crlnumber      = db/crlnumber
+crl_dir        = crl
+default_md     = sha384
+default_days   = 1825
+policy         = policy_root_ca
+email_in_dn    = no
+unique_subject = no
+copy_extensions = copy
+
+# Politique appliquée aux certificats signés par la racine.
+[ policy_root_ca ]
+countryName            = supplied
+organizationName       = supplied
+organizationalUnitName = optional
+commonName             = supplied

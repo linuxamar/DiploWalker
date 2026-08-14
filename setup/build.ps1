@@ -70,8 +70,8 @@ try {
     Pop-Location
 }
 
-# Renommer la sortie générée (le OutFile du .nsi ne contient pas la plateforme)
-$defaultOut = Join-Path $setupDir "Diplo-Setup-$Version.exe"
+# Déplacer la sortie générée (le OutFile du .nsi inclut déjà la plateforme)
+$defaultOut = Join-Path $setupDir "Diplo-Setup-$Version-$Platform.exe"
 if (Test-Path $defaultOut) {
     Move-Item -Path $defaultOut -Destination $outFile -Force
 }
@@ -109,8 +109,13 @@ if ($Sign) {
                 $signArgs += "/p", $SignPassword
             }
         } else {
-            # Sélection automatique du premier certificat de signature disponible.
-            $signArgs += "/a"
+            # Par défaut : la feuille de signature de code du projet Diplo.Installer.
+            $defaultPfx = Join-Path $repoRoot "certificates\codesigning\leaves\Diplo.Installer\Diplo.Installer.pfx"
+            if (Test-Path $defaultPfx) {
+                $signArgs += "/f", $defaultPfx
+            } else {
+                $signArgs += "/a"
+            }
         }
 
         $signArgs += "/tr", "http://timestamp.digicert.com"

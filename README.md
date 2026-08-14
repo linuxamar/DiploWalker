@@ -91,6 +91,38 @@ L'installateur effectue automatiquement :
 6. Création de la configuration CNI par défaut (réseau NAT `172.20.0.0/16`)
 7. Création des services Windows (Diplo.Container, Diplo.Volume, Diplo.Network)
 
+### Installation autonome de containerd/nerdctl (script Microsoft)
+
+Le dépôt fournit le script officiel Microsoft
+[`install-containerd-runtime.ps1`](https://github.com/microsoft/Windows-Containers/blob/Main/helpful_tools/Install-ContainerdRuntime/install-containerd-runtime.ps1)
+(microsoft/Windows-Containers), vendoré tel quel dans `setup/`. Il permet
+d'installer et de configurer containerd et nerdctl de manière autonome, sans
+l'installateur Diplo :
+
+```powershell
+# Élevé (PowerShell administrateur)
+.\setup\install-containerd-runtime.ps1
+```
+
+Le script, exécuté en tant qu'administrateur :
+
+- Active la fonctionnalité Windows **Containers** (et Hyper-V avec `-HyperV`) ;
+- Télécharge et installe containerd, nerdctl et les plugins CNI (dernières
+  versions par défaut via l'API GitHub, épinglables via `-ContainerDVersion`,
+  `-NerdCTLVersion` et `-WinCNIVersion`) ;
+- Ajoute le PATH (registre machine) ;
+- Génère `config.toml` et enregistre containerd comme service Windows ;
+- Attend la disponibilité via `nerdctl version`.
+
+Paramètres notables : `-ExternalNetAdapter` (réseau DHCP), `-ContainerBaseImage`,
+`-TransparentNetwork`, `-NoRestart`/`-Force`.
+
+> **Remarque** : ce script installe dans `C:\Program Files\containerd` et
+> `C:\Program Files\nerdctl` et enregistre containerd comme service Windows,
+> mais **ne crée pas** les services Diplo ni leur configuration. Pour une
+> installation Diplo complète (services + `config.toml` Diplo), privilégiez
+> `Diplo.Installer.exe install`.
+
 ### Commandes
 
 ```powershell

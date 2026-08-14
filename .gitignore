@@ -74,3 +74,17 @@ publish-cli/
 
 # Raccourci de lancement local de l'agent (non versionné)
 ai.cmd
+
+# PKI locale : les clés privées et CSR ne doivent jamais être versionnées
+certificates/**/private/
+certificates/**/csr/
+certificates/**/db/newcerts/
+certificates/**/db/index.txt
+certificates/**/db/index.txt.*
+certificates/**/db/*.old
+
+# Certificats de signature de code : clés privées, CSR et PFX non versionnés
+certificates/codesigning/leaves/**/*.key.pem
+certificates/codesigning/leaves/**/*.csr.pem
+certificates/codesigning/leaves/**/*.pfx
+certificates/**/*.pfx

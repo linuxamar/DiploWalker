@@ -1,0 +1,59 @@
+# Configuration de l'intermédiaire "System" (parent : la racine).
+# Autorité regroupant les authentifications des systèmes.
+# pathlen:0 : aucun autre intermédiaire en dessous, uniquement des feuilles.
+#
+# Exemples :
+#   # Génération de la clé et de la CSR
+#   openssl req  -new -config openssl.cnf -key private/system.key.pem \
+#                -out csr/system.csr.pem
+#   # Signature par la racine (exécutée depuis root-ca/)
+#   openssl ca   -config ../root-ca/openssl.cnf -extensions v3_intermediate_leaf \
+#                -in csr/system.csr.pem -out certs/system.crt.pem
+#   # Signature d'un certificat feuille d'authentification système
+#   openssl ca   -config openssl.cnf -extensions leaf_cert \
+#                -in ../leaf-system/csr/leaf-system.csr.pem \
+#                -out ../leaf-system/certs/leaf-system.crt.pem
+
+[ req ]
+default_bits       = 8192
+default_md         = sha384
+distinguished_name = req_distinguished_name
+string_mask        = utf8only
+prompt             = no
+
+[ req_distinguished_name ]
+countryName            = FR
+organizationName       = Diplo
+organizationalUnitName = Diplo PKI System
+commonName             = System
+
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir            = .
+database       = db/index.txt
+new_certs_dir  = db/newcerts
+certificate    = certs/system.crt.pem
+private_key    = private/system.key.pem
+serial         = db/serial
+crlnumber      = db/crlnumber
+crl_dir        = crl
+default_md     = sha384
+default_days   = 825
+policy         = policy_system
+email_in_dn    = no
+unique_subject = no
+copy_extensions = copy
+
+[ policy_system ]
+countryName            = supplied
+organizationName       = supplied
+organizationalUnitName = optional
+commonName             = supplied
+
+# Extensions des certificats feuilles signés par cette autorité.
+[ leaf_cert ]
+basicConstraints       = critical, CA:FALSE
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always, issuer
