@@ -87,3 +87,4 @@ certificates/**/db/*.old
 certificates/codesigning/leaves/**/*.key.pem
 certificates/codesigning/leaves/**/*.csr.pem
 certificates/codesigning/leaves/**/*.pfx
+certificates/**/*.pfx

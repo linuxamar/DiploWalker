@@ -19,7 +19,18 @@ Toutes les clés sont du **RSA 8192 bits** et les signatures utilisent **SHA-384
 │ pathlen:0  │ pathlen:0 │ pathlen:0               │
 │ (feuilles  │ (auth.   │ (signature de code)     │
 │  auth.)    │ systèmes)│                         │
-│            │          ├─────────────────────────┤
+│            ├──────────┤                         │
+│            │leaf-dll- │                         │
+│            │validation│                         │
+│            │(signature│                         │
+│            │ DLL)     │                         │
+│            ├──────────┤                         │
+│            │leaf-     │                         │
+│            │config-   │                         │
+│            │encryption│                         │
+│            │(chiffre. │                         │
+│            │ config)  │                         │
+├────────────┤          ├─────────────────────────┤
 │            │          │ leaves/<Projet>/        │
 │            │          │ une feuille par projet  │
 └────────────┴──────────┴─────────────────────────┘
@@ -32,6 +43,9 @@ Toutes les clés sont du **RSA 8192 bits** et les signatures utilisent **SHA-384
   certificat grâce à `copy_extensions = copy` dans la section `[ CA_default ]`.
 - Sous « CodeSigning », chaque projet de la solution possède sa propre feuille de
   signature de code (voir « Signature de code : une feuille par projet »).
+- Sous « System » : `leaf-dll-validation` (signature des DLL chargées dynamiquement,
+  voir « Validation des DLL ») et `leaf-config-encryption` (chiffrement des fichiers
+  de configuration, voir « Chiffrement des fichiers de configuration »).
 
 ## Contenu des répertoires
 
@@ -42,6 +56,8 @@ Toutes les clés sont du **RSA 8192 bits** et les signatures utilisent **SHA-384
 | `system/` | Intermédiaire « System » (signe les feuilles d'authentification des systèmes) |
 | `codesigning/` | Intermédiaire « CodeSigning » (signe les feuilles de signature de code) |
 | `codesigning/leaves/` | Une feuille de signature de code par projet (`leaves/<Projet>/`) |
+| `leaf-dll-validation/` | Certificat de signature des DLL chargées dynamiquement (parent : System) |
+| `leaf-config-encryption/` | Certificat de chiffrement des fichiers de configuration (parent : System) |
 
 Chaque autorité possède sa configuration `openssl.cnf` avec les sections `[ req ]`
 et `[ ca ]`, une base (`db/index.txt`, `db/serial`) et un dossier `certs/`.
@@ -71,6 +87,22 @@ Le binaire est disponible à l'emplacement Git pour Windows :
 openssl verify -CAfile certificates/root-ca/certs/root-ca.crt.pem `
   -untrusted certificates/codesigning/certs/codesigning.crt.pem `
   certificates/codesigning/leaves/Diplo.Cli/Diplo.Cli.crt.pem
+```
+
+### Vérifier la chaîne de leaf-dll-validation
+
+```powershell
+openssl verify -CAfile certificates/root-ca/certs/root-ca.crt.pem `
+  -untrusted certificates/system/certs/system.crt.pem `
+  certificates/leaf-dll-validation/certs/leaf-dll-validation.crt.pem
+```
+
+### Vérifier la chaîne de leaf-config-encryption
+
+```powershell
+openssl verify -CAfile certificates/root-ca/certs/root-ca.crt.pem `
+  -untrusted certificates/system/certs/system.crt.pem `
+  certificates/leaf-config-encryption/certs/leaf-config-encryption.crt.pem
 ```
 
 ### Inspecter une feuille (EKU `codeSigning`)
@@ -133,6 +165,73 @@ signtool verify /pa /v src/Diplo.Cli/bin/Debug/net10.0/Diplo.Cli.dll
 > Issued to: Diplo.Cli     Issued by: CodeSigning
 > Issued to: CodeSigning   Issued by: Diplo Root CA
 > ```
+
+## Validation des DLL chargées dynamiquement
+
+`leaf-dll-validation` (parent : **System**) permet de garantir qu'une DLL chargée
+dynamiquement a bien été produite par le projet Diplo. Le principe :
+
+1. **Signature** : la DLL est signée en Authenticode avec le PFX
+   `leaf-dll-validation.pfx` (EKU `codeSigning`, chaîne `leaf-dll-validation ←
+   System ← Diplo Root CA`).
+
+```powershell
+signtool sign /fd SHA256 /f certificates/leaf-dll-validation/leaf-dll-validation.pfx `
+  ma-plug-in.dll
+```
+
+2. **Validation avant chargement** : le chargeur vérifie la signature, puis que
+   la chaîne remonte à « System » et « Diplo Root CA » (via `X509Chain` en .NET,
+   `CertGetCertificateChain`/`WinVerifyTrust` en Win32, ou `signtool verify`).
+
+```powershell
+signtool verify /pa /v ma-plug-in.dll
+```
+
+> Comme pour le reste de la PKI, la validation complète exige que « Diplo Root CA »
+> et « System » soient installés dans les magasins de confiance de la machine qui
+> charge les DLL. Pour vérifier la chaîne cryptographique seule, utiliser la
+> commande `openssl verify` de la section précédente.
+
+## Chiffrement des fichiers de configuration
+
+`leaf-config-encryption` (parent : **System**) chiffre les fichiers de configuration
+du projet Diplo : seuls les éléments disposant de la clé privée peuvent les
+déchiffrer, et la chaîne (`leaf-config-encryption ← System ← Diplo Root CA`)
+garantit l'origine des données.
+
+Schéma conseillé — **chiffrement hybride** (RSA 8192 trop lent en données brutes) :
+
+1. **Chiffrement** : générer une clé de session AES-256 aléatoire, chiffrer le
+   fichier avec (AES-256-GCM ou AES-256-CBC + HMAC), puis chiffrer la clé de
+   session avec la clé publique RSA du certificat (RSA-OAEP, SHA-256). Ne stocker
+   que le fichier chiffré et la clé enveloppée.
+2. **Déchiffrement** : déchiffrer la clé de session avec la clé privée
+   (`leaf-config-encryption.pfx` ou le magasin de certificats), puis le fichier.
+
+Exemple minimal avec OpenSSL :
+
+```powershell
+# Extraire la clé publique du certificat
+openssl x509 -in certificates/leaf-config-encryption/certs/leaf-config-encryption.crt.pem -pubkey -noout `
+  -out public.pem
+
+# Chiffrer la clé de session (ici le fichier secret.bin, 64 o) avec RSA-OAEP
+openssl pkeyutl -encrypt -pubin -inkey public.pem -in secret.bin -out secret.bin.enc `
+  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256
+
+# Déchiffrer avec la clé privée
+openssl pkeyutl -decrypt -inkey certificates/leaf-config-encryption/private/leaf-config-encryption.key.pem `
+  -in secret.bin.enc -out secret.bin.dec `
+  -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256
+```
+
+En .NET, charger le certificat privé depuis le PFX ou le magasin, puis utiliser
+`RSA.Encrypt`/`RSA.Decrypt` avec `RSAEncryptionPadding.OaepSHA256`.
+
+> La validation complète de l'origine exige que « System » et « Diplo Root CA »
+> soient installés dans les magasins de confiance (ou fournis explicitement au
+> validateur).
 
 ## Régénération complète
 
