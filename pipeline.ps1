@@ -84,7 +84,7 @@ function Publish-Project {
     }
 
     if (-not (Test-Path $projectPath)) {
-        Write-Warning "Projet introuvable : $ProjectPath — ignoré."
+        Write-Warning "Projet introuvable : $projectPath — ignoré."
         return
     }
 
@@ -252,10 +252,10 @@ if ($runPublish) {
     Write-Host ""
     Write-Host "═══ Package NSIS ($plat) ═══" -ForegroundColor Cyan
             $appVersion = (Select-Xml -Path (Join-Path $PSScriptRoot "Directory.Build.props") -XPath "//Version").Node.InnerText
-            $setupArgs = @("-Version", $appVersion, "-Platform", $plat, "-Sign")
-            if ($SignCert) { $setupArgs += "-SignCert", $SignCert }
-            if ($SignPassword) { $setupArgs += "-SignPassword", $SignPassword }
-            if ($SignThumbprint) { $setupArgs += "-SignThumbprint", $SignThumbprint }
+            $setupArgs = @{ Version = $appVersion; Platform = $plat; Sign = $true }
+            if ($SignCert) { $setupArgs.SignCert = $SignCert }
+            if ($SignPassword) { $setupArgs.SignPassword = $SignPassword }
+            if ($SignThumbprint) { $setupArgs.SignThumbprint = $SignThumbprint }
             & $setupScript @setupArgs
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "Le packaging NSIS a échoué pour $plat."
