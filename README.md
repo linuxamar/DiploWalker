@@ -210,16 +210,16 @@ Diplo/
 │   └── Diplo.Gui/              # Interface graphique Avalonia
 ├── tests/
 │   ├── Diplo.Abstractions.Tests/
-│   ├── Diplo.Contracts.Tests/
-│   ├── Diplo.Core.Tests/
-│   ├── Diplo.Container.Tests/
-│   ├── Diplo.Installer.Tests/
-│   ├── Diplo.Network.Tests/
-│   ├── Diplo.Volume.Tests/
-│   ├── Diplo.Disk.Tests/
 │   ├── Diplo.Cli.Tests/
+│   ├── Diplo.Container.Tests/
+│   ├── Diplo.Core.Tests/
+│   ├── Diplo.Disk.Tests/
 │   ├── Diplo.Gui.Tests/
-│   └── Diplo.Integration.Tests/
+│   ├── Diplo.Installer.Tests/
+│   ├── Diplo.Integration.Tests/
+│   ├── Diplo.Network.Tests/
+│   ├── Diplo.TestHelpers/
+│   └── Diplo.Volume.Tests/
 ├── pipeline.ps1                # Pipeline de build et déploiement
 └── README.md
 ```

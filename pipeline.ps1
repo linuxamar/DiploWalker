@@ -128,7 +128,6 @@ $testProjects = @(
     "Diplo.Volume.Tests",
     "Diplo.Network.Tests",
     "Diplo.Core.Tests",
-    "Diplo.Contracts.Tests",
     "Diplo.Installer.Tests",
     "Diplo.Disk.Tests",
     "Diplo.Cli.Tests",

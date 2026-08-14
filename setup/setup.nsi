@@ -1,5 +1,6 @@
 !include "MUI2.nsh"
 !include "WinVer.nsh"
+!include "LogicLib.nsh"
 
 ; ── Définitions par défaut (surchargeables via -D) ──────────────────────────
 !ifndef APP_VERSION
@@ -197,6 +198,27 @@ Section -Additional
   WriteRegDWORD HKLM "${REG_KEY_UNINSTALL}" "NoRepair"        1
 SectionEnd
 
+; ── Certificats PKI (racine + intermédiaires) ───────────────────────────────
+; La racine est installée dans le magasin machine « Autorités de certification
+; racines de confiance » et les intermédiaires dans « Autorités de
+; certification intermédiaires ». La chaîne des binaires et de l'installateur
+; signés est alors reconnue sans manipulation manuelle.
+
+Section -Certificates
+  SetOutPath "$INSTDIR\certificates"
+  File "${PUBLISH_ROOT}\..\..\..\certificates\root-ca\certs\root-ca.crt.pem"
+  File "${PUBLISH_ROOT}\..\..\..\certificates\authentification\certs\authentification.crt.pem"
+  File "${PUBLISH_ROOT}\..\..\..\certificates\codesigning\certs\codesigning.crt.pem"
+  File "${PUBLISH_ROOT}\..\..\..\certificates\system\certs\system.crt.pem"
+  File "${PUBLISH_ROOT}\..\..\..\setup\manage-certificates.ps1"
+
+  nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1"'
+  Pop $0
+  ${If} $0 != 0
+    DetailPrint "Avertissement : importation des certificats impossible (code $0)."
+  ${EndIf}
+SectionEnd
+
 Function .onInit
   ${IfNot} ${AtLeastWin10}
     MessageBox MB_ICONSTOP "Diplo nécessite Windows 10 ou ultérieur."
@@ -214,6 +236,11 @@ Section "Uninstall"
   RMDir  /r "$INSTDIR\Diplo.Gui"
   RMDir  /r "$INSTDIR\Diplo.Cli"
   RMDir  /r "$INSTDIR\Diplo.Installer"
+
+  ; Retrait des certificats PKI des magasins machine, puis du disque.
+  nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1" -Remove'
+  RMDir  /r "$INSTDIR\certificates"
+
   Delete "$INSTDIR\uninst.exe"
   RMDir  "$INSTDIR"
 
