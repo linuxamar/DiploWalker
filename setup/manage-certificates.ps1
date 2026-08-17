@@ -59,6 +59,8 @@ function Remove-CertificatesFromStores {
             foreach ($cert in $toRemove) {
                 $store.Remove($cert)
             }
+        } catch {
+            Write-Warning "Impossible de nettoyer le magasin $storeName : $_"
         } finally {
             $store.Close()
         }
