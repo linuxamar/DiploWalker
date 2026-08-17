@@ -90,6 +90,22 @@ L'installateur effectue automatiquement :
 5. Génération de la configuration containerd (`config.toml`)
 6. Création de la configuration CNI par défaut (réseau NAT `172.20.0.0/16`)
 7. Création des services Windows (Diplo.Container, Diplo.Volume, Diplo.Network)
+8. Import des certificats PKI racine et intermédiaires dans les magasins de certificats de la machine
+
+#### Certificats PKI
+
+L'installateur NSIS embarque les certificats de la PKI Diplo et les importe automatiquement dans les magasins de certificats de la machine Windows :
+
+| Certificat | Magasin | Rôle |
+|------------|---------|------|
+| `Diplo Root CA` | Racines de confiance (Root) | Autorité racine de la PKI |
+| `Authentification` | CA intermédiaires | Authentification de services |
+| `CodeSigning` | CA intermédiaires | Signature de code (assemblies, installateur) |
+| `System` | CA intermédiaires | Certificats système (TLS, config) |
+
+Cette importation permet la **validation automatique des chaînes de signature** sans manipulation manuelle — les binaires signés par la PKI Diplo sont reconnus nativement par Windows.
+
+Le désinstalleur retire les certificats des magasins machine et supprime les fichiers `.crt.pem` déposés dans le dossier d'installation.
 
 ### Installation autonome de containerd/nerdctl (script Microsoft)
 
