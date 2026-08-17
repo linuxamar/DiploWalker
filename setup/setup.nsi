@@ -212,10 +212,12 @@ Section -Certificates
   File "${PUBLISH_ROOT}\..\..\..\certificates\system\certs\system.crt.pem"
   File "${PUBLISH_ROOT}\..\..\..\setup\manage-certificates.ps1"
 
-  nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1"'
+  nsExec::ExecToStack '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1"'
   Pop $0
+  Pop $1
   ${If} $0 != 0
     DetailPrint "Avertissement : importation des certificats impossible (code $0)."
+    DetailPrint "Sortie : $1"
   ${EndIf}
 SectionEnd
 
@@ -238,7 +240,13 @@ Section "Uninstall"
   RMDir  /r "$INSTDIR\Diplo.Installer"
 
   ; Retrait des certificats PKI des magasins machine, puis du disque.
-  nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1" -Remove'
+  nsExec::ExecToStack '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1" -Remove'
+  Pop $0
+  Pop $1
+  ${If} $0 != 0
+    DetailPrint "Avertissement : retrait des certificats impossible (code $0)."
+    DetailPrint "Sortie : $1"
+  ${EndIf}
   RMDir  /r "$INSTDIR\certificates"
 
   Delete "$INSTDIR\uninst.exe"
