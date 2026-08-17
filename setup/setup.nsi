@@ -235,11 +235,7 @@ Section "Uninstall"
   Delete "$DESKTOP\Diplo GUI.lnk"
   RMDir  /r "$SMPROGRAMS\${APP_NAME}"
 
-  RMDir  /r "$INSTDIR\Diplo.Gui"
-  RMDir  /r "$INSTDIR\Diplo.Cli"
-  RMDir  /r "$INSTDIR\Diplo.Installer"
-
-  ; Retrait des certificats PKI des magasins machine, puis du disque.
+  ; Retrait des certificats PKI des magasins machine avant la suppression des dossiers.
   nsExec::ExecToStack '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1" -Remove'
   Pop $0
   Pop $1
@@ -248,6 +244,10 @@ Section "Uninstall"
     DetailPrint "Sortie : $1"
   ${EndIf}
   RMDir  /r "$INSTDIR\certificates"
+
+  RMDir  /r "$INSTDIR\Diplo.Gui"
+  RMDir  /r "$INSTDIR\Diplo.Cli"
+  RMDir  /r "$INSTDIR\Diplo.Installer"
 
   Delete "$INSTDIR\uninst.exe"
   RMDir  "$INSTDIR"
