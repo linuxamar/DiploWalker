@@ -54,8 +54,7 @@ module ProcessExecTests =
 
     [<Fact>]
     let ``runWithResult transmet l'entree standard au processus`` () =
-        let script = "$c = [Console]::In.ReadToEnd(); [Console]::Out.Write($c)"
-        let code, stdout, _ = ProcessExec.runWithResult "powershell.exe" [ "-NoProfile"; "-NonInteractive"; "-Command"; script ] None (Some "hello-stdin")
+        let code, stdout, _ = ProcessExec.runWithResult "cmd.exe" [ "/c"; "more" ] None (Some "hello-stdin")
         code |> should equal 0
         stdout.Contains("hello-stdin") |> should equal true
 
