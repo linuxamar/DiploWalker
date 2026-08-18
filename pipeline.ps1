@@ -202,7 +202,7 @@ if ($runTests) {
         Write-Host ""
         Write-Host "  ▸ $test" -ForegroundColor Yellow
         Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Tests : $test ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
-        dotnet test $testPath --configuration Release --no-restore
+        dotnet test --project $testPath --configuration Release --no-restore
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  ✗ Échec des tests : $test" -ForegroundColor Red
             $allPassed = $false
