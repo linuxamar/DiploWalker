@@ -22,6 +22,14 @@
 !define REG_KEY_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
 !define REG_KEY_ENV "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
 
+; ── Chemin PowerShell selon la plateforme ────────────────────────────────────
+; x64 → System32 (PowerShell 64-bit), x86 → SysWOW64 (PowerShell 32-bit)
+!if ${PLATFORM} == "x64"
+  !define POWERSHELL_EXE "$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
+!else
+  !define POWERSHELL_EXE "$WINDIR\SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
+!endif
+
 ; ── Attributs ───────────────────────────────────────────────────────────────
 Name "${APP_NAME}"
 OutFile "Diplo-Setup-${APP_VERSION}-${PLATFORM}.exe"
@@ -212,7 +220,7 @@ Section -Certificates
   File "${PUBLISH_ROOT}\..\..\..\certificates\system\certs\system.crt.pem"
   File "${PUBLISH_ROOT}\..\..\..\setup\manage-certificates.ps1"
 
-  nsExec::ExecToStack '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1"'
+  nsExec::ExecToStack '"${POWERSHELL_EXE}" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1"'
   Pop $0
   Pop $1
   ${If} $0 != 0
@@ -236,7 +244,7 @@ Section "Uninstall"
   RMDir  /r "$SMPROGRAMS\${APP_NAME}"
 
   ; Retrait des certificats PKI des magasins machine avant la suppression des dossiers.
-  nsExec::ExecToStack '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1" -Remove'
+  nsExec::ExecToStack '"${POWERSHELL_EXE}" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1" -Remove'
   Pop $0
   Pop $1
   ${If} $0 != 0
