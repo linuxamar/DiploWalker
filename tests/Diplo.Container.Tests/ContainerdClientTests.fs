@@ -285,6 +285,10 @@ type ContainerdClientTests() =
             collected.Count |> should equal 2
             File.AppendAllText(file, "l3" + Environment.NewLine + "l4" + Environment.NewLine)
             runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 0 STOPPED")
+            let mutable waited2 = 0
+            while waited2 < 3000 && collected.Count < 4 do
+                Thread.Sleep 50
+                waited2 <- waited2 + 50
             completed.Task.Wait(5000) |> should equal true
             (collected |> Seq.toList) |> should equal [ "l1"; "l2"; "l3"; "l4" ]
             consumer.Wait()
