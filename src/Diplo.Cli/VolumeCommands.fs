@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open Diplo.Core.Clients
+open Diplo.Grpc
 open Diplo.Core.Output
 open Diplo.Grpc.Volume
 open Spectre.Console.Cli
@@ -87,7 +88,7 @@ type CreateVolumeCommand(output: IOutputPort, clients: IDiploClients) =
             if String.IsNullOrEmpty(settings.Name) then
                 output.WriteError("Le nom du volume est requis")
                 return 1
-            elif not (List.contains (settings.Driver.ToLowerInvariant()) ["local"; "nfs"; "smb"; "azure"; "aws"; "gcp"; "iso"]) then
+            elif not (DriverMappings.isValidVolumeDriver settings.Driver) then
                 output.WriteError(sprintf "Driver inconnu: %s" settings.Driver)
                 return 1
             elif settings.Driver.ToLowerInvariant() = "smb" && (String.IsNullOrWhiteSpace settings.Server || String.IsNullOrWhiteSpace settings.Share) then
@@ -98,15 +99,7 @@ type CreateVolumeCommand(output: IOutputPort, clients: IDiploClients) =
                 return 1
             else
                 let driverType =
-                    match settings.Driver.ToLowerInvariant() with
-                    | "local" -> StorageDriverType.Local
-                    | "nfs" -> StorageDriverType.Nfs
-                    | "smb" -> StorageDriverType.Smb
-                    | "azure" -> StorageDriverType.CloudAzure
-                    | "aws" -> StorageDriverType.CloudAws
-                    | "gcp" -> StorageDriverType.CloudGcp
-                    | "iso" -> StorageDriverType.Iso
-                    | _ -> failwithf "Driver %s non géré (normalement déjà validé)" settings.Driver
+                    DriverMappings.parseVolumeDriver settings.Driver
 
                 let driverOpts = System.Collections.Generic.Dictionary<string, string>()
                 let addOpt (key: string) (value: string) =

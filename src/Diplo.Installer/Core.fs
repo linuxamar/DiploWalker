@@ -415,7 +415,7 @@ let buildAppSettingsJson (grpcPort: int) (pipeName: string) (isolationType: stri
     | None -> ()
     root.["Logging"] <- logging
 
-    let options = JsonSerializerOptions(WriteIndented = true)
+    let options = DiploJson.defaultOptions
     root.ToJsonString(options)
 
 let createConfigFiles () =
@@ -456,7 +456,7 @@ let createConfigFiles () =
         let content = File.ReadAllText(containerSettingsPath)
         let doc = JsonNode.Parse(content) :?> JsonObject
         doc.["ContainerdSocket"] <- JsonValue.Create("npipe:////./pipe/containerd-containerd")
-        let options = JsonSerializerOptions(WriteIndented = true)
+        let options = DiploJson.defaultOptions
         File.WriteAllText(containerSettingsPath, doc.ToJsonString(options))
     with ex ->
         printfn "  [!] Erreur lors de la mise à jour de %s: %s" (Path.GetFileName(containerSettingsPath)) ex.Message

@@ -4,6 +4,7 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Diplo.Core.Clients
+open Diplo.Grpc
 open Diplo.Core.Output
 open Diplo.Grpc.Network
 open Spectre.Console.Cli
@@ -87,17 +88,12 @@ type CreateNetworkCommand(output: IOutputPort, clients: IDiploClients) =
             if String.IsNullOrEmpty(settings.Name) then
                 output.WriteError("Le nom du réseau est requis")
                 return 1
-            elif not (List.contains (settings.Driver.ToLowerInvariant()) ["bridge"; "none"; "custom_cni"; "pod"]) then
+            elif not (DriverMappings.isValidNetworkDriver settings.Driver) then
                 output.WriteError(sprintf "Driver inconnu: %s. Valeurs: bridge, none, custom_cni, pod" settings.Driver)
                 return 1
             else
                 let driver =
-                    match settings.Driver.ToLowerInvariant() with
-                    | "bridge" -> NetworkDriver.Bridge
-                    | "none" -> NetworkDriver.None
-                    | "custom_cni" -> NetworkDriver.CustomCni
-                    | "pod" -> NetworkDriver.Pod
-                    | _ -> failwithf "Driver %s non géré (normalement déjà validé)" settings.Driver
+                    DriverMappings.parseNetworkDriver settings.Driver
 
                 use client = clients.CreateNetworkClient()
                 let! response =

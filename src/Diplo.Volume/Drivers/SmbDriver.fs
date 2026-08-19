@@ -89,16 +89,6 @@ type SmbDriver(dataRoot: string) =
             ProcessExec.run "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None |> ignore
             (true, "Démonté")
 
-        member _.PruneVolumes() =
-            if not (store.ListVolumes().IsEmpty) then
-                let removed = ResizeArray<string>()
-                for vol in store.ListVolumes() do
-                    let mutable v = Unchecked.defaultof<JsonElement>
-                    let id = if vol.TryGetProperty("id", &v) then v.GetString() else null
-                    if not (String.IsNullOrEmpty(id)) then
-                        store.RemoveVolume(id) |> ignore
-                        removed.Add(id)
-                removed |> Seq.toList
-            else []
+        member _.PruneVolumes() = store.PruneAll()
 
         member _.GetVolumeSize(_id) = 0L

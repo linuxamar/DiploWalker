@@ -9,6 +9,7 @@
     <Compile Include="DiploConfig.fs" />
     <Compile Include="Mounts\MountParser.fs" />
     <Compile Include="CommandLine.fs" />
+    <Compile Include="Connection\GrpcClientFactory.fs" />
     <Compile Include="Connection\DiploChannel.fs" />
     <Compile Include="Clients\GrpcClientBase.fs" />
     <Compile Include="Clients\ClientInterfaces.fs" />

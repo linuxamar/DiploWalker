@@ -22,6 +22,8 @@
     <Compile Include="Security.fs" />
     <Compile Include="ProcessExec.fs" />
     <Compile Include="AtomicFile.fs" />
+    <Compile Include="JsonHelpers.fs" />
+    <Compile Include="DiploJson.fs" />
     <Compile Include="AuthToken.fs" />
     <Compile Include="TokenAuthMiddleware.fs" />
     <Compile Include="TokenInterceptor.fs" />

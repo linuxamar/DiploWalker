@@ -152,17 +152,9 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
         with ex ->
             Log.Warning(ex, "Erreur lors de la restauration des volumes montés au démarrage")
 
-    let tryGetString (el: JsonElement) (prop: string) =
-        let mutable v = Unchecked.defaultof<JsonElement>
-        if el.TryGetProperty(prop, &v) then v.GetString() else ""
-
-    let tryGetInt64 (el: JsonElement) (prop: string) =
-        let mutable v = Unchecked.defaultof<JsonElement>
-        if el.TryGetProperty(prop, &v) then v.GetInt64() else 0L
-
-    let tryGetDouble (el: JsonElement) (prop: string) =
-        let mutable v = Unchecked.defaultof<JsonElement>
-        if el.TryGetProperty(prop, &v) then v.GetDouble() else 0.0
+    let tryGetString (el: JsonElement) (prop: string) = JsonHelpers.tryGetString el prop
+    let tryGetInt64 (el: JsonElement) (prop: string) = JsonHelpers.tryGetInt64 el prop
+    let tryGetDouble (el: JsonElement) (prop: string) = JsonHelpers.tryGetDouble el prop
 
     let stateString (s: ContainerState) =
         match s with
