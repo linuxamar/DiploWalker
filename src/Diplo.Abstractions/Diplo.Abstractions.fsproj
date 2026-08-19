@@ -20,8 +20,10 @@
   <ItemGroup>
     <Compile Include="Interfaces.fs" />
     <Compile Include="Security.fs" />
+    <Compile Include="ServiceGuards.fs" />
     <Compile Include="ProcessExec.fs" />
     <Compile Include="AtomicFile.fs" />
+    <Compile Include="CachedConfig.fs" />
     <Compile Include="JsonHelpers.fs" />
     <Compile Include="DiploJson.fs" />
     <Compile Include="AuthToken.fs" />

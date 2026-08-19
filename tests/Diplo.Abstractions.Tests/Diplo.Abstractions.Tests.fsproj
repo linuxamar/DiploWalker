@@ -10,6 +10,10 @@
     <Compile Include="TokenInterceptorTests.fs" />
     <Compile Include="TokenAuthMiddlewareTests.fs" />
     <Compile Include="SecurityValidationTests.fs" />
+    <Compile Include="ServiceGuardsTests.fs" />
+    <Compile Include="CachedConfigTests.fs" />
+    <Compile Include="JsonHelpersTests.fs" />
+    <Compile Include="DiploJsonTests.fs" />
     <Compile Include="ProcessExecTests.fs" />
   </ItemGroup>
 

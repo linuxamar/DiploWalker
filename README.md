@@ -25,7 +25,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (672 tests)
+- **Tests** : xUnit (707 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -213,14 +213,21 @@ Options disponibles :
 ```
 Diplo/
 ├── src/
-│   ├── Diplo.Abstractions/     # Interfaces partagées, validation, sécurité, ServerConfig
+│   ├── Diplo.Abstractions/     # Interfaces, validation, sécurité, modules mutualisés
+│   │   ├── JsonHelpers.fs      # Extraction typée de propriétés JSON
+│   │   ├── DiploJson.fs        # Options sérialisation centralisées
+│   │   ├── ProcessExec.fs      # Exécution processus + PowerShell
+│   │   ├── ServiceGuards.fs    # Guards de validation d'entrée
+│   │   ├── CachedConfig.fs     # Cache générique avec invalidation
+│   │   ├── Security.fs         # Validation d'entrée, anti-injection
+│   │   └── ServerConfig.fs     # Configuration Kestrel / named pipes
 │   ├── Diplo.Container/        # Service gRPC de gestion des conteneurs
 │   ├── Diplo.Volume/           # Service gRPC de gestion des volumes
 │   ├── Diplo.Network/          # Service gRPC de gestion des réseaux
 │   ├── Diplo.Installer/        # Outil d'installation Windows
-│   ├── Diplo.Grpc/             # Types messages et services gRPC (protobuf-net)
+│   ├── Diplo.Grpc/             # Types messages, services gRPC, DriverMappings
 │   ├── Diplo.Contracts/        # Types partagés entre services
-│   ├── Diplo.Core/             # Clients gRPC, abstraction IOutputPort
+│   ├── Diplo.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
 │   ├── Diplo.Disk/             # Montage d'images disque (qcow2, raw, vhd, vhdx, vmdk)
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
 │   └── Diplo.Gui/              # Interface graphique Avalonia
@@ -325,7 +332,21 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
 5. **Supprimer le conteneur** — le write-back réécrit `data.img` depuis le staging et nettoie `%ProgramData%\Diplo\volumes` :
    ```powershell
    & ...\Diplo.Cli.exe container delete mon-conteneur -f
-   ```
+```
+
+### Modules mutualisés
+
+| Module | Projet | Rôle |
+|--------|--------|------|
+| `JsonHelpers` | Abstractions | Extraction typée de propriétés `JsonElement` (string, int64, double, bool) |
+| `DiploJson` | Abstractions | Options sérialisation JSON centralisées (snakeCase, case-insensitive, maxDepth) |
+| `ProcessExec` | Abstractions | Exécution processus externes + commandes PowerShell |
+| `ServiceGuards` | Abstractions | Guards de validation d'entrée réutilisables (RpcException) |
+| `CachedConfig<'T>` | Abstractions | Cache générique avec invalidation manuelle |
+| `DriverMappings` | Grpc | Mapping type↔string pour drivers volume et réseau |
+| `GrpcClientFactory` | Core | Construction canaux gRPC TCP/pipe avec retry et credentials |
+| `TestHelpers` | TestHelpers | Helpers temp dir pour les tests |
+
 
 **Résultats de la validation (11/08/2026, containerd v2.3.3, Windows 11 26200)** :
 

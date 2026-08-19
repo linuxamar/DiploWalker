@@ -26,6 +26,7 @@ module DiploJson =
     let withMaxDepth (maxDepth: int) =
         let o = JsonSerializerOptions()
         o.WriteIndented <- true
+        o.MaxDepth <- maxDepth
         o
 
     let documentOptions =
