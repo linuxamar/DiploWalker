@@ -4,6 +4,7 @@ open System
 open System.Collections.ObjectModel
 open Avalonia.Threading
 open Diplo.Core.Clients
+open Diplo.Grpc
 open Diplo.Core.Output
 open Diplo.Grpc.Volume
 
@@ -82,15 +83,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
             try
                 use client = new VolumeClient()
                 let driverEnum =
-                    match this.VolumeDriver.ToLowerInvariant() with
-                    | "local" -> StorageDriverType.Local
-                    | "nfs" -> StorageDriverType.Nfs
-                    | "smb" -> StorageDriverType.Smb
-                    | "azure" -> StorageDriverType.CloudAzure
-                    | "aws" -> StorageDriverType.CloudAws
-                    | "gcp" -> StorageDriverType.CloudGcp
-                    | "iso" -> StorageDriverType.Iso
-                    | _ -> StorageDriverType.Local
+                    DriverMappings.parseVolumeDriver this.VolumeDriver
                 let! response = client.CreateAsync(name = this.VolumeNameInput, driver = driverEnum)
                 outputPort.WriteSuccess(sprintf "Volume %s créé (ID: %s)" this.VolumeNameInput response.Id)
             with ex -> outputPort.WriteError(ex.Message)

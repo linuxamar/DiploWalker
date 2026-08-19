@@ -68,3 +68,16 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
 
     member _.VolumeExists(id: string) =
         File.Exists(metaPath id)
+
+    /// Supprime tous les volumes enregistrés et retourne la liste des identifiants supprimés.
+    member this.PruneAll() =
+        let volumes = this.ListVolumes()
+        if volumes.IsEmpty then []
+        else
+            let removed = ResizeArray<string>()
+            for vol in volumes do
+                let id = JsonHelpers.tryGetString vol "id"
+                if not (String.IsNullOrEmpty(id)) then
+                    this.RemoveVolume(id) |> ignore
+                    removed.Add(id)
+            removed |> Seq.toList

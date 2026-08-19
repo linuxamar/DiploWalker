@@ -65,3 +65,40 @@ module ProcessExec =
             let detail = if String.IsNullOrWhiteSpace stderr then "" else " " + stderr.Trim()
             raise (InvalidOperationException(sprintf "La commande '%s' a échoué (code %d):%s" fileName code detail))
         stdout
+
+    /// Exécute une commande PowerShell avec les paramètres spécifiés.
+    let runPowerShell (command: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
+        let timeout = timeoutMsOr timeoutMs
+        let script =
+            let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
+            let body = sprintf "%s -%s" command (parameters |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i]) |> String.concat " -")
+            sprintf "{ param(%s) %s }" (paramNames |> String.concat ", ") body
+        let args =
+            [ yield "-NoProfile"
+              yield "-NonInteractive"
+              yield "-Command"
+              yield script
+              yield! parameters |> List.map snd ]
+        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) None
+        if code <> 0 then
+            let detail = if String.IsNullOrWhiteSpace stderr then "" else " " + stderr.Trim()
+            raise (InvalidOperationException(sprintf "PowerShell a échoué (code %d):%s" code detail))
+        stdout
+
+    /// Exécute un script PowerShell brut avec des paramètres nommés.
+    let runPowerShellScript (scriptBody: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
+        let timeout = timeoutMsOr timeoutMs
+        let script =
+            let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
+            sprintf "{ param(%s) %s }" (paramNames |> String.concat ", ") scriptBody
+        let args =
+            [ yield "-NoProfile"
+              yield "-NonInteractive"
+              yield "-Command"
+              yield script
+              yield! parameters |> List.map snd ]
+        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) None
+        if code <> 0 then
+            let detail = if String.IsNullOrWhiteSpace stderr then "" else " " + stderr.Trim()
+            raise (InvalidOperationException(sprintf "PowerShell a échoué (code %d):%s" code detail))
+        stdout

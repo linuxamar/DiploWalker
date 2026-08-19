@@ -9,6 +9,7 @@
     <Compile Include="ContainerMessages.fs" />
     <Compile Include="VolumeMessages.fs" />
     <Compile Include="NetworkMessages.fs" />
+    <Compile Include="DriverMappings.fs" />
     <Compile Include="IContainerService.fs" />
     <Compile Include="IVolumeService.fs" />
     <Compile Include="INetworkService.fs" />

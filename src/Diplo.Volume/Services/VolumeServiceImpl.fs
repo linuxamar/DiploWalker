@@ -10,6 +10,7 @@ open Diplo.Grpc
 open Diplo.Grpc.Volume
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
+open Diplo.Grpc
 open Diplo.Volume.Drivers
 
 [<ServiceContract(Name = "IVolumeService")>]
@@ -17,28 +18,6 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
 
     let getDriver (driverType: StorageDriverType) =
         registry.Get(driverType)
-
-    let driverTypeToString (dt: StorageDriverType) =
-        match dt with
-        | StorageDriverType.Local -> "local"
-        | StorageDriverType.Nfs -> "nfs"
-        | StorageDriverType.Smb -> "smb"
-        | StorageDriverType.CloudAzure -> "azure"
-        | StorageDriverType.CloudAws -> "aws"
-        | StorageDriverType.CloudGcp -> "gcp"
-        | StorageDriverType.Iso -> "iso"
-        | _ -> "local"
-
-    let parseDriverString (s: string) =
-        match s.ToLowerInvariant() with
-        | "local" -> StorageDriverType.Local
-        | "nfs" -> StorageDriverType.Nfs
-        | "smb" -> StorageDriverType.Smb
-        | "azure" -> StorageDriverType.CloudAzure
-        | "aws" -> StorageDriverType.CloudAws
-        | "gcp" -> StorageDriverType.CloudGcp
-        | "iso" -> StorageDriverType.Iso
-        | _ -> StorageDriverType.Local
 
     interface IVolumeService with
 
@@ -52,7 +31,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                     SecurityValidation.validateLabel kv.Key kv.Value
                 let driverType =
                     if request.Driver = StorageDriverType.Local && driverOpts.ContainsKey("driver") then
-                        parseDriverString driverOpts.["driver"]
+                        DriverMappings.parseVolumeDriver driverOpts.["driver"]
                     else request.Driver
                 let driver = getDriver driverType
                 let (id, mountpoint) = driver.CreateVolume(name, driverOpts, labels)

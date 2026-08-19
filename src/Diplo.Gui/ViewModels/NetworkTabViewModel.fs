@@ -4,6 +4,7 @@ open System
 open System.Collections.ObjectModel
 open Avalonia.Threading
 open Diplo.Core.Clients
+open Diplo.Grpc
 open Diplo.Core.Output
 open Diplo.Grpc.Network
 
@@ -99,12 +100,7 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
             try
                 use client = new NetworkClient()
                 let driverEnum =
-                    match this.NetworkDriver.ToLowerInvariant() with
-                    | "bridge" -> Diplo.Grpc.Network.NetworkDriver.Bridge
-                    | "none" -> Diplo.Grpc.Network.NetworkDriver.None
-                    | "pod" -> Diplo.Grpc.Network.NetworkDriver.Pod
-                    | "cni" -> Diplo.Grpc.Network.NetworkDriver.CustomCni
-                    | _ -> Diplo.Grpc.Network.NetworkDriver.Bridge
+                    DriverMappings.parseNetworkDriver this.NetworkDriver
                 let! response = client.CreateAsync(this.NetworkNameInput, driver = driverEnum, subnet = this.NetworkSubnet, gateway = this.NetworkGateway)
                 outputPort.WriteSuccess(sprintf "Réseau %s créé (ID: %s)" this.NetworkNameInput response.Id)
             with ex -> outputPort.WriteError(ex.Message)
