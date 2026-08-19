@@ -12,23 +12,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | Projet | Rôle |
 |--------|------|
-| Diplo.Abstractions | Interfaces partagées, validation, sécurité |
+| Diplo.Abstractions | Interfaces partagées, validation, sécurité, modules utilitaires mutualisés |
 | Diplo.Container | Service gRPC de gestion des conteneurs (containerd) — création, cycle de vie, montage de volumes (`--mount`) |
 | Diplo.Volume | Service gRPC de gestion des volumes persistants |
 | Diplo.Network | Service gRPC de gestion des réseaux (CNI) |
 | Diplo.Installer | Installation Windows (services, containerd, CNI) |
-| Diplo.Grpc | Types messages et interfaces de service gRPC (protobuf-net, code-first) |
+| Diplo.Grpc | Types messages et interfaces de service gRPC (protobuf-net, code-first), mappings de drivers |
 | Diplo.Contracts | Types partagés entre services |
-| Diplo.Core | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `diplo.json` et support des named pipes (`http://pipe:/<nom>`) |
+| Diplo.Core | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `diplo.json` et support des named pipes (`http://pipe:/<nom>`), factory gRPC mutualisée |
 | Diplo.Disk | Montage d'images disque (qcow2 maison, raw, vhd, vhdx, vmdk) via DiscUtils |
 | Diplo.Cli | Client CLI (Spectre.Console) |
 | Diplo.Gui | Interface graphique Avalonia |
+
+### Modules mutualisés
+
+Les modules suivants ont été extraits du code dupliqué et centralisés dans Diplo.Abstractions / Diplo.Grpc :
+
+| Module | Projet | Rôle |
+|--------|--------|------|
+| `JsonHelpers` | Diplo.Abstractions | Extraction typée de propriétés depuis `JsonElement` (`tryGetString`, `tryGetInt64`, `tryGetDouble`, `tryGetBool`, `tryGetElement`, `tryGetStringValue`). Module `[<RequireQualifiedAccess>]` — appeler via `JsonHelpers.tryGetString`. |
+| `DiploJson` | Diplo.Abstractions | Options de sérialisation JSON centralisées (`defaultOptions`, `snakeCaseOptions`, `caseInsensitiveOptions`, `withMaxDepth`, `documentOptions`). |
+| `ProcessExec` | Diplo.Abstractions | Exécution de processus externes (`run`, `runWithResult`) et commandes PowerShell (`runPowerShell`, `runPowerShellScript`). Gère le timeout, le Kill, et la lecture asynchrone stdout/stderr. |
+| `ServiceGuards` | Diplo.Abstractions | Guards de validation d'entrée réutilisables (`requireNonEmpty`, `requireId`, `requirePositive`, `requireInRange`, `requireSafePath`, `requireLocalAddress`, `requireSafeCommand`). Lèvent `RpcException(InvalidArgument)`. |
+| `CachedConfig<'T>` | Diplo.Abstractions | Cache générique avec invalidation manuelle, protégé par un verrou. Chargement paresseux via `Value`, invalidation via `Invalidate()`. |
+| `DriverMappings` | Diplo.Grpc | Mapping type↔string pour les drivers volume (`StorageDriverType`) et réseau (`NetworkDriver`). Fonctions `parse*`, `isValid*`, `*ToString`, `all*Names`. |
+| `GrpcClientFactory` | Diplo.Core | Construction de canaux gRPC TCP ou named pipe avec retry (5 tentatives, backoff exponentiel) et credentials par token. |
+| `TestHelpers` | Diplo.TestHelpers | Helpers pour les tests (`createTempDir`, `cleanupDir`). |
 
 ## Stack
 
 - **.NET 10** (`dotnet 10.0.302` installé localement).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
-- **Tests** : xUnit v3 + FsUnit.xUnit — 672 tests au total (dont 31 d'intégration gRPC).
+- **Tests** : xUnit v4 + FsUnit.xUnit — 707 tests au total (dont 31 d'intégration gRPC).
 
 ## Commandes
 
