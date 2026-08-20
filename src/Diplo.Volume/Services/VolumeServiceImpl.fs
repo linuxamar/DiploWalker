@@ -10,7 +10,6 @@ open Diplo.Grpc
 open Diplo.Grpc.Volume
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
-open Diplo.Grpc
 open Diplo.Volume.Drivers
 
 [<ServiceContract(Name = "IVolumeService")>]

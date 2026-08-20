@@ -14,6 +14,7 @@
     <Compile Include="NetworkCommands.fs" />
     <Compile Include="StatusCommand.fs" />
     <Compile Include="ConfigCommands.fs" />
+    <Compile Include="DiskCommands.fs" />
     <Compile Include="ComposeCommands.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -25,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Diplo.Core\Diplo.Core.fsproj" />
+    <ProjectReference Include="..\Diplo.Disk\Diplo.Disk.fsproj" />
   </ItemGroup>
 
 </Project>

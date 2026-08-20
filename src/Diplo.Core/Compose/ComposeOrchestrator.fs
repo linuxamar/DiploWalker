@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Diagnostics
 open System.IO
 open System.Threading.Tasks
+open Grpc.Core
 open Diplo.Core.Clients
 open Diplo.Core.Output
 open Diplo.Abstractions
@@ -33,7 +34,7 @@ type ComposeOrchestrator(output: IOutputPort) =
     member _.ParseFile(filePath: string) : ComposeFile =
         SecurityValidation.validateFilePath filePath "Le fichier compose"
         if not (File.Exists filePath) then
-            failwithf "Le fichier compose '%s' est introuvable" filePath
+            raise (RpcException(Status(StatusCode.NotFound, sprintf "Le fichier compose '%s' est introuvable" filePath)))
 
         let yaml = File.ReadAllText(filePath)
         let stream = new StringReader(yaml)
@@ -69,7 +70,7 @@ type ComposeOrchestrator(output: IOutputPort) =
                         | _ ->
                             match buildCtx with
                             | Some ctx -> sprintf "%s_%s" projectName name
-                            | _ -> failwithf "Le service '%s' doit avoir une image ou un build" name
+                            | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "Le service '%s' doit avoir une image ou un build" name)))
 
                     let command =
                         match tryGetChild svc "command" with

@@ -2,6 +2,7 @@ namespace Diplo.Volume.Drivers
 
 open System
 open System.Text.Json
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -13,7 +14,7 @@ type CloudAwsDriver(dataRoot: string) =
         match driverOpts |> Map.tryFind "fsId", driverOpts |> Map.tryFind "region" with
         | Some fsId, Some region ->
             sprintf "%s.efs.%s.amazonaws.com:/" fsId region
-        | _ -> failwith "Les options 'fsId' et 'region' sont requises pour le driver AWS"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'fsId' et 'region' sont requises pour le driver AWS")))
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =
@@ -34,12 +35,12 @@ type CloudAwsDriver(dataRoot: string) =
             SecurityValidation.validateId id "L'identifiant du volume"
             SecurityValidation.validateVolumePath targetPath "Le chemin cible"
             match store.InspectVolume(id) with
-            | None -> failwithf "Volume %s introuvable" id
+            | None -> raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
             | Some info ->
                 let mutable v = Unchecked.defaultof<JsonElement>
                 let remotePath =
                     if info.TryGetProperty("remotePath", &v) then v.GetString()
-                    else failwithf "Aucun chemin distant pour le volume %s" id
+                    else raise (RpcException(Status(StatusCode.NotFound, sprintf "Aucun chemin distant pour le volume '%s'" id)))
                 ProcessExec.run "mount" [ "-o"; "nfsvers=4.1"; remotePath; targetPath ] (Some 30_000) None |> ignore
                 (true, targetPath)
 

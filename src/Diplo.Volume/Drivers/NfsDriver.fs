@@ -2,6 +2,7 @@ namespace Diplo.Volume.Drivers
 
 open System
 open System.Text.Json
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -12,7 +13,7 @@ type NfsDriver(dataRoot: string) =
     let extractRemotePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "server", driverOpts |> Map.tryFind "export" with
         | Some server, Some export -> sprintf "%s:/%s" server export
-        | _ -> failwith "Les options 'server' et 'export' sont requises pour le driver NFS"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'server' et 'export' sont requises pour le driver NFS")))
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =
@@ -33,12 +34,12 @@ type NfsDriver(dataRoot: string) =
             SecurityValidation.validateId id "L'identifiant du volume"
             SecurityValidation.validateVolumePath targetPath "Le chemin cible"
             match store.InspectVolume(id) with
-            | None -> failwithf "Volume %s introuvable" id
+            | None -> raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
             | Some info ->
                 let mutable v = Unchecked.defaultof<JsonElement>
                 let remotePath =
                     if info.TryGetProperty("remotePath", &v) then v.GetString()
-                    else failwithf "Aucun chemin distant pour le volume %s" id
+                    else raise (RpcException(Status(StatusCode.NotFound, sprintf "Aucun chemin distant pour le volume '%s'" id)))
                 ProcessExec.run "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some 30_000) None |> ignore
                 (true, targetPath)
 

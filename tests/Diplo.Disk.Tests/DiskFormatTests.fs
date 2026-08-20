@@ -91,11 +91,9 @@ module DiskFormatTests =
         DiskFormat.isDiskImage format |> should equal true
 
     [<Theory>]
-    [<InlineData("Qcow1")>]
     [<InlineData("Unknown")>]
     let ``isDiskImage refuse les formats non montables`` (name: string) =
         let format =
             match name with
-            | "Qcow1" -> DiskFormat.Qcow1
             | _ -> DiskFormat.Unknown
         DiskFormat.isDiskImage format |> should equal false

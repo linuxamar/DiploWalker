@@ -14,6 +14,9 @@ module DiskFormat =
         | Vhd
         | Vhdx
         | Vmdk
+        | Vdi
+        | Dmg
+        | Parallels
         | Raw
         | Unknown
 
@@ -24,6 +27,9 @@ module DiskFormat =
         | Vhd -> "vhd"
         | Vhdx -> "vhdx"
         | Vmdk -> "vmdk"
+        | Vdi -> "vdi"
+        | Dmg -> "dmg"
+        | Parallels -> "parallels"
         | Raw -> "raw"
         | Unknown -> "inconnu"
 
@@ -55,18 +61,36 @@ module DiskFormat =
                 elif isVhdx then Vhdx
                 elif isVmdk then Vmdk
                 else
-                    let foot = Array.zeroCreate<byte> 512
-                    if fs.Length < 512L then
-                        Raw
+                    let isVdi =
+                        fs.Length >= 72L
+                        && startsWith head 0
+                            [| 0x7Euy; 0x10uy; 0x10uy; 0x10uy
+                               0x4Duy; 0x61uy; 0x63uy; 0x20uy |]
+                    let isDmg =
+                        fs.Length >= 4L
+                        && startsWith head 0
+                            [| 0x78uy; 0x6Buy; 0x6Fuy; 0x6Cuy |]
+                    let isParallels =
+                        fs.Length >= 8L
+                        && startsWith head 0
+                            [| 0x70uy; 0x61uy; 0x72uy; 0x61uy
+                               0x0Duy; 0x0Auy; 0x1Auy; 0x0Auy |]
+                    if isVdi then Vdi
+                    elif isDmg then Dmg
+                    elif isParallels then Parallels
                     else
-                        fs.Position <- fs.Length - 512L
-                        fs.Read(foot, 0, 512) |> ignore
-                        let isVhd = startsWith foot 0 (Encoding.ASCII.GetBytes "conectix")
-                        if isVhd then Vhd else Raw
+                        let foot = Array.zeroCreate<byte> 512
+                        if fs.Length < 512L then
+                            Raw
+                        else
+                            fs.Position <- fs.Length - 512L
+                            fs.Read(foot, 0, 512) |> ignore
+                            let isVhd = startsWith foot 0 (Encoding.ASCII.GetBytes "conectix")
+                            if isVhd then Vhd else Raw
 
     /// Indique si le format est une image disque prise en charge par le
     /// moteur de montage (c'est-à-dire un fichier, pas un répertoire).
     let isDiskImage (format: Format) =
         match format with
-        | Qcow2 | Vhd | Vhdx | Vmdk | Raw -> true
-        | Qcow1 | Unknown -> false
+        | Qcow2 | Qcow1 | Vhd | Vhdx | Vmdk | Vdi | Dmg | Parallels | Raw -> true
+        | Unknown -> false

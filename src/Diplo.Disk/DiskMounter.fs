@@ -50,10 +50,8 @@ module DiskMounter =
         elif File.Exists source then
             let format = DiskFormat.detect source
             match format with
-            | DiskFormat.Qcow1 ->
-                failwith "Les images qcow v1 ne sont pas prises en charge (convertissez-les en qcow2 avec qemu-img)"
             | DiskFormat.Unknown ->
-                failwithf "Format d'image disque non reconnu : '%s'" source
+                invalidArg "source" (sprintf "Format d'image disque non reconnu : '%s'" source)
             | _ ->
                 let staging = Path.Combine(stagingRoot (), Guid.NewGuid().ToString("N"))
                 Directory.CreateDirectory staging |> ignore
@@ -65,7 +63,7 @@ module DiskMounter =
                         try Directory.Delete(staging, true) with _ -> ()
                 { Source = source; HostPath = staging; Destination = destination; ReadOnly = readOnly; Dispose = dispose }
         else
-            failwithf "La source du volume n'existe pas : '%s'" source
+            invalidArg "source" (sprintf "La source du volume n'existe pas : '%s'" source)
 
     /// Reconstruit un volume monté à partir de l'état persisté (après un
     /// redémarrage du service) : réutilise le dossier de staging existant et

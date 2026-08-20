@@ -3,7 +3,6 @@ namespace Diplo.Network.Services
 open System
 open System.ServiceModel
 open System.Collections.Generic
-open System.Diagnostics
 open System.Text.Json
 open System.Threading.Tasks
 open Grpc.Core

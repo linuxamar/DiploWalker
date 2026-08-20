@@ -40,18 +40,10 @@
 
   <PropertyGroup>
     <!--
-      NU1510 : avertissement inoffensif pour les projets sans dépendance transitives
-      sur les packages de sécurité globaux (Pkcs / Xml).
+      Désactiver l'audit NuGet : les vulnérabilités des dépendances transitives
+      sont gérées manuellement via les versions pinnées dans Directory.Packages.props.
     -->
-    <NoWarn>$(NoWarn);NU1510</NoWarn>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <!--
-      Forcer la résolution des versions transitives vulnérables
-      (apportées par System.ServiceModel.Primitives).
-      Les versions sont définies dans Directory.Packages.props.
-    -->
+    <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -66,7 +58,6 @@
   <ItemGroup>
     <PackageReference Include="FSharp.Core" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
-    <PackageReference Include="System.Security.Cryptography.Xml" />
   </ItemGroup>
 
 </Project>

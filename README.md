@@ -15,7 +15,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 ### Clients
 
-- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes et réseaux
+- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux et images disque (`disk create-image`)
 - **GUI** : `Diplo.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
 - **Résilience** : les canaux gRPC (`DiploChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
 
@@ -25,7 +25,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (707 tests)
+- **Tests** : xUnit (787 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -202,12 +202,6 @@ Options disponibles :
 
 `signtool.exe` est recherché dans le PATH puis dans les Windows Kits installés. Sans certificat disponible, la signature est ignorée (simple avertissement).
 
-### CI (GitHub Actions)
-
-`.github/workflows/ci.yml` :
-- **Build + tests** à chaque push/PR sur `dev` et `main` (`pipeline.ps1 -DoTests`) ;
-- **Publication** sur les tags `v*` : tests, publication self-contained x64/x86 et setup NSIS téléversés en artefacts.
-
 ### Structure du projet
 
 ```
@@ -228,7 +222,7 @@ Diplo/
 │   ├── Diplo.Grpc/             # Types messages, services gRPC, DriverMappings
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
-│   ├── Diplo.Disk/             # Montage d'images disque (qcow2, raw, vhd, vhdx, vmdk)
+│   ├── Diplo.Disk/             # Montage et création d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels)
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
 │   └── Diplo.Gui/              # Interface graphique Avalonia
 ├── tests/
@@ -268,7 +262,22 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 
 ## Montage de volumes et d'images disque
 
-À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** (qcow2, raw, vhd, vhdx, vmdk) gérées par `Diplo.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
+À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** gérées par `Diplo.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
+
+| Format | Extension(s) | R/W | Moteur |
+|--------|-------------|-----|--------|
+| **Qcow2** | `.qcow2` | R/W | Pilote maison (`Qcow2Stream`) |
+| **QCOW v1** | `.qcow` | R/W | Pilote maison (`Qcow1Stream`) |
+| **VHD** | `.vhd` | R/W | DiscUtils |
+| **VHDX** | `.vhdx` | R/W | DiscUtils |
+| **VMDK** | `.vmdk` | R/W | DiscUtils |
+| **VDI** | `.vdi` | R/W | DiscUtils |
+| **Raw** | `.img`, `.raw`, `.bin`, `.iso` | R/W | DiscUtils (FAT, NTFS, ext) |
+| **DMG** | `.dmg` | Lecture seule | DiscUtils |
+| **Parallels** | `.hdd`, `.hds` | R/W | Pilote maison (`ParallelsStream`) |
+| **Btrfs** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
+| **XFS** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
+| **HFS+** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
 
 ### CLI
 
@@ -283,9 +292,29 @@ diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\do
 
 Les sources sont restreintes aux répertoires autorisés par la validation de sécurité (`%TEMP%`, `%ProgramData%\Diplo`, `%ProgramFiles%\Diplo`). Une image disque est montée via un répertoire de préparation pour la durée de vie du conteneur, puis réécrite à la suppression.
 
+### Création d'images disque
+
+```powershell
+diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw]
+```
+
+| Format | Extension | Moteur | Note |
+|--------|-----------|--------|------|
+| **Raw** | `.img`, `.raw`, `.bin`, `.iso` | DiscUtils | Par défaut |
+| **VHD** | `.vhd` | DiscUtils | Virtual Hard Disk (dynamic) |
+| **VHDX** | `.vhdx` | DiscUtils | Virtual Hard Disk v2 (dynamic) |
+| **VMDK** | `.vmdk` | DiscUtils | Virtual Machine Disk (dynamic) |
+| **VDI** | `.vdi` | DiscUtils | VirtualBox Disk Image |
+
+La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés.
+
+Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (pas de factory publique dans DiscUtils).
+
 ### GUI
 
 L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
+
+L'onglet **Volumes** propose un panneau « Créer une image disque » avec sélection du répertoire source, du chemin de destination et du format.
 
 ## Authentification aux registres
 
@@ -305,79 +334,32 @@ diplo container pull myregistry.azurecr.io/team/app:latest --user inline:secret 
 
 L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de passe » avec les boutons **Se connecter** et **Se déconnecter**. Le pull utilise ensuite l'identifiant enregistré automatiquement.
 
-### Validation manuelle sur un hôte containerd réel
-
-Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable dans les tests : il nécessite un hôte Windows avec containerd installé. Procédure validée le 11/08/2026 contre containerd **v2.3.3** (namespace `default`) :
-
-1. **Image de test** — créer une image FAT brute (format détecté par `DiskFormat`) contenant `bonjour.txt` :
-   ```powershell
-   $img = "C:\ProgramData\Diplo\validate\data.img"
-   # Fabriquer une image FAT 64 Mo avec DiscUtils (script fsi ou utilitaire dédié).
-   ```
-2. **Publier et démarrer le service en TCP** (la validation a été effectuée en TCP ; le transport par named pipes est corrigé dans `ServerConfig` — voir ci-dessous) :
-   ```powershell
-   dotnet publish src\Diplo.Container -c Release -r win-x64 -p:Platform=x64 --self-contained true -o publish\WindowsServices\x64\Diplo.Container
-   & publish\WindowsServices\x64\Diplo.Container\Diplo.Container.exe   # service : http://127.0.0.1:5001
-   ```
-3. **Créer un conteneur avec l'image montée** (le CLI résout l'adresse depuis le token d'auth) :
-   ```powershell
-   & publish\WindowsServices\x64\Diplo.Cli\Diplo.Cli.exe container create mcr.microsoft.com/windows/nanoserver:ltsc2025 mon-conteneur --mount "src=$img,dst=C:\data"
-   ```
-4. **Démarrer, exécuter, écrire** :
-   ```powershell
-   & ...\Diplo.Cli.exe container start mon-conteneur        # démarre la tâche détachée (le stdio n'est plus attaché)
-   & ...\Diplo.Cli.exe container exec mon-conteneur cmd /c dir C:\data
-   & ...\Diplo.Cli.exe container exec mon-conteneur cmd /c copy nul C:\data\ecrit.txt
-   ```
-5. **Supprimer le conteneur** — le write-back réécrit `data.img` depuis le staging et nettoie `%ProgramData%\Diplo\volumes` :
-   ```powershell
-   & ...\Diplo.Cli.exe container delete mon-conteneur -f
-```
-
 ### Modules mutualisés
 
 | Module | Projet | Rôle |
 |--------|--------|------|
-| `JsonHelpers` | Abstractions | Extraction typée de propriétés `JsonElement` (string, int64, double, bool) |
-| `DiploJson` | Abstractions | Options sérialisation JSON centralisées (snakeCase, case-insensitive, maxDepth) |
-| `ProcessExec` | Abstractions | Exécution processus externes + commandes PowerShell |
-| `ServiceGuards` | Abstractions | Guards de validation d'entrée réutilisables (RpcException) |
+| `JsonHelpers` | Abstractions | Extraction typée de propriétés `JsonElement` |
+| `DiploJson` | Abstractions | Options sérialisation JSON centralisées |
+| `ProcessExec` | Abstractions | Exécution processus externes + PowerShell |
+| `ServiceGuards` | Abstractions | Guards de validation d'entrée (RpcException) |
 | `CachedConfig<'T>` | Abstractions | Cache générique avec invalidation manuelle |
 | `DriverMappings` | Grpc | Mapping type↔string pour drivers volume et réseau |
-| `GrpcClientFactory` | Core | Construction canaux gRPC TCP/pipe avec retry et credentials |
+| `GrpcClientFactory` | Core | Construction canaux gRPC TCP/pipe avec retry |
 | `TestHelpers` | TestHelpers | Helpers temp dir pour les tests |
+| `HawkyntFs` | Disk | Adaptateur Hawkynt pour Btrfs/XFS/HFS+ R/W |
+| `VdiFs` | Disk | Adaptateur DiscUtils.Vdi pour VDI R/W |
+| `Qcow1Fs` | Disk | Pilote maison QCOW v1 |
+| `DmgFs` | Disk | Adaptateur DiscUtils.Dmg pour extraction DMG |
+| `ParallelsFs` | Disk | Pilote maison Parallels |
+| `FsImage` | Disk | Création, extraction et réécriture d'images disque |
 
+### Validation ctr v2 (≥ v2.0)
 
-**Résultats de la validation (11/08/2026, containerd v2.3.3, Windows 11 26200)** :
+Le montage réel des images disque et la communication gRPC ont été validés en conditions réelles avec containerd **v2.3.3** (Windows 11 26200, namespace `default`). Points clés de compatibilité ctr v2 :
 
-- `container create` avec image FAT montée en `type=bind,src=<staging>,dst=C:\data,options=rbind` : le staging (`%ProgramData%\Diplo\volumes\<guid>`) est extrait de l'image, le contenu est visible dans le conteneur (`dir C:\data` → `bonjour.txt`) et la réponse porte bien l'ID du conteneur.
-- Le bind mount est bidirectionnel : `ecrit.txt` créé dans le conteneur apparaît dans le staging hôte.
-- `container delete -f` : conteneur et tâche supprimés, staging purgé, et `data.img` réécrit — un nouvel extract relit `bonjour.txt` **et** `ecrit.txt`.
-- `ctr tasks exec` s'exécute dans le conteneur (le top-level `ctr exec` n'existe pas en v2).
+- `--namespace`/`-n` est une option **globale** (avant la sous-commande).
+- `container create` attend `<IMAGE> <CONTAINER>` et ne produit aucune sortie en cas de succès.
+- `exec` est `tasks exec` ; `task info` et `task logs` ont été supprimés en v2.
+- Les logs sont capturés par le service dans `%ProgramData%\Diplo\logs\<id>.log` et relus par `container logs --follow`.
 
-**Résultats de la validation (12/08/2026)** :
-
-- `container logs --follow` validé de bout en bout en conditions réelles : conteneur `ping 127.0.0.1 -t` (une ligne par seconde) démarré détaché, puis `container logs --follow --tail 3` → instantané de 3 lignes puis ~1 nouvelle ligne par seconde reçue au fil de l'eau, suivi actif jusqu'à Ctrl+C. Cela a nécessité trois corrections : (1) `ContainerLogs.read` ouvrait le fichier avec `FileShare.Read` strict, incompatible avec le handle d'écriture du conteneur en cours d'exécution (IOException) — passage à `FileShare.ReadWrite ||| FileShare.Delete` ; (2) le `StreamWriter` de capture n'avait pas `AutoFlush` : les lignes restaient en mémoire tant que le conteneur tournait — `AutoFlush <- true` ; (3) `container create --cmd` : la commande était passée via un spec OCI avec l'option `--spec`, absente de `ctr v2.3.3` (d'où l'échec silencieux) — la commande est désormais passée en positionnel (`ctr container create <image> <id> <cmd> [args...]`) avec `--env`, `--mount`, `--memory-limit`, `--cpu-shares` en flags.
-- Le CLI expose `container create -c|--cmd "<ligne de commande>"` (découpage respectant les guillemets) en plus de `--command` (arguments répétés) ; les tests unitaires du flux (`getContainerLogs stream émet les nouvelles lignes au fil de l'eau et se termine à l'arrêt`) et de création renforcés.
-
-**Points en suspens résolus (12/08/2026)** :
-
-1. **Limites de ressources non prises en charge** : `ctr container create` (v2.3.3) ne propose pas `--pids-limit`, et `ctr task update`/`ctr container update` **n'existent pas** (« No help topic for 'update' »). `UpdateContainer` lève désormais une `RpcException` claire (`Unimplemented`) quand une limite est demandée (no-op sinon) — il n'était utilisé ni par le CLI ni par la GUI.
-2. **`container delete -f` tolérant** : la suppression forcée d'un conteneur inexistant échouait par une erreur gRPC (« Exception was thrown by handler ») ; elle retourne désormais un succès (les échecs de `task kill` et `container delete` sont journalisés en avertissement) — l'arrêt forcé devient idempotent.
-3. **Source de logs GUI validée en conditions réelles** : `GrpcContainerLogsSource` (`GetSnapshot` → 3 lignes avec `tail=3` ; `GetStream` en `follow` → 67 lignes reçues au fil de l'eau) testé contre le service réel, mêmes endpoints gRPC que le CLI.
-4. **Arrêt propre sur Ctrl+C du `container logs --follow`** : validation réelle dans une console dédiée (`AttachConsole` + `GenerateConsoleCtrlEvent`) — le CLI sortait brutalement avec `STATUS_CONTROL_C_EXIT` (0xC000013A). Spectre.Console.Cli 0.55 ne pose pas `e.Cancel` et n'annule pas le jeton : ajout de `CtrlCHandler` (pose `e.Cancel=true` + annulation) et rattrapage de `RpcException` de statut `Cancelled` — `EXIT_CODE=0` désormais.
-6. **Transport par named pipes revalidé en direct** : `GetVersion` et `ListContainers` confirmés sur `http://pipe:/diplo-container-validate` (requêtes HTTP/2 200 dans les logs du service) en plus du TCP (port 5001). Au passage, correction d'un vrai bug : la `PipeSecurity` contenait une règle « Deny Everyone » qui empêchait la création du pipe (sur Windows les règles Deny priment sur les Allow, or l'utilisateur courant est membre de Everyone) → échec de liaison et crash du service ; la règle a été retirée et l'accès passe par un `Allow` `FullControl` pour l'utilisateur courant (comme le fait Kestrel avec `CurrentUserOnly`).
-
-**Compatibilité ctr v2 (≥ v2.0) — écarts corrigés au fil de la validation** :
-
-- `--namespace`/`-n` est une option **globale** (avant la sous-commande), et non locale.
-- `container create` attend `<IMAGE> <CONTAINER>` (ordre inversé par rapport à v1) et ne produit **aucune sortie** en cas de succès.
-- `exec` est `tasks exec` ; `task info` et `task logs` ont été **supprimés** en v2 : `task info` est remplacé par le parsing de `tasks list`. Les logs sont capturés par le service lors du démarrage détaché dans `%ProgramData%\Diplo\logs\<id>.log` et relus par `container logs` (`tail`, `since` ; `--follow` suit le fichier et émet les nouvelles lignes au fil de l'eau jusqu'à la sortie du conteneur ou Ctrl+C).
-- `PullImage` n'utilise volontairement pas de namespace : `ctr image pull` s'applique au namespace courant.
-
-**Points corrigés au fil des validations** :
-
-- Transport Kestrel par named pipes : le flag par défaut de `NamedPipeServerStreamAcl.Create` levait une `ArgumentException` ; `ServerConfig` fournit désormais une `PipeSecurity` explicite (`CurrentUserOnly=false`). **Procédure de validation du transport par named pipes** : (1) dans `ServerConfig`, publier avec `UseNamedPipes: true` et `ListenUrls: http://pipe:/Diplo.Container`, puis publier/démarrer le service ; (2) exécuter `diplo container version` et vérifier que le canal `http://pipe:/Diplo.Container` est bien écouté ; (3) exécuter `diplo container list` — une réponse confirme la liaison par named pipes ; (4) si une `ArgumentException` subsiste, vérifier que la `PipeSecurity` explicite (`CurrentUserOnly=false`) est appliquée dans `ServerConfig`. Le transport par named pipes est également couvert par un test d'intégration automatisé (Kestrel `ListenNamedPipe`, canal `npipe://`) en plus des tests TCP (`UseNamedPipes: false`, port 5001).
-- `container start` démarre la tâche de manière détachée (`ctr tasks start` sans attache au stdio) et capture les logs dans un fichier par conteneur, ce qui permet une utilisation non interactive.
-- `container exec` accepte désormais les arguments contenant des espaces (reconstruction de la ligne de commande avec échappement).
-- L'état des volumes montés est persisté (`MountState`) : après un redémarrage du service, les associations sont restaurées et le write-back à la suppression conserve son comportement.
+Résultats validés : montage bind R/W bidirectionnel, `container logs --follow` en streaming, named pipes et TCP, suppression idempotente (`delete -f`), et write-back d'images disque.

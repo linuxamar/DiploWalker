@@ -1,7 +1,6 @@
 namespace Diplo.Network.Plugins
 
 open System
-open System.Diagnostics
 open System.Net.NetworkInformation
 open System.Collections.Concurrent
 open Serilog
