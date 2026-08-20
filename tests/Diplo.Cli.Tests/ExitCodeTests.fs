@@ -151,3 +151,27 @@ module ExitCodeTests =
         let output = MockOutputPort()
         let code = run (RunCniPluginCommand(output)) (RunCniPluginSettings(PluginPath = "C:\\plugins\\mon-plugin.exe", ContainerId = "c", NetnsPath = null))
         code |> should equal 1
+
+    // ─── Disk ─────────────────────────────────────────────────────────
+    open Diplo.Cli.Disk
+
+    [<Fact>]
+    let ``disk create-image sans source retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (CreateImageCommand(output)) (CreateImageSettings(Source = null, Dest = "C:\\img.vhd"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``disk create-image sans destination retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (CreateImageCommand(output)) (CreateImageSettings(Source = "C:\\src", Dest = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``disk create-image avec source inexistante retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (CreateImageCommand(output)) (CreateImageSettings(Source = "Z:\\n'existe\\pas", Dest = "C:\\img.vhd"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)

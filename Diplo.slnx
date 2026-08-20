@@ -12,6 +12,7 @@
     <Project Path="src/Diplo.Core/Diplo.Core.fsproj" />
     <Project Path="src/Diplo.Disk/Diplo.Disk.fsproj" />
     <Project Path="src/Diplo.Cli/Diplo.Cli.fsproj" />
+    <Project Path="src/Diplo.Contracts/Diplo.Contracts.fsproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Diplo.Abstractions.Tests/Diplo.Abstractions.Tests.fsproj">

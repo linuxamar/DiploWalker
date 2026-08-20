@@ -294,6 +294,36 @@ module ``Vérification des paramètres des commandes`` =
         let settings = ImageTagSettings()
         settings.Target |> should be Null
 
+    // --- Disk settings ---
+    open Diplo.Cli.Disk
+
+    [<Fact>]
+    let ``CreateImageSettings.Source est null par défaut`` () =
+        let settings = CreateImageSettings()
+        settings.Source |> should be Null
+
+    [<Fact>]
+    let ``CreateImageSettings.Dest est null par défaut`` () =
+        let settings = CreateImageSettings()
+        settings.Dest |> should be Null
+
+    [<Fact>]
+    let ``CreateImageSettings.Format est 'raw' par défaut`` () =
+        let settings = CreateImageSettings()
+        settings.Format |> should equal "raw"
+
+    [<Fact>]
+    let ``CreateImageSettings porte l'option --format`` () =
+        let attr =
+            typeof<CreateImageSettings>.GetProperty("Format")
+                .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+        let longNames =
+            attr
+            |> Array.tryPick (function
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | _ -> None)
+        longNames |> should equal (Some [| "format" |])
+
     open Diplo.Cli.Container
 
     [<Fact>]
@@ -394,6 +424,14 @@ module ``Vérification des paramètres des commandes`` =
     [<Fact>]
     let ``ImageTagCommand hérite de AsyncCommand<ImageTagSettings>`` () =
         typeof<ImageTagCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ImageTagSettings>>)
+        |> should be True
+
+    // --- Disk commands ---
+    open Diplo.Cli.Disk
+
+    [<Fact>]
+    let ``CreateImageCommand hérite de AsyncCommand<CreateImageSettings>`` () =
+        typeof<CreateImageCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<CreateImageSettings>>)
         |> should be True
 
 module ``Vérification du MockOutputPort`` =
