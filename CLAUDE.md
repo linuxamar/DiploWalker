@@ -50,7 +50,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - **.NET 10** (`dotnet 10.0.302` installé localement).
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 833 tests au total (dont 31 d'intégration gRPC).
+- **Tests** : xUnit v4 + FsUnit.xUnit — 841 tests au total (dont 31 d'intégration gRPC).
 
 ## Commandes
 

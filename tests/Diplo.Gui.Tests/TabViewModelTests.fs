@@ -172,7 +172,7 @@ let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
 // ── VolumeTabViewModel ──────────────────────────────────────
 
 [<Fact>]
-let ``VolumeTabViewModel expose les 7 commandes ICommand`` () =
+let ``VolumeTabViewModel expose les 10 commandes ICommand`` () =
     let port = MockOutputPort()
     let vm = VolumeTabViewModel(port)
     vm.ListVolumesCommand     |> should not' (be Null)
@@ -182,6 +182,17 @@ let ``VolumeTabViewModel expose les 7 commandes ICommand`` () =
     vm.MountVolumeCommand     |> should not' (be Null)
     vm.UnmountVolumeCommand   |> should not' (be Null)
     vm.PruneVolumesCommand    |> should not' (be Null)
+    vm.CreateImageCommand     |> should not' (be Null)
+    vm.BrowseSourceCommand    |> should not' (be Null)
+    vm.BrowseDestCommand      |> should not' (be Null)
+
+[<Fact>]
+let ``VolumeTabViewModel etat initial image disque`` () =
+    let port = MockOutputPort()
+    let vm = VolumeTabViewModel(port)
+    vm.ImageSourceDir  |> should equal ""
+    vm.ImageDestPath   |> should equal ""
+    vm.ImageFormat     |> should equal "raw"
 
 [<Fact>]
 let ``VolumeTabViewModel etat initial`` () =

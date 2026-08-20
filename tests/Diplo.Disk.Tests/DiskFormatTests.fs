@@ -74,19 +74,54 @@ module DiskFormatTests =
             DiskFormat.detect p |> should equal DiskFormat.Raw
         finally File.Delete p
 
+    [<Fact>]
+    let ``detect reconnait une image vdi`` () =
+        let p = tempFile ()
+        try
+            let header = Array.zeroCreate<byte> 72
+            [| 0x7Euy; 0x10uy; 0x10uy; 0x10uy; 0x4Duy; 0x61uy; 0x63uy; 0x20uy |].CopyTo(header, 0)
+            writeBytes p header
+            DiskFormat.detect p |> should equal DiskFormat.Vdi
+        finally File.Delete p
+
+    [<Fact>]
+    let ``detect reconnait une image dmg`` () =
+        let p = tempFile ()
+        try
+            writeBytes p [| 0x78uy; 0x6Buy; 0x6Fuy; 0x6Cuy |]
+            DiskFormat.detect p |> should equal DiskFormat.Dmg
+        finally File.Delete p
+
+    [<Fact>]
+    let ``detect reconnait une image parallels`` () =
+        let p = tempFile ()
+        try
+            let header = [| 0x70uy; 0x61uy; 0x72uy; 0x61uy; 0x0Duy; 0x0Auy; 0x1Auy; 0x0Auy |]
+            writeBytes p header
+            DiskFormat.detect p |> should equal DiskFormat.Parallels
+        finally File.Delete p
+
     [<Theory>]
     [<InlineData("Qcow2")>]
+    [<InlineData("Qcow1")>]
     [<InlineData("Vhd")>]
     [<InlineData("Vhdx")>]
     [<InlineData("Vmdk")>]
+    [<InlineData("Vdi")>]
+    [<InlineData("Dmg")>]
+    [<InlineData("Parallels")>]
     [<InlineData("Raw")>]
     let ``isDiskImage accepte les formats montables`` (name: string) =
         let format =
             match name with
             | "Qcow2" -> DiskFormat.Qcow2
+            | "Qcow1" -> DiskFormat.Qcow1
             | "Vhd" -> DiskFormat.Vhd
             | "Vhdx" -> DiskFormat.Vhdx
             | "Vmdk" -> DiskFormat.Vmdk
+            | "Vdi" -> DiskFormat.Vdi
+            | "Dmg" -> DiskFormat.Dmg
+            | "Parallels" -> DiskFormat.Parallels
             | _ -> DiskFormat.Raw
         DiskFormat.isDiskImage format |> should equal true
 
