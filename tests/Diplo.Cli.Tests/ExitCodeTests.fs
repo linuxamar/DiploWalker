@@ -175,3 +175,82 @@ module ExitCodeTests =
         let code = run (CreateImageCommand(output)) (CreateImageSettings(Source = "Z:\\n'existe\\pas", Dest = "C:\\img.vhd"))
         code |> should equal 1
         output.Errors |> should not' (be Empty)
+
+    // ─── Volume inspect / mount / unmount ─────────────────────────────
+    open Diplo.Cli.Volume
+
+    [<Fact>]
+    let ``volume inspect sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (InspectVolumeCommand(output)) (InspectVolumeSettings(Id = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``volume mount sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (MountVolumeCommand(output)) (MountSettings(Id = null, Target = "C:\\mnt"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``volume unmount sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (UnmountVolumeCommand(output)) (UnmountSettings(Id = null, Target = "C:\\mnt"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    // ─── Network inspect ──────────────────────────────────────────────
+    open Diplo.Cli.Network
+
+    [<Fact>]
+    let ``network inspect sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (InspectNetworkCommand(output)) (InspectNetworkSettings(Id = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    // ─── Compose ──────────────────────────────────────────────────────
+    open Diplo.Cli.Compose
+
+    [<Fact>]
+    let ``compose up sans fichier retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ComposeUpCommand(output)) (ComposeUpSettings(File = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``compose down sans fichier retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ComposeDownCommand(output)) (ComposeDownSettings(File = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``compose ps sans fichier retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ComposePsCommand(output)) (ComposePsSettings(File = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``compose logs sans fichier retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ComposeLogsCommand(output)) (ComposeLogsSettings(File = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``compose pull sans fichier retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ComposePullCommand(output)) (ComposePullSettings(File = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``compose build sans fichier retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ComposeBuildCommand(output)) (ComposeBuildSettings(File = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)

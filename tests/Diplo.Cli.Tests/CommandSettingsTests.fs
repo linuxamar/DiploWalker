@@ -405,6 +405,28 @@ module ``Vérification des paramètres des commandes`` =
                 | _ -> None)
         longNames |> should equal (Some [| "mount" |])
 
+    // --- Volume inspect/mount/unmount ---
+    [<Fact>]
+    let ``InspectVolumeCommand hérite de AsyncCommand<InspectVolumeSettings>`` () =
+        typeof<InspectVolumeCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<InspectVolumeSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``MountVolumeCommand hérite de AsyncCommand<MountSettings>`` () =
+        typeof<MountVolumeCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<MountSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``UnmountVolumeCommand hérite de AsyncCommand<UnmountSettings>`` () =
+        typeof<UnmountVolumeCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<UnmountSettings>>)
+        |> should be True
+
+    // --- Network inspect ---
+    [<Fact>]
+    let ``InspectNetworkCommand hérite de AsyncCommand<InspectNetworkSettings>`` () =
+        typeof<InspectNetworkCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<InspectNetworkSettings>>)
+        |> should be True
+
     // --- Image commands ---
     [<Fact>]
     let ``ImageListCommand hérite de AsyncCommand<ImageListSettings>`` () =
@@ -433,6 +455,45 @@ module ``Vérification des paramètres des commandes`` =
     let ``CreateImageCommand hérite de AsyncCommand<CreateImageSettings>`` () =
         typeof<CreateImageCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<CreateImageSettings>>)
         |> should be True
+
+    // --- Compose commands ---
+    open Diplo.Cli.Compose
+
+    [<Fact>]
+    let ``ComposeUpCommand hérite de AsyncCommand<ComposeUpSettings>`` () =
+        typeof<ComposeUpCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ComposeUpSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ComposeDownCommand hérite de AsyncCommand<ComposeDownSettings>`` () =
+        typeof<ComposeDownCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ComposeDownSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ComposePsCommand hérite de AsyncCommand<ComposePsSettings>`` () =
+        typeof<ComposePsCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ComposePsSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ComposeLogsCommand hérite de AsyncCommand<ComposeLogsSettings>`` () =
+        typeof<ComposeLogsCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ComposeLogsSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ComposePullCommand hérite de AsyncCommand<ComposePullSettings>`` () =
+        typeof<ComposePullCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ComposePullSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ComposeBuildCommand hérite de AsyncCommand<ComposeBuildSettings>`` () =
+        typeof<ComposeBuildCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ComposeBuildSettings>>)
+        |> should be True
+
+    // --- Compose settings ---
+    [<Fact>]
+    let ``ComposeLogsSettings.Service est null par défaut`` () =
+        let settings = ComposeLogsSettings()
+        settings.Service |> should be Null
 
 module ``Vérification du MockOutputPort`` =
 

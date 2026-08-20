@@ -1,6 +1,5 @@
 namespace Diplo.Cli
 
-open System
 open System.Collections.Generic
 open Spectre.Console
 
