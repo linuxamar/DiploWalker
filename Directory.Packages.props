@@ -36,5 +36,6 @@
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
     <PackageVersion Include="ZstdSharp.Port" Version="0.8.8" />
     <PackageVersion Include="LTRData.DiscUtils" Version="1.0.88" />
+    <PackageVersion Include="Hawkynt.FileFormats.FileSystems" Version="1.0.0.776" />
   </ItemGroup>
 </Project>

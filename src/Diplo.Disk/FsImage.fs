@@ -72,12 +72,16 @@ module FsImage =
 
     /// Extrait le contenu du système de fichiers de l'image dans `targetDir`.
     /// Retourne le nombre de fichiers extraits.
+    /// Essaie Hawkynt en premier (Btrfs, XFS, HFS+), puis fallback DiscUtils.
     let extract (sourcePath: string) (targetDir: string) (readOnly: bool) : int =
-        use disk = openDisk sourcePath readOnly
-        use fs = openFileSystem disk
-        let counter = ref 0
-        copyDirectory fs "\\" targetDir counter
-        !counter
+        match HawkyntFs.tryExtract sourcePath targetDir with
+        | Some count -> count
+        | None ->
+            use disk = openDisk sourcePath readOnly
+            use fs = openFileSystem disk
+            let counter = ref 0
+            copyDirectory fs "\\" targetDir counter
+            !counter
 
     let rec private copyIntoFs (fs: DiscFileSystem) (fsDir: string) (realDir: string) =
         for file in Directory.GetFiles realDir do
@@ -101,8 +105,10 @@ module FsImage =
     /// l'image : retour arrière des modifications effectuées par le conteneur.
     /// Pour le qcow2, l'écriture se fait directement dans les clusters de
     /// l'image via le pilote maison (aucune conversion, aucun intermédiaire).
+    /// Essaie Hawkynt en premier (Btrfs, XFS, HFS+), puis fallback DiscUtils.
     let writeBack (sourcePath: string) (sourceDir: string) =
-        use disk = openDisk sourcePath false
-        use fs = openFileSystem disk
-        copyIntoFs fs "\\" sourceDir
-        deleteFsEntries fs "\\" sourceDir
+        if not (HawkyntFs.tryWriteBack sourcePath sourceDir) then
+            use disk = openDisk sourcePath false
+            use fs = openFileSystem disk
+            copyIntoFs fs "\\" sourceDir
+            deleteFsEntries fs "\\" sourceDir

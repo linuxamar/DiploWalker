@@ -10,6 +10,7 @@
     <Compile Include="DiskFormatTests.fs" />
     <Compile Include="FsImageTests.fs" />
     <Compile Include="Qcow2Tests.fs" />
+    <Compile Include="HawkyntFsTests.fs" />
     <Compile Include="DiskMounterTests.fs" />
   </ItemGroup>
 
