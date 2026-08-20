@@ -38,6 +38,12 @@ module FsImage =
         match DiskFormat.detect sourcePath with
         | DiskFormat.Qcow2 ->
             new Raw.Disk(new Qcow2Stream(sourcePath, access), Ownership.Dispose) :> VirtualDisk
+        | DiskFormat.Qcow1 ->
+            new Raw.Disk(new Qcow1Stream(sourcePath, access), Ownership.Dispose) :> VirtualDisk
+        | DiskFormat.Vdi ->
+            new Vdi.Disk(new FileStream(sourcePath, FileMode.Open, access, FileShare.Read), Ownership.Dispose) :> VirtualDisk
+        | DiskFormat.Parallels ->
+            new Raw.Disk(new ParallelsStream(sourcePath, access), Ownership.Dispose) :> VirtualDisk
         | DiskFormat.Raw ->
             new Raw.Disk(new FileStream(sourcePath, FileMode.Open, access, FileShare.Read), Ownership.Dispose) :> VirtualDisk
         | _ ->
@@ -72,9 +78,16 @@ module FsImage =
 
     /// Extrait le contenu du système de fichiers de l'image dans `targetDir`.
     /// Retourne le nombre de fichiers extraits.
-    /// Essaie Hawkynt en premier (Btrfs, XFS, HFS+), puis fallback DiscUtils.
+    /// Essaie les adaptateurs spécialisés (Hawkynt Btrfs/XFS/HFS+, VDI, DMG)
+    /// avant de fallback sur DiscUtils générique.
     let extract (sourcePath: string) (targetDir: string) (readOnly: bool) : int =
         match HawkyntFs.tryExtract sourcePath targetDir with
+        | Some count -> count
+        | None ->
+        match VdiFs.tryExtract sourcePath targetDir with
+        | Some count -> count
+        | None ->
+        match DmgFs.tryExtract sourcePath targetDir with
         | Some count -> count
         | None ->
             use disk = openDisk sourcePath readOnly
@@ -103,11 +116,12 @@ module FsImage =
 
     /// Réécrit le contenu de `sourceDir` dans le système de fichiers de
     /// l'image : retour arrière des modifications effectuées par le conteneur.
-    /// Pour le qcow2, l'écriture se fait directement dans les clusters de
-    /// l'image via le pilote maison (aucune conversion, aucun intermédiaire).
-    /// Essaie Hawkynt en premier (Btrfs, XFS, HFS+), puis fallback DiscUtils.
+    /// Essaie les adaptateurs spécialisés avant fallback DiscUtils générique.
     let writeBack (sourcePath: string) (sourceDir: string) =
-        if not (HawkyntFs.tryWriteBack sourcePath sourceDir) then
+        if HawkyntFs.tryWriteBack sourcePath sourceDir then ()
+        elif VdiFs.tryWriteBack sourcePath sourceDir then ()
+        elif DmgFs.tryWriteBack sourcePath sourceDir then ()
+        else
             use disk = openDisk sourcePath false
             use fs = openFileSystem disk
             copyIntoFs fs "\\" sourceDir

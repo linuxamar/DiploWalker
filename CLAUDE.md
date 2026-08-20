@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Diplo.Grpc | Types messages et interfaces de service gRPC (protobuf-net, code-first), mappings de drivers |
 | Diplo.Contracts | Types partagés entre services |
 | Diplo.Core | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `diplo.json` et support des named pipes (`http://pipe:/<nom>`), factory gRPC mutualisée |
-| Diplo.Disk | Montage d'images disque (qcow2 maison, raw, vhd, vhdx, vmdk) via DiscUtils + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems |
+| Diplo.Disk | Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels) via DiscUtils/pilotes maison + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems |
 | Diplo.Cli | Client CLI (Spectre.Console) |
 | Diplo.Gui | Interface graphique Avalonia |
 
@@ -39,6 +39,10 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 | `GrpcClientFactory` | Diplo.Core | Construction de canaux gRPC TCP ou named pipe avec retry (5 tentatives, backoff exponentiel) et credentials par token. |
 | `TestHelpers` | Diplo.TestHelpers | Helpers pour les tests (`createTempDir`, `cleanupDir`). |
 | `HawkyntFs` | Diplo.Disk | Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la réécriture de Btrfs, XFS et HFS+. Seuil de 2 Go pour éviter le tout-en-mémoire ; fallback DiscUtils au-delà. |
+| `VdiFs` | Diplo.Disk | Adaptateur DiscUtils.Vdi pour l'extraction et la réécriture R/W d'images VDI (VirtualBox). |
+| `Qcow1Fs` | Diplo.Disk | Pilote maison pour les images QCOW v1 (QFI\\xFE) : lecture/écriture in-place via `Qcow1Stream`. |
+| `DmgFs` | Diplo.Disk | Adaptateur DiscUtils.Dmg pour l'extraction (lecture seule) d'images DMG (Apple Disk Image). |
+| `ParallelsFs` | Diplo.Disk | Pilote maison pour les images Parallels (.hdd, .hds) : lecture/écriture in-place via `ParallelsStream`. |
 
 ## Stack
 
