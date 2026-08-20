@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Diplo.Grpc | Types messages et interfaces de service gRPC (protobuf-net, code-first), mappings de drivers |
 | Diplo.Contracts | Types partagés entre services |
 | Diplo.Core | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `diplo.json` et support des named pipes (`http://pipe:/<nom>`), factory gRPC mutualisée |
-| Diplo.Disk | Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels) via DiscUtils/pilotes maison + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems |
+| Diplo.Disk | Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels) via DiscUtils/pilotes maison + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems. Création d'images disque (VHD, VHDX, VMDK, VDI, Raw) via `FsImage.create`. |
 | Diplo.Cli | Client CLI (Spectre.Console) |
 | Diplo.Gui | Interface graphique Avalonia |
 
@@ -43,19 +43,22 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 | `Qcow1Fs` | Diplo.Disk | Pilote maison pour les images QCOW v1 (QFI\\xFE) : lecture/écriture in-place via `Qcow1Stream`. |
 | `DmgFs` | Diplo.Disk | Adaptateur DiscUtils.Dmg pour l'extraction (lecture seule) d'images DMG (Apple Disk Image). |
 | `ParallelsFs` | Diplo.Disk | Pilote maison pour les images Parallels (.hdd, .hds) : lecture/écriture in-place via `ParallelsStream`. |
+| `FsImage` | Diplo.Disk | Création d'images disque (`create`), extraction (`extract`) et réécriture (`writeBack`) de systèmes de fichiers. Chaîne d'adaptateurs Hawkynt → VdiFs → DmgFs → DiscUtils. Supporte Raw, VHD, VHDX, VMDK et VDI en création. |
 
 ## Stack
 
 - **.NET 10** (`dotnet 10.0.302` installé localement).
+- Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
 - **Tests** : xUnit v4 + FsUnit.xUnit — 787 tests au total (dont 31 d'intégration gRPC).
 
 ## Commandes
 
 ```powershell
-.\pipeline.ps1 -DoTests           # Tests unitaires
-.\pipeline.ps1 -DoPublish         # Publication self-contained
-.\pipeline.ps1 -Clean -Restore    # Nettoyage + restauration NuGet
+dotnet build Diplo.slnx                       # Build complète
+.\pipeline.ps1 -DoTests                       # Tests unitaires
+.\pipeline.ps1 -DoPublish                     # Publication self-contained
+.\pipeline.ps1 -Clean -Restore                # Nettoyage + restauration NuGet
 ```
 
 ## Conventions Git

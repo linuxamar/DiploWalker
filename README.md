@@ -15,7 +15,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 ### Clients
 
-- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes et réseaux
+- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux et images disque (`disk create-image`)
 - **GUI** : `Diplo.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
 - **Résilience** : les canaux gRPC (`DiploChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
 
@@ -222,7 +222,7 @@ Diplo/
 │   ├── Diplo.Grpc/             # Types messages, services gRPC, DriverMappings
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
-│   ├── Diplo.Disk/             # Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels)
+│   ├── Diplo.Disk/             # Montage et création d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels)
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
 │   └── Diplo.Gui/              # Interface graphique Avalonia
 ├── tests/
@@ -292,9 +292,29 @@ diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\do
 
 Les sources sont restreintes aux répertoires autorisés par la validation de sécurité (`%TEMP%`, `%ProgramData%\Diplo`, `%ProgramFiles%\Diplo`). Une image disque est montée via un répertoire de préparation pour la durée de vie du conteneur, puis réécrite à la suppression.
 
+### Création d'images disque
+
+```powershell
+diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw]
+```
+
+| Format | Extension | Moteur | Note |
+|--------|-----------|--------|------|
+| **Raw** | `.img`, `.raw`, `.bin`, `.iso` | DiscUtils | Par défaut |
+| **VHD** | `.vhd` | DiscUtils | Virtual Hard Disk (dynamic) |
+| **VHDX** | `.vhdx` | DiscUtils | Virtual Hard Disk v2 (dynamic) |
+| **VMDK** | `.vmdk` | DiscUtils | Virtual Machine Disk (dynamic) |
+| **VDI** | `.vdi` | DiscUtils | VirtualBox Disk Image |
+
+La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés.
+
+Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (pas de factory publique dans DiscUtils).
+
 ### GUI
 
 L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
+
+L'onglet **Volumes** propose un panneau « Créer une image disque » avec sélection du répertoire source, du chemin de destination et du format.
 
 ## Authentification aux registres
 
@@ -331,6 +351,7 @@ L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de pas
 | `Qcow1Fs` | Disk | Pilote maison QCOW v1 |
 | `DmgFs` | Disk | Adaptateur DiscUtils.Dmg pour extraction DMG |
 | `ParallelsFs` | Disk | Pilote maison Parallels |
+| `FsImage` | Disk | Création, extraction et réécriture d'images disque |
 
 ### Validation ctr v2 (≥ v2.0)
 

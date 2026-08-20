@@ -33,6 +33,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Diplo.Core\Diplo.Core.fsproj" />
+    <ProjectReference Include="..\Diplo.Disk\Diplo.Disk.fsproj" />
   </ItemGroup>
 
 </Project>

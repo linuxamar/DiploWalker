@@ -7,6 +7,7 @@ open Diplo.Core.Clients
 open Diplo.Grpc
 open Diplo.Core.Output
 open Diplo.Grpc.Volume
+open Diplo.Disk
 
 type VolumeDisplayInfo = {
     Id: string
@@ -26,6 +27,9 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     let mutable volumeDriver = "local"
     let mutable volumeTargetPath = ""
     let mutable volumeForce = false
+    let mutable imageSourceDir = ""
+    let mutable imageDestPath = ""
+    let mutable imageFormat = "raw"
 
     member _.Volumes = volumes
 
@@ -34,6 +38,9 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member _.VolumeDriver with get () = volumeDriver and set v = volumeDriver <- v; this.OnPropertyChanged()
     member _.VolumeTargetPath with get () = volumeTargetPath and set v = volumeTargetPath <- v; this.OnPropertyChanged()
     member _.VolumeForce with get () = volumeForce and set v = volumeForce <- v; this.OnPropertyChanged()
+    member _.ImageSourceDir with get () = imageSourceDir and set v = imageSourceDir <- v; this.OnPropertyChanged()
+    member _.ImageDestPath with get () = imageDestPath and set v = imageDestPath <- v; this.OnPropertyChanged()
+    member _.ImageFormat with get () = imageFormat and set v = imageFormat <- v; this.OnPropertyChanged()
 
     member _.ListVolumesCommand = RelayCommand(Action(fun () -> this.ListVolumes() |> ignore))
     member _.InspectVolumeCommand = RelayCommand(Action(fun () -> this.InspectVolume() |> ignore))
@@ -42,6 +49,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member _.MountVolumeCommand = RelayCommand(Action(fun () -> this.MountVolume() |> ignore))
     member _.UnmountVolumeCommand = RelayCommand(Action(fun () -> this.UnmountVolume() |> ignore))
     member _.PruneVolumesCommand = RelayCommand(Action(fun () -> this.PruneVolumes() |> ignore))
+    member _.CreateImageCommand = RelayCommand(Action(fun () -> this.CreateImage() |> ignore))
 
     member private this.ListVolumes() =
         task {
@@ -125,5 +133,30 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                 use client = new VolumeClient()
                 let! response = client.PruneVolumesAsync()
                 outputPort.WriteSuccess(sprintf "Volumes nettoyés - %s" response.Message)
+            with ex -> outputPort.WriteError(ex.Message)
+        }
+
+    member private this.CreateImage() =
+        task {
+            try
+                if String.IsNullOrEmpty this.ImageSourceDir then
+                    outputPort.WriteError("Le répertoire source est requis")
+                elif not (System.IO.Directory.Exists this.ImageSourceDir) then
+                    outputPort.WriteError(sprintf "Le répertoire source n'existe pas : '%s'" this.ImageSourceDir)
+                elif String.IsNullOrEmpty this.ImageDestPath then
+                    outputPort.WriteError("Le chemin de destination est requis")
+                else
+                    let format =
+                        match this.ImageFormat.ToLowerInvariant() with
+                        | "vhd" -> DiskFormat.Vhd
+                        | "vhdx" -> DiskFormat.Vhdx
+                        | "vmdk" -> DiskFormat.Vmdk
+                        | "vdi" -> DiskFormat.Vdi
+                        | "raw" | "" -> DiskFormat.Raw
+                        | other -> failwithf "Format inconnu : '%s'" other
+                    outputPort.WriteLine(sprintf "Création de l'image '%s' au format %s…" this.ImageDestPath (DiskFormat.toString format))
+                    let result = FsImage.create this.ImageSourceDir this.ImageDestPath format
+                    let size = System.IO.FileInfo(result).Length
+                    outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
             with ex -> outputPort.WriteError(ex.Message)
         }

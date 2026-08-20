@@ -5,6 +5,7 @@ open Diplo.Cli.Container
 open Diplo.Cli.Volume
 open Diplo.Cli.Network
 open Diplo.Cli.Compose
+open Diplo.Cli.Disk
 open Spectre.Console.Cli
 
 let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) =
@@ -79,6 +80,10 @@ let main argv =
             addCmd c "logs" typeof<ComposeLogsCommand>
             addCmd c "pull" typeof<ComposePullCommand>
             addCmd c "build" typeof<ComposeBuildCommand>
+        )) |> ignore
+
+        config.AddBranch("disk", Action<IConfigurator<CommandSettings>>(fun c ->
+            addCmd c "create-image" typeof<CreateImageCommand>
         )) |> ignore
     ) |> ignore
     app.Run(argv)
