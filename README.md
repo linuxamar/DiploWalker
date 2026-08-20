@@ -25,7 +25,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (707 tests)
+- **Tests** : xUnit (787 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -228,7 +228,7 @@ Diplo/
 │   ├── Diplo.Grpc/             # Types messages, services gRPC, DriverMappings
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
-│   ├── Diplo.Disk/             # Montage d'images disque (qcow2, raw, vhd, vhdx, vmdk)
+│   ├── Diplo.Disk/             # Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels)
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
 │   └── Diplo.Gui/              # Interface graphique Avalonia
 ├── tests/
@@ -268,7 +268,22 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 
 ## Montage de volumes et d'images disque
 
-À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** (qcow2, raw, vhd, vhdx, vmdk) gérées par `Diplo.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
+À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** gérées par `Diplo.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
+
+| Format | Extension(s) | R/W | Moteur |
+|--------|-------------|-----|--------|
+| **Qcow2** | `.qcow2` | R/W | Pilote maison (`Qcow2Stream`) |
+| **QCOW v1** | `.qcow` | R/W | Pilote maison (`Qcow1Stream`) |
+| **VHD** | `.vhd` | R/W | DiscUtils |
+| **VHDX** | `.vhdx` | R/W | DiscUtils |
+| **VMDK** | `.vmdk` | R/W | DiscUtils |
+| **VDI** | `.vdi` | R/W | DiscUtils |
+| **Raw** | `.img`, `.raw`, `.bin`, `.iso` | R/W | DiscUtils (FAT, NTFS, ext) |
+| **DMG** | `.dmg` | Lecture seule | DiscUtils |
+| **Parallels** | `.hdd`, `.hds` | R/W | Pilote maison (`ParallelsStream`) |
+| **Btrfs** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
+| **XFS** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
+| **HFS+** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
 
 ### CLI
 
@@ -346,6 +361,11 @@ Le montage réel des images disque (via `ctr --mount`) n'est pas automatisable d
 | `DriverMappings` | Grpc | Mapping type↔string pour drivers volume et réseau |
 | `GrpcClientFactory` | Core | Construction canaux gRPC TCP/pipe avec retry et credentials |
 | `TestHelpers` | TestHelpers | Helpers temp dir pour les tests |
+| `HawkyntFs` | Disk | Adaptateur Hawkynt pour Btrfs/XFS/HFS+ R/W (seuil 2 Go) |
+| `VdiFs` | Disk | Adaptateur DiscUtils.Vdi pour VDI R/W |
+| `Qcow1Fs` | Disk | Pilote maison QCOW v1 (QFI\xFE) |
+| `DmgFs` | Disk | Adaptateur DiscUtils.Dmg pour extraction DMG |
+| `ParallelsFs` | Disk | Pilote maison Parallels (.hdd, .hds) |
 
 
 **Résultats de la validation (11/08/2026, containerd v2.3.3, Windows 11 26200)** :
