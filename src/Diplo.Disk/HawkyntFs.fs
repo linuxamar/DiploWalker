@@ -1,6 +1,7 @@
 namespace Diplo.Disk
 
 open System.IO
+open Serilog
 
 /// Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la
 /// réécriture de systèmes de fichiers Btrfs, XFS et HFS+.
@@ -84,15 +85,21 @@ module HawkyntFs =
                 | _ when DiskFormat.isDiskImage format ->
                     use stream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read)
                     try Some (extractBtrfs stream targetDir)
-                    with _ ->
+                    with ex ->
+                        Log.Warning(ex, "Échec extraction Btrfs, tentative XFS")
                         stream.Position <- 0L
                         try Some (extractXfs stream targetDir)
-                        with _ ->
+                        with ex ->
+                            Log.Warning(ex, "Échec extraction XFS, tentative HFS+")
                             stream.Position <- 0L
                             try Some (extractHfsPlus stream targetDir)
-                            with _ -> None
+                            with ex ->
+                                Log.Warning(ex, "Échec extraction HFS+")
+                                None
                 | _ -> None
-            with _ -> None
+            with ex ->
+                Log.Warning(ex, "Échec détection format Hawkynt pour {Path}", sourcePath)
+                None
 
     // ── Réécriture Btrfs ──────────────────────────────────────────────
 
@@ -160,10 +167,16 @@ module HawkyntFs =
                 | DiskFormat.Qcow2 -> false
                 | _ when DiskFormat.isDiskImage format ->
                     try writeBackBtrfs sourcePath sourceDir; true
-                    with _ ->
+                    with ex ->
+                        Log.Warning(ex, "Échec réécriture Btrfs, tentative XFS")
                         try writeBackXfs sourcePath sourceDir; true
-                        with _ ->
+                        with ex ->
+                            Log.Warning(ex, "Échec réécriture XFS, tentative HFS+")
                             try writeBackHfsPlus sourcePath sourceDir; true
-                            with _ -> false
+                            with ex ->
+                                Log.Warning(ex, "Échec réécriture HFS+")
+                                false
                 | _ -> false
-            with _ -> false
+            with ex ->
+                Log.Warning(ex, "Échec détection format Hawkynt pour réécriture {Path}", sourcePath)
+                false

@@ -68,3 +68,30 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 ## Langue
 
 Le projet est francophone : README, commentaires, commits et documentation en français (avec accents corrects).
+
+## Validation ctr v2 — détails
+
+Le montage réel des images disque et la communication gRPC ont été validés en conditions réelles avec containerd **v2.3.3** (Windows 11 26200, namespace `default`).
+
+### Écarts ctr v2 (≥ v2.0) par rapport à v1
+
+- `--namespace`/`-n` est une option **globale** (avant la sous-commande), et non locale.
+- `container create` attend `<IMAGE> <CONTAINER>` (ordre inversé par rapport à v1) et ne produit **aucune sortie** en cas de succès.
+- `exec` est `tasks exec` ; `task info` et `task logs` ont été **supprimés** en v2 : `task info` est remplacé par le parsing de `tasks list`.
+- `PullImage` n'utilise volontairement pas de namespace : `ctr image pull` s'applique au namespace courant.
+
+### Points corrigés au fil des validations
+
+1. **ContainerLogs.read** ouvrait le fichier avec `FileShare.Read` strict — incompatible avec le handle d'écriture du conteneur en cours d'exécution (IOException). Passage à `FileShare.ReadWrite ||| FileShare.Delete`.
+2. **StreamWriter AutoFlush** — les lignes de logs restaient en mémoire tant que le conteneur tournait. `AutoFlush <- true` ajouté.
+3. **container create --cmd** — la commande était passée via un spec OCI avec l'option `--spec`, absente de `ctr v2.3.3`. La commande est désormais passée en positionnel (`ctr container create <image> <id> <cmd> [args...]`).
+4. **UpdateContainer** — `ctr task update`/`ctr container update` n'existent pas en v2. Lève `RpcException(Unimplemented)` quand une limite est demandée (no-op sinon).
+5. **container delete -f** — la suppression forcée d'un conteneur inexistant échouait par une erreur gRPC. Elle retourne désormais un succès (échecs journalisés en avertissement) — idempotent.
+6. **Transport named pipes** — `PipeSecurity` contenait une règle « Deny Everyone » qui empêchait la création du pipe (règles Deny priment sur Allow sur Windows). Règle retirée, accès par `Allow FullControl` pour l'utilisateur courant.
+7. **Ctrl+C sur container logs --follow** — le CLI sortait avec `STATUS_CONTROL_C_EXIT` (0xC000013A). Ajout de `CtrlCHandler` (pose `e.Cancel=true` + annulation) et rattrapage de `RpcException(Cancelled)`.
+8. **container exec arguments espacés** — reconstruction de la ligne de commande avec échappement.
+9. **MountState** — état des volumes montés persisté ; restauration au redémarrage du service.
+
+### Logs
+
+Les logs sont capturés par le service lors du démarrage détaché dans `%ProgramData%\Diplo\logs\<id>.log` et relus par `container logs` (`tail`, `since` ; `--follow` suit le fichier et émet les nouvelles lignes au fil de l'eau).
