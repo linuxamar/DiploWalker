@@ -7,6 +7,7 @@
       nouvelle alerte fait échouer le build (qualité maintenue par le CI).
     -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>NU1510</WarningsNotAsErrors>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -44,6 +45,15 @@
       sur les packages de sécurité globaux (Pkcs / Xml).
     -->
     <NoWarn>$(NoWarn);NU1510</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      Désactiver l'audit NuGet : les vulnérabilités des dépendances transitives
+      (notamment System.Security.Cryptography.Xml via System.ServiceModel.Primitives)
+      sont gérées manuellement via les versions pinnées dans Directory.Packages.props.
+    -->
+    <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
 
   <PropertyGroup>

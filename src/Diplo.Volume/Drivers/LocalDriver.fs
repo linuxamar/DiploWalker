@@ -3,6 +3,7 @@ namespace Diplo.Volume.Drivers
 open System
 open System.IO
 open System.Text.Json
+open Grpc.Core
 open Serilog
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
@@ -86,7 +87,7 @@ type LocalVolumeDriver(dataRoot: string) =
             let dir = Path.Combine(volumesDir, id)
             let mountFile = Path.Combine(mountsDir, id)
             if Directory.Exists(mountFile) && not force then
-                failwith "Le volume est monté. Utilisez force=true pour forcer la suppression."
+                raise (RpcException(Status(StatusCode.FailedPrecondition, "Le volume est monté. Utilisez force=true pour forcer la suppression.")))
             let dirExisted = Directory.Exists(dir)
             try if dirExisted then Directory.Delete(dir, true)
             with :? System.IO.DirectoryNotFoundException ->
@@ -125,7 +126,7 @@ type LocalVolumeDriver(dataRoot: string) =
         lock lockObj (fun () ->
             let src = resolveDataPath id
             if not (Directory.Exists(src)) then
-                failwithf "Volume %s introuvable" id
+                raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
             let mountDir = mountPath id targetPath
             SecurityValidation.validatePath mountDir mountsDir "Le chemin de montage"
             Directory.CreateDirectory(mountDir) |> ignore

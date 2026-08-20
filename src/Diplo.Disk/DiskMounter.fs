@@ -51,7 +51,7 @@ module DiskMounter =
             let format = DiskFormat.detect source
             match format with
             | DiskFormat.Unknown ->
-                failwithf "Format d'image disque non reconnu : '%s'" source
+                invalidArg "source" (sprintf "Format d'image disque non reconnu : '%s'" source)
             | _ ->
                 let staging = Path.Combine(stagingRoot (), Guid.NewGuid().ToString("N"))
                 Directory.CreateDirectory staging |> ignore
@@ -63,7 +63,7 @@ module DiskMounter =
                         try Directory.Delete(staging, true) with _ -> ()
                 { Source = source; HostPath = staging; Destination = destination; ReadOnly = readOnly; Dispose = dispose }
         else
-            failwithf "La source du volume n'existe pas : '%s'" source
+            invalidArg "source" (sprintf "La source du volume n'existe pas : '%s'" source)
 
     /// Reconstruit un volume monté à partir de l'état persisté (après un
     /// redémarrage du service) : réutilise le dossier de staging existant et

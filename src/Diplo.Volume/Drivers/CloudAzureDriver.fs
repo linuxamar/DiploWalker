@@ -2,6 +2,7 @@ namespace Diplo.Volume.Drivers
 
 open System
 open System.Text.Json
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -13,7 +14,7 @@ type CloudAzureDriver(dataRoot: string) =
         match driverOpts |> Map.tryFind "storageAccount", driverOpts |> Map.tryFind "shareName" with
         | Some account, Some share ->
             sprintf "\\\\%s.file.core.windows.net\\%s" account share
-        | _ -> failwith "Les options 'storageAccount' et 'shareName' sont requises pour le driver Azure"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'storageAccount' et 'shareName' sont requises pour le driver Azure")))
 
     let buildNetUseArgs (sharePath: string) (targetPath: string) (driverOpts: Map<string, string>) =
         let args = ResizeArray<string>()
@@ -23,7 +24,7 @@ type CloudAzureDriver(dataRoot: string) =
         | Some account, Some key ->
             args.Add("/user:AZURE\\" + account)
             args.Add(key)
-        | _ -> failwith "Les options 'storageAccount' et 'storageKey' sont requises pour le montage Azure"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'storageAccount' et 'storageKey' sont requises pour le montage Azure")))
         args.Add("/persistent:no")
         args |> Seq.toList
 
@@ -46,12 +47,12 @@ type CloudAzureDriver(dataRoot: string) =
             SecurityValidation.validateId id "L'identifiant du volume"
             SecurityValidation.validateVolumePath targetPath "Le chemin cible"
             match store.InspectVolume(id) with
-            | None -> failwithf "Volume %s introuvable" id
+            | None -> raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
             | Some info ->
                 let mutable v = Unchecked.defaultof<JsonElement>
                 let sharePath =
                     if info.TryGetProperty("remotePath", &v) then v.GetString()
-                    else failwithf "Aucun chemin distant pour le volume %s" id
+                    else raise (RpcException(Status(StatusCode.NotFound, sprintf "Aucun chemin distant pour le volume '%s'" id)))
                 let mutable ov = Unchecked.defaultof<JsonElement>
                 let opts =
                     if info.TryGetProperty("driverOpts", &ov) then

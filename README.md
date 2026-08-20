@@ -202,12 +202,6 @@ Options disponibles :
 
 `signtool.exe` est recherché dans le PATH puis dans les Windows Kits installés. Sans certificat disponible, la signature est ignorée (simple avertissement).
 
-### CI (GitHub Actions)
-
-`.github/workflows/ci.yml` :
-- **Build + tests** à chaque push/PR sur `dev` et `main` (`pipeline.ps1 -DoTests`) ;
-- **Publication** sur les tags `v*` : tests, publication self-contained x64/x86 et setup NSIS téléversés en artefacts.
-
 ### Structure du projet
 
 ```

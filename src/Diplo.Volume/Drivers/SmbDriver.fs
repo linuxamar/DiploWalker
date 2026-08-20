@@ -2,6 +2,7 @@ namespace Diplo.Volume.Drivers
 
 open System
 open System.Text.Json
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -12,7 +13,7 @@ type SmbDriver(dataRoot: string) =
     let extractSharePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "server", driverOpts |> Map.tryFind "share" with
         | Some server, Some share -> sprintf "\\\\%s\\%s" server share
-        | _ -> failwith "Les options 'server' et 'share' sont requises pour le driver SMB"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'server' et 'share' sont requises pour le driver SMB")))
 
     /// Monte le partage : l'identifiant est enregistré dans le gestionnaire
     /// d'identifiants Windows (cmdkey) puis retiré, afin que le mot de passe
@@ -54,12 +55,12 @@ type SmbDriver(dataRoot: string) =
             SecurityValidation.validateId id "L'identifiant du volume"
             SecurityValidation.validateVolumePath targetPath "Le chemin cible"
             match store.InspectVolume(id) with
-            | None -> failwithf "Volume %s introuvable" id
+            | None -> raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
             | Some info ->
                 let mutable v = Unchecked.defaultof<JsonElement>
                 let remotePath =
                     if info.TryGetProperty("remotePath", &v) then v.GetString()
-                    else failwithf "Aucun chemin distant pour le volume %s" id
+                    else raise (RpcException(Status(StatusCode.NotFound, sprintf "Aucun chemin distant pour le volume '%s'" id)))
                 let optsMap =
                     if String.IsNullOrEmpty(options) then Map.empty
                     else

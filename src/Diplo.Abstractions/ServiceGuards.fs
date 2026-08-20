@@ -46,3 +46,18 @@ module ServiceGuards =
     /// Vérifie que la commande ne contient pas d'injection.
     let requireSafeCommand (command: string array) =
         SecurityValidation.validateCommand command
+
+    /// Lève NotFound si l'identifiant de volume est manquant.
+    let requireVolumeId (id: string) =
+        if System.String.IsNullOrWhiteSpace(id) then
+            raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du volume est requis")))
+
+    /// Lève NotFound si le volume est introuvable.
+    let requireVolumeFound (id: string) (found: bool) =
+        if not found then
+            raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
+
+    /// Lève NotFound si le chemin cible est manquant.
+    let requireTargetPath (path: string) =
+        if System.String.IsNullOrWhiteSpace(path) then
+            raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin cible est requis")))

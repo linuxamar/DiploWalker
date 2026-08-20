@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Text
 open System.Text.Json
+open Grpc.Core
 open Serilog
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
@@ -550,11 +551,11 @@ type IsoDriver(dataRoot: string) =
 
     let validateIso (driverOpts: Map<string, string>) =
         match driverOpts.TryFind("iso") with
-        | None -> failwith "L'option 'iso' est requise pour le driver ISO"
-        | Some isoPath when String.IsNullOrWhiteSpace(isoPath) -> failwith "L'option 'iso' est requise pour le driver ISO"
+        | None -> raise (RpcException(Status(StatusCode.InvalidArgument, "L'option 'iso' est requise pour le driver ISO")))
+        | Some isoPath when String.IsNullOrWhiteSpace(isoPath) -> raise (RpcException(Status(StatusCode.InvalidArgument, "L'option 'iso' est requise pour le driver ISO")))
         | Some isoPath ->
             if not (File.Exists(isoPath)) then
-                failwithf "Le fichier ISO '%s' est introuvable" isoPath
+                raise (RpcException(Status(StatusCode.NotFound, sprintf "Le fichier ISO '%s' est introuvable" isoPath)))
             isoPath
 
     interface IVolumeDriver with
@@ -585,14 +586,14 @@ type IsoDriver(dataRoot: string) =
             SecurityValidation.validateId id "L'identifiant du volume"
             SecurityValidation.validateVolumePath targetPath "Le chemin cible"
             match store.InspectVolume(id) with
-            | None -> failwithf "Volume %s introuvable" id
+            | None -> raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
             | Some info ->
                 let mutable v = Unchecked.defaultof<JsonElement>
                 if not (info.TryGetProperty("remotePath", &v)) then
-                    failwithf "Volume %s invalide (chemin ISO manquant)" id
+                    raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "Volume '%s' invalide (chemin ISO manquant)" id)))
                 let isoPath = v.GetString()
                 if not (File.Exists(isoPath)) then
-                    failwithf "Le fichier ISO '%s' est introuvable" isoPath
+                    raise (RpcException(Status(StatusCode.NotFound, sprintf "Le fichier ISO '%s' est introuvable" isoPath)))
                 IsoImage.extract isoPath targetPath |> ignore
                 (true, targetPath)
 
