@@ -68,14 +68,14 @@ module FsImage =
 
     let rec private copyDirectory (fs: DiscFileSystem) (fsDir: string) (realRoot: string) (counter: int ref) =
         Directory.CreateDirectory(realFrom realRoot fsDir) |> ignore
-        for file in fs.GetFiles fsDir do
+        for file in fs.GetFiles fsDir |> Seq.toArray do
             let target = realFrom realRoot file
             Directory.CreateDirectory(Path.GetDirectoryName target) |> ignore
             use src = fs.OpenFile(file, FileMode.Open, FileAccess.Read)
             use dst = File.Create target
             src.CopyTo dst
             counter := !counter + 1
-        for sub in fs.GetDirectories fsDir do
+        for sub in fs.GetDirectories fsDir |> Seq.toArray do
             copyDirectory fs sub realRoot counter
 
     /// Extrait le contenu du système de fichiers de l'image dans `targetDir`.
@@ -110,9 +110,9 @@ module FsImage =
             copyIntoFs fs fsPath dir
 
     let rec private deleteFsEntries (fs: DiscFileSystem) (fsDir: string) (realRoot: string) =
-        for file in fs.GetFiles fsDir do
+        for file in fs.GetFiles fsDir |> Seq.toArray do
             if not (File.Exists(realFrom realRoot file)) then fs.DeleteFile file
-        for sub in fs.GetDirectories fsDir do
+        for sub in fs.GetDirectories fsDir |> Seq.toArray do
             deleteFsEntries fs sub realRoot
             if not (Directory.Exists(realFrom realRoot sub)) then fs.DeleteDirectory(sub, false)
 
@@ -160,15 +160,21 @@ module FsImage =
         if File.Exists path then
             VirtualDisk.OpenDisk(path, FileAccess.ReadWrite)
         else
-            let typeName, variant =
-                match format with
-                | DiskFormat.Vhd   -> "vhd",  "dynamic"
-                | DiskFormat.Vhdx  -> "vhdx", "dynamic"
-                | DiskFormat.Vmdk  -> "vmdk", "dynamic"
-                | DiskFormat.Vdi   -> "vdi",  "dynamic"
-                | DiskFormat.Raw   -> "raw",  null
-                | _ -> "raw", null
-            VirtualDisk.CreateDisk(typeName, variant, path, virtualSize, Nullable<Geometry>(), Dictionary<string,string>())
+            match format with
+            | DiskFormat.Raw ->
+                let fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None)
+                fs.SetLength(virtualSize)
+                fs.Flush()
+                new Raw.Disk(fs, Ownership.Dispose) :> VirtualDisk
+            | _ ->
+                let typeName, variant =
+                    match format with
+                    | DiskFormat.Vhd   -> "vhd",  "dynamic"
+                    | DiskFormat.Vhdx  -> "vhdx", "dynamic"
+                    | DiskFormat.Vmdk  -> "vmdk", "dynamic"
+                    | DiskFormat.Vdi   -> "vdi",  "dynamic"
+                    | _ -> "raw", null
+                VirtualDisk.CreateDisk(typeName, variant, path, virtualSize, Nullable<Geometry>(), Dictionary<string,string>())
 
     /// Formate le disque avec NTFS et copie le contenu de `sourceDir`
     /// dans l'image créée. Retourne le chemin du fichier image.

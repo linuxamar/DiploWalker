@@ -177,6 +177,19 @@
                                   VerticalAlignment="Center" />
                     </WrapPanel>
 
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Rép. source:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding VolumeTab.ImageSourceDir}" Width="220" Margin="0,0,12,0"
+                                 PlaceholderText="chemin vers le répertoire source" />
+                        <TextBlock Text="Destination:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding VolumeTab.ImageDestPath}" Width="220" Margin="0,0,12,0"
+                                 PlaceholderText="chemin de l'image à créer" />
+                        <TextBlock Text="Format:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding VolumeTab.ImageFormat}" Width="80" Margin="0,0,12,0"
+                                 PlaceholderText="raw" />
+                        <Button Content="🖼 Créer image" Command="{Binding VolumeTab.CreateImageCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
                     <DataGrid ItemsSource="{Binding VolumeTab.Volumes}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"
                               Background="#252526" Foreground="#d4d4d4" BorderThickness="0">

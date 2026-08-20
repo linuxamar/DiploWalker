@@ -78,3 +78,116 @@ module FsImageTests =
             let missing = Path.Combine(root, "missing.img")
             (fun () -> FsImage.writeBack missing (Path.Combine(root, "staging")))
             |> should throw typeof<System.IO.FileNotFoundException>)
+
+    // ── Tests de FsImage.create ──────────────────────────────────────
+
+    let private runCreate (f: string -> string -> string -> unit) =
+        let root = TestImage.createTempDir ()
+        try
+            let src = Path.Combine(root, "src")
+            let dest = Path.Combine(root, "dest", "test.vhd")
+            Directory.CreateDirectory(src) |> ignore
+            f root src dest
+        finally
+            TestImage.cleanupDir root
+
+    let private sourceContents =
+        [ "fichier.txt", "contenu du fichier"
+          @"sous\dossier\fichier2.txt", "deuxieme fichier" ]
+
+    let private writeSourceDir (src: string) =
+        for (rel, content) in sourceContents do
+            let parent = Path.GetDirectoryName(rel)
+            if not (String.IsNullOrEmpty parent) then
+                Directory.CreateDirectory(Path.Combine(src, parent)) |> ignore
+            File.WriteAllText(Path.Combine(src, rel), content)
+
+    [<Fact>]
+    let ``create genere un fichier VHD existant et lisible`` () =
+        runCreate (fun _ src dest ->
+            writeSourceDir src
+            let result = FsImage.create src dest DiskFormat.Vhd
+            result |> should equal dest
+            File.Exists(dest) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.ReadAllText(Path.Combine(re, "fichier.txt")) |> should equal "contenu du fichier"
+            File.ReadAllText(Path.Combine(re, "sous", "dossier", "fichier2.txt")) |> should equal "deuxieme fichier")
+
+    [<Fact>]
+    let ``create genere un fichier VHDX et lisible`` () =
+        runCreate (fun _ src dest ->
+            let destVhdx = Path.ChangeExtension(dest, ".vhdx")
+            writeSourceDir src
+            let result = FsImage.create src destVhdx DiskFormat.Vhdx
+            result |> should equal destVhdx
+            File.Exists(destVhdx) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(destVhdx), "re")
+            FsImage.extract destVhdx re false |> ignore
+            File.ReadAllText(Path.Combine(re, "fichier.txt")) |> should equal "contenu du fichier")
+
+    [<Fact>]
+    let ``create genere un fichier VMDK et lisible`` () =
+        runCreate (fun _ src dest ->
+            let destVmdk = Path.ChangeExtension(dest, ".vmdk")
+            writeSourceDir src
+            let result = FsImage.create src destVmdk DiskFormat.Vmdk
+            result |> should equal destVmdk
+            File.Exists(destVmdk) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(destVmdk), "re")
+            FsImage.extract destVmdk re false |> ignore
+            File.ReadAllText(Path.Combine(re, "fichier.txt")) |> should equal "contenu du fichier")
+
+    [<Fact>]
+    let ``create genere un fichier VDI et lisible`` () =
+        runCreate (fun _ src dest ->
+            let destVdi = Path.ChangeExtension(dest, ".vdi")
+            writeSourceDir src
+            let result = FsImage.create src destVdi DiskFormat.Vdi
+            result |> should equal destVdi
+            File.Exists(destVdi) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(destVdi), "re")
+            FsImage.extract destVdi re false |> ignore
+            File.ReadAllText(Path.Combine(re, "fichier.txt")) |> should equal "contenu du fichier")
+
+    [<Fact>]
+    let ``create genere un fichier Raw et lisible`` () =
+        runCreate (fun _ src dest ->
+            let destRaw = Path.ChangeExtension(dest, ".img")
+            writeSourceDir src
+            let result = FsImage.create src destRaw DiskFormat.Raw
+            result |> should equal destRaw
+            File.Exists(destRaw) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(destRaw), "re")
+            FsImage.extract destRaw re false |> ignore
+            File.ReadAllText(Path.Combine(re, "fichier.txt")) |> should equal "contenu du fichier")
+
+    [<Fact>]
+    let ``create leve invalidArg si le repertoire source n'existe pas`` () =
+        runCreate (fun root _ dest ->
+            let missing = Path.Combine(root, "n'existe pas")
+            (fun () -> FsImage.create missing dest DiskFormat.Vhd |> ignore)
+            |> should throw typeof<System.ArgumentException>)
+
+    [<Fact>]
+    let ``create leve invalidArg si le format n'est pas supporte en creation`` () =
+        runCreate (fun _ src dest ->
+            writeSourceDir src
+            (fun () -> FsImage.create src dest DiskFormat.Qcow2 |> ignore)
+            |> should throw typeof<System.ArgumentException>)
+
+    [<Fact>]
+    let ``create cree le repertoire parent du fichier de destination`` () =
+        runCreate (fun _ src dest ->
+            let nestedDest = Path.Combine(Path.GetDirectoryName(dest), "sous", "dossier", "img.vhd")
+            writeSourceDir src
+            FsImage.create src nestedDest DiskFormat.Vhd |> ignore
+            File.Exists(nestedDest) |> should equal true)
+
+    [<Fact>]
+    let ``create genere un fichier avec une taille minimale`` () =
+        runCreate (fun _ src dest ->
+            File.WriteAllText(Path.Combine(src, "tiny.txt"), "petit")
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            let info = FileInfo(dest)
+            info.Length |> should be (greaterThan 0L))
