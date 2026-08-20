@@ -13,6 +13,7 @@ type MainWindow() as this =
     do
         this.DataContext <- viewModel
         AvaloniaXamlLoader.Load(this)
+        viewModel.VolumeTab.SetStorageProvider(this.StorageProvider)
 
     member private _.OnQuit(_sender: obj, _e: RoutedEventArgs) =
         this.Close()

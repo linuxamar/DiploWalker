@@ -55,15 +55,18 @@ module FsImage =
     /// physiques, détectés automatiquement parmi les fournisseurs enregistrés.
     let private openFileSystem (disk: VirtualDisk) : DiscFileSystem =
         let vm = new VolumeManager(disk)
-        let logical = vm.GetLogicalVolumes() |> Seq.cast<VolumeInfo>
-        let physical = vm.GetPhysicalVolumes() |> Seq.cast<VolumeInfo>
-        Seq.append logical physical
-        |> Seq.choose (fun v ->
-            let detected = FileSystemManager.DetectFileSystems v
-            if detected.Count > 0 then Some (v, detected.[0]) else None)
-        |> Seq.tryHead
+        let candidates =
+            Seq.append
+                (vm.GetLogicalVolumes() |> Seq.cast<VolumeInfo>)
+                (vm.GetPhysicalVolumes() |> Seq.cast<VolumeInfo>)
+            |> Seq.toArray
+        candidates
+        |> Array.tryFind (fun v ->
+            FileSystemManager.DetectFileSystems(v).Count > 0)
         |> function
-            | Some (volume, fsi) -> fsi.Open volume
+            | Some volume ->
+                let fsi = FileSystemManager.DetectFileSystems(volume).[0]
+                fsi.Open(volume)
             | None -> failwith "Aucun système de fichiers détecté dans l'image disque"
 
     let rec private copyDirectory (fs: DiscFileSystem) (fsDir: string) (realRoot: string) (counter: int ref) =
@@ -198,15 +201,20 @@ module FsImage =
         if not (String.IsNullOrEmpty parentDir) then
             Directory.CreateDirectory(parentDir) |> ignore
 
-        use disk = openOrCreateDisk destPath format virtualSize
+        let fileCreated = File.Exists(destPath)
+        try
+            use disk = openOrCreateDisk destPath format virtualSize
 
-        let volumeManager = VolumeManager(disk)
-        let physicalVolumes = volumeManager.GetPhysicalVolumes() |> Seq.cast<VolumeInfo> |> Seq.toList
-        if physicalVolumes.IsEmpty then
-            failwith "Aucun volume physique détecté dans le disque créé"
+            let volumeManager = VolumeManager(disk)
+            let physicalVolumes = volumeManager.GetPhysicalVolumes() |> Seq.cast<VolumeInfo> |> Seq.toList
+            if physicalVolumes.IsEmpty then
+                failwith "Aucun volume physique détecté dans le disque créé"
 
-        let pv = physicalVolumes.Head
-        Ntfs.NtfsFileSystem.Format(pv, "Diplo", Ntfs.NtfsFormatOptions()) |> ignore
-        use fs = openFileSystem disk
-        copyDirIntoFs fs "\\" sourceDir
-        destPath
+            let pv = physicalVolumes.Head
+            Ntfs.NtfsFileSystem.Format(pv, "Diplo", Ntfs.NtfsFormatOptions()) |> ignore
+            use fs = openFileSystem disk
+            copyDirIntoFs fs "\\" sourceDir
+            destPath
+        with ex ->
+            try if File.Exists destPath then File.Delete destPath with _ -> ()
+            reraise ()

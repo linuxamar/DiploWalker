@@ -2,6 +2,8 @@ namespace Diplo.Gui.ViewModels
 
 open System
 open System.Collections.ObjectModel
+open System.Threading.Tasks
+open Avalonia.Platform.Storage
 open Avalonia.Threading
 open Diplo.Core.Clients
 open Diplo.Grpc
@@ -30,6 +32,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     let mutable imageSourceDir = ""
     let mutable imageDestPath = ""
     let mutable imageFormat = "raw"
+    let mutable storageProvider : IStorageProvider = null
 
     member _.Volumes = volumes
 
@@ -42,6 +45,9 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member _.ImageDestPath with get () = imageDestPath and set v = imageDestPath <- v; this.OnPropertyChanged()
     member _.ImageFormat with get () = imageFormat and set v = imageFormat <- v; this.OnPropertyChanged()
 
+    member _.SetStorageProvider(sp: IStorageProvider) =
+        storageProvider <- sp
+
     member _.ListVolumesCommand = RelayCommand(Action(fun () -> this.ListVolumes() |> ignore))
     member _.InspectVolumeCommand = RelayCommand(Action(fun () -> this.InspectVolume() |> ignore))
     member _.CreateVolumeCommand = RelayCommand(Action(fun () -> this.CreateVolume() |> ignore))
@@ -50,6 +56,40 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member _.UnmountVolumeCommand = RelayCommand(Action(fun () -> this.UnmountVolume() |> ignore))
     member _.PruneVolumesCommand = RelayCommand(Action(fun () -> this.PruneVolumes() |> ignore))
     member _.CreateImageCommand = RelayCommand(Action(fun () -> this.CreateImage() |> ignore))
+    member _.BrowseSourceCommand = RelayCommand(Action(fun () -> this.BrowseSource() |> ignore))
+    member _.BrowseDestCommand = RelayCommand(Action(fun () -> this.BrowseDest() |> ignore))
+
+    member private this.BrowseSource() =
+        task {
+            if isNull storageProvider then ()
+            else
+                let folders = storageProvider.OpenFolderPickerAsync(FolderPickerOpenOptions(
+                    Title = "Sélectionner le répertoire source",
+                    AllowMultiple = false))
+                let! result = folders
+                if result.Count > 0 then
+                    this.ImageSourceDir <- result.[0].Path.LocalPath
+        } |> ignore
+
+    member private this.BrowseDest() =
+        task {
+            if isNull storageProvider then ()
+            else
+                let files = storageProvider.OpenFilePickerAsync(FilePickerOpenOptions(
+                    Title = "Enregistrer l'image disque sous",
+                    AllowMultiple = false,
+                    FileTypeFilter = [
+                        FilePickerFileType("VHD", Patterns = [| "*.vhd" |])
+                        FilePickerFileType("VHDX", Patterns = [| "*.vhdx" |])
+                        FilePickerFileType("VMDK", Patterns = [| "*.vmdk" |])
+                        FilePickerFileType("VDI", Patterns = [| "*.vdi" |])
+                        FilePickerFileType("Raw", Patterns = [| "*.img"; "*.raw" |])
+                        FilePickerFileType("Tous", Patterns = [| "*.*" |])
+                    ]))
+                let! result = files
+                if result.Count > 0 then
+                    this.ImageDestPath <- result.[0].Path.LocalPath
+        } |> ignore
 
     member private this.ListVolumes() =
         task {

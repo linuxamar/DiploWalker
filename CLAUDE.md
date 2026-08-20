@@ -50,7 +50,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - **.NET 10** (`dotnet 10.0.302` installé localement).
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 787 tests au total (dont 31 d'intégration gRPC).
+- **Tests** : xUnit v4 + FsUnit.xUnit — 803 tests au total (dont 31 d'intégration gRPC).
 
 ## Commandes
 
@@ -67,6 +67,7 @@ dotnet build Diplo.slnx                       # Build complète
 - Branche de développement : `dev` ; branche principale : `main`.
 - **Commits** : ne jamais ajouter de trailer `Co-Authored-By` ni de mention de co-auteur ; l'auteur
   reste seul auteur. Pas de mention « Generated with Claude Code » dans les PR/issues sauf demande explicite.
+- **Merge vers `main`** : ne jamais merger `dev` vers `main` sans demande explicite de l'utilisateur.
 
 ## Langue
 
