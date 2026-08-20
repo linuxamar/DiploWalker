@@ -25,7 +25,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (800 tests)
+- **Tests** : xUnit (803 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -309,6 +309,23 @@ diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|
 La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés. En cas d'erreur lors du formatage ou de la copie, le fichier partiel est automatiquement supprimé (rollback).
 
 Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (pas de factory publique dans DiscUtils).
+
+### Formats supportés — tableau récapitulatif
+
+| Format | Montage | Création image | Moteur |
+|--------|---------|----------------|--------|
+| Qcow2 | R/W | — | Pilote maison |
+| QCOW v1 | R/W | — | Pilote maison |
+| VHD | R/W | ✅ | DiscUtils |
+| VHDX | R/W | ✅ | DiscUtils |
+| VMDK | R/W | ✅ | DiscUtils |
+| VDI | R/W | ✅ | DiscUtils |
+| Raw | R/W | ✅ | DiscUtils |
+| DMG | Lecture seule | — | DiscUtils |
+| Parallels | R/W | — | Pilote maison |
+| Btrfs | R/W | — | Hawkynt (seuil 2 Go) |
+| XFS | R/W | — | Hawkynt (seuil 2 Go) |
+| HFS+ | R/W | — | Hawkynt (seuil 2 Go) |
 
 ### GUI
 

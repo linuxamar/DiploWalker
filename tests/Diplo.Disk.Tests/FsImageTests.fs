@@ -233,3 +233,41 @@ module FsImageTests =
             File.Exists(dest) |> should equal true
             let info = FileInfo(dest)
             info.Length |> should be (greaterThan (int64 data.Length)))
+
+    [<Fact>]
+    let ``create gere les caracteres CJK dans les noms de fichiers`` () =
+        runCreate (fun _ src dest ->
+            File.WriteAllText(Path.Combine(src, "テスト.txt"), "japonais")
+            File.WriteAllText(Path.Combine(src, "测试.txt"), "chinois")
+            File.WriteAllText(Path.Combine(src, "한국어.txt"), "coréen")
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.Exists(Path.Combine(re, "テスト.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "测试.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "한국어.txt")) |> should equal true
+            File.ReadAllText(Path.Combine(re, "テスト.txt")) |> should equal "japonais")
+
+    [<Fact>]
+    let ``create gere les fichiers en lecture seule`` () =
+        runCreate (fun _ src dest ->
+            let roFile = Path.Combine(src, "readonly.txt")
+            File.WriteAllText(roFile, "protégé")
+            File.SetAttributes(roFile, FileAttributes.ReadOnly)
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            File.Exists(dest) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.ReadAllText(Path.Combine(re, "readonly.txt")) |> should equal "protégé"
+            File.SetAttributes(roFile, FileAttributes.Normal))
+
+    [<Fact>]
+    let ``create gere les liens symboliques NTFS`` () =
+        runCreate (fun _ src dest ->
+            File.WriteAllText(Path.Combine(src, "cible.txt"), "données")
+            let linkPath = Path.Combine(src, "lien.txt")
+            try
+                File.CreateSymbolicLink(linkPath, Path.Combine(src, "cible.txt")) |> ignore
+                FsImage.create src dest DiskFormat.Vhd |> ignore
+                File.Exists(dest) |> should equal true
+            with :? PlatformNotSupportedException -> ())
