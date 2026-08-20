@@ -191,3 +191,45 @@ module FsImageTests =
             FsImage.create src dest DiskFormat.Vhd |> ignore
             let info = FileInfo(dest)
             info.Length |> should be (greaterThan 0L))
+
+    [<Fact>]
+    let ``create accepte un repertoire source vide`` () =
+        runCreate (fun _ src dest ->
+            let result = FsImage.create src dest DiskFormat.Vhd
+            File.Exists(dest) |> should equal true)
+
+    [<Fact>]
+    let ``create gere les caracteres speciaux dans les noms de fichiers`` () =
+        runCreate (fun _ src dest ->
+            File.WriteAllText(Path.Combine(src, "fichier avec espaces.txt"), "espaces")
+            File.WriteAllText(Path.Combine(src, "données-françaises.txt"), "accents")
+            File.WriteAllText(Path.Combine(src, "fichier-v2.1.0_beta.txt"), "version")
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            File.Exists(dest) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.Exists(Path.Combine(re, "fichier avec espaces.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "données-françaises.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "fichier-v2.1.0_beta.txt")) |> should equal true)
+
+    [<Fact>]
+    let ``create gere les repertoires imbriques profondement`` () =
+        runCreate (fun _ src dest ->
+            let deepPath = Path.Combine(src, "a", "b", "c", "d", "e")
+            Directory.CreateDirectory(deepPath) |> ignore
+            File.WriteAllText(Path.Combine(deepPath, "profond.txt"), "niveau 5")
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.ReadAllText(Path.Combine(re, "a", "b", "c", "d", "e", "profond.txt")) |> should equal "niveau 5")
+
+    [<Fact>]
+    let ``create gere un gros fichier`` () =
+        runCreate (fun _ src dest ->
+            let bigFile = Path.Combine(src, "gros.bin")
+            let data = Array.create (10 * 1024 * 1024) 0xABuy
+            File.WriteAllBytes(bigFile, data)
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            File.Exists(dest) |> should equal true
+            let info = FileInfo(dest)
+            info.Length |> should be (greaterThan (int64 data.Length)))

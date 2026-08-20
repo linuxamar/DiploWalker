@@ -25,7 +25,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (803 tests)
+- **Tests** : xUnit (800 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -306,7 +306,7 @@ diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|
 | **VMDK** | `.vmdk` | DiscUtils | Virtual Machine Disk (dynamic) |
 | **VDI** | `.vdi` | DiscUtils | VirtualBox Disk Image |
 
-La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés.
+La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés. En cas d'erreur lors du formatage ou de la copie, le fichier partiel est automatiquement supprimé (rollback).
 
 Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (pas de factory publique dans DiscUtils).
 
@@ -314,7 +314,7 @@ Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (
 
 L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
 
-L'onglet **Volumes** propose un panneau « Créer une image disque » avec sélection du répertoire source, du chemin de destination et du format.
+L'onglet **Volumes** propose un panneau « Créer une image disque » avec sélection du répertoire source (bouton `…` avec sélecteur de dossier), du chemin de destination (bouton `…` avec sélecteur de fichier) et du format.
 
 ## Authentification aux registres
 
