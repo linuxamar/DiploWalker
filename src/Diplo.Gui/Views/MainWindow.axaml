@@ -289,7 +289,15 @@
                         <Button Content="🔨 Construire" Command="{Binding ComposeTab.ComposeBuildCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
-                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <Button Content="📂 Ouvrir" Command="{Binding ComposeTab.OpenComposeFileCommand}" Margin="0,0,4,0" />
+                        <Button Content="💾 Enregistrer" Command="{Binding ComposeTab.SaveComposeFileCommand}" Margin="0,0,4,0" />
+                        <Button Content="✅ Valider" Command="{Binding ComposeTab.ValidateComposeFileCommand}" Margin="0,0,4,0" />
+                        <TextBlock Text="{Binding ComposeTab.ComposeEditor.FilePath}" VerticalAlignment="Center"
+                                   Margin="12,0,0,0" Opacity="0.6" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                         <TextBlock Text="Fichier:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ComposeTab.ComposeFilePath}" Width="400" Margin="0,0,12,0"
                                  PlaceholderText="chemin vers docker-compose.yml" />
@@ -297,6 +305,22 @@
                         <TextBox Text="{Binding ComposeTab.ComposeServiceName}" Width="160" Margin="0,0,12,0"
                                  PlaceholderText="nom du service (optionnel)" />
                     </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <TextBlock Text="Réf. image:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ComposeTab.InspectImageRef}" Width="200" Margin="0,0,12,0"
+                                 PlaceholderText="image:tag (inspecter)" />
+                        <Button Content="🔍 Inspecter img" Command="{Binding ComposeTab.InspectImageCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <Panel x:Name="ComposeEditorHost" DockPanel.Dock="Top" Height="250" />
+
+                    <ListBox DockPanel.Dock="Top"
+                             Height="80" Margin="0,4,0,4"
+                             ItemsSource="{Binding ComposeTab.ComposeEditor.Errors}"
+                             Background="#1e1e1e" Foreground="#d4d4d4"
+                             BorderThickness="1" BorderBrush="#333"
+                             DisplayMemberBinding="{Binding Message}" />
 
                     <DataGrid ItemsSource="{Binding ComposeTab.ComposeServices}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"

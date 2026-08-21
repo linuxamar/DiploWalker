@@ -89,3 +89,18 @@ module ProcessExecTests =
             Directory.GetFiles(dir, "*.tmp") |> should be Empty
         finally
             Directory.Delete(dir, true)
+
+    [<Fact>]
+    let ``runUnit retourne unit sans erreur si le processus reussit`` () =
+        let result = ProcessExec.runUnit "cmd.exe" [ "/c"; "echo"; "ok" ] None None
+        result |> should equal ()
+
+    [<Fact>]
+    let ``runUnit leve une exception si le processus echoue`` () =
+        (fun () -> ProcessExec.runUnit "cmd.exe" [ "/c"; "exit"; "1" ] None None)
+        |> should throw typeof<InvalidOperationException>
+
+    [<Fact>]
+    let ``runUnit leve une exception en cas de timeout`` () =
+        (fun () -> ProcessExec.runUnit "cmd.exe" [ "/c"; "ping"; "-n"; "5"; "127.0.0.1" ] (Some 500) None)
+        |> should throw typeof<TimeoutException>

@@ -14,6 +14,7 @@
     <Compile Include="ViewModels\ContainerTabViewModel.fs" />
     <Compile Include="ViewModels\VolumeTabViewModel.fs" />
     <Compile Include="ViewModels\NetworkTabViewModel.fs" />
+    <Compile Include="ViewModels\ComposeEditorViewModel.fs" />
     <Compile Include="ViewModels\ComposeTabViewModel.fs" />
     <Compile Include="ViewModels\SettingsTabViewModel.fs" />
     <Compile Include="ViewModels\MainWindowViewModel.fs" />
@@ -30,6 +31,8 @@
     <PackageReference Include="Avalonia.Desktop"  />
     <PackageReference Include="Avalonia.Themes.Fluent"  />
     <PackageReference Include="Avalonia.Controls.DataGrid"  />
+    <PackageReference Include="Avalonia.AvaloniaEdit"  />
+    <PackageReference Include="AvaloniaEdit.TextMate"  />
   </ItemGroup>
 
   <ItemGroup>
