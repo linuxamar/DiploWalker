@@ -8,11 +8,13 @@
 
   <ItemGroup>
     <Compile Include="ViewModels\ViewModelBase.fs" />
+    <Compile Include="ViewModels\CommandHelpers.fs" />
     <Compile Include="Services\AvaloniaOutputPort.fs" />
     <Compile Include="Services\ContainerLogsSource.fs" />
     <Compile Include="ViewModels\ContainerTabViewModel.fs" />
     <Compile Include="ViewModels\VolumeTabViewModel.fs" />
     <Compile Include="ViewModels\NetworkTabViewModel.fs" />
+    <Compile Include="ViewModels\ComposeEditorViewModel.fs" />
     <Compile Include="ViewModels\ComposeTabViewModel.fs" />
     <Compile Include="ViewModels\SettingsTabViewModel.fs" />
     <Compile Include="ViewModels\MainWindowViewModel.fs" />
@@ -25,10 +27,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia"  />
-    <PackageReference Include="Avalonia.Desktop"  />
-    <PackageReference Include="Avalonia.Themes.Fluent"  />
-    <PackageReference Include="Avalonia.Controls.DataGrid"  />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" />
+    <PackageReference Include="AvaloniaEdit.TextMate" />
+    <PackageReference Include="TextMateSharp.Grammars" />
   </ItemGroup>
 
   <ItemGroup>
