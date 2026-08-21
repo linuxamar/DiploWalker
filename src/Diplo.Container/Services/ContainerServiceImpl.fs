@@ -218,8 +218,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.CreateContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Image) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'image du conteneur est requise")))
+                ServiceGuards.requireNonEmpty request.Image "L'image du conteneur"
                 let name = if String.IsNullOrEmpty(request.Name) then Guid.NewGuid().ToString("N") else request.Name
                 SecurityValidation.validateName name "Le nom du conteneur"
                 SecurityValidation.validateImage request.Image
@@ -233,8 +232,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                     request.Mounts
                     |> Seq.map (fun m ->
                         SecurityValidation.validateVolumePath m.Source "La source du volume"
-                        if String.IsNullOrEmpty(m.Destination) then
-                            raise (RpcException(Status(StatusCode.InvalidArgument, "La destination du montage ne peut pas être vide")))
+                        ServiceGuards.requireNonEmpty m.Destination "La destination du montage"
                         m.Source, m.Destination, m.ReadOnly)
                     |> Seq.toList
                 let mounted = ResizeArray<MountedVolume>()
@@ -264,8 +262,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.StartContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 if request.Attach then
                     client.StartContainer(DefaultNamespace, request.Id, false)
                 else
@@ -275,8 +272,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.StopContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 let timeout = if request.TimeoutSeconds > 0 then request.TimeoutSeconds else 10
                 do! client.StopContainer(DefaultNamespace, request.Id, timeout)
                 return { StopContainerResponse.State = ContainerState.Stopped; Message = "Conteneur arrêté" }
@@ -284,8 +280,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.DeleteContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 client.DeleteContainer(DefaultNamespace, request.Id, request.Force)
                 match mountedVolumes.TryRemove(request.Id) with
                 | true, volumes ->
@@ -299,8 +294,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.InspectContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 let info = client.InspectContainer(DefaultNamespace, request.Id)
                 let taskInfo = client.TaskInfo(DefaultNamespace, request.Id)
                 let env =
@@ -381,8 +375,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
             }
 
         member _.GetContainerLogs(request, context) =
-            if String.IsNullOrEmpty(request.Id) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            ServiceGuards.requireContainerId request.Id
             let tail = if request.Tail > 0 then min request.Tail 10_000 else 100
             let follow = request.Follow
             let since = if String.IsNullOrEmpty(request.Since) then "" else request.Since
@@ -399,8 +392,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                 |> fun l -> l.Select(toEntry).ToAsyncEnumerable()
 
         member _.ExecInContainer(request, _context) =
-            if String.IsNullOrEmpty(request.Id) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            ServiceGuards.requireContainerId request.Id
             if request.Command.Count = 0 then
                 raise (RpcException(Status(StatusCode.InvalidArgument, "Au moins une commande est requise")))
             let command = request.Command |> Seq.toArray
@@ -410,8 +402,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.PullImage(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Image) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'image à télécharger est requise")))
+                ServiceGuards.requireNonEmpty request.Image "L'image à télécharger"
                 let userArg = if String.IsNullOrEmpty request.User then None else Some request.User
                 let result = client.PullImage(request.Image, userArg)
                 return { PullImageResponse.Image = request.Image; Message = result }
@@ -446,18 +437,15 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.RenameContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-                if String.IsNullOrEmpty(request.NewName) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le nouveau nom est requis")))
+                ServiceGuards.requireContainerId request.Id
+                ServiceGuards.requireNonEmpty request.NewName "Le nouveau nom"
                 client.RenameContainer(DefaultNamespace, request.Id, request.NewName)
                 return { RenameContainerResponse.Success = true; Message = sprintf "Conteneur renommé en '%s'" request.NewName }
             }
 
         member _.TopContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 let output = client.TopContainer(DefaultNamespace, request.Id)
                 let response = { TopContainerResponse.Processes = List<ProcessInfo>() }
                 let lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
@@ -481,8 +469,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.GetContainerStats(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 let json = client.GetContainerStats(DefaultNamespace, request.Id)
                 return buildStats json
             }
@@ -505,8 +492,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.InspectImage(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Ref) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
+                ServiceGuards.requireNonEmpty request.Ref "La référence de l'image"
                 let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
                 let imgJson = client.InspectImage(ns, request.Ref)
                 let labels =
@@ -528,8 +514,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.RemoveImage(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Ref) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
+                ServiceGuards.requireNonEmpty request.Ref "La référence de l'image"
                 let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
                 let message = client.RemoveImage(ns, request.Ref)
                 return { RemoveImageResponse.Success = true; Message = message }
@@ -537,10 +522,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.TagImage(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Source) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "La source de l'image est requise")))
-                if String.IsNullOrEmpty(request.Target) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "La cible de l'image est requise")))
+                ServiceGuards.requireNonEmpty request.Source "La source de l'image"
+                ServiceGuards.requireNonEmpty request.Target "La cible de l'image"
                 let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
                 client.TagImage(ns, request.Source, request.Target)
                 return
@@ -553,16 +536,14 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.PauseContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 client.PauseContainer(DefaultNamespace, request.Id)
                 return { PauseContainerResponse.State = ContainerState.Paused; Message = "Conteneur en pause" }
             }
 
         member _.UnpauseContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 client.ResumeContainer(DefaultNamespace, request.Id)
                 return { UnpauseContainerResponse.State = ContainerState.Running; Message = "Conteneur repris" }
             }
@@ -571,8 +552,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.WaitContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 let exitCode = client.WaitForContainerExit(DefaultNamespace, request.Id, request.TimeoutSeconds)
                 if exitCode = -1 then
                     return { WaitContainerResponse.ExitCode = -1; State = ContainerState.Running; Message = "Timeout en attendant la sortie du conteneur" }
@@ -584,8 +564,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.UpdateContainer(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+                ServiceGuards.requireContainerId request.Id
                 client.UpdateContainer(DefaultNamespace, request.Id, request.MemoryLimit, request.CpuShares, request.PidLimit)
                 return { UpdateContainerResponse.Success = true; Message = "Conteneur mis à jour" }
             }
@@ -624,8 +603,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
         // ─── Stats streaming ────────────────────────────────────────────────
 
         member _.GetContainerStatsStream(request, _context) =
-            if String.IsNullOrEmpty(request.Id) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
+            ServiceGuards.requireContainerId request.Id
             let channel = Channel.CreateUnbounded<GetContainerStatsResponse>()
             let intervalMs = if request.IntervalSeconds > 0 then request.IntervalSeconds * 1000 else 2000
             let run () =
@@ -783,10 +761,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.ReadFile(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-                if String.IsNullOrEmpty(request.Path) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin du fichier est requis")))
+                ServiceGuards.requireContainerId request.Id
+                ServiceGuards.requireNonEmpty request.Path "Le chemin du fichier"
                 let command = [| "base64"; request.Path |]
                 SecurityValidation.validateCommand command
                 let output = client.ExecInContainer(DefaultNamespace, request.Id, command)
@@ -800,10 +776,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.WriteFile(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Id) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-                if String.IsNullOrEmpty(request.Path) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin du fichier est requis")))
+                ServiceGuards.requireContainerId request.Id
+                ServiceGuards.requireNonEmpty request.Path "Le chemin du fichier"
                 let command = [| "sh"; "-c"; "base64 -d > " + request.Path |]
                 SecurityValidation.validateContainerPath request.Path "Le chemin du fichier"
                 try
@@ -826,10 +800,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.CommitImage(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.ContainerId) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis")))
-                if String.IsNullOrEmpty(request.ImageRef) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
+                ServiceGuards.requireContainerId request.ContainerId
+                ServiceGuards.requireNonEmpty request.ImageRef "La référence de l'image"
                 SecurityValidation.validateImage request.ImageRef
                 try
                     let info = client.InspectContainer(DefaultNamespace, request.ContainerId)
@@ -853,8 +825,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
         // ─── Export / Import ────────────────────────────────────────────────
 
         member _.ExportImage(request, _context) =
-            if String.IsNullOrEmpty(request.ImageRef) then
-                raise (RpcException(Status(StatusCode.InvalidArgument, "La référence de l'image est requise")))
+            ServiceGuards.requireNonEmpty request.ImageRef "La référence de l'image"
             let ns = if String.IsNullOrEmpty(request.NamespaceName) then DefaultNamespace else request.NamespaceName
             SecurityValidation.validateImage request.ImageRef
             let channel = Channel.CreateUnbounded<ImageChunk>()
@@ -917,18 +888,15 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.LoginRegistry(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Registry) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'adresse du registre est requise")))
-                if String.IsNullOrEmpty(request.Username) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom d'utilisateur est requis")))
+                ServiceGuards.requireNonEmpty request.Registry "L'adresse du registre"
+                ServiceGuards.requireNonEmpty request.Username "Le nom d'utilisateur"
                 RegistryAuth.add (RegistryAuth.stateFile ()) request.Registry request.Username request.Password
                 return { LoginRegistryResponse.Success = true; Message = sprintf "Authentification configurée pour le registre '%s'" request.Registry }
             }
 
         member _.LogoutRegistry(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Registry) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "L'adresse du registre est requise")))
+                ServiceGuards.requireNonEmpty request.Registry "L'adresse du registre"
                 RegistryAuth.remove (RegistryAuth.stateFile ()) request.Registry
                 return { LogoutRegistryResponse.Success = true; Message = sprintf "Déconnexion du registre '%s' effectuée" request.Registry }
             }
@@ -937,8 +905,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.CreateNamespace(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Name) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom du namespace est requis")))
+                ServiceGuards.requireNonEmpty request.Name "Le nom du namespace"
                 SecurityValidation.validateId request.Name "Le namespace"
                 client.CreateNamespace(request.Name)
                 return { CreateNamespaceResponse.Success = true; Message = sprintf "Namespace '%s' créé" request.Name }
@@ -946,8 +913,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
         member _.DeleteNamespace(request, _context) =
             task {
-                if String.IsNullOrEmpty(request.Name) then
-                    raise (RpcException(Status(StatusCode.InvalidArgument, "Le nom du namespace est requis")))
+                ServiceGuards.requireNonEmpty request.Name "Le nom du namespace"
                 SecurityValidation.validateId request.Name "Le namespace"
                 client.DeleteNamespace(request.Name)
                 return { DeleteNamespaceResponse.Success = true; Message = sprintf "Namespace '%s' supprimé" request.Name }
