@@ -36,24 +36,22 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member _.ComposeBuildCommand = RelayCommand(Action(fun () -> this.ComposeBuild() |> ignore))
 
     member private this.ComposeUp() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 let orchestrator = ComposeOrchestrator(outputPort)
                 do! orchestrator.Up(this.ComposeFilePath)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ComposeDown() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 let orchestrator = ComposeOrchestrator(outputPort)
                 do! orchestrator.Down(this.ComposeFilePath)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ComposePs() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 let orchestrator = ComposeOrchestrator(outputPort)
                 let compose = orchestrator.ParseFile(this.ComposeFilePath)
                 use client = new ContainerClient()
@@ -80,30 +78,26 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
                             })
                 )
                 outputPort.WriteSuccess(sprintf "%d conteneur(s) compose trouvé(s)" composeServices.Count)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ComposeLogs() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 let orchestrator = ComposeOrchestrator(outputPort)
                 let service = if String.IsNullOrEmpty(this.ComposeServiceName) then None else Some this.ComposeServiceName
                 do! orchestrator.Logs(this.ComposeFilePath, service)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ComposeBuild() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 let orchestrator = ComposeOrchestrator(outputPort)
                 do! orchestrator.Build(this.ComposeFilePath)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ComposePull() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 let orchestrator = ComposeOrchestrator(outputPort)
                 do! orchestrator.Pull(this.ComposeFilePath)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })

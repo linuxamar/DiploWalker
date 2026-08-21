@@ -92,8 +92,8 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
         } |> ignore
 
     member private this.ListVolumes() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 use client = new VolumeClient()
                 let! response = client.ListAsync()
                 Dispatcher.UIThread.Post(fun () ->
@@ -108,12 +108,11 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                         })
                 )
                 outputPort.WriteSuccess(sprintf "%d volume(s) trouvé(s)" response.Volumes.Count)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.InspectVolume() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 use client = new VolumeClient()
                 let! response = client.InspectAsync(id = this.VolumeIdInput)
                 outputPort.WriteLine(sprintf "ID: %s" response.Id)
@@ -123,62 +122,56 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                 outputPort.WriteLine(sprintf "État: %s" (response.State.ToString()))
                 if response.SizeBytes > 0L then
                     outputPort.WriteLine(sprintf "Taille: %d octets" response.SizeBytes)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.CreateVolume() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 use client = new VolumeClient()
                 let driverEnum =
                     DriverMappings.parseVolumeDriver this.VolumeDriver
                 let! response = client.CreateAsync(name = this.VolumeNameInput, driver = driverEnum)
                 outputPort.WriteSuccess(sprintf "Volume %s créé (ID: %s)" this.VolumeNameInput response.Id)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.RemoveVolume() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 use client = new VolumeClient()
                 let! response = client.RemoveAsync(id = this.VolumeIdInput, force = this.VolumeForce)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Volume %s supprimé" this.VolumeIdInput)
                 else
                     outputPort.WriteWarning(response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.MountVolume() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 use client = new VolumeClient()
                 let! response = client.MountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
                 outputPort.WriteSuccess(sprintf "Volume %s monté sur %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.UnmountVolume() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 use client = new VolumeClient()
                 let! response = client.UnmountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
                 outputPort.WriteSuccess(sprintf "Volume %s démonté de %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.PruneVolumes() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 use client = new VolumeClient()
                 let! response = client.PruneVolumesAsync()
                 outputPort.WriteSuccess(sprintf "Volumes nettoyés - %s" response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.CreateImage() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 if String.IsNullOrEmpty this.ImageSourceDir then
                     outputPort.WriteError("Le répertoire source est requis")
                 elif not (System.IO.Directory.Exists this.ImageSourceDir) then
@@ -198,5 +191,4 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                     let result = FsImage.create this.ImageSourceDir this.ImageDestPath format
                     let size = System.IO.FileInfo(result).Length
                     outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
