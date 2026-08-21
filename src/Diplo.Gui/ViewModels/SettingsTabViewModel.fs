@@ -52,14 +52,14 @@ type SettingsTabViewModel(outputPort: IOutputPort) as this =
                 statusMessage <- "Les trois adresses sont obligatoires."
                 this.OnPropertyChanged(nameof this.StatusMessage)
             else
-                try
+                Cmd.runSyncWith outputPort (fun msg ->
+                    statusMessage <- "Erreur : " + msg
+                    this.OnPropertyChanged(nameof this.StatusMessage)) (fun () ->
                     DiploConfig.save this.ConfigPath
                         (containerAddress.Trim()) (volumeAddress.Trim()) (networkAddress.Trim())
                     DiploConfig.invalidate()
                     statusMessage <- sprintf "Configuration enregistrée (%s) — appliquée aux prochaines opérations." this.ConfigPath
-                    outputPort.WriteLine(sprintf "Configuration client enregistrée dans %s" this.ConfigPath)
-                with ex ->
-                    statusMessage <- "Erreur : " + ex.Message
+                    outputPort.WriteLine(sprintf "Configuration client enregistrée dans %s" this.ConfigPath))
                 this.OnPropertyChanged(nameof this.StatusMessage)))
 
     member _.ReloadCommand: ICommand =

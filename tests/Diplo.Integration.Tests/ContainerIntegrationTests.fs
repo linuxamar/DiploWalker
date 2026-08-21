@@ -27,6 +27,9 @@ module ContainerIntegrationTests =
     open DiscUtils.Partitions
     open DiscUtils.Streams
 
+    open Diplo.Core.Connection
+    open Diplo.TestHelpers
+
     type private MockContainerdClient() =
 
         let mutable containers = Map.empty<string, Map<string, string>>
@@ -133,9 +136,6 @@ module ContainerIntegrationTests =
                 stdin.CopyTo(stdout)
                 0
 
-    let private createChannel (address: string) =
-        GrpcChannel.ForAddress(address, GrpcChannelOptions())
-
     let private startAppWith (mock: MockContainerdClient) () =
         let builder = WebApplication.CreateBuilder()
         builder.Services.AddCodeFirstGrpc() |> ignore
@@ -164,6 +164,16 @@ module ContainerIntegrationTests =
         app.StopAsync().GetAwaiter().GetResult()
         (app :> IAsyncDisposable).DisposeAsync().AsTask().GetAwaiter().GetResult()
 
+    let private withContainerApp (f: string -> 'a) =
+        let app, address = startApp ()
+        try f address
+        finally stopApp app
+
+    let private withContainerAppMock (f: string -> MockContainerdClient -> 'a) =
+        let app, address, mock = startAppWithMock ()
+        try f address mock
+        finally stopApp app
+
     /// Crée une image disque FAT 64 Mo (table de partitions BIOS) contenant
     /// les fichiers (chemin relatif, contenu texte) fournis.
     let private createFatImage (path: string) (contents: (string * string) list) =
@@ -182,9 +192,8 @@ module ContainerIntegrationTests =
 
     [<Fact>]
     let ``CreateContainer via gRPC retourne l'ID`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let req: CreateContainerRequest =
                 { Name = "ctn-grpc"; Image = "test:latest"
@@ -197,14 +206,12 @@ module ContainerIntegrationTests =
             String.IsNullOrEmpty(result.Id) |> should equal false
             result.State |> should equal ContainerState.Created
             String.IsNullOrEmpty(result.CreatedAt) |> should equal false
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``CreateContainer puis StartContainer via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let createReq: CreateContainerRequest =
                 { Name = "to-start"; Image = "test:latest"
@@ -218,17 +225,14 @@ module ContainerIntegrationTests =
             let startResult = client.StartContainer(startReq, CancellationToken.None).Result
             startResult.State |> should equal ContainerState.Running
             startResult.Message |> should equal "Conteneur démarré"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``CreateContainer avec montage d'un repertoire via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
-            let mountDir = Path.Combine(Path.GetTempPath(), "diplo-int-mount-" + Guid.NewGuid().ToString("N"))
-            Directory.CreateDirectory(mountDir) |> ignore
+            let mountDir = TestHelpers.createTempDir "mount"
             try
                 let createReq: CreateContainerRequest =
                     { Name = "avec-mount"; Image = "test:latest"
@@ -246,15 +250,13 @@ module ContainerIntegrationTests =
                 let delResult = client.DeleteContainer(delReq, CancellationToken.None).Result
                 delResult.Success |> should equal true
             finally
-                try Directory.Delete(mountDir, true) with _ -> ()
-        finally
-            stopApp app
+                TestHelpers.cleanupDir mountDir
+        )
 
     [<Fact>]
     let ``InspectContainer via gRPC retourne les infos`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let createReq: CreateContainerRequest =
                 { Name = "to-inspect"; Image = "test:latest"
@@ -268,14 +270,12 @@ module ContainerIntegrationTests =
             let inspectResult = client.InspectContainer(inspectReq, CancellationToken.None).Result
             inspectResult.Id |> should equal createResult.Id
             inspectResult.Image |> should equal "test:latest"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``ListContainers via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let createReq: CreateContainerRequest =
                 { Name = ""; Image = "test:latest"
@@ -289,38 +289,32 @@ module ContainerIntegrationTests =
             let listReq: ListContainersRequest = { All = false; Filters = Dictionary() }
             let listResult = client.ListContainers(listReq, CancellationToken.None).Result
             listResult.Containers.Count |> should equal 2
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``ListNamespaces via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let req: ListNamespacesRequest = { Placeholder = false }
             let result = client.ListNamespaces(req, CancellationToken.None).Result
             result.Namespaces |> should contain "default"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``GetVersion via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let req: GetVersionRequest = { Placeholder = false }
             let result = client.GetVersion(req, CancellationToken.None).Result
             result.Version |> should equal "1.0.0-test"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``CreateContainer sans nom genere un id automatiquement`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let req: CreateContainerRequest =
                 { Name = ""; Image = "test:latest"
@@ -331,14 +325,12 @@ module ContainerIntegrationTests =
                   HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let result = client.CreateContainer(req, CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``DeleteContainer via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let createReq: CreateContainerRequest =
                 { Name = "to-delete"; Image = "test:latest"
@@ -351,14 +343,12 @@ module ContainerIntegrationTests =
             let deleteReq: DeleteContainerRequest = { Id = createResult.Id; Force = false }
             let deleteResult = client.DeleteContainer(deleteReq, CancellationToken.None).Result
             deleteResult.Success |> should equal true
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``StopContainer via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let createReq: CreateContainerRequest =
                 { Name = "to-stop"; Image = "test:latest"
@@ -372,14 +362,12 @@ module ContainerIntegrationTests =
             let stopResult = client.StopContainer(stopReq, CancellationToken.None).Result
             stopResult.State |> should equal ContainerState.Stopped
             stopResult.Message |> should equal "Conteneur arrêté"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``CreateContainer avec image vide via gRPC lance exception`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withContainerApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IContainerService>()
             let req: CreateContainerRequest =
                 { Name = "no-image"; Image = ""
@@ -390,45 +378,43 @@ module ContainerIntegrationTests =
                   HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
             let ex = Assert.Throws<AggregateException>(fun () -> client.CreateContainer(req, CancellationToken.None).Result |> ignore)
             ex.InnerException.Message |> should haveSubstring "L'image du conteneur"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``CreateContainer avec une image disque montee via gRPC puis DeleteContainer reecrit l'image`` () =
-        let app, address, mock = startAppWithMock ()
-        let root = Path.Combine(Path.GetTempPath(), "diplo-int-image-" + Guid.NewGuid().ToString("N"))
-        Directory.CreateDirectory root |> ignore
-        let imagePath = Path.Combine(root, "data.img")
-        try
-            createFatImage imagePath [ "hello.txt", "v1" ]
-            use channel = createChannel address
-            let client = channel.CreateGrpcService<IContainerService>()
-            let createReq: CreateContainerRequest =
-                { Name = "avec-image"; Image = "test:latest"
-                  Command = List<string>(); Args = List<string>()
-                  Env = Dictionary(); Labels = Dictionary()
-                  MemoryLimit = 0L; CpuShares = 0; PidLimit = 0
-                  Mounts = List<ContainerMount>()
-                  RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
-                  HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
-            createReq.Mounts.Add({ Source = imagePath; Destination = "C:\\data"; ReadOnly = false })
-            let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
-            String.IsNullOrEmpty(createResult.Id) |> should equal false
-            let mounts = mock.MountsById |> Map.tryFind createResult.Id
-            mounts.IsSome |> should equal true
-            let (hostPath, dest, ro) = mounts.Value |> List.head
-            dest |> should equal "C:\\data"
-            ro |> should equal false
-            Directory.Exists hostPath |> should equal true
-            File.ReadAllText(Path.Combine(hostPath, "hello.txt")) |> should equal "v1"
-            File.WriteAllText(Path.Combine(hostPath, "hello.txt"), "v2")
-            let delReq: DeleteContainerRequest = { Id = createResult.Id; Force = false }
-            let delResult = client.DeleteContainer(delReq, CancellationToken.None).Result
-            delResult.Success |> should equal true
-            let re = Path.Combine(root, "re")
-            Diplo.Disk.FsImage.extract imagePath re false |> ignore
-            File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2"
-        finally
-            try Directory.Delete(root, true) with _ -> ()
-            stopApp app
+        withContainerAppMock (fun address mock ->
+            let root = TestHelpers.createTempDir "image"
+            let imagePath = Path.Combine(root, "data.img")
+            try
+                createFatImage imagePath [ "hello.txt", "v1" ]
+                use channel = DiploChannel.forAddress address
+                let client = channel.CreateGrpcService<IContainerService>()
+                let createReq: CreateContainerRequest =
+                    { Name = "avec-image"; Image = "test:latest"
+                      Command = List<string>(); Args = List<string>()
+                      Env = Dictionary(); Labels = Dictionary()
+                      MemoryLimit = 0L; CpuShares = 0; PidLimit = 0
+                      Mounts = List<ContainerMount>()
+                      RestartPolicy = ""; RestartMaxCount = 0; Ports = List<PortMapping>()
+                      HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
+                createReq.Mounts.Add({ Source = imagePath; Destination = "C:\\data"; ReadOnly = false })
+                let createResult = client.CreateContainer(createReq, CancellationToken.None).Result
+                String.IsNullOrEmpty(createResult.Id) |> should equal false
+                let mounts = mock.MountsById |> Map.tryFind createResult.Id
+                mounts.IsSome |> should equal true
+                let (hostPath, dest, ro) = mounts.Value |> List.head
+                dest |> should equal "C:\\data"
+                ro |> should equal false
+                Directory.Exists hostPath |> should equal true
+                File.ReadAllText(Path.Combine(hostPath, "hello.txt")) |> should equal "v1"
+                File.WriteAllText(Path.Combine(hostPath, "hello.txt"), "v2")
+                let delReq: DeleteContainerRequest = { Id = createResult.Id; Force = false }
+                let delResult = client.DeleteContainer(delReq, CancellationToken.None).Result
+                delResult.Success |> should equal true
+                let re = Path.Combine(root, "re")
+                Diplo.Disk.FsImage.extract imagePath re false |> ignore
+                File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2"
+            finally
+                TestHelpers.cleanupDir root
+        )
 

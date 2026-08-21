@@ -10,6 +10,7 @@
     <Compile Include="Drivers\RemoteVolumeStore.fs" />
     <Compile Include="Drivers\VolumeDriverRegistry.fs" />
     <Compile Include="Drivers\LocalDriver.fs" />
+    <Compile Include="Drivers\RemoteDriverBase.fs" />
     <Compile Include="Drivers\NfsDriver.fs" />
     <Compile Include="Drivers\SmbDriver.fs" />
     <Compile Include="Drivers\CloudAzureDriver.fs" />

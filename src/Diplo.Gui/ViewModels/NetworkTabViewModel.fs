@@ -21,6 +21,7 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
     inherit ViewModelBase()
 
     let networks = ObservableCollection<NetworkDisplayInfo>()
+    let networkClient = new NetworkClient()
 
     let mutable networkIdInput = ""
     let mutable networkNameInput = ""
@@ -60,10 +61,9 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
     member _.PruneNetworksCommand = RelayCommand(Action(fun () -> this.PruneNetworks() |> ignore))
 
     member private this.ListNetworks() =
-        task {
-            try
-                use client = new NetworkClient()
-                let! response = client.ListAsync()
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = networkClient.ListAsync()
                 Dispatcher.UIThread.Post(fun () ->
                     networks.Clear()
                     for n in response.Networks do
@@ -77,14 +77,12 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
                         })
                 )
                 outputPort.WriteSuccess(sprintf "%d réseau(x) trouvé(s)" response.Networks.Count)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.InspectNetwork() =
-        task {
-            try
-                use client = new NetworkClient()
-                let! response = client.InspectAsync(id = this.NetworkIdInput)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = networkClient.InspectAsync(id = this.NetworkIdInput)
                 outputPort.WriteLine(sprintf "ID: %s" response.Id)
                 outputPort.WriteLine(sprintf "Nom: %s" response.Name)
                 outputPort.WriteLine(sprintf "Driver: %s" (response.Driver.ToString()))
@@ -92,70 +90,57 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
                 outputPort.WriteLine(sprintf "Passerelle: %s" response.Gateway)
                 if response.Endpoints.Count > 0 then
                     outputPort.WriteLine(sprintf "Points de connexion: %d" response.Endpoints.Count)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.CreateNetwork() =
-        task {
-            try
-                use client = new NetworkClient()
+        Cmd.run outputPort (fun () ->
+            task {
                 let driverEnum =
                     DriverMappings.parseNetworkDriver this.NetworkDriver
-                let! response = client.CreateAsync(this.NetworkNameInput, driver = driverEnum, subnet = this.NetworkSubnet, gateway = this.NetworkGateway)
+                let! response = networkClient.CreateAsync(this.NetworkNameInput, driver = driverEnum, subnet = this.NetworkSubnet, gateway = this.NetworkGateway)
                 outputPort.WriteSuccess(sprintf "Réseau %s créé (ID: %s)" this.NetworkNameInput response.Id)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.RemoveNetwork() =
-        task {
-            try
-                use client = new NetworkClient()
-                let! response = client.RemoveAsync(id = this.NetworkIdInput, force = this.NetworkForce)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = networkClient.RemoveAsync(id = this.NetworkIdInput, force = this.NetworkForce)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Réseau %s supprimé" this.NetworkIdInput)
                 else
                     outputPort.WriteWarning(response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ConnectContainer() =
-        task {
-            try
-                use client = new NetworkClient()
-                let! response = client.ConnectAsync(this.NetworkIdInput, this.NetworkContainerId, endpointId = this.NetworkEndpointId, ipv4Address = this.NetworkIpv4)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = networkClient.ConnectAsync(this.NetworkIdInput, this.NetworkContainerId, endpointId = this.NetworkEndpointId, ipv4Address = this.NetworkIpv4)
                 outputPort.WriteSuccess(sprintf "Conteneur %s connecté au réseau %s - %s" this.NetworkContainerId this.NetworkIdInput response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.DisconnectContainer() =
-        task {
-            try
-                use client = new NetworkClient()
-                let! response = client.DisconnectAsync(this.NetworkIdInput, this.NetworkContainerId, endpointId = this.NetworkEndpointId, force = this.NetworkForce)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = networkClient.DisconnectAsync(this.NetworkIdInput, this.NetworkContainerId, endpointId = this.NetworkEndpointId, force = this.NetworkForce)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Conteneur %s déconnecté du réseau %s" this.NetworkContainerId this.NetworkIdInput)
                 else
                     outputPort.WriteWarning(response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.RunCniPlugin() =
-        task {
-            try
-                use client = new NetworkClient()
-                let! response = client.RunCniPluginAsync(pluginPath = this.NetworkCniPluginPath, command = this.NetworkCniCommand, containerId = this.NetworkContainerId, netnsPath = this.NetworkNetnsPath)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = networkClient.RunCniPluginAsync(pluginPath = this.NetworkCniPluginPath, command = this.NetworkCniCommand, containerId = this.NetworkContainerId, netnsPath = this.NetworkNetnsPath)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Plugin CNI exécuté - %s" response.Message)
                 else
                     outputPort.WriteWarning(response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.PruneNetworks() =
-        task {
-            try
-                use client = new NetworkClient()
-                let! response = client.PruneNetworksAsync()
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = networkClient.PruneNetworksAsync()
                 outputPort.WriteSuccess(sprintf "Réseaux nettoyés - %s" response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })

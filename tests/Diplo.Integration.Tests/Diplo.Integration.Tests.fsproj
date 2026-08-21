@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\Diplo.Volume\Diplo.Volume.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Container\Diplo.Container.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Network\Diplo.Network.fsproj" />
+    <ProjectReference Include="..\..\tests\Diplo.TestHelpers\Diplo.TestHelpers.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -32,13 +32,16 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 |--------|--------|------|
 | `JsonHelpers` | Diplo.Abstractions | Extraction typée de propriétés depuis `JsonElement` (`tryGetString`, `tryGetInt64`, `tryGetDouble`, `tryGetBool`, `tryGetElement`, `tryGetStringValue`). Module `[<RequireQualifiedAccess>]` — appeler via `JsonHelpers.tryGetString`. |
 | `DiploJson` | Diplo.Abstractions | Options de sérialisation JSON centralisées (`defaultOptions`, `snakeCaseOptions`, `caseInsensitiveOptions`, `withMaxDepth`, `documentOptions`). |
-| `ProcessExec` | Diplo.Abstractions | Exécution de processus externes (`run`, `runWithResult`) et commandes PowerShell (`runPowerShell`, `runPowerShellScript`). Gère le timeout, le Kill, et la lecture asynchrone stdout/stderr. |
+| `ProcessExec` | Diplo.Abstractions | Exécution de processus externes (`run`, `runWithResult`, `runUnit`) et commandes PowerShell (`runPowerShell`, `runPowerShellScript`). Gère le timeout, le Kill, et la lecture asynchrone stdout/stderr. `runUnit` exécute sans retourner la sortie standard (usage montage/démontage). |
 | `ServiceGuards` | Diplo.Abstractions | Guards de validation d'entrée réutilisables (`requireNonEmpty`, `requireId`, `requirePositive`, `requireInRange`, `requireSafePath`, `requireLocalAddress`, `requireSafeCommand`). Lèvent `RpcException(InvalidArgument)`. |
 | `CachedConfig<'T>` | Diplo.Abstractions | Cache générique avec invalidation manuelle, protégé par un verrou. Chargement paresseux via `Value`, invalidation via `Invalidate()`. |
 | `DriverMappings` | Diplo.Grpc | Mapping type↔string pour les drivers volume (`StorageDriverType`) et réseau (`NetworkDriver`). Fonctions `parse*`, `isValid*`, `*ToString`, `all*Names`. |
 | `GrpcClientFactory` | Diplo.Core | Construction de canaux gRPC TCP ou named pipe avec retry (5 tentatives, backoff exponentiel) et credentials par token. |
 | `TestHelpers` | Diplo.TestHelpers | Helpers pour les tests (`createTempDir`, `cleanupDir`). |
+| `Cmd` | Diplo.Gui | Helpers try/with mutualisés pour les commandes GUI (`run` async, `runSync` synchrone, `runSyncWith` avec callback d'erreur custom). |
 | `HawkyntFs` | Diplo.Disk | Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la réécriture de Btrfs, XFS et HFS+. Seuil de 2 Go pour éviter le tout-en-mémoire ; fallback DiscUtils au-delà. |
+| `ComposeEditorViewModel` | Diplo.Gui | ViewModel de l'éditeur Compose (AvalonEdit) : chargement/sauvegarde de fichiers YAML, validation en temps réel (clé `services` absente, services sans `image` ni `build`), collection `Errors` exposée pour le bindind XAML. |
+| `RemoteDriverHelpers` | Diplo.Volume | Helpers mutualisés pour les 5 drivers distants (NFS, AWS EFS, GCP Filestore, Azure Files, SMB) : `mountVolume`, `unmountVolume`, `unmountNfsLike` (umount → fallback mount -u), `pruneCloudVolumes`. |
 | `VdiFs` | Diplo.Disk | Adaptateur DiscUtils.Vdi pour l'extraction et la réécriture R/W d'images VDI (VirtualBox). |
 | `Qcow1Fs` | Diplo.Disk | Pilote maison pour les images QCOW v1 (QFI\\xFE) : lecture/écriture in-place via `Qcow1Stream`. |
 | `DmgFs` | Diplo.Disk | Adaptateur DiscUtils.Dmg pour l'extraction (lecture seule) d'images DMG (Apple Disk Image). |
@@ -50,7 +53,8 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - **.NET 10** (`dotnet 10.0.302` installé localement).
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 787 tests au total (dont 31 d'intégration gRPC).
+- **GUI** : Avalonia 12.1.1 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate).
+- **Tests** : xUnit v4 + FsUnit.xUnit — 863 tests au total.
 
 ## Commandes
 
@@ -67,6 +71,7 @@ dotnet build Diplo.slnx                       # Build complète
 - Branche de développement : `dev` ; branche principale : `main`.
 - **Commits** : ne jamais ajouter de trailer `Co-Authored-By` ni de mention de co-auteur ; l'auteur
   reste seul auteur. Pas de mention « Generated with Claude Code » dans les PR/issues sauf demande explicite.
+- **Merge vers `main`** : ne jamais merger `dev` vers `main` sans demande explicite de l'utilisateur.
 
 ## Langue
 

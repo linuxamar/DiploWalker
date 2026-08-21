@@ -172,7 +172,7 @@ let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
 // ── VolumeTabViewModel ──────────────────────────────────────
 
 [<Fact>]
-let ``VolumeTabViewModel expose les 7 commandes ICommand`` () =
+let ``VolumeTabViewModel expose les 10 commandes ICommand`` () =
     let port = MockOutputPort()
     let vm = VolumeTabViewModel(port)
     vm.ListVolumesCommand     |> should not' (be Null)
@@ -182,6 +182,17 @@ let ``VolumeTabViewModel expose les 7 commandes ICommand`` () =
     vm.MountVolumeCommand     |> should not' (be Null)
     vm.UnmountVolumeCommand   |> should not' (be Null)
     vm.PruneVolumesCommand    |> should not' (be Null)
+    vm.CreateImageCommand     |> should not' (be Null)
+    vm.BrowseSourceCommand    |> should not' (be Null)
+    vm.BrowseDestCommand      |> should not' (be Null)
+
+[<Fact>]
+let ``VolumeTabViewModel etat initial image disque`` () =
+    let port = MockOutputPort()
+    let vm = VolumeTabViewModel(port)
+    vm.ImageSourceDir  |> should equal ""
+    vm.ImageDestPath   |> should equal ""
+    vm.ImageFormat     |> should equal "raw"
 
 [<Fact>]
 let ``VolumeTabViewModel etat initial`` () =
@@ -351,3 +362,155 @@ let ``ContainerTabViewModel GetContainerLogs sans suivi affiche l'instantané en
     waitUntil (fun () -> port.Successes.Length = 1) |> should equal true
     Assert.Contains("[2026-08-12T10:00:00Z] ligne 1", port.Successes.Head)
     Assert.Contains("ligne 2", port.Successes.Head)
+
+// ── ComposeEditorViewModel ────────────────────────────────────
+
+[<Fact>]
+let ``ComposeEditorViewModel etat initial`` () =
+    let vm = ComposeEditorViewModel()
+    vm.FilePath |> should equal ""
+    vm.Errors.Count |> should equal 0
+    vm.Document.Text |> should equal ""
+
+[<Fact>]
+let ``ComposeEditorViewModel LoadFile charge le contenu`` () =
+    let dir = TestHelpers.createTempDir "editor-test"
+    try
+        let path = IO.Path.Combine(dir, "docker-compose.yml")
+        IO.File.WriteAllText(path, "version: \"3.8\"\nservices:\n  web:\n    image: nginx\n")
+        let vm = ComposeEditorViewModel()
+        vm.LoadFile(path)
+        vm.FilePath |> should equal path
+        vm.Document.Text.Contains("nginx") |> should equal true
+    finally
+        TestHelpers.cleanupDir dir
+
+[<Fact>]
+let ``ComposeEditorViewModel Validate detecte un document YAML valide`` () =
+    let vm = ComposeEditorViewModel()
+    vm.Document.Text <- "version: \"3.8\"\nservices:\n  web:\n    image: nginx\n"
+    vm.Validate()
+    vm.Errors.Count |> should equal 0
+
+[<Fact>]
+let ``ComposeEditorViewModel Validate detecte l'absence de services`` () =
+    let vm = ComposeEditorViewModel()
+    vm.Document.Text <- "version: \"3.8\"\n"
+    vm.Validate()
+    vm.Errors.Count |> should be (greaterThan 0)
+    vm.Errors.[0].Message |> should haveSubstring "services"
+
+[<Fact>]
+let ``ComposeEditorViewModel Validate detecte un service sans image ni build`` () =
+    let vm = ComposeEditorViewModel()
+    vm.Document.Text <- "services:\n  web:\n    command: echo\n"
+    vm.Validate()
+    vm.Errors.Count |> should be (greaterThan 0)
+    vm.Errors.[0].Message |> should haveSubstring "image"
+    vm.Errors.[0].Sévérité |> should equal "erreur"
+
+[<Fact>]
+let ``ComposeEditorViewModel Validate detecte un YAML invalide`` () =
+    let vm = ComposeEditorViewModel()
+    vm.Document.Text <- "services:\n  web:\n    image: nginx\n  [\n"
+    vm.Validate()
+    vm.Errors.Count |> should be (greaterThan 0)
+
+[<Fact>]
+let ``ComposeEditorViewModel Validate detecte un document vide`` () =
+    let vm = ComposeEditorViewModel()
+    vm.Document.Text <- ""
+    vm.Validate()
+    vm.Errors.Count |> should be (greaterThan 0)
+    vm.Errors.[0].Sévérité |> should equal "avertissement"
+
+[<Fact>]
+let ``ComposeEditorViewModel Save ecrit sur le disque`` () =
+    let dir = TestHelpers.createTempDir "editor-save"
+    try
+        let path = IO.Path.Combine(dir, "docker-compose.yml")
+        let vm = ComposeEditorViewModel()
+        vm.Document.Text <- "services:\n  web:\n    image: nginx\n"
+        vm.SaveAs(path)
+        vm.FilePath |> should equal path
+        IO.File.ReadAllText(path).Contains("nginx") |> should equal true
+    finally
+        TestHelpers.cleanupDir dir
+
+[<Fact>]
+let ``ComposeEditorViewModel proprietes declenchent PropertyChanged`` () =
+    let vm = ComposeEditorViewModel()
+    let mutable changed = []
+    vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
+    vm.FilePath <- "/test/path.yml"
+    vm.SyntaxHighlightingName <- "Custom"
+    changed |> should contain "FilePath"
+    changed |> should contain "SyntaxHighlightingName"
+
+// ── ComposeTabViewModel — nouvelles fonctionnalités ───────────
+
+[<Fact>]
+let ``ComposeTabViewModel expose les commandes de l'editeur`` () =
+    let port = MockOutputPort()
+    let vm = ComposeTabViewModel(port)
+    vm.OpenComposeFileCommand     |> should not' (be Null)
+    vm.SaveComposeFileCommand     |> should not' (be Null)
+    vm.ValidateComposeFileCommand |> should not' (be Null)
+    vm.InspectImageCommand        |> should not' (be Null)
+
+[<Fact>]
+let ``ComposeTabViewModel ComposeEditor n'est pas null`` () =
+    let port = MockOutputPort()
+    let vm = ComposeTabViewModel(port)
+    vm.ComposeEditor |> should not' (be Null)
+
+[<Fact>]
+let ``ComposeTabViewModel InspectImageRef etat initial`` () =
+    let port = MockOutputPort()
+    let vm = ComposeTabViewModel(port)
+    vm.InspectImageRef |> should equal ""
+
+[<Fact>]
+let ``ComposeTabViewModel InspectImageRef declenche PropertyChanged`` () =
+    let port = MockOutputPort()
+    let vm = ComposeTabViewModel(port)
+    let mutable changed = []
+    vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
+    vm.InspectImageRef <- "nginx:latest"
+    changed |> should contain "InspectImageRef"
+
+[<Fact>]
+let ``ComposeTabViewModel OnSelectedServiceChanged met a jour InspectImageRef`` () =
+    let port = MockOutputPort()
+    let vm = ComposeTabViewModel(port)
+    vm.OnSelectedServiceChanged("alpine:3.18")
+    vm.InspectImageRef |> should equal "alpine:3.18"
+
+[<Fact>]
+let ``ComposeTabViewModel ValidateComposeFile sans fichier affiche avertissement`` () =
+    let port = MockOutputPort()
+    let vm = ComposeTabViewModel(port)
+    (vm.ValidateComposeFileCommand :> System.Windows.Input.ICommand).Execute(null)
+    // Pas de fichier chargé, validate fonctionne sur le document vide
+    vm.ComposeEditor.Errors.Count |> should be (greaterThan 0)
+
+[<Fact>]
+let ``ComposeTabViewModel SaveComposeFile sans fichier ouvre le dialogue`` () =
+    let port = MockOutputPort()
+    let vm = ComposeTabViewModel(port)
+    (vm.SaveComposeFileCommand :> System.Windows.Input.ICommand).Execute(null)
+    // Sans storageProvider, écrit un avertissement
+    port.Warnings |> Seq.exists (fun w -> w.Contains "Fournisseur") |> should equal true
+
+[<Fact>]
+let ``ComposeTabViewModel ComposeFilePath charge l'editeur`` () =
+    let dir = TestHelpers.createTempDir "compose-load"
+    try
+        let path = IO.Path.Combine(dir, "docker-compose.yml")
+        IO.File.WriteAllText(path, "services:\n  web:\n    image: nginx\n")
+        let port = MockOutputPort()
+        let vm = ComposeTabViewModel(port)
+        vm.ComposeFilePath <- path
+        vm.ComposeEditor.Document.Text.Contains("nginx") |> should equal true
+    finally
+        TestHelpers.cleanupDir dir

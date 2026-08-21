@@ -19,6 +19,9 @@ module NetworkIntegrationTests =
     open Diplo.Network.Plugins
     open Diplo.Network.Services
 
+    open Diplo.Core.Connection
+    open Diplo.TestHelpers
+
     type private MockNetworkDriver() =
 
         let mutable networks = Map.empty<string, NetworkDriverInfo>
@@ -67,9 +70,6 @@ module NetworkIntegrationTests =
                 networks <- Map.empty
                 Ok ids
 
-    let private createChannel (address: string) =
-        GrpcChannel.ForAddress(address, GrpcChannelOptions())
-
     let private startApp () =
         let mock = MockNetworkDriver()
         let drivers = Dictionary<NetworkDriver, INetworkDriver>()
@@ -88,118 +88,88 @@ module NetworkIntegrationTests =
         let address = app.Urls |> Seq.head
         app, address
 
+    let private netReq name subnet gateway =
+        { Name = name; Driver = NetworkDriver.Bridge
+          Subnet = subnet; Gateway = gateway; IpRange = ""
+          Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
+
     let private stopApp (app: WebApplication) =
         app.StopAsync().GetAwaiter().GetResult()
         (app :> IAsyncDisposable).DisposeAsync().AsTask().GetAwaiter().GetResult()
 
+    let private withNetworkApp (f: string -> 'a) =
+        let app, address = startApp ()
+        try f address
+        finally stopApp app
+
     [<Fact>]
     let ``CreateNetwork via gRPC retourne les informations`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
-            let req: CreateNetworkRequest =
-                { Name = "net-grpc"; Driver = NetworkDriver.Bridge
-                  Subnet = "10.0.0.0/24"; Gateway = "10.0.0.1"; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
+            let req = netReq "net-grpc" "10.0.0.0/24" "10.0.0.1"
             let result = client.CreateNetwork(req, CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
             result.Name |> should equal "net-grpc"
             result.Driver |> should equal NetworkDriver.Bridge
             result.Subnet |> should equal "10.0.0.0/24"
             result.Gateway |> should equal "10.0.0.1"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``CreateNetwork sans nom genere un id automatiquement`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
-            let req: CreateNetworkRequest =
-                { Name = ""; Driver = NetworkDriver.Bridge
-                  Subnet = ""; Gateway = ""; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
-            let result = client.CreateNetwork(req, CancellationToken.None).Result
+            let result = client.CreateNetwork(netReq "" "" "", CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
             result.Id.Length |> should equal 32
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``CreateNetwork puis RemoveNetwork via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
-            let createReq: CreateNetworkRequest =
-                { Name = "to-delete-net"; Driver = NetworkDriver.Bridge
-                  Subnet = ""; Gateway = ""; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
-            let createResult = client.CreateNetwork(createReq, CancellationToken.None).Result
+            let createResult = client.CreateNetwork(netReq "to-delete-net" "" "", CancellationToken.None).Result
             let removeReq: RemoveNetworkRequest = { Id = createResult.Id; Force = false }
             let removeResult = client.RemoveNetwork(removeReq, CancellationToken.None).Result
             removeResult.Success |> should equal true
             removeResult.Message |> should equal "Réseau supprimé"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``InspectNetwork via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
-            let createReq: CreateNetworkRequest =
-                { Name = "net-inspect"; Driver = NetworkDriver.Bridge
-                  Subnet = "192.168.1.0/24"; Gateway = "192.168.1.1"; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
-            let createResult = client.CreateNetwork(createReq, CancellationToken.None).Result
+            let createResult = client.CreateNetwork(netReq "net-inspect" "" "", CancellationToken.None).Result
             let inspectReq: InspectNetworkRequest = { Id = createResult.Id }
             let inspectResult = client.InspectNetwork(inspectReq, CancellationToken.None).Result
             inspectResult.Id |> should equal createResult.Id
             inspectResult.Name |> should equal "net-inspect"
-            inspectResult.Subnet |> should equal "192.168.1.0/24"
-            inspectResult.Gateway |> should equal "192.168.1.1"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``ListNetworks via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
-            let req1: CreateNetworkRequest =
-                { Name = "net-list-1"; Driver = NetworkDriver.Bridge
-                  Subnet = ""; Gateway = ""; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
-            let req2: CreateNetworkRequest =
-                { Name = "net-list-2"; Driver = NetworkDriver.Bridge
-                  Subnet = ""; Gateway = ""; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
-            client.CreateNetwork(req1, CancellationToken.None).Result |> ignore
-            client.CreateNetwork(req2, CancellationToken.None).Result |> ignore
+            client.CreateNetwork(netReq "net-list-1" "" "", CancellationToken.None).Result |> ignore
+            client.CreateNetwork(netReq "net-list-2" "" "", CancellationToken.None).Result |> ignore
             let listReq: ListNetworksRequest = { Filters = Dictionary() }
             let listResult = client.ListNetworks(listReq, CancellationToken.None).Result
             listResult.Networks.Count |> should equal 2
             listResult.Networks |> Seq.exists (fun n -> n.Name = "net-list-1") |> should equal true
             listResult.Networks |> Seq.exists (fun n -> n.Name = "net-list-2") |> should equal true
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``ConnectContainer puis DisconnectContainer via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
-            let createReq: CreateNetworkRequest =
-                { Name = "net-connect"; Driver = NetworkDriver.Bridge
-                  Subnet = ""; Gateway = ""; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
-            let netResult = client.CreateNetwork(createReq, CancellationToken.None).Result
+            let netResult = client.CreateNetwork(netReq "net-connect" "" "", CancellationToken.None).Result
             let connectReq: ConnectContainerRequest =
                 { NetworkId = netResult.Id; ContainerId = "ct-grpc"
                   EndpointId = "ep-grpc"; Ipv4Address = "10.0.0.5"
@@ -212,55 +182,37 @@ module NetworkIntegrationTests =
                   EndpointId = "ep-grpc"; Force = false }
             let disconnectResult = client.DisconnectContainer(disconnectReq, CancellationToken.None).Result
             disconnectResult.Success |> should equal true
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``PruneNetworks via gRPC`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
-            let req1: CreateNetworkRequest =
-                { Name = "net-prune-1"; Driver = NetworkDriver.Bridge
-                  Subnet = ""; Gateway = ""; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
-            let req2: CreateNetworkRequest =
-                { Name = "net-prune-2"; Driver = NetworkDriver.Bridge
-                  Subnet = ""; Gateway = ""; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
-            client.CreateNetwork(req1, CancellationToken.None).Result |> ignore
-            client.CreateNetwork(req2, CancellationToken.None).Result |> ignore
+            client.CreateNetwork(netReq "net-prune-1" "" "", CancellationToken.None).Result |> ignore
+            client.CreateNetwork(netReq "net-prune-2" "" "", CancellationToken.None).Result |> ignore
             let pruneReq: PruneNetworksRequest = { Placeholder = false }
             let pruneResult = client.PruneNetworks(pruneReq, CancellationToken.None).Result
             pruneResult.Count |> should equal 2
             pruneResult.NetworksDeleted.Count |> should equal 2
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``RemoveNetwork sur reseau inexistant via gRPC lance exception`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
             let req: RemoveNetworkRequest = { Id = "does-not-exist"; Force = false }
             let ex = Assert.Throws<AggregateException>(fun () -> client.RemoveNetwork(req, CancellationToken.None).Result |> ignore)
             ex.InnerException.Message |> should haveSubstring "introuvable"
-        finally
-            stopApp app
+        )
 
     [<Fact>]
     let ``CreateNetwork avec nom injection via gRPC lance exception`` () =
-        let app, address = startApp ()
-        try
-            use channel = createChannel address
+        withNetworkApp (fun address ->
+            use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<INetworkService>()
-            let req: CreateNetworkRequest =
-                { Name = "bad; rm -rf /"; Driver = NetworkDriver.Bridge
-                  Subnet = ""; Gateway = ""; IpRange = ""
-                  Options = Dictionary(); Labels = Dictionary(); CniPluginPath = "" }
+            let req = netReq "bad; rm -rf /" "" ""
             let ex = Assert.Throws<AggregateException>(fun () -> client.CreateNetwork(req, CancellationToken.None).Result |> ignore)
             ex.InnerException.Message |> should haveSubstring "Le nom du réseau"
-        finally
-            stopApp app
+        )

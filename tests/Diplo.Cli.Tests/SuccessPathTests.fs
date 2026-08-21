@@ -6,6 +6,7 @@ namespace Diplo.Cli.Tests
 module SuccessPathTests =
 
     open System.Threading
+    open System.IO
     open Xunit
     open FsUnit.Xunit
     open Spectre.Console.Cli
@@ -138,3 +139,22 @@ module SuccessPathTests =
         let code = run (RunCniPluginCommand(output, clients)) (RunCniPluginSettings(PluginPath = "C:\\plugins\\x.exe", CniCommand = "ADD", ContainerId = "c", NetnsPath = "C:\\ns\\1"))
         code |> should equal 1
         output.Errors |> should contain (sprintf "Échec du plugin CNI: %s" "ADD a échoué")
+
+    // ─── Disk ─────────────────────────────────────────────────────────
+    open Diplo.Cli.Disk
+
+    [<Fact>]
+    let ``disk create-image en succès retourne 0 et écrit le succès`` () =
+        let output = MockOutputPort()
+        let root = TestHelpers.createTempDir "cli-disk"
+        try
+            let src = Path.Combine(root, "src")
+            let dest = Path.Combine(root, "out", "test.vhd")
+            Directory.CreateDirectory(src) |> ignore
+            File.WriteAllText(Path.Combine(src, "hello.txt"), "contenu")
+            let code = run (CreateImageCommand(output)) (CreateImageSettings(Source = src, Dest = dest))
+            code |> should equal 0
+            output.Successes |> should not' (be Empty)
+            File.Exists(dest) |> should equal true
+        finally
+            TestHelpers.cleanupDir root

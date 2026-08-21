@@ -191,3 +191,83 @@ module FsImageTests =
             FsImage.create src dest DiskFormat.Vhd |> ignore
             let info = FileInfo(dest)
             info.Length |> should be (greaterThan 0L))
+
+    [<Fact>]
+    let ``create accepte un repertoire source vide`` () =
+        runCreate (fun _ src dest ->
+            let result = FsImage.create src dest DiskFormat.Vhd
+            File.Exists(dest) |> should equal true)
+
+    [<Fact>]
+    let ``create gere les caracteres speciaux dans les noms de fichiers`` () =
+        runCreate (fun _ src dest ->
+            File.WriteAllText(Path.Combine(src, "fichier avec espaces.txt"), "espaces")
+            File.WriteAllText(Path.Combine(src, "données-françaises.txt"), "accents")
+            File.WriteAllText(Path.Combine(src, "fichier-v2.1.0_beta.txt"), "version")
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            File.Exists(dest) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.Exists(Path.Combine(re, "fichier avec espaces.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "données-françaises.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "fichier-v2.1.0_beta.txt")) |> should equal true)
+
+    [<Fact>]
+    let ``create gere les repertoires imbriques profondement`` () =
+        runCreate (fun _ src dest ->
+            let deepPath = Path.Combine(src, "a", "b", "c", "d", "e")
+            Directory.CreateDirectory(deepPath) |> ignore
+            File.WriteAllText(Path.Combine(deepPath, "profond.txt"), "niveau 5")
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.ReadAllText(Path.Combine(re, "a", "b", "c", "d", "e", "profond.txt")) |> should equal "niveau 5")
+
+    [<Fact>]
+    let ``create gere un gros fichier`` () =
+        runCreate (fun _ src dest ->
+            let bigFile = Path.Combine(src, "gros.bin")
+            let data = Array.create (10 * 1024 * 1024) 0xABuy
+            File.WriteAllBytes(bigFile, data)
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            File.Exists(dest) |> should equal true
+            let info = FileInfo(dest)
+            info.Length |> should be (greaterThan (int64 data.Length)))
+
+    [<Fact>]
+    let ``create gere les caracteres CJK dans les noms de fichiers`` () =
+        runCreate (fun _ src dest ->
+            File.WriteAllText(Path.Combine(src, "テスト.txt"), "japonais")
+            File.WriteAllText(Path.Combine(src, "测试.txt"), "chinois")
+            File.WriteAllText(Path.Combine(src, "한국어.txt"), "coréen")
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.Exists(Path.Combine(re, "テスト.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "测试.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "한국어.txt")) |> should equal true
+            File.ReadAllText(Path.Combine(re, "テスト.txt")) |> should equal "japonais")
+
+    [<Fact>]
+    let ``create gere les fichiers en lecture seule`` () =
+        runCreate (fun _ src dest ->
+            let roFile = Path.Combine(src, "readonly.txt")
+            File.WriteAllText(roFile, "protégé")
+            File.SetAttributes(roFile, FileAttributes.ReadOnly)
+            FsImage.create src dest DiskFormat.Vhd |> ignore
+            File.Exists(dest) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(dest), "re")
+            FsImage.extract dest re false |> ignore
+            File.ReadAllText(Path.Combine(re, "readonly.txt")) |> should equal "protégé"
+            File.SetAttributes(roFile, FileAttributes.Normal))
+
+    [<Fact>]
+    let ``create gere les liens symboliques NTFS`` () =
+        runCreate (fun _ src dest ->
+            File.WriteAllText(Path.Combine(src, "cible.txt"), "données")
+            let linkPath = Path.Combine(src, "lien.txt")
+            try
+                File.CreateSymbolicLink(linkPath, Path.Combine(src, "cible.txt")) |> ignore
+                FsImage.create src dest DiskFormat.Vhd |> ignore
+                File.Exists(dest) |> should equal true
+            with :? PlatformNotSupportedException -> ())

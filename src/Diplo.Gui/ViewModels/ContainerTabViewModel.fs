@@ -29,6 +29,8 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
 
     let logsSourceFactory = defaultArg logsSourceFactory (fun () -> new GrpcContainerLogsSource() :> IContainerLogsSource)
 
+    let containerClient = new ContainerClient()
+
     let containers = ObservableCollection<ContainerInfo>()
     let images = ObservableCollection<ImageInfo>()
 
@@ -108,10 +110,9 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
     member _.RegistryLogoutCommand = RelayCommand(Action(fun () -> this.RegistryLogout() |> ignore))
 
     member private this.ListContainers() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.ListAsync(all = this.ContainerAll)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.ListAsync(all = this.ContainerAll)
                 Dispatcher.UIThread.Post(fun () ->
                     containers.Clear()
                     for c in response.Containers do
@@ -124,14 +125,12 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                         })
                 )
                 outputPort.WriteSuccess(sprintf "%d conteneur(s) trouvé(s)" response.Containers.Count)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.InspectContainer() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.InspectAsync(id = this.ContainerIdInput)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.InspectAsync(id = this.ContainerIdInput)
                 outputPort.WriteLine(sprintf "ID: %s" response.Id)
                 outputPort.WriteLine(sprintf "Nom: %s" response.Name)
                 outputPort.WriteLine(sprintf "Image: %s" response.Image)
@@ -145,100 +144,82 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                     outputPort.WriteLine("Labels:")
                     for kvp in response.Labels do
                         outputPort.WriteLine(sprintf "  %s = %s" kvp.Key kvp.Value)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.StartContainer() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.StartAsync(id = this.ContainerIdInput)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.StartAsync(id = this.ContainerIdInput)
                 outputPort.WriteSuccess(sprintf "Conteneur %s démarré - %s" this.ContainerIdInput response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.StopContainer() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.StopAsync(id = this.ContainerIdInput, timeoutSeconds = this.ContainerTimeout)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.StopAsync(id = this.ContainerIdInput, timeoutSeconds = this.ContainerTimeout)
                 outputPort.WriteSuccess(sprintf "Conteneur %s arrêté - %s" this.ContainerIdInput response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.DeleteContainer() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.DeleteAsync(id = this.ContainerIdInput, force = this.ContainerForce)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.DeleteAsync(id = this.ContainerIdInput, force = this.ContainerForce)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Conteneur %s supprimé" this.ContainerIdInput)
                 else
                     outputPort.WriteWarning(response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.PullImage() =
-        task {
-            try
-                use client = new ContainerClient()
+        Cmd.run outputPort (fun () ->
+            task {
                 let! response =
-                    client.PullImageAsync(
+                    containerClient.PullImageAsync(
                         image = this.ContainerImageInput,
                         ?user = (if String.IsNullOrEmpty(this.ContainerImageUser) then None else Some this.ContainerImageUser))
                 outputPort.WriteSuccess(sprintf "Image %s téléchargée - %s" this.ContainerImageInput response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.GetVersion() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.GetVersionAsync()
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.GetVersionAsync()
                 outputPort.WriteLine(sprintf "Version: %s" response.Version)
                 outputPort.WriteLine(sprintf "Révision: %s" response.Revision)
                 outputPort.WriteLine(sprintf "Go: %s" response.GoVersion)
                 outputPort.WriteLine(sprintf "OS/Arch: %s/%s" response.Os response.Arch)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.RenameContainer() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.RenameContainerAsync(id = this.ContainerIdInput, newName = this.ContainerNewName)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.RenameContainerAsync(id = this.ContainerIdInput, newName = this.ContainerNewName)
                 outputPort.WriteSuccess(sprintf "Conteneur %s renommé en %s" this.ContainerIdInput this.ContainerNewName)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.TopContainer() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.TopContainerAsync(id = this.ContainerIdInput)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.TopContainerAsync(id = this.ContainerIdInput)
                 outputPort.WriteLine(sprintf "Processus du conteneur %s:" this.ContainerIdInput)
                 for proc in response.Processes do
                     outputPort.WriteLine(sprintf "  PID: %d  CMD: %s" proc.Pid proc.Command)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.GetContainerStats() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.GetContainerStatsAsync(id = this.ContainerIdInput)
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.GetContainerStatsAsync(id = this.ContainerIdInput)
                 outputPort.WriteLine(sprintf "Métriques du conteneur %s:" this.ContainerIdInput)
                 outputPort.WriteLine(sprintf "  CPU: %.2f  Mémoire: %d" response.CpuUsage response.MemoryUsage)
                 outputPort.WriteLine(sprintf "  Réseau RX: %d  TX: %d" response.NetworkRx response.NetworkTx)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ListImages() =
-        task {
-            try
-                use client = new ContainerClient()
+        Cmd.run outputPort (fun () ->
+            task {
                 let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
-                let! response = client.ListImagesAsync(?namespaceName = ns)
+                let! response = containerClient.ListImagesAsync(?namespaceName = ns)
                 Dispatcher.UIThread.Post(fun () ->
                     images.Clear()
                     for img in response.Images do
@@ -250,15 +231,13 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                         })
                 )
                 outputPort.WriteSuccess(sprintf "%d image(s) trouvée(s)" response.Images.Count)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.InspectImage() =
-        task {
-            try
-                use client = new ContainerClient()
+        Cmd.run outputPort (fun () ->
+            task {
                 let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
-                let! response = client.InspectImageAsync(ref = this.ContainerImageRef, ?namespaceName = ns)
+                let! response = containerClient.InspectImageAsync(ref = this.ContainerImageRef, ?namespaceName = ns)
                 outputPort.WriteLine(sprintf "Référentiel: %s" response.Ref)
                 outputPort.WriteLine(sprintf "Tag: %s" response.Tag)
                 outputPort.WriteLine(sprintf "Taille: %d octets" response.Size)
@@ -267,49 +246,42 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                     outputPort.WriteLine("Labels:")
                     for kvp in response.Labels do
                         outputPort.WriteLine(sprintf "  %s = %s" kvp.Key kvp.Value)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.RemoveImage() =
-        task {
-            try
-                use client = new ContainerClient()
+        Cmd.run outputPort (fun () ->
+            task {
                 let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
-                let! response = client.RemoveImageAsync(ref = this.ContainerImageRef, ?namespaceName = ns)
+                let! response = containerClient.RemoveImageAsync(ref = this.ContainerImageRef, ?namespaceName = ns)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Image %s supprimée" this.ContainerImageRef)
                 else
                     outputPort.WriteWarning(response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.TagImage() =
-        task {
-            try
-                use client = new ContainerClient()
+        Cmd.run outputPort (fun () ->
+            task {
                 let ns = if String.IsNullOrEmpty(this.ContainerNamespace) then None else Some this.ContainerNamespace
-                let! response = client.TagImageAsync(source = this.ContainerImageRef, target = this.ContainerImageTarget, ?namespaceName = ns)
+                let! response = containerClient.TagImageAsync(source = this.ContainerImageRef, target = this.ContainerImageTarget, ?namespaceName = ns)
                 outputPort.WriteSuccess(sprintf "Image %s étiquetée en %s - %s" this.ContainerImageRef this.ContainerImageTarget response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.CreateContainer() =
-        task {
-            try
-                use client = new ContainerClient()
+        Cmd.run outputPort (fun () ->
+            task {
                 let mounts = MountParser.parse this.ContainerMounts
                 let! response =
-                    client.CreateAsync(
+                    containerClient.CreateAsync(
                         name = this.ContainerNameInput,
                         image = this.ContainerImageInput,
                         ?mounts = (if mounts.IsEmpty then None else Some mounts))
                 outputPort.WriteSuccess(sprintf "Conteneur créé : %s (ID: %s)" response.Name response.Id)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.GetContainerLogs() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 use source = logsSourceFactory ()
                 if this.ContainerFollow then
                     cancelPreviousLogStream ()
@@ -337,37 +309,30 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                     for entry in entries do
                         sb.AppendLine(sprintf "[%s] %s" entry.Timestamp entry.Log) |> ignore
                     outputPort.WriteSuccess(sb.ToString())
-            with
-            | :? OperationCanceledException -> ()
-            | ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ExecInContainer() =
-        task {
-            try
-                use client = new ContainerClient()
+        Cmd.run outputPort (fun () ->
+            task {
                 let parts = Diplo.Core.CommandLine.split this.ContainerExecCommand |> Array.ofList
-                let! entries = client.Exec(id = this.ContainerIdInput, command = parts)
+                let! entries = containerClient.Exec(id = this.ContainerIdInput, command = parts)
                 let sb = Text.StringBuilder()
                 for entry in entries do
                     sb.Append(Text.Encoding.UTF8.GetString(entry.Data)) |> ignore
                 outputPort.WriteSuccess(sb.ToString())
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.ListNamespaces() =
-        task {
-            try
-                use client = new ContainerClient()
-                let! response = client.ListNamespacesAsync()
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.ListNamespacesAsync()
                 let nsList = String.Join(", ", response.Namespaces)
                 outputPort.WriteSuccess(sprintf "Namespaces: %s" nsList)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.RegistryLogin() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 if String.IsNullOrEmpty(this.RegistryInput) then
                     outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
                 elif String.IsNullOrEmpty(this.RegistryUsernameInput) then
@@ -375,9 +340,8 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                 elif String.IsNullOrEmpty(this.RegistryPasswordInput) then
                     outputPort.WriteError("Le mot de passe est requis")
                 else
-                    use client = new ContainerClient()
                     let! response =
-                        client.LoginRegistryAsync(
+                        containerClient.LoginRegistryAsync(
                             registry = this.RegistryInput,
                             username = this.RegistryUsernameInput,
                             password = this.RegistryPasswordInput)
@@ -386,20 +350,17 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                         this.RegistryPasswordInput <- ""
                     else
                         outputPort.WriteError(response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })
 
     member private this.RegistryLogout() =
-        task {
-            try
+        Cmd.run outputPort (fun () ->
+            task {
                 if String.IsNullOrEmpty(this.RegistryInput) then
                     outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
                 else
-                    use client = new ContainerClient()
-                    let! response = client.LogoutRegistryAsync(registry = this.RegistryInput)
+                    let! response = containerClient.LogoutRegistryAsync(registry = this.RegistryInput)
                     if response.Success then
                         outputPort.WriteSuccess(response.Message)
                     else
                         outputPort.WriteError(response.Message)
-            with ex -> outputPort.WriteError(ex.Message)
-        }
+            })

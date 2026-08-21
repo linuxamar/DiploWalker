@@ -10,6 +10,7 @@
     <Compile Include="IsoDriverTests.fs" />
     <Compile Include="MockVolumeDriver.fs" />
     <Compile Include="VolumeServiceImplTests.fs" />
+    <Compile Include="RemoteDriverHelpersTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

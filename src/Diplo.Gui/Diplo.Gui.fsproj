@@ -27,13 +27,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" />
-    <PackageReference Include="Avalonia.Desktop" />
-    <PackageReference Include="Avalonia.Themes.Fluent" />
-    <PackageReference Include="Avalonia.Controls.DataGrid" />
-    <PackageReference Include="Avalonia.AvaloniaEdit" />
-    <PackageReference Include="AvaloniaEdit.TextMate" />
-    <PackageReference Include="TextMateSharp.Grammars" />
+    <PackageReference Include="Avalonia"  />
+    <PackageReference Include="Avalonia.Desktop"  />
+    <PackageReference Include="Avalonia.Themes.Fluent"  />
+    <PackageReference Include="Avalonia.Controls.DataGrid"  />
+    <PackageReference Include="Avalonia.AvaloniaEdit"  />
+    <PackageReference Include="AvaloniaEdit.TextMate"  />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,6 +3,7 @@ namespace Diplo.Gui.Views
 open Avalonia.Controls
 open Avalonia.Interactivity
 open Avalonia.Markup.Xaml
+open AvaloniaEdit.TextMate
 open Diplo.Gui.ViewModels
 
 type MainWindow() as this =
@@ -13,6 +14,25 @@ type MainWindow() as this =
     do
         this.DataContext <- viewModel
         AvaloniaXamlLoader.Load(this)
+        viewModel.VolumeTab.SetStorageProvider(this.StorageProvider)
+        viewModel.ComposeTab.SetStorageProvider(this.StorageProvider)
+        this.setUpComposeEditor()
+
+    member private this.setUpComposeEditor() =
+        let host = this.FindControl<Panel>("ComposeEditorHost")
+        let editor = AvaloniaEdit.TextEditor(
+            Document = viewModel.ComposeTab.ComposeEditor.Document,
+            FontFamily = Avalonia.Media.FontFamily("Cascadia Code, Consolas"),
+            FontSize = 13.0,
+            ShowLineNumbers = true,
+            Background = Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#1e1e1e")),
+            Foreground = Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#d4d4d4"))
+        )
+        let registry = TextMateSharp.Grammars.RegistryOptions(TextMateSharp.Grammars.ThemeName.DarkPlus)
+        let installation = editor.InstallTextMate(registry)
+        let yamlLang = registry.GetLanguageByExtension(".yaml")
+        installation.SetGrammar(registry.GetScopeByLanguageId(yamlLang.Id))
+        host.Children.Add(editor) |> ignore
 
     member private _.OnQuit(_sender: obj, _e: RoutedEventArgs) =
         this.Close()

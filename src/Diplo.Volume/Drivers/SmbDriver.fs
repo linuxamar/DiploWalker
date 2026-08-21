@@ -1,8 +1,6 @@
 namespace Diplo.Volume.Drivers
 
 open System
-open System.Text.Json
-open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -13,83 +11,44 @@ type SmbDriver(dataRoot: string) =
     let extractSharePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "server", driverOpts |> Map.tryFind "share" with
         | Some server, Some share -> sprintf "\\\\%s\\%s" server share
-        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'server' et 'share' sont requises pour le driver SMB")))
+        | _ -> failwith "Les options 'server' et 'share' sont requises pour le driver SMB"
 
-    /// Monte le partage : l'identifiant est enregistré dans le gestionnaire
-    /// d'identifiants Windows (cmdkey) puis retiré, afin que le mot de passe
-    /// n'apparaisse jamais sur la ligne de commande de `net use` (visible dans
-    /// le gestionnaire de tâches et les journaux d'audit).
-    let mountShare (remotePath: string) (targetPath: string) (user: string option) (password: string option) =
+    let mountShare (remotePath: string) (targetPath: string) (opts: Map<string, string>) =
+        let user = opts |> Map.tryFind "username"
+        let password = opts |> Map.tryFind "password"
         match user, password with
         | Some user, Some password ->
             let server = remotePath.TrimStart('\\') |> fun p -> p.Split('\\').[0]
             try
-                ProcessExec.run "cmdkey" [ "/add:" + server; "/user:" + user; "/pass:" + password ] (Some 30_000) None |> ignore
+                ProcessExec.runUnit "cmdkey" [ "/add:" + server; "/user:" + user; "/pass:" + password ] (Some 30_000) None
                 try
-                    ProcessExec.run "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None |> ignore
+                    ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None
                 finally
-                    try ProcessExec.run "cmdkey" [ "/delete:" + server ] (Some 30_000) None |> ignore
+                    try ProcessExec.runUnit "cmdkey" [ "/delete:" + server ] (Some 30_000) None
                     with _ -> ()
             with _ -> reraise ()
         | Some user, None ->
-            ProcessExec.run "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None |> ignore
+            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None
         | None, _ ->
-            ProcessExec.run "net" [ "use"; targetPath; remotePath; "/persistent:no" ] (Some 30_000) None |> ignore
+            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/persistent:no" ] (Some 30_000) None
+
+    let unmountSmb (targetPath: string) =
+        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =
             let sharePath = extractSharePath driverOpts
-            let (id, mountpoint) = store.CreateVolume(name, sharePath, labels, driverOpts)
-            (id, mountpoint)
+            store.CreateVolume(name, sharePath, labels, driverOpts)
 
-        member _.RemoveVolume(id, _force) =
-            store.RemoveVolume(id)
-
-        member _.InspectVolume(id) =
-            store.InspectVolume(id)
-
-        member _.ListVolumes(_filters) =
-            store.ListVolumes()
+        member _.RemoveVolume(id, _force) = store.RemoveVolume(id)
+        member _.InspectVolume(id) = store.InspectVolume(id)
+        member _.ListVolumes(_filters) = store.ListVolumes()
+        member _.GetVolumeSize(_id) = 0L
 
         member _.MountVolume(id, targetPath, options) =
-            SecurityValidation.validateId id "L'identifiant du volume"
-            SecurityValidation.validateVolumePath targetPath "Le chemin cible"
-            match store.InspectVolume(id) with
-            | None -> raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
-            | Some info ->
-                let mutable v = Unchecked.defaultof<JsonElement>
-                let remotePath =
-                    if info.TryGetProperty("remotePath", &v) then v.GetString()
-                    else raise (RpcException(Status(StatusCode.NotFound, sprintf "Aucun chemin distant pour le volume '%s'" id)))
-                let optsMap =
-                    if String.IsNullOrEmpty(options) then Map.empty
-                    else
-                        options.Split(';')
-                        |> Array.choose (fun part ->
-                            let idx = part.IndexOf('=')
-                            if idx > 0 then Some(part.Substring(0, idx), part.Substring(idx + 1))
-                            else None)
-                        |> Map.ofSeq
-                let mergedOpts =
-                    let mutable ov = Unchecked.defaultof<JsonElement>
-                    if info.TryGetProperty("driverOpts", &ov) then
-                        let mutable existing = optsMap
-                        for prop in ov.EnumerateObject() do
-                            if not (existing.ContainsKey(prop.Name)) then
-                                existing <- existing |> Map.add prop.Name (prop.Value.GetString())
-                        existing
-                    else optsMap
-                mountShare remotePath targetPath
-                    (mergedOpts |> Map.tryFind "username")
-                    (mergedOpts |> Map.tryFind "password")
-                (true, targetPath)
+            RemoteDriverHelpers.mountVolume store id targetPath options mountShare
 
         member _.UnmountVolume(id, targetPath) =
-            SecurityValidation.validateId id "L'identifiant du volume"
-            SecurityValidation.validateVolumePath targetPath "Le chemin cible"
-            ProcessExec.run "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None |> ignore
-            (true, "Démonté")
+            RemoteDriverHelpers.unmountVolume id targetPath unmountSmb
 
         member _.PruneVolumes() = store.PruneAll()
-
-        member _.GetVolumeSize(_id) = 0L

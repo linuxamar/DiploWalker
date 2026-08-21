@@ -28,10 +28,16 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         use doc = JsonDocument.Parse(text, JsonDocumentOptions(MaxDepth = 32))
         doc.RootElement.Clone()
 
+    let validateNsId (namespaceName: string) (id: string) =
+        SecurityValidation.validateId namespaceName "Le namespace"
+        SecurityValidation.validateContainerId id
+
+    let validateNs (namespaceName: string) =
+        SecurityValidation.validateId namespaceName "Le namespace"
+
     interface IContainerdClient with
         member _.CreateContainer(namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit, mounts) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             SecurityValidation.validateImage image
             let ctrArgs = ResizeArray()
             ctrArgs.AddRange(nsArgs namespaceName [ "container"; "create" ])
@@ -68,16 +74,14 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             if String.IsNullOrEmpty(trimmed) then id else trimmed
 
         member _.StartContainer(namespaceName, id, detach) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             let args =
                 if detach then nsArgs namespaceName [ "task"; "start"; "--detach"; id ]
                 else nsArgs namespaceName [ "task"; "start"; id ]
             runCtr args |> ignore
 
         member _.StartContainerWithLogs(namespaceName, id, logFile) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             try
                 let psi = ProcessStartInfo(ctrPath)
                 for a in nsArgs namespaceName [ "task"; "start"; id ] do
@@ -115,8 +119,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 Log.Error(ex, "Erreur lors du démarrage avec capture des logs du conteneur {ContainerId}", id)
 
         member _.StopContainer(namespaceName, id, timeoutSeconds) : Task =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGTERM"; id ]) |> ignore
             task {
                 if timeoutSeconds > 0 then
@@ -125,8 +128,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             } :> Task
 
         member _.DeleteContainer(namespaceName, id, force) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             if force then
                 try runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGKILL"; id ]) |> ignore
                 with ex -> Log.Warning(ex, "Erreur lors de l'arrêt forcé du conteneur {ContainerId}", id)
@@ -136,18 +138,15 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
 
         member _.PauseContainer(namespaceName, id) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             runCtr (nsArgs namespaceName [ "task"; "pause"; id ]) |> ignore
 
         member _.ResumeContainer(namespaceName, id) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             runCtr (nsArgs namespaceName [ "task"; "resume"; id ]) |> ignore
 
         member _.WaitForContainerExit(namespaceName, id, timeoutSeconds) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             let deadline =
                 if timeoutSeconds > 0 then Some (DateTime.UtcNow.AddSeconds(float timeoutSeconds))
                 else None
@@ -178,21 +177,19 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             loop ()
 
         member _.UpdateContainer(namespaceName, id, memoryLimit, cpuShares, pidLimit) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             if memoryLimit > 0L || cpuShares > 0 || pidLimit > 0 then
                 raise (RpcException(Status(
                     StatusCode.Unimplemented,
                     "La mise à jour des limites d'un conteneur n'est pas disponible avec cette version de ctr : la sous-commande `ctr task update` est absente")))
 
         member _.InspectContainer(namespaceName, id) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             let output = runCtr (nsArgs namespaceName [ "container"; "info"; id ])
             parseJson output
 
         member _.ListContainers(namespaceName, all) =
-            SecurityValidation.validateId namespaceName "Le namespace"
+            validateNs namespaceName
             let ids =
                 runCtr (nsArgs namespaceName [ "container"; "list"; "--quiet" ])
                 |> fun output -> output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
@@ -211,8 +208,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 ids |> List.filter running.Contains
 
         member _.GetContainerLogs(namespaceName, id, tail, follow, since) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             let lines = ContainerLogs.read id tail since
             if lines.Length = 0 then
                 [ "Aucun journal pour ce conteneur (le conteneur doit être démarré en mode détaché pour capturer ses logs)" ]
@@ -220,8 +216,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 lines |> Array.toList
 
         member _.GetContainerLogsStream(namespaceName, id, tail, since, ct) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             let channel = System.Threading.Channels.Channel.CreateUnbounded<string>()
             let writer = channel.Writer
             let isContainerRunning () =
@@ -282,8 +277,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                             ValueTask() } }
 
         member _.ExecInContainer(namespaceName, id, command) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             SecurityValidation.validateCommand command
             let args =
                 [ yield "--namespace"; yield namespaceName
@@ -297,8 +291,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 "Erreur d'exécution dans le conteneur"
 
         member _.StartExec(namespaceName, id, command, stdin, stdout, stderr) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             SecurityValidation.validateCommand command
             let args =
                 [ yield "--namespace"; yield namespaceName
@@ -327,8 +320,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 -1
 
         member _.TaskInfo(namespaceName, id) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             try
                 let output = runCtr (nsArgs namespaceName [ "tasks"; "list" ])
                 let row =
@@ -409,14 +401,12 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             runCtr [ "namespace"; "remove"; name ] |> ignore
 
         member _.RenameContainer(namespaceName, id, newName) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             SecurityValidation.validateName newName "Le nouveau nom"
             runCtr (nsArgs namespaceName [ "container"; "rename"; id; newName ]) |> ignore
 
         member _.TopContainer(namespaceName, id) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             try
                 let output = runCtr (nsArgs namespaceName [ "task"; "ps"; id ])
                 output
@@ -425,8 +415,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 "Erreur lors de la récupération des processus"
 
         member _.GetContainerStats(namespaceName, id) =
-            SecurityValidation.validateId namespaceName "Le namespace"
-            SecurityValidation.validateContainerId id
+            validateNsId namespaceName id
             try
                 let output = runCtr (nsArgs namespaceName [ "task"; "metrics"; id ])
                 parseJson output
@@ -436,7 +425,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 doc.RootElement.Clone()
 
         member _.ListImages(namespaceName) =
-            SecurityValidation.validateId namespaceName "Le namespace"
+            validateNs namespaceName
             try
                 let output = runCtr (nsArgs namespaceName [ "image"; "list" ])
                 let lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
@@ -460,7 +449,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 []
 
         member _.InspectImage(namespaceName, imageRef) =
-            SecurityValidation.validateId namespaceName "Le namespace"
+            validateNs namespaceName
             SecurityValidation.validateImage imageRef
             try
                 let output = runCtr (nsArgs namespaceName [ "image"; "info"; imageRef ])
@@ -471,7 +460,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 doc.RootElement.Clone()
 
         member _.RemoveImage(namespaceName, imageRef) =
-            SecurityValidation.validateId namespaceName "Le namespace"
+            validateNs namespaceName
             SecurityValidation.validateImage imageRef
             try
                 runCtr (nsArgs namespaceName [ "image"; "remove"; imageRef ]) |> ignore
@@ -481,18 +470,18 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 sprintf "Erreur lors de la suppression de l'image %s" imageRef
 
         member _.TagImage(namespaceName, source, target) =
-            SecurityValidation.validateId namespaceName "Le namespace"
+            validateNs namespaceName
             SecurityValidation.validateImage source
             SecurityValidation.validateImage target
             runCtr (nsArgs namespaceName [ "image"; "tag"; source; target ]) |> ignore
 
         member _.ExportImage(namespaceName, imageRef, tarFile) =
-            SecurityValidation.validateId namespaceName "Le namespace"
+            validateNs namespaceName
             SecurityValidation.validateImage imageRef
             runCtr (nsArgs namespaceName [ "image"; "export"; tarFile; imageRef ]) |> ignore
 
         member _.ImportImage(namespaceName, tarFile) =
-            SecurityValidation.validateId namespaceName "Le namespace"
+            validateNs namespaceName
             let output = runCtr (nsArgs namespaceName [ "image"; "import"; tarFile ])
             output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
             |> Array.toList

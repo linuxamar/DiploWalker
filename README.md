@@ -25,7 +25,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (787 tests)
+- **Tests** : xUnit (841 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -306,15 +306,32 @@ diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|
 | **VMDK** | `.vmdk` | DiscUtils | Virtual Machine Disk (dynamic) |
 | **VDI** | `.vdi` | DiscUtils | VirtualBox Disk Image |
 
-La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés.
+La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés. En cas d'erreur lors du formatage ou de la copie, le fichier partiel est automatiquement supprimé (rollback).
 
 Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (pas de factory publique dans DiscUtils).
+
+### Formats supportés — tableau récapitulatif
+
+| Format | Montage | Création image | Moteur |
+|--------|---------|----------------|--------|
+| Qcow2 | R/W | — | Pilote maison |
+| QCOW v1 | R/W | — | Pilote maison |
+| VHD | R/W | ✅ | DiscUtils |
+| VHDX | R/W | ✅ | DiscUtils |
+| VMDK | R/W | ✅ | DiscUtils |
+| VDI | R/W | ✅ | DiscUtils |
+| Raw | R/W | ✅ | DiscUtils |
+| DMG | Lecture seule | — | DiscUtils |
+| Parallels | R/W | — | Pilote maison |
+| Btrfs | R/W | — | Hawkynt (seuil 2 Go) |
+| XFS | R/W | — | Hawkynt (seuil 2 Go) |
+| HFS+ | R/W | — | Hawkynt (seuil 2 Go) |
 
 ### GUI
 
 L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
 
-L'onglet **Volumes** propose un panneau « Créer une image disque » avec sélection du répertoire source, du chemin de destination et du format.
+L'onglet **Volumes** propose un panneau « Créer une image disque » avec sélection du répertoire source (bouton `…` avec sélecteur de dossier), du chemin de destination (bouton `…` avec sélecteur de fichier) et du format.
 
 ## Authentification aux registres
 
@@ -333,6 +350,72 @@ diplo container pull myregistry.azurecr.io/team/app:latest --user inline:secret 
 ### GUI
 
 L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de passe » avec les boutons **Se connecter** et **Se déconnecter**. Le pull utilise ensuite l'identifiant enregistré automatiquement.
+
+## Référence CLI
+
+```powershell
+# Statut
+diplo status check
+
+# Conteneurs
+diplo container list [--all] [-n <namespace>]
+diplo container create <image> <nom> --mount "src=...,dst=...[;ro]"
+diplo container delete <id> [-f]
+diplo container start <id>
+diplo container stop <id> [--timeout <sec>]
+diplo container inspect <id>
+diplo container rename <id> <nouveau_nom>
+diplo container logs <id> [--follow] [--tail <n>]
+diplo container exec <id> <cmd> [args...]
+diplo container top <id>
+diplo container stats <id>
+diplo container namespaces
+
+# Images
+diplo container image-list [-n <namespace>]
+diplo container image-inspect <ref>
+diplo container image-remove <ref>
+diplo container image-tag <source> <cible>
+diplo container pull <ref> [--user <utilisateur>]
+diplo container login <registre> --username <u> [--password <p>]
+diplo container logout <registre>
+
+# Volumes
+diplo volume list
+diplo volume create <nom> [--driver local|smb|nfs]
+diplo volume inspect <id>
+diplo volume remove <id> [-f]
+diplo volume mount <id> <cible>
+diplo volume unmount <id> <cible>
+diplo volume prune
+
+# Réseaux
+diplo network list
+diplo network create <nom> [--driver bridge|none|custom_cni|pod]
+diplo network inspect <id>
+diplo network remove <id> [-f]
+diplo network connect <réseau> <conteneur>
+diplo network disconnect <réseau> <conteneur> [-f]
+diplo network run-cni-plugin <plugin> <cmd> <conteneur> <netns>
+diplo network prune
+
+# Images disque
+diplo disk create-image <source> <dest> [--format vhd|vhdx|vmdk|vdi|raw]
+
+# Compose
+diplo compose up <fichier>
+diplo compose down <fichier>
+diplo compose ps <fichier>
+diplo compose logs <fichier> [-s <service>]
+diplo compose pull <fichier>
+diplo compose build <fichier>
+
+# Configuration
+diplo config init [--path <chemin>] [--transport tcp|pipe]
+
+# Version
+diplo version
+```
 
 ### Modules mutualisés
 
