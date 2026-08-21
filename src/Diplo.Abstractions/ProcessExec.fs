@@ -66,6 +66,10 @@ module ProcessExec =
             raise (InvalidOperationException(sprintf "La commande '%s' a échoué (code %d):%s" fileName code detail))
         stdout
 
+    /// Exécute sans retourner la sortie (usage montage/démontage).
+    let runUnit (fileName: string) (args: seq<string>) (timeoutMs: int option) (input: string option) : unit =
+        run fileName args timeoutMs input |> ignore
+
     /// Exécute une commande PowerShell avec les paramètres spécifiés.
     let runPowerShell (command: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
         let timeout = timeoutMsOr timeoutMs

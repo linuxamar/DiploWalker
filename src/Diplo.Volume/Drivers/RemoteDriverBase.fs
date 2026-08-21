@@ -52,6 +52,12 @@ module RemoteDriverHelpers =
         unmountFn targetPath
         (true, "Démonté")
 
+    /// Démontage NFS-like : umount → fallback mount -u → silencieux.
+    let unmountNfsLike (targetPath: string) =
+        try ProcessExec.runUnit "umount" [ targetPath ] (Some 30_000) None
+        with _ -> try ProcessExec.runUnit "mount" [ "-u"; targetPath ] (Some 30_000) None
+                  with _ -> ()
+
     /// Prune cloud partagé : itère sur le store et supprime tous les volumes.
     let pruneCloudVolumes (store: RemoteVolumeStore) =
         if not (store.ListVolumes().IsEmpty) then

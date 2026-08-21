@@ -23,6 +23,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     inherit ViewModelBase()
 
     let volumes = ObservableCollection<VolumeDisplayInfo>()
+    let volumeClient = new VolumeClient()
 
     let mutable volumeIdInput = ""
     let mutable volumeNameInput = ""
@@ -94,8 +95,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ListVolumes() =
         Cmd.run outputPort (fun () ->
             task {
-                use client = new VolumeClient()
-                let! response = client.ListAsync()
+                let! response = volumeClient.ListAsync()
                 Dispatcher.UIThread.Post(fun () ->
                     volumes.Clear()
                     for v in response.Volumes do
@@ -113,8 +113,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member private this.InspectVolume() =
         Cmd.run outputPort (fun () ->
             task {
-                use client = new VolumeClient()
-                let! response = client.InspectAsync(id = this.VolumeIdInput)
+                let! response = volumeClient.InspectAsync(id = this.VolumeIdInput)
                 outputPort.WriteLine(sprintf "ID: %s" response.Id)
                 outputPort.WriteLine(sprintf "Nom: %s" response.Name)
                 outputPort.WriteLine(sprintf "Driver: %s" (response.Driver.ToString()))
@@ -127,18 +126,16 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member private this.CreateVolume() =
         Cmd.run outputPort (fun () ->
             task {
-                use client = new VolumeClient()
                 let driverEnum =
                     DriverMappings.parseVolumeDriver this.VolumeDriver
-                let! response = client.CreateAsync(name = this.VolumeNameInput, driver = driverEnum)
+                let! response = volumeClient.CreateAsync(name = this.VolumeNameInput, driver = driverEnum)
                 outputPort.WriteSuccess(sprintf "Volume %s créé (ID: %s)" this.VolumeNameInput response.Id)
             })
 
     member private this.RemoveVolume() =
         Cmd.run outputPort (fun () ->
             task {
-                use client = new VolumeClient()
-                let! response = client.RemoveAsync(id = this.VolumeIdInput, force = this.VolumeForce)
+                let! response = volumeClient.RemoveAsync(id = this.VolumeIdInput, force = this.VolumeForce)
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Volume %s supprimé" this.VolumeIdInput)
                 else
@@ -148,24 +145,21 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member private this.MountVolume() =
         Cmd.run outputPort (fun () ->
             task {
-                use client = new VolumeClient()
-                let! response = client.MountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
+                let! response = volumeClient.MountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
                 outputPort.WriteSuccess(sprintf "Volume %s monté sur %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
             })
 
     member private this.UnmountVolume() =
         Cmd.run outputPort (fun () ->
             task {
-                use client = new VolumeClient()
-                let! response = client.UnmountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
+                let! response = volumeClient.UnmountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
                 outputPort.WriteSuccess(sprintf "Volume %s démonté de %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
             })
 
     member private this.PruneVolumes() =
         Cmd.run outputPort (fun () ->
             task {
-                use client = new VolumeClient()
-                let! response = client.PruneVolumesAsync()
+                let! response = volumeClient.PruneVolumesAsync()
                 outputPort.WriteSuccess(sprintf "Volumes nettoyés - %s" response.Message)
             })
 

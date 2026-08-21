@@ -14,14 +14,7 @@ type CloudGcpDriver(dataRoot: string) =
         | _ -> failwith "Les options 'ipAddress' et 'volumeName' sont requises pour le driver GCP"
 
     let mountNfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
-        ProcessExec.run "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some 30_000) None |> ignore
-
-    let unmountNfs (targetPath: string) =
-        try
-            ProcessExec.run "umount" [ targetPath ] (Some 30_000) None |> ignore
-        with _ ->
-            try ProcessExec.run "mount" [ "-u"; targetPath ] (Some 30_000) None |> ignore
-            with _ -> ()
+        ProcessExec.runUnit "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some 30_000) None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =
@@ -37,6 +30,6 @@ type CloudGcpDriver(dataRoot: string) =
             RemoteDriverHelpers.mountVolume store id targetPath options mountNfs
 
         member _.UnmountVolume(id, targetPath) =
-            RemoteDriverHelpers.unmountVolume id targetPath unmountNfs
+            RemoteDriverHelpers.unmountVolume id targetPath RemoteDriverHelpers.unmountNfsLike
 
         member _.PruneVolumes() = RemoteDriverHelpers.pruneCloudVolumes store

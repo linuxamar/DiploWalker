@@ -27,10 +27,10 @@ type CloudAzureDriver(dataRoot: string) =
 
     let mountAzure (sharePath: string) (targetPath: string) (opts: Map<string, string>) =
         let args = buildNetUseArgs sharePath targetPath opts
-        ProcessExec.run "net" ("use" :: args) (Some 30_000) None |> ignore
+        ProcessExec.runUnit "net" ("use" :: args) (Some 30_000) None
 
     let unmountAzure (targetPath: string) =
-        ProcessExec.run "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None |> ignore
+        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =

@@ -20,20 +20,20 @@ type SmbDriver(dataRoot: string) =
         | Some user, Some password ->
             let server = remotePath.TrimStart('\\') |> fun p -> p.Split('\\').[0]
             try
-                ProcessExec.run "cmdkey" [ "/add:" + server; "/user:" + user; "/pass:" + password ] (Some 30_000) None |> ignore
+                ProcessExec.runUnit "cmdkey" [ "/add:" + server; "/user:" + user; "/pass:" + password ] (Some 30_000) None
                 try
-                    ProcessExec.run "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None |> ignore
+                    ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None
                 finally
-                    try ProcessExec.run "cmdkey" [ "/delete:" + server ] (Some 30_000) None |> ignore
+                    try ProcessExec.runUnit "cmdkey" [ "/delete:" + server ] (Some 30_000) None
                     with _ -> ()
             with _ -> reraise ()
         | Some user, None ->
-            ProcessExec.run "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None |> ignore
+            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None
         | None, _ ->
-            ProcessExec.run "net" [ "use"; targetPath; remotePath; "/persistent:no" ] (Some 30_000) None |> ignore
+            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/persistent:no" ] (Some 30_000) None
 
     let unmountSmb (targetPath: string) =
-        ProcessExec.run "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None |> ignore
+        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =

@@ -19,6 +19,7 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     inherit ViewModelBase()
 
     let composeServices = ObservableCollection<ComposeServiceInfo>()
+    let composeClient = new ContainerClient()
 
     let mutable composeFilePath = ""
     let mutable composeServiceName = ""
@@ -54,8 +55,7 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
             task {
                 let orchestrator = ComposeOrchestrator(outputPort)
                 let compose = orchestrator.ParseFile(this.ComposeFilePath)
-                use client = new ContainerClient()
-                let! response = client.ListAsync(all = true)
+                let! response = composeClient.ListAsync(all = true)
 
                 Dispatcher.UIThread.Post(fun () ->
                     composeServices.Clear()
