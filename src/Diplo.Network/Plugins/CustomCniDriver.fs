@@ -100,6 +100,7 @@ type CustomCniDriver() =
                     | _ -> ()
                     Ok {
                         EndpointId = actualEndpointId
+                        ContainerId = containerId
                         Ipv4Address = assignedIp
                         MacAddress = mac
                         Message = sprintf "Connecté au réseau CNI '%s'" netInfo.Name

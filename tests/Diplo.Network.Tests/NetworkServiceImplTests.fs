@@ -147,13 +147,13 @@ module NetworkServiceImplTests =
         result.Message |> should equal "Déconnecté"
 
     [<Fact>]
-    let ``DisconnectContainer sur reseau inexistant retourne error`` () =
+    let ``DisconnectContainer sur reseau inexistant retourne NotFound`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
         let req = { NetworkId = "nonexistent"; ContainerId = "container-x"; EndpointId = "ep-x"; Force = false }
-        let result = (svc :> INetworkService).DisconnectContainer(req, ctx).Result
-        result.Success |> should equal false
-        result.Message.Contains("introuvable") |> should equal true
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> INetworkService).DisconnectContainer(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> Grpc.Core.RpcException
+        rpcEx.StatusCode |> should equal Grpc.Core.StatusCode.NotFound
 
     // --- PruneNetworks ---
     [<Fact>]

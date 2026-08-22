@@ -128,6 +128,7 @@ type BridgeNetworkDriver() =
                         |> fun s -> s.Trim()
                     Ok {
                         EndpointId = actualEndpointId
+                        ContainerId = containerId
                         Ipv4Address = assignedIp
                         MacAddress = mac
                         Message = sprintf "Connecté au bridge '%s'" netInfo.Name

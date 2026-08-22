@@ -32,6 +32,17 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
         inspectImageRef <- imageRef
         this.OnPropertyChanged("InspectImageRef")
 
+    let composeUpCmd = RelayCommand(Action(fun () -> this.ComposeUp() |> ignore))
+    let composeDownCmd = RelayCommand(Action(fun () -> this.ComposeDown() |> ignore))
+    let composePsCmd = RelayCommand(Action(fun () -> this.ComposePs() |> ignore))
+    let composeLogsCmd = RelayCommand(Action(fun () -> this.ComposeLogs() |> ignore))
+    let composePullCmd = RelayCommand(Action(fun () -> this.ComposePull() |> ignore))
+    let composeBuildCmd = RelayCommand(Action(fun () -> this.ComposeBuild() |> ignore))
+    let inspectImageCmd = RelayCommand(Action(fun () -> this.InspectImage() |> ignore))
+    let openComposeFileCmd = RelayCommand(Action(fun () -> this.OpenComposeFile() |> ignore))
+    let saveComposeFileCmd = RelayCommand(Action(fun () -> this.SaveComposeFile() |> ignore))
+    let validateComposeFileCmd = RelayCommand(Action(fun () -> this.ValidateComposeFile() |> ignore))
+
     member _.ComposeServices = composeServices
     member _.ComposeEditor = composeEditor
 
@@ -55,16 +66,16 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member _.OnSelectedServiceChanged(imageRef: string) =
         setSelectedService imageRef
 
-    member _.ComposeUpCommand = RelayCommand(Action(fun () -> this.ComposeUp() |> ignore))
-    member _.ComposeDownCommand = RelayCommand(Action(fun () -> this.ComposeDown() |> ignore))
-    member _.ComposePsCommand = RelayCommand(Action(fun () -> this.ComposePs() |> ignore))
-    member _.ComposeLogsCommand = RelayCommand(Action(fun () -> this.ComposeLogs() |> ignore))
-    member _.ComposePullCommand = RelayCommand(Action(fun () -> this.ComposePull() |> ignore))
-    member _.ComposeBuildCommand = RelayCommand(Action(fun () -> this.ComposeBuild() |> ignore))
-    member _.InspectImageCommand = RelayCommand(Action(fun () -> this.InspectImage() |> ignore))
-    member _.OpenComposeFileCommand = RelayCommand(Action(fun () -> this.OpenComposeFile() |> ignore))
-    member _.SaveComposeFileCommand = RelayCommand(Action(fun () -> this.SaveComposeFile() |> ignore))
-    member _.ValidateComposeFileCommand = RelayCommand(Action(fun () -> this.ValidateComposeFile() |> ignore))
+    member _.ComposeUpCommand = composeUpCmd
+    member _.ComposeDownCommand = composeDownCmd
+    member _.ComposePsCommand = composePsCmd
+    member _.ComposeLogsCommand = composeLogsCmd
+    member _.ComposePullCommand = composePullCmd
+    member _.ComposeBuildCommand = composeBuildCmd
+    member _.InspectImageCommand = inspectImageCmd
+    member _.OpenComposeFileCommand = openComposeFileCmd
+    member _.SaveComposeFileCommand = saveComposeFileCmd
+    member _.ValidateComposeFileCommand = validateComposeFileCmd
 
     member private this.InspectImage() =
         Cmd.run outputPort (fun () ->
@@ -121,21 +132,21 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeUp() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = ComposeOrchestrator(outputPort)
+                let orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Up(this.ComposeFilePath)
             })
 
     member private this.ComposeDown() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = ComposeOrchestrator(outputPort)
+                let orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Down(this.ComposeFilePath)
             })
 
     member private this.ComposePs() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = ComposeOrchestrator(outputPort)
+                let orchestrator = new ComposeOrchestrator(outputPort)
                 let compose = orchestrator.ParseFile(this.ComposeFilePath)
                 let! response = composeClient.ListAsync(all = true)
 
@@ -165,7 +176,7 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeLogs() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = ComposeOrchestrator(outputPort)
+                let orchestrator = new ComposeOrchestrator(outputPort)
                 let service = if String.IsNullOrEmpty(this.ComposeServiceName) then None else Some this.ComposeServiceName
                 do! orchestrator.Logs(this.ComposeFilePath, service)
             })
@@ -173,13 +184,13 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeBuild() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = ComposeOrchestrator(outputPort)
+                let orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Build(this.ComposeFilePath)
             })
 
     member private this.ComposePull() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = ComposeOrchestrator(outputPort)
+                let orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Pull(this.ComposeFilePath)
             })

@@ -74,8 +74,12 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                 let found =
                     try
                         registry.GetAll()
-                        |> List.exists (fun d -> try d.RemoveVolume(request.Id, request.Force) with _ -> false)
-                    with ex ->
+                        |> List.exists (fun d ->
+                            try d.RemoveVolume(request.Id, request.Force)
+                            with :? RpcException -> reraise ()
+                               | _ -> false)
+                    with :? RpcException -> reraise ()
+                       | ex ->
                         Log.Warning(ex, "Erreur lors de la suppression du volume {VolumeId}", request.Id)
                         false
                 if not found then
@@ -148,7 +152,8 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                     registry.GetAll()
                     |> List.collect (fun d ->
                         try d.ListVolumes(filters)
-                        with _ -> [])
+                        with :? RpcException -> reraise ()
+                           | _ -> [])
                 let response =
                     { ListVolumesResponse.Volumes = System.Collections.Generic.List<VolumeInfo>() }
                 for vol in allVolumes do
@@ -171,7 +176,8 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                         try
                             let (_, mountpoint) = driver.MountVolume(request.Id, request.TargetPath, options)
                             Some mountpoint
-                        with _ -> None
+                        with :? RpcException -> reraise ()
+                           | _ -> None
                     let result =
                         registry.GetAll()
                         |> List.tryPick tryMount
@@ -199,7 +205,8 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                         try
                             let (_, message) = driver.UnmountVolume(request.Id, request.TargetPath)
                             Some message
-                        with _ -> None
+                        with :? RpcException -> reraise ()
+                           | _ -> None
                     let result =
                         registry.GetAll()
                         |> List.tryPick tryUnmount
@@ -219,7 +226,8 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                     registry.GetAll()
                     |> List.collect (fun d ->
                         try d.PruneVolumes()
-                        with _ -> [])
+                        with :? RpcException -> reraise ()
+                           | _ -> [])
                 let count = allRemoved |> List.length
                 return
                     { PruneVolumesResponse.VolumesDeleted = System.Collections.Generic.List<string>(allRemoved)

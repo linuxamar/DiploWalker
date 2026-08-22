@@ -121,30 +121,32 @@
                         <Button Content="📁 Espaces" Command="{Binding ContainerTab.ListNamespacesCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
-                    <DataGrid ItemsSource="{Binding ContainerTab.Containers}" AutoGenerateColumns="False"
-                              IsReadOnly="True" GridLinesVisibility="Horizontal"
-                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
-                              CanUserResizeColumns="True" CanUserSortColumns="True">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
-                            <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="160" />
-                            <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="200" />
-                            <DataGridTextColumn Header="État" Binding="{Binding État}" Width="80" />
-                            <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Grid Grid.Row="0" RowDefinitions="*,*" Height="300" Margin="0,4,0,0">
+                        <DataGrid Grid.Row="0" ItemsSource="{Binding ContainerTab.Containers}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" GridLinesVisibility="Horizontal"
+                                  Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
+                                  CanUserResizeColumns="True" CanUserSortColumns="True">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
+                                <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="160" />
+                                <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="200" />
+                                <DataGridTextColumn Header="État" Binding="{Binding État}" Width="80" />
+                                <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+                            </DataGrid.Columns>
+                        </DataGrid>
 
-                    <DataGrid ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
-                              IsReadOnly="True" GridLinesVisibility="Horizontal"
-                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
-                              CanUserResizeColumns="True" CanUserSortColumns="True">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
-                            <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
-                            <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
-                            <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" GridLinesVisibility="Horizontal"
+                                  Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
+                                  CanUserResizeColumns="True" CanUserSortColumns="True">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
+                                <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
+                                <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
+                                <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
                 </DockPanel>
             </TabItem>
 

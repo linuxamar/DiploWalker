@@ -40,10 +40,10 @@ type ComposeEditorViewModel() as this =
 
     member _.Save() =
         if not (String.IsNullOrEmpty(filePath)) then
-            IO.File.WriteAllText(filePath, document.Text)
+            Diplo.Abstractions.AtomicFile.write filePath document.Text
 
     member _.SaveAs(path: string) =
-        IO.File.WriteAllText(path, document.Text)
+        Diplo.Abstractions.AtomicFile.write path document.Text
         filePath <- path
         this.OnPropertyChanged("FilePath")
 

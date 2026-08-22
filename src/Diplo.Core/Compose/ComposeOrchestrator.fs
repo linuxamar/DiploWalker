@@ -31,6 +31,10 @@ type ComposeOrchestrator(output: IOutputPort) =
             seq.Children |> Seq.map (fun c -> c.ToString()) |> Seq.toList
         | _ -> []
 
+    interface IDisposable with
+        member _.Dispose() =
+            (containerClient :> IDisposable).Dispose()
+
     member _.ParseFile(filePath: string) : ComposeFile =
         SecurityValidation.validateFilePath filePath "Le fichier compose"
         if not (File.Exists filePath) then

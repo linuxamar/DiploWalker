@@ -171,6 +171,7 @@ type PodDriver(hns: IHnsProvider) =
                         | _ -> assignedIp <- "DHCP"
                         let epInfo = {
                             EndpointId = actualEndpointId
+                            ContainerId = containerId
                             Ipv4Address = assignedIp
                             MacAddress = ""
                             Message = sprintf "Connecté au Pod '%s' (%d/%d)" podInfo.DriverInfo.Name (epCount + 1) podInfo.MaxContainers
@@ -191,7 +192,7 @@ type PodDriver(hns: IHnsProvider) =
                     | true, podEndpoints ->
                         if String.IsNullOrEmpty(endpointId) then
                             let removed = podEndpoints.Values
-                                          |> Seq.filter (fun ep -> ep.EndpointId.Contains(containerId.Substring(0, min 8 containerId.Length)))
+                                          |> Seq.filter (fun ep -> ep.ContainerId = containerId)
                                           |> Seq.map (fun ep -> podEndpoints.TryRemove(ep.EndpointId))
                                           |> Seq.fold (fun acc (removed, _) -> acc || removed) false
                             if not removed then
