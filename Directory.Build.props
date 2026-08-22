@@ -40,10 +40,12 @@
 
   <PropertyGroup>
     <!--
-      Désactiver l'audit NuGet : les vulnérabilités des dépendances transitives
-      sont gérées manuellement via les versions pinnées dans Directory.Packages.props.
+      Audit NuGet : activé pour détecter les vulnérabilités des dépendances
+      transitives (CVE connues). Mode=latest : analyse avec les règles les
+      plus récentes.
     -->
-    <NuGetAudit>false</NuGetAudit>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>latest</NuGetAuditMode>
   </PropertyGroup>
 
   <PropertyGroup>
