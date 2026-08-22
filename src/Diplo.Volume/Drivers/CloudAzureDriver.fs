@@ -1,6 +1,7 @@
 namespace Diplo.Volume.Drivers
 
 open System
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -11,7 +12,7 @@ type CloudAzureDriver(dataRoot: string) =
     let buildAzureSharePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "storageAccount", driverOpts |> Map.tryFind "shareName" with
         | Some account, Some share -> sprintf "\\\\%s.file.core.windows.net\\%s" account share
-        | _ -> failwith "Les options 'storageAccount' et 'shareName' sont requises pour le driver Azure"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'storageAccount' et 'shareName' sont requises pour le driver Azure")))
 
     let buildNetUseArgs (sharePath: string) (targetPath: string) (driverOpts: Map<string, string>) =
         let args = ResizeArray<string>()
@@ -21,7 +22,7 @@ type CloudAzureDriver(dataRoot: string) =
         | Some account, Some key ->
             args.Add("/user:AZURE\\" + account)
             args.Add(key)
-        | _ -> failwith "Les options 'storageAccount' et 'storageKey' sont requises pour le montage Azure"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'storageAccount' et 'storageKey' sont requises pour le montage Azure")))
         args.Add("/persistent:no")
         args |> Seq.toList
 

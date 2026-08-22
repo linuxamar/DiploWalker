@@ -173,16 +173,19 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                 elif String.IsNullOrEmpty this.ImageDestPath then
                     outputPort.WriteError("Le chemin de destination est requis")
                 else
-                    let format =
+                    let formatOpt =
                         match this.ImageFormat.ToLowerInvariant() with
-                        | "vhd" -> DiskFormat.Vhd
-                        | "vhdx" -> DiskFormat.Vhdx
-                        | "vmdk" -> DiskFormat.Vmdk
-                        | "vdi" -> DiskFormat.Vdi
-                        | "raw" | "" -> DiskFormat.Raw
-                        | other -> failwithf "Format inconnu : '%s'" other
-                    outputPort.WriteLine(sprintf "Création de l'image '%s' au format %s…" this.ImageDestPath (DiskFormat.toString format))
-                    let result = FsImage.create this.ImageSourceDir this.ImageDestPath format
-                    let size = System.IO.FileInfo(result).Length
-                    outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
+                        | "vhd" -> Some DiskFormat.Vhd
+                        | "vhdx" -> Some DiskFormat.Vhdx
+                        | "vmdk" -> Some DiskFormat.Vmdk
+                        | "vdi" -> Some DiskFormat.Vdi
+                        | "raw" | "" -> Some DiskFormat.Raw
+                        | other -> outputPort.WriteError(sprintf "Format inconnu : '%s' (utilisez vhd, vhdx, vmdk, vdi ou raw)" other); None
+                    match formatOpt with
+                    | None -> ()
+                    | Some format ->
+                        outputPort.WriteLine(sprintf "Création de l'image '%s' au format %s…" this.ImageDestPath (DiskFormat.toString format))
+                        let result = FsImage.create this.ImageSourceDir this.ImageDestPath format
+                        let size = System.IO.FileInfo(result).Length
+                        outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
             })

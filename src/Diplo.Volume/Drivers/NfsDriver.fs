@@ -1,6 +1,7 @@
 namespace Diplo.Volume.Drivers
 
 open System
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -11,7 +12,7 @@ type NfsDriver(dataRoot: string) =
     let extractRemotePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "server", driverOpts |> Map.tryFind "export" with
         | Some server, Some export -> sprintf "%s:/%s" server export
-        | _ -> failwith "Les options 'server' et 'export' sont requises pour le driver NFS"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'server' et 'export' sont requises pour le driver NFS")))
 
     let mountNfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
         ProcessExec.runUnit "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some 30_000) None

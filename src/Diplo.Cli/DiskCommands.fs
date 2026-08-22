@@ -31,16 +31,19 @@ type CreateImageCommand(output: IOutputPort) =
                 output.WriteError("Le chemin de destination est requis")
                 return 1
             else
+                let fmt = settings.Format.ToLowerInvariant()
+                match fmt with
+                | "vhd" | "vhdx" | "vmdk" | "vdi" | "raw" | "" -> ()
+                | other ->
+                    output.WriteError(sprintf "Format inconnu : '%s' (utilisez vhd, vhdx, vmdk, vdi ou raw)" other)
+
                 let format =
-                    match settings.Format.ToLowerInvariant() with
+                    match fmt with
                     | "vhd" -> DiskFormat.Vhd
                     | "vhdx" -> DiskFormat.Vhdx
                     | "vmdk" -> DiskFormat.Vmdk
                     | "vdi" -> DiskFormat.Vdi
-                    | "raw" | "" -> DiskFormat.Raw
-                    | other ->
-                        output.WriteError(sprintf "Format inconnu : '%s' (utilisez vhd, vhdx, vmdk, vdi ou raw)" other)
-                        failwith "Format inconnu"
+                    | _ -> DiskFormat.Raw
 
                 try
                     output.WriteLine(sprintf "Création de l'image '%s' au format %s…" settings.Dest (DiskFormat.toString format))

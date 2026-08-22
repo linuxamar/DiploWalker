@@ -11,6 +11,7 @@
     <Compile Include="MockVolumeDriver.fs" />
     <Compile Include="VolumeServiceImplTests.fs" />
     <Compile Include="RemoteDriverHelpersTests.fs" />
+    <Compile Include="RemoteDriverTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

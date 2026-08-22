@@ -1,6 +1,7 @@
 namespace Diplo.Volume.Drivers
 
 open System
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -11,7 +12,7 @@ type SmbDriver(dataRoot: string) =
     let extractSharePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "server", driverOpts |> Map.tryFind "share" with
         | Some server, Some share -> sprintf "\\\\%s\\%s" server share
-        | _ -> failwith "Les options 'server' et 'share' sont requises pour le driver SMB"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'server' et 'share' sont requises pour le driver SMB")))
 
     let mountShare (remotePath: string) (targetPath: string) (opts: Map<string, string>) =
         let user = opts |> Map.tryFind "username"
