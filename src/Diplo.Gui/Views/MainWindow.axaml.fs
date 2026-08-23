@@ -1,6 +1,9 @@
 namespace Diplo.Gui.Views
 
+open System
+open System.IO
 open Avalonia.Controls
+open Avalonia.Platform
 open Avalonia.Interactivity
 open Avalonia.Markup.Xaml
 open AvaloniaEdit.TextMate
@@ -13,7 +16,10 @@ type MainWindow() as this =
 
     do
         this.DataContext <- viewModel
-        AvaloniaXamlLoader.Load(this)
+        let assembly = typeof<MainWindow>.Assembly
+        let uri = Uri("avares://Diplo.Gui/Views/MainWindow.axaml")
+        use stream : Stream = AssetLoader.Open(uri)
+        AvaloniaRuntimeXamlLoader.Load(stream, assembly, this) |> ignore
         viewModel.VolumeTab.SetStorageProvider(this.StorageProvider)
         viewModel.ComposeTab.SetStorageProvider(this.StorageProvider)
         this.setUpComposeEditor()

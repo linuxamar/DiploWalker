@@ -11,7 +11,7 @@
       Désactive la référence implicite FSharp.Core du SDK .NET 10.
       La version est pinnée via CentralPackageTransitivePinningEnabled
       dans Directory.Packages.props (évite le conflit MSB3277 entre
-      la version SDK 11.0.0.0 et la version NuGet 10.1.400).
+      la version SDK et la version NuGet 10.1.400).
     -->
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
