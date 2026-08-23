@@ -62,6 +62,7 @@ type LocalVolumeDriver(dataRoot: string) =
             | Some p when not (String.IsNullOrWhiteSpace p) ->
                 // Référence directe : le volume pointe sur le répertoire fourni,
                 // sans le copier. Le répertoire est créé s'il n'existe pas encore.
+                SecurityValidation.validateVolumePath p "Le chemin du volume" |> ignore
                 let full = Path.GetFullPath(p)
                 Directory.CreateDirectory(full) |> ignore
                 full

@@ -3,6 +3,7 @@ namespace Diplo.Disk
 open System
 open System.IO
 open System.Text.Json
+open Serilog
 
 /// Persistance de l'état des volumes montés par conteneur : permet de
 /// restaurer le write-back après un redémarrage du service sans ré-extraire
@@ -29,11 +30,26 @@ module MountState =
         try
             if not (File.Exists path) then Map.empty
             else
-                let entries = JsonSerializer.Deserialize<ContainerState list>(File.ReadAllText path)
-                entries
-                |> Seq.map (fun e -> e.Id, e.Mounts)
-                |> Map.ofSeq
-        with _ -> Map.empty
+                let json = File.ReadAllText path
+                if String.IsNullOrWhiteSpace(json) || json = "null" then
+                    Log.Warning("Fichier d'état de montage vide ou null : {Path}", path)
+                    Map.empty
+                else
+                    let entries = JsonSerializer.Deserialize<ContainerState list>(json)
+                    if isNull (box entries) then
+                        Log.Warning("Fichier d'état de montage contient null : {Path}", path)
+                        Map.empty
+                    else
+                        entries
+                        |> Seq.map (fun e -> e.Id, e.Mounts)
+                        |> Map.ofSeq
+        with
+        | :? JsonException as ex ->
+            Log.Warning(ex, "Fichier d'état de montage corrompu : {Path}", path)
+            Map.empty
+        | ex ->
+            Log.Warning(ex, "Erreur lecture état de montage : {Path}", path)
+            Map.empty
 
     /// Enregistre l'état des volumes montés (écriture atomique : fichier
     /// temporaire du même répertoire puis remplacement).

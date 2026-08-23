@@ -3,6 +3,7 @@ namespace Diplo.Disk
 open System.IO
 open DiscUtils
 open DiscUtils.Streams
+open Serilog
 
 /// Adaptateur DMG (Apple Disk Image) pour extraction et reecriture.
 /// Lecture via DiscUtils.Dmg (UDIF compresse), ecriture via Hawkynt DmgWriter.
@@ -18,8 +19,13 @@ module DmgFs =
                 Some (disk :> VirtualDisk)
             with ex ->
                 fs.Dispose()
-                raise ex
-        with _ -> None
+                reraise ()
+        with
+        | :? IOException -> None
+        | :? System.NotSupportedException -> None
+        | ex ->
+            Log.Warning(ex, "Erreur inattendue ouverture DMG pour {Path}", sourcePath)
+            None
 
     let private openFileSystem (disk: VirtualDisk) =
         let vm = new VolumeManager(disk)
@@ -79,9 +85,9 @@ module DmgFs =
                 use _disk = disk
                 match openFileSystem disk with
                 | Some fs ->
+                    use _fs = fs
                     let counter = ref 0
                     copyDirectory fs "/" targetDir counter
-                    fs.Dispose()
                     Some !counter
                 | None -> None
             | None -> None

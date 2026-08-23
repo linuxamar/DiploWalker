@@ -573,6 +573,7 @@ type IsoDriver(dataRoot: string) =
                 | None -> null
             store.RemoveVolume(id) |> ignore
             if force && not (String.IsNullOrEmpty(isoPath)) && File.Exists(isoPath) then
+                SecurityValidation.validateVolumePath isoPath "Le chemin du fichier ISO" |> ignore
                 File.Delete(isoPath)
             true
 

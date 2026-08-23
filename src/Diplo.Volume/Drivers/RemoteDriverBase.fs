@@ -60,13 +60,14 @@ module RemoteDriverHelpers =
 
     /// Prune cloud partagé : itère sur le store et supprime tous les volumes.
     let pruneCloudVolumes (store: RemoteVolumeStore) =
-        if not (store.ListVolumes().IsEmpty) then
+        let vols = store.ListVolumes()
+        if not (vols.IsEmpty) then
             let removed = ResizeArray<string>()
-            for vol in store.ListVolumes() do
+            for vol in vols do
                 let mutable v = Unchecked.defaultof<JsonElement>
                 let id = if vol.TryGetProperty("id", &v) then v.GetString() else null
                 if not (String.IsNullOrEmpty(id)) then
-                    store.RemoveVolume(id) |> ignore
-                    removed.Add(id)
+                    if store.RemoveVolume(id) then
+                        removed.Add(id)
             removed |> Seq.toList
         else []

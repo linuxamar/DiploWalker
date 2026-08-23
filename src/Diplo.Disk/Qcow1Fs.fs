@@ -126,20 +126,10 @@ module Qcow1 =
                     bOff <- bOff + toRead
                     vOff <- vOff + int64 toRead
 
-    let private findFreeCluster (s: Stream) (h: Header) : int64 =
+    let private findFreeCluster (_s: Stream) (h: Header) : int64 =
         let endOfL1 = h.L1TableOffset + int64 h.L1Size * 8L
-        let startCluster = (endOfL1 + h.ClusterSize - 1L) / h.ClusterSize
-        let mutable candidate = startCluster
-        let buf = Array.zeroCreate<byte> 8
-        let fileLen = s.Length
-        while candidate * h.ClusterSize + 8L <= fileLen do
-            s.Position <- candidate * h.ClusterSize
-            let _ = s.Read(buf, 0, 8)
-            let hasNonZero = buf |> Array.exists (fun b -> b <> 0uy)
-            if hasNonZero then candidate <- candidate + 1L
-            else candidate <- candidate + 1L
-        let lastCluster = (fileLen + h.ClusterSize - 1L) / h.ClusterSize
-        max candidate lastCluster
+        let lastCluster = (endOfL1 + h.ClusterSize - 1L) / h.ClusterSize
+        lastCluster
 
     let writeBytesAt (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) =
         let clusterBits = h.ClusterBits
