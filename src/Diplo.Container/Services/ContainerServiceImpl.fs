@@ -879,7 +879,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                     finally
                         fs.Dispose()
                     let refs = client.ImportImage(DefaultNamespace, tmp)
-                    return { ImportImageResponse.ImageRefs = List<string>(refs); Message = sprintf "%d image(s) import�e(s)" refs.Length }
+                    return { ImportImageResponse.ImageRefs = List<string>(refs); Message = sprintf "%d image(s) importée(s)" refs.Length }
                 finally
                     try File.Delete(tmp) with _ -> ()
             }

@@ -190,10 +190,12 @@ module Qcow2 =
     /// correctement refcountées, ce qui est le cas des images produites par
     /// qemu-img.
     let private findFreeCluster (s: Stream) (h: Header) : int64 =
+        let maxClusters = int64 h.RefcountTableClusters * int64 (refcountsPerBlock h)
         let mutable n = 1L
         let mutable found = -1L
-        while found < 0L do
+        while found < 0L && n < maxClusters do
             if readRefcount s h n = 0 then found <- n else n <- n + 1L
+        if found < 0L then failwith "Image qcow2 pleine : aucun cluster libre disponible"
         found
 
     // ── lecture ────────────────────────────────────────────────────────────

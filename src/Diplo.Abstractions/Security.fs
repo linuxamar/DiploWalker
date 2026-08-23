@@ -134,7 +134,8 @@ module SecurityValidation =
             allowedCniPluginDirs
             |> List.exists (fun dir ->
                 let fullDir = Path.GetFullPath(dir)
-                resolvedPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
+                let fullDirWithSep = if fullDir.EndsWith(Path.DirectorySeparatorChar) then fullDir else fullDir + string Path.DirectorySeparatorChar
+                resolvedPath.StartsWith(fullDirWithSep, StringComparison.OrdinalIgnoreCase))
         if not isAllowed then
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "Le plugin CNI '%s' n'est pas dans un répertoire autorisé" pluginPath)))
         resolvedPath
@@ -215,7 +216,8 @@ module SecurityValidation =
                 if di.Exists then di.FullName
                 else Path.GetFullPath(baseDir)
             with _ -> Path.GetFullPath(baseDir)
-        if not (resolvedPath.StartsWith(resolvedBase, StringComparison.OrdinalIgnoreCase)) then
+        let resolvedBaseWithSep = if resolvedBase.EndsWith(Path.DirectorySeparatorChar) then resolvedBase else resolvedBase + string Path.DirectorySeparatorChar
+        if not (resolvedPath.StartsWith(resolvedBaseWithSep, StringComparison.OrdinalIgnoreCase)) then
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s sort du répertoire autorisé: '%s'" label resolvedPath)))
 
     /// Hosts autorisés pour les connexions gRPC (localhost uniquement).
@@ -293,6 +295,7 @@ module SecurityValidation =
         let isAllowed =
             snapshot
             |> Set.exists (fun fullDir ->
-                fullPath.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase))
+                let fullDirWithSep = if fullDir.EndsWith(Path.DirectorySeparatorChar) then fullDir else fullDir + string Path.DirectorySeparatorChar
+                fullPath.StartsWith(fullDirWithSep, StringComparison.OrdinalIgnoreCase))
         if not isAllowed then
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s n'est pas dans un répertoire autorisé: '%s'" label fullPath)))

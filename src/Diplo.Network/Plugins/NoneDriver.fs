@@ -51,6 +51,7 @@ type NoneDriver() =
             let epId = Guid.NewGuid().ToString("N")
             Ok {
                 EndpointId = epId
+                ContainerId = containerId
                 Ipv4Address = ""
                 MacAddress = ""
                 Message = sprintf "Container '%s' isolé (réseau None)" containerId

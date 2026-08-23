@@ -31,13 +31,17 @@ type ComposeOrchestrator(output: IOutputPort) =
             seq.Children |> Seq.map (fun c -> c.ToString()) |> Seq.toList
         | _ -> []
 
+    interface IDisposable with
+        member _.Dispose() =
+            (containerClient :> IDisposable).Dispose()
+
     member _.ParseFile(filePath: string) : ComposeFile =
         SecurityValidation.validateFilePath filePath "Le fichier compose"
         if not (File.Exists filePath) then
             raise (RpcException(Status(StatusCode.NotFound, sprintf "Le fichier compose '%s' est introuvable" filePath)))
 
         let yaml = File.ReadAllText(filePath)
-        let stream = new StringReader(yaml)
+        use stream = new StringReader(yaml)
         let doc = YamlStream()
         doc.Load(stream)
         let root = doc.Documents.[0].RootNode :?> YamlMappingNode

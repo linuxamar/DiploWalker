@@ -1,6 +1,7 @@
 namespace Diplo.Volume.Drivers
 
 open System
+open Grpc.Core
 open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
@@ -11,7 +12,7 @@ type CloudAwsDriver(dataRoot: string) =
     let buildEfsPath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "fsId", driverOpts |> Map.tryFind "region" with
         | Some fsId, Some region -> sprintf "%s.efs.%s.amazonaws.com:/" fsId region
-        | _ -> failwith "Les options 'fsId' et 'region' sont requises pour le driver AWS"
+        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'fsId' et 'region' sont requises pour le driver AWS")))
 
     let mountEfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
         ProcessExec.runUnit "mount" [ "-o"; "nfsvers=4.1"; remotePath; targetPath ] (Some 30_000) None

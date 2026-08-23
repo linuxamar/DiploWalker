@@ -27,7 +27,25 @@ type private RateLimiter(maxRequests: int, windowSeconds: int) =
     member _.TryReset(ip: string) =
         hits.TryRemove(ip) |> ignore
 
+    /// Nettoie les entrées expirées de toutes les IP (appelé périodiquement).
+    member _.PurgeExpired() =
+        let now = DateTime.UtcNow
+        let windowStart = now.AddSeconds(-float windowSeconds)
+        for kvp in hits do
+            lock (box kvp.Value) (fun () ->
+                kvp.Value.RemoveAll(fun t -> t < windowStart) |> ignore)
+            if kvp.Value.Count = 0 then
+                hits.TryRemove(kvp.Key) |> ignore
+
 let private rateLimiter = RateLimiter(maxRequests = 30, windowSeconds = 60)
+
+/// Timer de nettoyage : purge les entrées expirées toutes les 2 minutes.
+let private purgeTimer =
+    new System.Threading.Timer(
+        (fun _ -> rateLimiter.PurgeExpired()),
+        null,
+        System.TimeSpan.FromMinutes(2.0),
+        System.TimeSpan.FromMinutes(2.0))
 
 type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddleware>) =
 

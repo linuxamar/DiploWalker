@@ -57,9 +57,15 @@ module RegistryAuth =
         try
             if not (File.Exists path) then Map.empty
             else
-                let entries = JsonSerializer.Deserialize<RegistryEntry list>(File.ReadAllText path)
-                entries |> Seq.map (fun e -> e.Registry, e) |> Map.ofSeq
-        with _ -> Map.empty
+                let json = File.ReadAllText path
+                if String.IsNullOrWhiteSpace(json) || json = "null" then Map.empty
+                else
+                    let entries = JsonSerializer.Deserialize<RegistryEntry list>(json)
+                    if isNull (box entries) then Map.empty
+                    else entries |> Seq.map (fun e -> e.Registry, e) |> Map.ofSeq
+        with
+        | :? JsonException -> Map.empty
+        | _ -> Map.empty
 
     /// Enregistre les identifiants (écriture atomique : fichier temporaire puis remplacement).
     let save (path: string) (entries: seq<RegistryEntry>) =

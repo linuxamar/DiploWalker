@@ -163,7 +163,10 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                         match kvp.Value.Inspect(request.NetworkId) with
                         | Ok info when info.Driver = kvp.Key -> Some kvp.Value
                         | _ -> None)
-                let driver = foundDriver |> Option.defaultValue (defaultDriver ())
+                let driver =
+                    match foundDriver with
+                    | Some d -> d
+                    | None -> raise (RpcException(Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.NetworkId)))
                 match driver.Disconnect(request.NetworkId, request.ContainerId, request.EndpointId, request.Force) with
                 | Ok () ->
                     return { DisconnectContainerResponse.Success = true; Message = "Déconnecté" }

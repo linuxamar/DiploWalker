@@ -91,6 +91,8 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 psi.UseShellExecute <- false
                 psi.CreateNoWindow <- true
                 let proc = Process.Start(psi)
+                if isNull proc then
+                    raise (InvalidOperationException(sprintf "Impossible de démarrer le processus ctr pour le conteneur %s" id))
                 let dir = Path.GetDirectoryName(logFile)
                 if not (String.IsNullOrEmpty(dir)) then Directory.CreateDirectory(dir) |> ignore
                 let writer = new StreamWriter(logFile, true)
@@ -336,7 +338,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
                     let pid = if parts.Length >= 2 && parts[1] <> "-" then parts[1] else "0"
                     let status = if parts.Length >= 3 then parts[2] else "unknown"
-                    let json = sprintf """{"status":"%s","pid":%s,"exited_at":""}""" status pid
+                    let json = System.Text.Json.JsonSerializer.Serialize({| status = status; pid = pid; exited_at = "" |})
                     use doc = JsonDocument.Parse(json)
                     doc.RootElement.Clone()
             with ex ->
@@ -437,11 +439,8 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 dataLines
                 |> Array.map (fun line ->
                     let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
-                    let json =
-                        if parts.Length >= 2 then
-                            sprintf """{"id":"%s","repository":"%s","ref":"%s"}""" parts[0] parts[0] parts[0]
-                        else
-                            sprintf """{"id":"%s","repository":"%s","ref":"%s"}""" line line line
+                    let id = if parts.Length >= 2 then parts[0] else line
+                    let json = System.Text.Json.JsonSerializer.Serialize({| id = id; repository = id; ref = id |})
                     parseJson json)
                 |> Array.toList
             with ex ->

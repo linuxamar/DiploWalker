@@ -12,7 +12,7 @@ module HawkyntFs =
     // ── Extraction Btrfs ──────────────────────────────────────────────
 
     let private extractBtrfs (stream: Stream) (targetDir: string) =
-        let reader = new FileSystem.Btrfs.BtrfsReader(stream, true)
+        use reader = new FileSystem.Btrfs.BtrfsReader(stream, true)
         let mutable count = 0
         for entry in reader.Entries do
             if not (System.String.IsNullOrEmpty(entry.Name)) then
@@ -26,13 +26,12 @@ module HawkyntFs =
                         Directory.CreateDirectory(dir) |> ignore
                     File.WriteAllBytes(fullPath, reader.Extract(entry))
                     count <- count + 1
-        reader.Dispose()
         count
 
     // ── Extraction XFS ────────────────────────────────────────────────
 
     let private extractXfs (stream: Stream) (targetDir: string) =
-        let reader = new FileSystem.Xfs.XfsReader(stream, true)
+        use reader = new FileSystem.Xfs.XfsReader(stream, true)
         let mutable count = 0
         for entry in reader.Entries do
             if not (System.String.IsNullOrEmpty(entry.Name)) then
@@ -46,13 +45,12 @@ module HawkyntFs =
                         Directory.CreateDirectory(dir) |> ignore
                     File.WriteAllBytes(fullPath, reader.Extract(entry))
                     count <- count + 1
-        reader.Dispose()
         count
 
     // ── Extraction HFS+ ───────────────────────────────────────────────
 
     let private extractHfsPlus (stream: Stream) (targetDir: string) =
-        let reader = new FileSystem.HfsPlus.HfsPlusReader(stream, true)
+        use reader = new FileSystem.HfsPlus.HfsPlusReader(stream, true)
         let mutable count = 0
         for entry in reader.Entries do
             let name = if System.String.IsNullOrEmpty(entry.FullPath) then entry.Name else entry.FullPath
@@ -67,7 +65,6 @@ module HawkyntFs =
                         Directory.CreateDirectory(dir) |> ignore
                     File.WriteAllBytes(fullPath, reader.Extract(entry))
                     count <- count + 1
-        reader.Dispose()
         count
 
     /// Tente d'extraire une image disque via Hawkynt.
@@ -105,8 +102,8 @@ module HawkyntFs =
 
     let private writeBackBtrfs (sourcePath: string) (sourceDir: string) =
         let imageBytes = File.ReadAllBytes(sourcePath)
-        let stream = new MemoryStream(imageBytes)
-        let reader = new FileSystem.Btrfs.BtrfsReader(stream, false)
+        use stream = new MemoryStream(imageBytes)
+        use reader = new FileSystem.Btrfs.BtrfsReader(stream, false)
         let writer = new FileSystem.Btrfs.BtrfsWriter()
         for entry in reader.Entries do
             if not entry.IsDirectory then
@@ -114,7 +111,6 @@ module HawkyntFs =
         for file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories) do
             let relPath = file.Substring(sourceDir.Length).TrimStart(Path.DirectorySeparatorChar).Replace(Path.DirectorySeparatorChar, '/')
             writer.AddFile(relPath, File.ReadAllBytes(file))
-        reader.Dispose()
         use output = new FileStream(sourcePath, FileMode.Create, FileAccess.Write)
         writer.WriteTo(output)
 
@@ -122,8 +118,8 @@ module HawkyntFs =
 
     let private writeBackXfs (sourcePath: string) (sourceDir: string) =
         let imageBytes = File.ReadAllBytes(sourcePath)
-        let stream = new MemoryStream(imageBytes)
-        let reader = new FileSystem.Xfs.XfsReader(stream, false)
+        use stream = new MemoryStream(imageBytes)
+        use reader = new FileSystem.Xfs.XfsReader(stream, false)
         let writer = new FileSystem.Xfs.XfsWriter()
         for entry in reader.Entries do
             if not entry.IsDirectory then
@@ -131,7 +127,6 @@ module HawkyntFs =
         for file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories) do
             let relPath = file.Substring(sourceDir.Length).TrimStart(Path.DirectorySeparatorChar).Replace(Path.DirectorySeparatorChar, '/')
             writer.AddFile(relPath, File.ReadAllBytes(file))
-        reader.Dispose()
         use output = new FileStream(sourcePath, FileMode.Create, FileAccess.Write)
         writer.WriteTo(output)
 
@@ -139,8 +134,8 @@ module HawkyntFs =
 
     let private writeBackHfsPlus (sourcePath: string) (sourceDir: string) =
         let imageBytes = File.ReadAllBytes(sourcePath)
-        let stream = new MemoryStream(imageBytes)
-        let reader = new FileSystem.HfsPlus.HfsPlusReader(stream, false)
+        use stream = new MemoryStream(imageBytes)
+        use reader = new FileSystem.HfsPlus.HfsPlusReader(stream, false)
         let writer = new FileSystem.HfsPlus.HfsPlusWriter(true, true, 8192, "")
         for entry in reader.Entries do
             if not entry.IsDirectory then
@@ -149,7 +144,6 @@ module HawkyntFs =
         for file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories) do
             let relPath = file.Substring(sourceDir.Length).TrimStart(Path.DirectorySeparatorChar).Replace(Path.DirectorySeparatorChar, '/')
             writer.AddFile(relPath, File.ReadAllBytes(file))
-        reader.Dispose()
         use output = new FileStream(sourcePath, FileMode.Create, FileAccess.Write)
         writer.BuildToStreamingAutoSized(output, 2048)
 

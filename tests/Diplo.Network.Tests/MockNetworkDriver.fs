@@ -46,6 +46,7 @@ type MockNetworkDriver() =
             else
                 let epInfo = {
                     EndpointId = endpointId
+                    ContainerId = containerId
                     Ipv4Address = ipv4Address |> Option.defaultValue "172.17.0.2"
                     MacAddress = "02:42:ac:11:00:02"
                     Message = sprintf "Connecté à %s" containerId

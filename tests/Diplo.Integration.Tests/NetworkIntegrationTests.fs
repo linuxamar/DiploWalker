@@ -54,7 +54,7 @@ module NetworkIntegrationTests =
                 if networks |> Map.containsKey networkId |> not then
                     Error "réseau introuvable"
                 else
-                    let ep = { EndpointId = endpointId; Ipv4Address = ipv4Address |> Option.defaultValue "172.17.0.2"; MacAddress = "02:42:ac:11:00:02"; Message = sprintf "Connecté à %s" containerId }
+                    let ep = { EndpointId = endpointId; ContainerId = containerId; Ipv4Address = ipv4Address |> Option.defaultValue "172.17.0.2"; MacAddress = "02:42:ac:11:00:02"; Message = sprintf "Connecté à %s" containerId }
                     endpoints <- endpoints |> Map.add endpointId ep
                     Ok ep
 

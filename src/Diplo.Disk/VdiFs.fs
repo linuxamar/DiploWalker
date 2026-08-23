@@ -3,6 +3,7 @@ namespace Diplo.Disk
 open System.IO
 open DiscUtils
 open DiscUtils.Streams
+open Serilog
 
 /// Adaptateur DiscUtils.Vdi pour l'extraction et la réécriture
 /// de systèmes de fichiers contenus dans des images VDI (VirtualBox).
@@ -12,8 +13,6 @@ open DiscUtils.Streams
 /// un Stream au disque DiscUtils, puis on extrait le FS contenu.
 module VdiFs =
 
-    let private maxInMemoryBytes = 2L * 1024L * 1024L * 1024L
-
     let private tryOpen (sourcePath: string) (readOnly: bool) =
         let access = if readOnly then FileAccess.Read else FileAccess.ReadWrite
         let fs = new FileStream(sourcePath, FileMode.Open, access, FileShare.Read)
@@ -22,7 +21,7 @@ module VdiFs =
             disk :> VirtualDisk
         with ex ->
             fs.Dispose()
-            raise ex
+            reraise ()
 
     let private openFileSystem (disk: VirtualDisk) =
         let vm = new VolumeManager(disk)
@@ -82,12 +81,18 @@ module VdiFs =
                 use disk = tryOpen sourcePath true
                 match openFileSystem disk with
                 | Some fs ->
+                    use _fs = fs
                     let counter = ref 0
                     copyDirectory fs "/" targetDir counter
-                    fs.Dispose()
                     Some !counter
                 | None -> None
-            with _ -> None
+            with
+            | :? IOException as ex ->
+                Log.Warning(ex, "Échec extraction VDI pour {Path}", sourcePath)
+                None
+            | ex ->
+                Log.Warning(ex, "Erreur inattendue extraction VDI pour {Path}", sourcePath)
+                None
 
     /// Réécrit le contenu de `sourceDir` dans l'image VDI via DiscUtils.Vdi.
     /// Retourne true si réussi, false sinon.
@@ -98,9 +103,15 @@ module VdiFs =
                 use disk = tryOpen sourcePath false
                 match openFileSystem disk with
                 | Some fs ->
+                    use _fs = fs
                     copyIntoFs fs "/" sourceDir
                     deleteFsEntries fs "/" sourceDir
-                    fs.Dispose()
                     true
                 | None -> false
-            with _ -> false
+            with
+            | :? IOException as ex ->
+                Log.Warning(ex, "Échec réécriture VDI pour {Path}", sourcePath)
+                false
+            | ex ->
+                Log.Warning(ex, "Erreur inattendue réécriture VDI pour {Path}", sourcePath)
+                false

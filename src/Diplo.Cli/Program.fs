@@ -86,4 +86,5 @@ let main argv =
             addCmd c "create-image" typeof<CreateImageCommand>
         )) |> ignore
     ) |> ignore
-    app.Run(argv)
+    app.Run(argv) |> ignore
+    0

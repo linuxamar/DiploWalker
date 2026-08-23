@@ -15,6 +15,7 @@ type NetworkDriverInfo = {
 
 type EndpointInfo = {
     EndpointId: string
+    ContainerId: string
     Ipv4Address: string
     MacAddress: string
     Message: string

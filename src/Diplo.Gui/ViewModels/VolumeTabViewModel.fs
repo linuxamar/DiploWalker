@@ -35,6 +35,17 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     let mutable imageFormat = "raw"
     let mutable storageProvider : IStorageProvider = null
 
+    let listVolumesCmd = RelayCommand(Action(fun () -> this.ListVolumes() |> ignore))
+    let inspectVolumeCmd = RelayCommand(Action(fun () -> this.InspectVolume() |> ignore))
+    let createVolumeCmd = RelayCommand(Action(fun () -> this.CreateVolume() |> ignore))
+    let removeVolumeCmd = RelayCommand(Action(fun () -> this.RemoveVolume() |> ignore))
+    let mountVolumeCmd = RelayCommand(Action(fun () -> this.MountVolume() |> ignore))
+    let unmountVolumeCmd = RelayCommand(Action(fun () -> this.UnmountVolume() |> ignore))
+    let pruneVolumesCmd = RelayCommand(Action(fun () -> this.PruneVolumes() |> ignore))
+    let createImageCmd = RelayCommand(Action(fun () -> this.CreateImage() |> ignore))
+    let browseSourceCmd = RelayCommand(Action(fun () -> this.BrowseSource() |> ignore))
+    let browseDestCmd = RelayCommand(Action(fun () -> this.BrowseDest() |> ignore))
+
     member _.Volumes = volumes
 
     member _.VolumeIdInput with get () = volumeIdInput and set v = volumeIdInput <- v; this.OnPropertyChanged()
@@ -49,16 +60,16 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member _.SetStorageProvider(sp: IStorageProvider) =
         storageProvider <- sp
 
-    member _.ListVolumesCommand = RelayCommand(Action(fun () -> this.ListVolumes() |> ignore))
-    member _.InspectVolumeCommand = RelayCommand(Action(fun () -> this.InspectVolume() |> ignore))
-    member _.CreateVolumeCommand = RelayCommand(Action(fun () -> this.CreateVolume() |> ignore))
-    member _.RemoveVolumeCommand = RelayCommand(Action(fun () -> this.RemoveVolume() |> ignore))
-    member _.MountVolumeCommand = RelayCommand(Action(fun () -> this.MountVolume() |> ignore))
-    member _.UnmountVolumeCommand = RelayCommand(Action(fun () -> this.UnmountVolume() |> ignore))
-    member _.PruneVolumesCommand = RelayCommand(Action(fun () -> this.PruneVolumes() |> ignore))
-    member _.CreateImageCommand = RelayCommand(Action(fun () -> this.CreateImage() |> ignore))
-    member _.BrowseSourceCommand = RelayCommand(Action(fun () -> this.BrowseSource() |> ignore))
-    member _.BrowseDestCommand = RelayCommand(Action(fun () -> this.BrowseDest() |> ignore))
+    member _.ListVolumesCommand = listVolumesCmd
+    member _.InspectVolumeCommand = inspectVolumeCmd
+    member _.CreateVolumeCommand = createVolumeCmd
+    member _.RemoveVolumeCommand = removeVolumeCmd
+    member _.MountVolumeCommand = mountVolumeCmd
+    member _.UnmountVolumeCommand = unmountVolumeCmd
+    member _.PruneVolumesCommand = pruneVolumesCmd
+    member _.CreateImageCommand = createImageCmd
+    member _.BrowseSourceCommand = browseSourceCmd
+    member _.BrowseDestCommand = browseDestCmd
 
     member private this.BrowseSource() =
         task {
@@ -173,16 +184,19 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                 elif String.IsNullOrEmpty this.ImageDestPath then
                     outputPort.WriteError("Le chemin de destination est requis")
                 else
-                    let format =
+                    let formatOpt =
                         match this.ImageFormat.ToLowerInvariant() with
-                        | "vhd" -> DiskFormat.Vhd
-                        | "vhdx" -> DiskFormat.Vhdx
-                        | "vmdk" -> DiskFormat.Vmdk
-                        | "vdi" -> DiskFormat.Vdi
-                        | "raw" | "" -> DiskFormat.Raw
-                        | other -> failwithf "Format inconnu : '%s'" other
-                    outputPort.WriteLine(sprintf "Création de l'image '%s' au format %s…" this.ImageDestPath (DiskFormat.toString format))
-                    let result = FsImage.create this.ImageSourceDir this.ImageDestPath format
-                    let size = System.IO.FileInfo(result).Length
-                    outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
+                        | "vhd" -> Some DiskFormat.Vhd
+                        | "vhdx" -> Some DiskFormat.Vhdx
+                        | "vmdk" -> Some DiskFormat.Vmdk
+                        | "vdi" -> Some DiskFormat.Vdi
+                        | "raw" | "" -> Some DiskFormat.Raw
+                        | other -> outputPort.WriteError(sprintf "Format inconnu : '%s' (utilisez vhd, vhdx, vmdk, vdi ou raw)" other); None
+                    match formatOpt with
+                    | None -> ()
+                    | Some format ->
+                        outputPort.WriteLine(sprintf "Création de l'image '%s' au format %s…" this.ImageDestPath (DiskFormat.toString format))
+                        let result = FsImage.create this.ImageSourceDir this.ImageDestPath format
+                        let size = System.IO.FileInfo(result).Length
+                        outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
             })

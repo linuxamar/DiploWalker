@@ -39,7 +39,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 | `GrpcClientFactory` | Diplo.Core | Construction de canaux gRPC TCP ou named pipe avec retry (5 tentatives, backoff exponentiel) et credentials par token. |
 | `TestHelpers` | Diplo.TestHelpers | Helpers pour les tests (`createTempDir`, `cleanupDir`). |
 | `Cmd` | Diplo.Gui | Helpers try/with mutualisés pour les commandes GUI (`run` async, `runSync` synchrone, `runSyncWith` avec callback d'erreur custom). |
-| `HawkyntFs` | Diplo.Disk | Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la réécriture de Btrfs, XFS et HFS+. Seuil de 2 Go pour éviter le tout-en-mémoire ; fallback DiscUtils au-delà. |
+| `HawkyntFs` | Diplo.Disk | Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la réécriture de Btrfs, XFS et HFS+. Seuil de 2 Go pour éviter le tout-en-mémoire ; fallback DiscUtils au-delà. Tous les readers/streams utilisent `use` pour la libération garantie. |
 | `ComposeEditorViewModel` | Diplo.Gui | ViewModel de l'éditeur Compose (AvalonEdit) : chargement/sauvegarde de fichiers YAML, validation en temps réel (clé `services` absente, services sans `image` ni `build`), collection `Errors` exposée pour le bindind XAML. |
 | `RemoteDriverHelpers` | Diplo.Volume | Helpers mutualisés pour les 5 drivers distants (NFS, AWS EFS, GCP Filestore, Azure Files, SMB) : `mountVolume`, `unmountVolume`, `unmountNfsLike` (umount → fallback mount -u), `pruneCloudVolumes`. |
 | `VdiFs` | Diplo.Disk | Adaptateur DiscUtils.Vdi pour l'extraction et la réécriture R/W d'images VDI (VirtualBox). |
@@ -54,7 +54,18 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
 - **GUI** : Avalonia 12.1.1 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 863 tests au total.
+- **Tests** : xUnit v4 + FsUnit.xUnit — 878 tests au total.
+
+### Contraintes F#
+
+- Compilation séquentielle : l'ordre dans `.fsproj` détermine la visibilité des modules.
+- `JsonHelpers` a `[<RequireQualifiedAccess>]` — appels qualifiés (`JsonHelpers.tryGetString`).
+- `[<CLIMutable>]` requis pour les types record envoyés/reçus par gRPC (protobuf-net).
+- **FS0960** : les liaisons `let`/`do` doivent précéder les `member` dans les classes F#.
+- **Commandes ViewModel** : les `let` bindings (ex. `let cmd = RelayCommand(...)`) sont placés avant les `member`, les closures capturent `this` via `as this` et ne s'exécutent qu'au clic.
+- **`IDisposable` + `new`** : F# exige `new Type(args)` quand `Type` implémente `IDisposable`.
+- **Paramètres optionnels** : `?` interdits hors des `member` F#.
+- **`let mutable`** dans les classes : utilise des `let`/`do` bindings pour accéder aux propriétés avec `member private`.
 
 ## Commandes
 
@@ -76,6 +87,10 @@ dotnet build Diplo.slnx                       # Build complète
 ## Langue
 
 Le projet est francophone : README, commentaires, commits et documentation en français (avec accents corrects).
+
+## Sécurité
+
+- **NuGet Audit** : activé (`NuGetAudit=true`, `NuGetAuditMode=latest`) dans `Directory.Build.props` — bloque la compilation si des vulnérabilités critiques sont détectées dans les dépendances NuGet.
 
 ## Validation ctr v2 — détails
 

@@ -36,6 +36,15 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
     let mutable networkCniCommand = "ADD"
     let mutable networkNetnsPath = ""
 
+    let listNetworksCmd = RelayCommand(Action(fun () -> this.ListNetworks() |> ignore))
+    let inspectNetworkCmd = RelayCommand(Action(fun () -> this.InspectNetwork() |> ignore))
+    let createNetworkCmd = RelayCommand(Action(fun () -> this.CreateNetwork() |> ignore))
+    let removeNetworkCmd = RelayCommand(Action(fun () -> this.RemoveNetwork() |> ignore))
+    let connectNetworkCmd = RelayCommand(Action(fun () -> this.ConnectContainer() |> ignore))
+    let disconnectNetworkCmd = RelayCommand(Action(fun () -> this.DisconnectContainer() |> ignore))
+    let runCniPluginCmd = RelayCommand(Action(fun () -> this.RunCniPlugin() |> ignore))
+    let pruneNetworksCmd = RelayCommand(Action(fun () -> this.PruneNetworks() |> ignore))
+
     member _.Networks = networks
 
     member _.NetworkIdInput with get () = networkIdInput and set v = networkIdInput <- v; this.OnPropertyChanged()
@@ -51,14 +60,14 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
     member _.NetworkCniCommand with get () = networkCniCommand and set v = networkCniCommand <- v; this.OnPropertyChanged()
     member _.NetworkNetnsPath with get () = networkNetnsPath and set v = networkNetnsPath <- v; this.OnPropertyChanged()
 
-    member _.ListNetworksCommand = RelayCommand(Action(fun () -> this.ListNetworks() |> ignore))
-    member _.InspectNetworkCommand = RelayCommand(Action(fun () -> this.InspectNetwork() |> ignore))
-    member _.CreateNetworkCommand = RelayCommand(Action(fun () -> this.CreateNetwork() |> ignore))
-    member _.RemoveNetworkCommand = RelayCommand(Action(fun () -> this.RemoveNetwork() |> ignore))
-    member _.ConnectNetworkCommand = RelayCommand(Action(fun () -> this.ConnectContainer() |> ignore))
-    member _.DisconnectNetworkCommand = RelayCommand(Action(fun () -> this.DisconnectContainer() |> ignore))
-    member _.RunCniPluginCommand = RelayCommand(Action(fun () -> this.RunCniPlugin() |> ignore))
-    member _.PruneNetworksCommand = RelayCommand(Action(fun () -> this.PruneNetworks() |> ignore))
+    member _.ListNetworksCommand = listNetworksCmd
+    member _.InspectNetworkCommand = inspectNetworkCmd
+    member _.CreateNetworkCommand = createNetworkCmd
+    member _.RemoveNetworkCommand = removeNetworkCmd
+    member _.ConnectNetworkCommand = connectNetworkCmd
+    member _.DisconnectNetworkCommand = disconnectNetworkCmd
+    member _.RunCniPluginCommand = runCniPluginCmd
+    member _.PruneNetworksCommand = pruneNetworksCmd
 
     member private this.ListNetworks() =
         Cmd.run outputPort (fun () ->

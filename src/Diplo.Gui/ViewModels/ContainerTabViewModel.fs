@@ -62,6 +62,30 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
             logCts.Dispose()
             logCts <- null
 
+    let listContainersCmd = RelayCommand(Action(fun () -> this.ListContainers() |> ignore))
+    let inspectContainerCmd = RelayCommand(Action(fun () -> this.InspectContainer() |> ignore))
+    let startContainerCmd = RelayCommand(Action(fun () -> this.StartContainer() |> ignore))
+    let stopContainerCmd = RelayCommand(Action(fun () -> this.StopContainer() |> ignore))
+    let deleteContainerCmd = RelayCommand(Action(fun () -> this.DeleteContainer() |> ignore))
+    let pullImageCmd = RelayCommand(Action(fun () -> this.PullImage() |> ignore))
+    let versionCmd = RelayCommand(Action(fun () -> this.GetVersion() |> ignore))
+    let renameContainerCmd = RelayCommand(Action(fun () -> this.RenameContainer() |> ignore))
+    let topContainerCmd = RelayCommand(Action(fun () -> this.TopContainer() |> ignore))
+    let statsContainerCmd = RelayCommand(Action(fun () -> this.GetContainerStats() |> ignore))
+    let listImagesCmd = RelayCommand(Action(fun () -> this.ListImages() |> ignore))
+    let inspectImageCmd = RelayCommand(Action(fun () -> this.InspectImage() |> ignore))
+    let removeImageCmd = RelayCommand(Action(fun () -> this.RemoveImage() |> ignore))
+    let tagImageCmd = RelayCommand(Action(fun () -> this.TagImage() |> ignore))
+    let createContainerCmd = RelayCommand(Action(fun () -> this.CreateContainer() |> ignore))
+    let getContainerLogsCmd = RelayCommand(Action(fun () -> this.GetContainerLogs() |> ignore))
+    let stopFollowLogsCmd = RelayCommand(Action(fun () ->
+        this.ContainerFollow <- false
+        cancelPreviousLogStream ()))
+    let execInContainerCmd = RelayCommand(Action(fun () -> this.ExecInContainer() |> ignore))
+    let listNamespacesCmd = RelayCommand(Action(fun () -> this.ListNamespaces() |> ignore))
+    let registryLoginCmd = RelayCommand(Action(fun () -> this.RegistryLogin() |> ignore))
+    let registryLogoutCmd = RelayCommand(Action(fun () -> this.RegistryLogout() |> ignore))
+
     member _.Containers = containers
     member _.Images = images
 
@@ -85,29 +109,27 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
     member _.RegistryUsernameInput with get () = registryUsernameInput and set v = registryUsernameInput <- v; this.OnPropertyChanged()
     member _.RegistryPasswordInput with get () = registryPasswordInput and set v = registryPasswordInput <- v; this.OnPropertyChanged()
 
-    member _.ListContainersCommand = RelayCommand(Action(fun () -> this.ListContainers() |> ignore))
-    member _.InspectContainerCommand = RelayCommand(Action(fun () -> this.InspectContainer() |> ignore))
-    member _.StartContainerCommand = RelayCommand(Action(fun () -> this.StartContainer() |> ignore))
-    member _.StopContainerCommand = RelayCommand(Action(fun () -> this.StopContainer() |> ignore))
-    member _.DeleteContainerCommand = RelayCommand(Action(fun () -> this.DeleteContainer() |> ignore))
-    member _.PullImageCommand = RelayCommand(Action(fun () -> this.PullImage() |> ignore))
-    member _.VersionCommand = RelayCommand(Action(fun () -> this.GetVersion() |> ignore))
-    member _.RenameContainerCommand = RelayCommand(Action(fun () -> this.RenameContainer() |> ignore))
-    member _.TopContainerCommand = RelayCommand(Action(fun () -> this.TopContainer() |> ignore))
-    member _.StatsContainerCommand = RelayCommand(Action(fun () -> this.GetContainerStats() |> ignore))
-    member _.ListImagesCommand = RelayCommand(Action(fun () -> this.ListImages() |> ignore))
-    member _.InspectImageCommand = RelayCommand(Action(fun () -> this.InspectImage() |> ignore))
-    member _.RemoveImageCommand = RelayCommand(Action(fun () -> this.RemoveImage() |> ignore))
-    member _.TagImageCommand = RelayCommand(Action(fun () -> this.TagImage() |> ignore))
-    member _.CreateContainerCommand = RelayCommand(Action(fun () -> this.CreateContainer() |> ignore))
-    member _.GetContainerLogsCommand = RelayCommand(Action(fun () -> this.GetContainerLogs() |> ignore))
-    member _.StopFollowLogsCommand = RelayCommand(Action(fun () ->
-        this.ContainerFollow <- false
-        cancelPreviousLogStream ()))
-    member _.ExecInContainerCommand = RelayCommand(Action(fun () -> this.ExecInContainer() |> ignore))
-    member _.ListNamespacesCommand = RelayCommand(Action(fun () -> this.ListNamespaces() |> ignore))
-    member _.RegistryLoginCommand = RelayCommand(Action(fun () -> this.RegistryLogin() |> ignore))
-    member _.RegistryLogoutCommand = RelayCommand(Action(fun () -> this.RegistryLogout() |> ignore))
+    member _.ListContainersCommand = listContainersCmd
+    member _.InspectContainerCommand = inspectContainerCmd
+    member _.StartContainerCommand = startContainerCmd
+    member _.StopContainerCommand = stopContainerCmd
+    member _.DeleteContainerCommand = deleteContainerCmd
+    member _.PullImageCommand = pullImageCmd
+    member _.VersionCommand = versionCmd
+    member _.RenameContainerCommand = renameContainerCmd
+    member _.TopContainerCommand = topContainerCmd
+    member _.StatsContainerCommand = statsContainerCmd
+    member _.ListImagesCommand = listImagesCmd
+    member _.InspectImageCommand = inspectImageCmd
+    member _.RemoveImageCommand = removeImageCmd
+    member _.TagImageCommand = tagImageCmd
+    member _.CreateContainerCommand = createContainerCmd
+    member _.GetContainerLogsCommand = getContainerLogsCmd
+    member _.StopFollowLogsCommand = stopFollowLogsCmd
+    member _.ExecInContainerCommand = execInContainerCmd
+    member _.ListNamespacesCommand = listNamespacesCmd
+    member _.RegistryLoginCommand = registryLoginCmd
+    member _.RegistryLogoutCommand = registryLogoutCmd
 
     member private this.ListContainers() =
         Cmd.run outputPort (fun () ->
