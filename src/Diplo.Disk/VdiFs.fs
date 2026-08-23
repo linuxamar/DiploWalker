@@ -13,8 +13,6 @@ open Serilog
 /// un Stream au disque DiscUtils, puis on extrait le FS contenu.
 module VdiFs =
 
-    let private maxInMemoryBytes = 2L * 1024L * 1024L * 1024L
-
     let private tryOpen (sourcePath: string) (readOnly: bool) =
         let access = if readOnly then FileAccess.Read else FileAccess.ReadWrite
         let fs = new FileStream(sourcePath, FileMode.Open, access, FileShare.Read)

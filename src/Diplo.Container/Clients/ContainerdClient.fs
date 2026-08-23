@@ -91,6 +91,8 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 psi.UseShellExecute <- false
                 psi.CreateNoWindow <- true
                 let proc = Process.Start(psi)
+                if isNull proc then
+                    raise (InvalidOperationException(sprintf "Impossible de démarrer le processus ctr pour le conteneur %s" id))
                 let dir = Path.GetDirectoryName(logFile)
                 if not (String.IsNullOrEmpty(dir)) then Directory.CreateDirectory(dir) |> ignore
                 let writer = new StreamWriter(logFile, true)

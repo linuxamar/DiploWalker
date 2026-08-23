@@ -132,21 +132,21 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeUp() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Up(this.ComposeFilePath)
             })
 
     member private this.ComposeDown() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Down(this.ComposeFilePath)
             })
 
     member private this.ComposePs() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort)
                 let compose = orchestrator.ParseFile(this.ComposeFilePath)
                 let! response = composeClient.ListAsync(all = true)
 
@@ -176,7 +176,7 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeLogs() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort)
                 let service = if String.IsNullOrEmpty(this.ComposeServiceName) then None else Some this.ComposeServiceName
                 do! orchestrator.Logs(this.ComposeFilePath, service)
             })
@@ -184,13 +184,13 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeBuild() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Build(this.ComposeFilePath)
             })
 
     member private this.ComposePull() =
         Cmd.run outputPort (fun () ->
             task {
-                let orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Pull(this.ComposeFilePath)
             })

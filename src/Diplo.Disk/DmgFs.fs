@@ -9,8 +9,6 @@ open Serilog
 /// Lecture via DiscUtils.Dmg (UDIF compresse), ecriture via Hawkynt DmgWriter.
 module DmgFs =
 
-    let private maxInMemoryBytes = 2L * 1024L * 1024L * 1024L
-
     let private tryOpenDisk (sourcePath: string) =
         try
             let fs = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read)

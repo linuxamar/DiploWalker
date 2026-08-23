@@ -371,7 +371,7 @@ module Udf =
                 else
                     let length = extLength &&& 0x3FFFFFFF
                     let location = readUInt32LE ad locOffset
-                    let start = int64 (partitionStart + location) * int64 logicalBlockSize
+                    let start = (int64 partitionStart + int64 location) * int64 logicalBlockSize
                     let available = min (int64 length) (max 0L (src.Length - start))
                     if available > 0 then
                         content.AddRange(src.ReadBytes start (int available))
@@ -387,7 +387,7 @@ module Udf =
     /// pour chaque entrée (nom brut, emplacement de l'ICB enfant, estRépertoire).
     /// Les entrées parent (« . » / « .. ») et les noms vides sont exclus.
     let readDirEntries (src: IsoSource.T) (icbLocation: int) (partitionStart: int) (logicalBlockSize: int) : (string * int * bool) list =
-        let icbOffset = int64 (partitionStart + icbLocation) * int64 logicalBlockSize
+        let icbOffset = (int64 partitionStart + int64 icbLocation) * int64 logicalBlockSize
         if icbOffset + 36L > src.Length then
             failwithf "Image UDF invalide (ICB à l'adresse %d)" icbOffset
         let desc = src.ReadBytes icbOffset 176
@@ -442,7 +442,7 @@ module Udf =
             failwith "Image non UDF (descripteur NSR introuvable)"
         let (partitionStart, logicalBlockSize, fsdLocation) = readVds src
 
-        let fsdOffset = int64 (partitionStart + fsdLocation) * int64 logicalBlockSize
+        let fsdOffset = (int64 partitionStart + int64 fsdLocation) * int64 logicalBlockSize
         if fsdOffset + 466L > src.Length then
             failwith "Image UDF invalide (descripteur de jeu de fichiers manquant)"
         let fsd = src.ReadBytes fsdOffset 466
@@ -457,7 +457,7 @@ module Udf =
         let mutable count = 0
         while pending.Count > 0 do
             let (relDir, icbLocation) = pending.Dequeue()
-            let icbOffset = int64 (partitionStart + icbLocation) * int64 logicalBlockSize
+            let icbOffset = (int64 partitionStart + int64 icbLocation) * int64 logicalBlockSize
             if icbOffset + 36L > src.Length then
                 failwithf "Image UDF invalide (ICB à l'adresse %d)" icbOffset
             let desc = src.ReadBytes icbOffset 176
@@ -477,7 +477,7 @@ module Udf =
                             if visited.Add(sub, childIcbLocation) then
                                 pending.Enqueue(sub, childIcbLocation)
                         else
-                            let fileIcb = int64 (partitionStart + childIcbLocation) * int64 logicalBlockSize
+                            let fileIcb = (int64 partitionStart + int64 childIcbLocation) * int64 logicalBlockSize
                             let fileData = readIcbData src (int fileIcb) partitionStart logicalBlockSize
                             let filePath = pathFromRelative targetPath sub
                             Directory.CreateDirectory(Path.GetDirectoryName(filePath)) |> ignore
@@ -494,7 +494,7 @@ module Udf =
         if segments.Length = 0 then
             failwithf "Chemin de fichier invalide : '%s'" pathInImage
         let (partitionStart, logicalBlockSize, fsdLocation) = readVds src
-        let fsdOffset = int64 (partitionStart + fsdLocation) * int64 logicalBlockSize
+        let fsdOffset = (int64 partitionStart + int64 fsdLocation) * int64 logicalBlockSize
         if fsdOffset + 466L > src.Length then
             failwith "Image UDF invalide (descripteur de jeu de fichiers manquant)"
         let fsd = src.ReadBytes fsdOffset 466
@@ -512,7 +512,7 @@ module Udf =
             | Some (_, childIcb, isDir) when isLast ->
                 if isDir then
                     failwithf "'%s' est un répertoire dans l'image '%s'" pathInImage isoPath
-                let fileIcb = int64 (partitionStart + childIcb) * int64 logicalBlockSize
+                let fileIcb = (int64 partitionStart + int64 childIcb) * int64 logicalBlockSize
                 readIcbData src (int fileIcb) partitionStart logicalBlockSize
             | Some (_, childIcb, isDir) ->
                 if not isDir then
