@@ -28,6 +28,8 @@ type MainWindow() as this =
         viewModel.VolumeTab.SetStorageProvider(this.StorageProvider)
         viewModel.ComposeTab.SetStorageProvider(this.StorageProvider)
         this.setUpComposeEditor()
+        let aboutItem = this.FindControl<MenuItem>("AboutMenuItem")
+        aboutItem.Command <- Diplo.Gui.ViewModels.RelayCommand(Action(fun () -> this.OnAbout(null, RoutedEventArgs())))
 
     member private this.setUpComposeEditor() =
         let host = this.FindControl<Panel>("ComposeEditorHost")
