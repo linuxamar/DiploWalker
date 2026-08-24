@@ -386,3 +386,9 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                     else
                         outputPort.WriteError(response.Message)
             })
+
+    interface IDisposable with
+        member _.Dispose() =
+            if logCts <> null then
+                logCts.Cancel()
+                logCts.Dispose()

@@ -8,17 +8,11 @@ type TypeRegistrar() =
     let services = ServiceCollection()
     do services.AddSingleton<Diplo.Core.Output.IOutputPort>(SpectreOutputPort()) |> ignore
     do services.AddSingleton<Diplo.Core.Clients.IDiploClients>(Diplo.Core.Clients.DiploClients()) |> ignore
-    let mutable buildProvider: IServiceProvider option = None
+    let buildProvider = lazy (services.BuildServiceProvider() :> IServiceProvider)
 
     interface ITypeRegistrar with
         member _.Build() =
-            let provider =
-                match buildProvider with
-                | Some p -> p
-                | None ->
-                    let p = services.BuildServiceProvider()
-                    buildProvider <- Some p
-                    p
+            let provider = buildProvider.Value
             { new ITypeResolver with
                 member _.Resolve(type') = provider.GetService(type') }
 

@@ -87,7 +87,7 @@ let ``ComposeTabViewModel proprietes declenchent PropertyChanged`` () =
 [<Fact>]
 let ``ContainerTabViewModel expose les commandes ICommand`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port)
+    let vm = new ContainerTabViewModel(port)
     vm.ListContainersCommand     |> should not' (be Null)
     vm.StartContainerCommand     |> should not' (be Null)
     vm.StopContainerCommand      |> should not' (be Null)
@@ -112,7 +112,7 @@ let ``ContainerTabViewModel expose les commandes ICommand`` () =
 [<Fact>]
 let ``ContainerTabViewModel etat initial`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port)
+    let vm = new ContainerTabViewModel(port)
     vm.ContainerIdInput     |> should equal ""
     vm.ContainerNameInput   |> should equal ""
     vm.ContainerMounts      |> should equal ""
@@ -123,13 +123,13 @@ let ``ContainerTabViewModel etat initial`` () =
 [<Fact>]
 let ``ContainerTabViewModel user pull etat initial`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port)
+    let vm = new ContainerTabViewModel(port)
     vm.ContainerImageUser |> should equal ""
 
 [<Fact>]
 let ``ContainerTabViewModel user pull declenche PropertyChanged`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port)
+    let vm = new ContainerTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
     vm.ContainerImageUser <- "inline:secret"
@@ -138,7 +138,7 @@ let ``ContainerTabViewModel user pull declenche PropertyChanged`` () =
 [<Fact>]
 let ``ContainerTabViewModel registres etat initial`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port)
+    let vm = new ContainerTabViewModel(port)
     vm.RegistryInput           |> should equal ""
     vm.RegistryUsernameInput   |> should equal ""
     vm.RegistryPasswordInput   |> should equal ""
@@ -146,7 +146,7 @@ let ``ContainerTabViewModel registres etat initial`` () =
 [<Fact>]
 let ``ContainerTabViewModel proprietes registres declenchent PropertyChanged`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port)
+    let vm = new ContainerTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
     vm.RegistryInput <- "myregistry.azurecr.io"
@@ -159,7 +159,7 @@ let ``ContainerTabViewModel proprietes registres declenchent PropertyChanged`` (
 [<Fact>]
 let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port)
+    let vm = new ContainerTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
     vm.ContainerIdInput <- "abc123"
@@ -343,7 +343,7 @@ let private waitUntil (predicate: unit -> bool) =
 [<Fact>]
 let ``ContainerTabViewModel GetContainerLogs en mode suivi emet chaque ligne au fil de l'eau`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
+    let vm = new ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
     vm.ContainerIdInput <- "c1"
     vm.ContainerFollow <- true
     (vm.GetContainerLogsCommand :> ICommand).Execute(null)
@@ -355,7 +355,7 @@ let ``ContainerTabViewModel GetContainerLogs en mode suivi emet chaque ligne au 
 [<Fact>]
 let ``ContainerTabViewModel GetContainerLogs sans suivi affiche l'instantané en bloc`` () =
     let port = MockOutputPort()
-    let vm = ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
+    let vm = new ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
     vm.ContainerIdInput <- "c1"
     vm.ContainerFollow <- false
     (vm.GetContainerLogsCommand :> ICommand).Execute(null)
