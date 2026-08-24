@@ -104,7 +104,9 @@ function Publish-Project {
         -p:Platform=$Plat `
         -p:PublishTrimmed=false `
         -p:PublishSingleFile=false `
-        -p:IncludeNativeLibrariesForSelfExtract=true
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:DebugType=None `
+        -p:DebugSymbols=false
 
     if ($LASTEXITCODE -ne 0) {
         throw "Échec de la publication de $ProjectName ($Plat)."
