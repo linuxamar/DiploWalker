@@ -521,6 +521,13 @@ type VersionCommand(output: IOutputPort, clients: IDiploClients) =
             output.WriteLine(sprintf "  Go        : %s" v.GoVersion)
             output.WriteLine(sprintf "  OS        : %s" v.Os)
             output.WriteLine(sprintf "  Arch      : %s" v.Arch)
+            output.WriteLine("")
+            output.WriteLine("  Licences des dépendances :")
+            output.WriteLine("    MIT (22)              : Avalonia, FSharp.Core, DiscUtils, Microsoft, Spectre, YamlDotNet, ZstdSharp")
+            output.WriteLine("    Apache-2.0 (13)       : gRPC, protobuf-net, Serilog, xunit")
+            output.WriteLine("    BSD-3-Clause (1)      : Google.Protobuf")
+            output.WriteLine("    LGPL-3.0+ (1)         : Hawkynt.FileFormats.FileSystems")
+            output.WriteLine("  Voir THIRD-PARTY-NOTICES.txt pour le texte intégral.")
             return 0
         }
 
