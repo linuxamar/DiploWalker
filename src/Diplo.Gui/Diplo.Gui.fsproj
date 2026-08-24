@@ -20,6 +20,8 @@
     <Compile Include="ViewModels\MainWindowViewModel.fs" />
     <EmbeddedResource Include="Views\MainWindow.axaml" LogicalName="Diplo.Gui.Views.MainWindow.axaml" />
     <Compile Include="Views\MainWindow.axaml.fs" />
+    <EmbeddedResource Include="UserControls\ContainerDetailUserControl.axaml" LogicalName="Diplo.Gui.UserControls.ContainerDetailUserControl.axaml" />
+    <Compile Include="UserControls\ContainerDetailUserControl.axaml.fs" />
     <EmbeddedResource Include="App.axaml" LogicalName="Diplo.Gui.App.axaml" />
     <EmbeddedResource Include="Diplo.ico" LogicalName="Diplo.Gui.Diplo.ico" />
     <Compile Include="App.axaml.fs" />

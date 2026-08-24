@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Diplo.Gui.ViewModels"
+        xmlns:uc="using:Diplo.Gui.UserControls"
         x:CompileBindings="False"
         Title="Diplo — Gestion Docker"
-        Width="960" Height="720"
+        Width="1100" Height="750"
         WindowStartupLocation="CenterScreen">
 
     <DockPanel>
@@ -20,121 +21,96 @@
             <TabControl Grid.Row="0" Margin="4">
             <TabItem Header="Conteneurs">
                 <DockPanel>
+                    <!-- Toolbar principal -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
                         <Button Content="🔄 Lister" Command="{Binding ContainerTab.ListContainersCommand}" Margin="0,0,4,0" />
-                        <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="▶ Démarrer" Command="{Binding ContainerTab.StartContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="⏹ Arrêter" Command="{Binding ContainerTab.StopContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.DeleteContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="✏ Renommer" Command="{Binding ContainerTab.RenameContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="⚙ Processus" Command="{Binding ContainerTab.TopContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="📊 Métriques" Command="{Binding ContainerTab.StatsContainerCommand}" Margin="0,0,4,0" />
                         <Button Content="➕ Créer" Command="{Binding ContainerTab.CreateContainerCommand}" Margin="0,0,4,0" />
                         <Button Content="📥 Télécharger" Command="{Binding ContainerTab.PullImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="ℹ Version" Command="{Binding ContainerTab.VersionCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectContainerCommand}" Margin="0,0,12,0" />
+                        <Button Content="📁 Espaces" Command="{Binding ContainerTab.ListNamespacesCommand}" Margin="0,0,4,0" />
+                        <Button Content="ℹ Version" Command="{Binding ContainerTab.VersionCommand}" />
                     </WrapPanel>
 
+                    <!-- Champs de création / recherche -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerIdInput}" Width="200" Margin="0,0,12,0"
+                        <TextBlock Text="ID :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ContainerTab.ContainerIdInput}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="identifiant du conteneur" />
-                        <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerNameInput}" Width="160" Margin="0,0,12,0"
+                        <TextBlock Text="Nom :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ContainerTab.ContainerNameInput}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="nom (optionnel)" />
-                        <TextBlock Text="Image:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerImageInput}" Width="200" Margin="0,0,12,0"
+                        <TextBlock Text="Image :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ContainerTab.ContainerImageInput}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="nom:tag" />
-                        <TextBlock Text="User (pull):" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerImageUser}" Width="140" Margin="0,0,12,0"
-                                 PlaceholderText="user:pass (optionnel)" />
-                        <TextBlock Text="Espace:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerNamespace}" Width="140" Margin="0,0,12,0"
-                                 PlaceholderText="namespace (optionnel)" />
-                        <TextBlock Text="Timeout:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBlock Text="User (pull) :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ContainerTab.ContainerImageUser}" Width="120" Margin="0,0,12,0"
+                                 PlaceholderText="user:pass" />
+                        <TextBlock Text="Espace :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ContainerTab.ContainerNamespace}" Width="120" Margin="0,0,12,0"
+                                 PlaceholderText="namespace" />
+                        <TextBlock Text="Timeout :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
                         <NumericUpDown Value="{Binding ContainerTab.ContainerTimeout}" Minimum="1" Maximum="300"
-                                       Width="80" />
+                                       Width="70" />
                         <CheckBox Content="Tous" IsChecked="{Binding ContainerTab.ContainerAll}" Margin="12,0,0,0"
                                   VerticalAlignment="Center" />
                         <CheckBox Content="Forcer" IsChecked="{Binding ContainerTab.ContainerForce}" Margin="8,0,0,0"
                                    VerticalAlignment="Center" />
                     </WrapPanel>
 
-                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <TextBlock Text="Montages:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerMounts}" Width="560"
-                                 AcceptsReturn="True" TextWrapping="Wrap" Height="56"
-                                 PlaceholderText="src=C:\donnees,dst=C:\conteneur\donnees[,ro] — un montage par ligne (ou séparé par ;)" />
-                    </WrapPanel>
-
-                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <TextBlock Text="Nouveau nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerNewName}" Width="140" Margin="0,0,12,0"
-                                 PlaceholderText="renommer" />
-                        <TextBlock Text="Réf. image:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerImageRef}" Width="200" Margin="0,0,12,0"
-                                 PlaceholderText="image:tag (inspect/remove/tag)" />
-                        <TextBlock Text="Cible:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200" Margin="0,0,12,0"
-                                 PlaceholderText="nouveau:tag (tag)" />
-                        <Button Content="📋 Lister images" Command="{Binding ContainerTab.ListImagesCommand}" Margin="0,0,4,0" />
-                        <Button Content="🔍 Inspecter img" Command="{Binding ContainerTab.InspectImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="🗑 Supprimer img" Command="{Binding ContainerTab.RemoveImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="🏷 Étiqueter" Command="{Binding ContainerTab.TagImageCommand}" Margin="0,0,4,0" />
-                    </WrapPanel>
-
-                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <TextBlock Text="Registre:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.RegistryInput}" Width="200" Margin="0,0,12,0"
-                                 PlaceholderText="ex. myregistry.azurecr.io" />
-                        <TextBlock Text="Utilisateur:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.RegistryUsernameInput}" Width="120" Margin="0,0,12,0"
-                                 PlaceholderText="utilisateur" />
-                        <TextBlock Text="Mot de passe:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.RegistryPasswordInput}" Width="160" Margin="0,0,12,0"
-                                 PasswordChar="●" PlaceholderText="mot de passe" />
-                        <Button Content="🔐 Se connecter" Command="{Binding ContainerTab.RegistryLoginCommand}" Margin="0,0,4,0" />
-                        <Button Content="🚪 Se déconnecter" Command="{Binding ContainerTab.RegistryLogoutCommand}" Margin="0,0,4,0" />
-                    </WrapPanel>
-
-                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Button Content="📜 Journaux" Command="{Binding ContainerTab.GetContainerLogsCommand}" Margin="0,0,4,0" />
-                        <CheckBox Content="Suivre" IsChecked="{Binding ContainerTab.ContainerFollow}" Margin="8,0,0,0" VerticalAlignment="Center" />
-                        <TextBlock Text="Lignes:" VerticalAlignment="Center" Margin="8,0,4,0" />
-                        <NumericUpDown Value="{Binding ContainerTab.ContainerTail}" Minimum="10" Maximum="10000" Width="80" />
-                        <TextBlock Text="Depuis:" VerticalAlignment="Center" Margin="8,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerSince}" Width="140" Margin="0,0,12,0" PlaceholderText="ISO date (optionnel)" />
-                        <Button Content="⚡ Exécuter" Command="{Binding ContainerTab.ExecInContainerCommand}" Margin="0,0,4,0" />
-                        <TextBlock Text="Cmd:" VerticalAlignment="Center" Margin="8,0,4,0" />
-                        <TextBox Text="{Binding ContainerTab.ContainerExecCommand}" Width="200" Margin="0,0,12,0" PlaceholderText="commande à exécuter" />
-                        <Button Content="📁 Espaces" Command="{Binding ContainerTab.ListNamespacesCommand}" Margin="0,0,4,0" />
-                    </WrapPanel>
-
-                    <Grid Grid.Row="0" RowDefinitions="*,*" Height="300" Margin="0,4,0,0">
-                        <DataGrid Grid.Row="0" ItemsSource="{Binding ContainerTab.Containers}" AutoGenerateColumns="False"
-                                  IsReadOnly="True" GridLinesVisibility="Horizontal"
+                    <!-- Zone principale : DataGrid + Détail -->
+                    <Grid ColumnDefinitions="*,4,*" Margin="0,0,0,4">
+                        <!-- DataGrid Conteneurs -->
+                        <DataGrid Grid.Column="0" ItemsSource="{Binding ContainerTab.Containers}"
+                                  AutoGenerateColumns="False" IsReadOnly="True"
+                                  GridLinesVisibility="Horizontal" CanUserResizeColumns="True"
+                                  CanUserSortColumns="True"
                                   Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
-                                  CanUserResizeColumns="True" CanUserSortColumns="True">
+                                  SelectedItem="{Binding ContainerTab.SelectedContainer}">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
-                                <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="160" />
-                                <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="200" />
+                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="90" />
+                                <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="140" />
+                                <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="180" />
                                 <DataGridTextColumn Header="État" Binding="{Binding État}" Width="80" />
-                                <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+                                <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="130" />
                             </DataGrid.Columns>
                         </DataGrid>
 
-                        <DataGrid Grid.Row="1" ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
-                                  IsReadOnly="True" GridLinesVisibility="Horizontal"
-                                  Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
-                                  CanUserResizeColumns="True" CanUserSortColumns="True">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
-                                <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
-                                <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
-                                <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
+                                      Background="#555" ResizeDirection="Columns" />
+
+                        <!-- Détail du conteneur sélectionné -->
+                        <uc:ContainerDetailUserControl Grid.Column="2" />
                     </Grid>
+
+                    <!-- Section Images (réduite) -->
+                    <Expander DockPanel.Dock="Bottom" Header="Images" Margin="0,4,0,0"
+                              Background="#1e1e1e" IsExpanded="False">
+                        <DockPanel>
+                            <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
+                                <TextBlock Text="Réf. image :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                                <TextBox Text="{Binding ContainerTab.ContainerImageRef}" Width="200" Margin="0,0,12,0"
+                                         PlaceholderText="image:tag (inspect/remove/tag)" />
+                                <TextBlock Text="Cible :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                                <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200" Margin="0,0,12,0"
+                                         PlaceholderText="nouveau:tag (tag)" />
+                                <Button Content="📋 Lister" Command="{Binding ContainerTab.ListImagesCommand}" Margin="0,0,4,0" />
+                                <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectImageCommand}" Margin="0,0,4,0" />
+                                <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.RemoveImageCommand}" Margin="0,0,4,0" />
+                                <Button Content="🏷 Étiqueter" Command="{Binding ContainerTab.TagImageCommand}" />
+                            </WrapPanel>
+                            <DataGrid ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
+                                      IsReadOnly="True" GridLinesVisibility="Horizontal"
+                                      Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
+                                      CanUserResizeColumns="True" CanUserSortColumns="True">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
+                                    <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
+                                    <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
+                                    <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </DockPanel>
+                    </Expander>
                 </DockPanel>
             </TabItem>
 

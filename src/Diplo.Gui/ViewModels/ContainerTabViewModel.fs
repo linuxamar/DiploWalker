@@ -54,6 +54,8 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
     let mutable registryUsernameInput = ""
     let mutable registryPasswordInput = ""
 
+    let mutable selectedContainer: ContainerInfo = Unchecked.defaultof<ContainerInfo>
+
     let mutable logCts: CancellationTokenSource = null
 
     let cancelPreviousLogStream () =
@@ -88,6 +90,15 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
 
     member _.Containers = containers
     member _.Images = images
+
+    member _.SelectedContainer
+        with get () = selectedContainer
+        and set v =
+            selectedContainer <- v
+            this.OnPropertyChanged()
+            this.OnPropertyChanged(nameof this.HasSelection)
+
+    member _.HasSelection = not (isNull (box selectedContainer))
 
     member _.ContainerIdInput with get () = containerIdInput and set v = containerIdInput <- v; this.OnPropertyChanged()
     member _.ContainerNameInput with get () = containerNameInput and set v = containerNameInput <- v; this.OnPropertyChanged()
