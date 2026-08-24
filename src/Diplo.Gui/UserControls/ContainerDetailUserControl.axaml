@@ -129,17 +129,21 @@
                   Margin="0,0,4,4" Padding="8,4"/>
         </WrapPanel>
 
-        <DataGrid ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
-                  IsReadOnly="True" GridLinesVisibility="Horizontal"
-                  CanUserResizeColumns="True" CanUserSortColumns="True"
-                  MaxHeight="200" Margin="10,0,10,4">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
-            <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
-            <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
-            <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid ColumnDefinitions="*,Auto" Margin="10,0,10,4">
+          <DataGrid Grid.Column="0" ItemsSource="{Binding ContainerTab.Images}"
+                    AutoGenerateColumns="False" IsReadOnly="True"
+                    GridLinesVisibility="Horizontal" CanUserResizeColumns="True"
+                    CanUserSortColumns="True" MaxHeight="200">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
+              <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
+              <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
+              <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <GridSplitter Grid.Column="1" Width="5" ResizeDirection="Columns"
+                        Background="Transparent" Margin="4,0,0,0"/>
+        </Grid>
 
       </StackPanel>
     </DockPanel>
