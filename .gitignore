@@ -44,6 +44,12 @@ ScaffoldingReadMe.txt
 *~
 CodeCoverage/
 
+# Visual Studio
+.vs/
+
+# Visual Studio launch settings
+**/Properties/launchSettings.json
+
 # MSBuild Binary and Structured Log
 *.binlog
 

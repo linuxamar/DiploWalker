@@ -18,10 +18,10 @@
     <Compile Include="ViewModels\ComposeTabViewModel.fs" />
     <Compile Include="ViewModels\SettingsTabViewModel.fs" />
     <Compile Include="ViewModels\MainWindowViewModel.fs" />
-    <AvaloniaResource Include="Views\MainWindow.axaml" />
+    <EmbeddedResource Include="Views\MainWindow.axaml" LogicalName="Diplo.Gui.Views.MainWindow.axaml" />
     <Compile Include="Views\MainWindow.axaml.fs" />
-    <AvaloniaResource Include="App.axaml" />
-    <AvaloniaResource Include="Diplo.ico" />
+    <EmbeddedResource Include="App.axaml" LogicalName="Diplo.Gui.App.axaml" />
+    <EmbeddedResource Include="Diplo.ico" LogicalName="Diplo.Gui.Diplo.ico" />
     <Compile Include="App.axaml.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -32,7 +32,9 @@
     <PackageReference Include="Avalonia.Themes.Fluent"  />
     <PackageReference Include="Avalonia.Controls.DataGrid"  />
     <PackageReference Include="Avalonia.AvaloniaEdit"  />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader"  />
     <PackageReference Include="AvaloniaEdit.TextMate"  />
+    <PackageReference Include="FSharp.Core"  />
   </ItemGroup>
 
   <ItemGroup>

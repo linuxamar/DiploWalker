@@ -1,5 +1,8 @@
 namespace Diplo.Gui.Views
 
+open System
+open System.IO
+open System.Reflection
 open Avalonia.Controls
 open Avalonia.Interactivity
 open Avalonia.Markup.Xaml
@@ -13,7 +16,15 @@ type MainWindow() as this =
 
     do
         this.DataContext <- viewModel
-        AvaloniaXamlLoader.Load(this)
+        let assembly = typeof<MainWindow>.Assembly
+        let baseDir = AppContext.BaseDirectory
+        for dll in Directory.GetFiles(baseDir, "Avalonia*.dll") do
+            try Assembly.LoadFrom(dll) |> ignore with _ -> ()
+        use stream = assembly.GetManifestResourceStream("Diplo.Gui.Views.MainWindow.axaml")
+        AvaloniaRuntimeXamlLoader.Load(stream, assembly, this) |> ignore
+        use iconStream = assembly.GetManifestResourceStream("Diplo.Gui.Diplo.ico")
+        if not (isNull iconStream) then
+            this.Icon <- WindowIcon(iconStream)
         viewModel.VolumeTab.SetStorageProvider(this.StorageProvider)
         viewModel.ComposeTab.SetStorageProvider(this.StorageProvider)
         this.setUpComposeEditor()

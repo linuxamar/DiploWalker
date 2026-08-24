@@ -7,6 +7,13 @@
       nouvelle alerte fait échouer le build (qualité maintenue par le CI).
     -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!--
+      Désactive la référence implicite FSharp.Core du SDK .NET 10.
+      La version est pinnée via CentralPackageTransitivePinningEnabled
+      dans Directory.Packages.props (évite le conflit MSB3277 entre
+      la version SDK et la version NuGet 10.1.400).
+    -->
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -41,11 +48,11 @@
   <PropertyGroup>
     <!--
       Audit NuGet : activé pour détecter les vulnérabilités des dépendances
-      transitives (CVE connues). Mode=latest : analyse avec les règles les
-      plus récentes.
+      transitives (CVE connues). Mode=all : analyse des dépendances directes
+      et transitives.
     -->
     <NuGetAudit>true</NuGetAudit>
-    <NuGetAuditMode>latest</NuGetAuditMode>
+    <NuGetAuditMode>all</NuGetAuditMode>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -58,8 +65,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Core" />
-    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <!--
+      Les paquets framework (FSharp.Core, Cryptography.Pkcs, Cryptography.Xml)
+      ne nécessitent plus de PackageReference explicite — les versions sont
+      pinnées au niveau transitive via CentralPackageTransitivePinningEnabled
+      dans Directory.Packages.props (corrige NU1510).
+    -->
   </ItemGroup>
 
 </Project>
