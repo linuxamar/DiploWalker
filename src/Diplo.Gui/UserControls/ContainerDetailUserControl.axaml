@@ -141,8 +141,8 @@
               <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
             </DataGrid.Columns>
           </DataGrid>
-          <GridSplitter Grid.Column="1" Width="5" ResizeDirection="Columns"
-                        Margin="4,0,0,0"/>
+          <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"
+                        ResizeDirection="Columns" Margin="4,0,0,0"/>
         </Grid>
 
       </StackPanel>
