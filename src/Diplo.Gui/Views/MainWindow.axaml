@@ -75,7 +75,8 @@
                         </DataGrid>
 
                         <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
-                                      ResizeDirection="Columns" />
+                                      ResizeDirection="Columns"
+                                      Background="{DynamicResource SystemChromeGrayColor}" />
 
                         <!-- Détail du conteneur sélectionné -->
                         <uc:ContainerDetailUserControl Grid.Column="2" />
@@ -306,7 +307,8 @@
         </TabControl>
 
             <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
-                          ResizeDirection="Rows" />
+                          ResizeDirection="Rows"
+                          Background="{DynamicResource SystemChromeGrayColor}" />
 
             <Border Grid.Row="2" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" Margin="0,4,0,0">
                 <DockPanel>

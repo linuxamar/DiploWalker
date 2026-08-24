@@ -142,7 +142,8 @@
             </DataGrid.Columns>
           </DataGrid>
           <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"
-                        ResizeDirection="Columns" Margin="4,0,0,0"/>
+                        ResizeDirection="Columns" Margin="4,0,0,0"
+                        Background="{DynamicResource SystemChromeGrayColor}"/>
         </Grid>
 
       </StackPanel>
