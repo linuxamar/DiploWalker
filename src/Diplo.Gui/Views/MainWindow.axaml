@@ -19,7 +19,7 @@
 
         <Grid RowDefinitions="*,5,Auto">
             <TabControl Grid.Row="0" Margin="4">
-            <TabItem Header="Conteneurs">
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="🐳"/><TextBlock Text=" Conteneurs" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <!-- Toolbar principal -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
@@ -84,7 +84,7 @@
                 </DockPanel>
             </TabItem>
 
-            <TabItem Header="Volumes">
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="📁"/><TextBlock Text=" Volumes" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
                         <Button Content="🔄 Lister" Command="{Binding VolumeTab.ListVolumesCommand}" Margin="0,0,4,0" />
@@ -141,7 +141,7 @@
                 </DockPanel>
             </TabItem>
 
-            <TabItem Header="Réseaux">
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="🌐"/><TextBlock Text=" Réseaux" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
                         <Button Content="🔄 Lister" Command="{Binding NetworkTab.ListNetworksCommand}" Margin="0,0,4,0" />
@@ -212,7 +212,7 @@
                 </DockPanel>
             </TabItem>
 
-            <TabItem Header="Compose">
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="📝"/><TextBlock Text=" Compose" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
                         <Button Content="▶ Démarrer" Command="{Binding ComposeTab.ComposeUpCommand}" Margin="0,0,4,0" />
@@ -269,7 +269,7 @@
                 </DockPanel>
             </TabItem>
 
-            <TabItem Header="Paramètres">
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="⚙"/><TextBlock Text=" Paramètres" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <StackPanel Margin="12">
                     <TextBlock Text="Configuration client (diplo.json)" FontWeight="Bold" />
                     <TextBlock Text="{Binding SettingsTab.ConfigPath}" TextWrapping="Wrap"
