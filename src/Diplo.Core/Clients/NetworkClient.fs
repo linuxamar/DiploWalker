@@ -36,7 +36,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
           ?cniPluginPath: string,
           ?ct: CancellationToken ) =
         task {
-            if String.IsNullOrEmpty(name) then invalidArg (nameof name) "Le nom du réseau est requis"
+            if String.IsNullOrWhiteSpace(name) then invalidArg (nameof name) "Le nom du réseau est requis"
             let d = defaultArg driver NetworkDriver.Bridge
             let s = defaultArg subnet ""
             let g = defaultArg gateway ""
@@ -52,7 +52,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.RemoveAsync(id: string, ?force: bool, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du réseau est requis"
+            if String.IsNullOrWhiteSpace(id) then invalidArg (nameof id) "L'identifiant du réseau est requis"
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
             let! response = client.RemoveNetwork({ Id = id; Force = f }, ct)
@@ -61,7 +61,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.InspectAsync(id: string, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du réseau est requis"
+            if String.IsNullOrWhiteSpace(id) then invalidArg (nameof id) "L'identifiant du réseau est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.InspectNetwork({ Id = id }, ct)
             return response
@@ -78,8 +78,8 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.ConnectAsync(networkId: string, containerId: string, ?endpointId: string, ?ipv4Address: string, ?options: IDictionary<string, string>, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(networkId) then invalidArg (nameof networkId) "L'identifiant du réseau est requis"
-            if String.IsNullOrEmpty(containerId) then invalidArg (nameof containerId) ServiceGuards.ContainerIdRequired
+            if String.IsNullOrWhiteSpace(networkId) then invalidArg (nameof networkId) "L'identifiant du réseau est requis"
+            if String.IsNullOrWhiteSpace(containerId) then invalidArg (nameof containerId) ServiceGuards.ContainerIdRequired
             let eId = defaultArg endpointId ""
             let ip = defaultArg ipv4Address ""
             let ct = defaultArg ct CancellationToken.None
@@ -91,8 +91,8 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.DisconnectAsync(networkId: string, containerId: string, ?endpointId: string, ?force: bool, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(networkId) then invalidArg (nameof networkId) "L'identifiant du réseau est requis"
-            if String.IsNullOrEmpty(containerId) then invalidArg (nameof containerId) ServiceGuards.ContainerIdRequired
+            if String.IsNullOrWhiteSpace(networkId) then invalidArg (nameof networkId) "L'identifiant du réseau est requis"
+            if String.IsNullOrWhiteSpace(containerId) then invalidArg (nameof containerId) ServiceGuards.ContainerIdRequired
             let eId = defaultArg endpointId ""
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
@@ -102,10 +102,10 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.RunCniPluginAsync(pluginPath: string, command: string, containerId: string, netnsPath: string, ?config: CniConfiguration, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(pluginPath) then invalidArg (nameof pluginPath) "Le chemin du plugin est requis"
-            if String.IsNullOrEmpty(command) then invalidArg (nameof command) "La commande est requise"
-            if String.IsNullOrEmpty(containerId) then invalidArg (nameof containerId) ServiceGuards.ContainerIdRequired
-            if String.IsNullOrEmpty(netnsPath) then invalidArg (nameof netnsPath) "Le chemin netns est requis"
+            if String.IsNullOrWhiteSpace(pluginPath) then invalidArg (nameof pluginPath) "Le chemin du plugin est requis"
+            if String.IsNullOrWhiteSpace(command) then invalidArg (nameof command) "La commande est requise"
+            if String.IsNullOrWhiteSpace(containerId) then invalidArg (nameof containerId) ServiceGuards.ContainerIdRequired
+            if String.IsNullOrWhiteSpace(netnsPath) then invalidArg (nameof netnsPath) "Le chemin netns est requis"
             let ct = defaultArg ct CancellationToken.None
             let request = { PluginPath = pluginPath; Command = command; ContainerId = containerId; NetnsPath = netnsPath; Config = Unchecked.defaultof<CniConfiguration> }
             config |> Option.iter (fun c -> request.Config <- c)

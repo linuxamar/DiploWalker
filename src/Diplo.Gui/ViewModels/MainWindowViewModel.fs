@@ -15,7 +15,7 @@ type MainWindowViewModel() as this =
     let logText = Text.StringBuilder()
     let maxLogLines = 500
 
-    let containerTab = ContainerTabViewModel(outputPort)
+    let containerTab = new ContainerTabViewModel(outputPort)
     let volumeTab = VolumeTabViewModel(outputPort)
     let networkTab = NetworkTabViewModel(outputPort)
     let composeTab = ComposeTabViewModel(outputPort)
