@@ -21,13 +21,13 @@ type CreateImageCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty settings.Source then
+            if String.IsNullOrWhiteSpace settings.Source then
                 output.WriteError("Le répertoire source est requis")
                 return 1
             elif not (IO.Directory.Exists settings.Source) then
                 output.WriteError(sprintf "Le répertoire source n'existe pas : '%s'" settings.Source)
                 return 1
-            elif String.IsNullOrEmpty settings.Dest then
+            elif String.IsNullOrWhiteSpace settings.Dest then
                 output.WriteError("Le chemin de destination est requis")
                 return 1
             else

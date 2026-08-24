@@ -16,7 +16,7 @@ type ComposeUpCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.File) then
+            if String.IsNullOrWhiteSpace(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
@@ -35,7 +35,7 @@ type ComposeDownCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.File) then
+            if String.IsNullOrWhiteSpace(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
@@ -54,7 +54,7 @@ type ComposePsCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.File) then
+            if String.IsNullOrWhiteSpace(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
@@ -74,7 +74,7 @@ type ComposeLogsCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.File) then
+            if String.IsNullOrWhiteSpace(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
@@ -94,7 +94,7 @@ type ComposePullCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.File) then
+            if String.IsNullOrWhiteSpace(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
@@ -113,7 +113,7 @@ type ComposeBuildCommand(output: IOutputPort) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.File) then
+            if String.IsNullOrWhiteSpace(settings.File) then
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else

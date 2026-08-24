@@ -55,7 +55,7 @@ type InspectContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -87,7 +87,7 @@ type StartContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -109,7 +109,7 @@ type StopContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -131,7 +131,7 @@ type DeleteContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -157,7 +157,7 @@ type PullImageCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Image) then
+            if String.IsNullOrWhiteSpace(settings.Image) then
                 output.WriteError("L'image est requise")
                 return 1
             else
@@ -165,7 +165,7 @@ type PullImageCommand(output: IOutputPort, clients: IDiploClients) =
                 let! response =
                     client.PullImageAsync(
                         settings.Image,
-                        ?user = (if String.IsNullOrEmpty(settings.User) then None else Some settings.User))
+                        ?user = (if String.IsNullOrWhiteSpace(settings.User) then None else Some settings.User))
                 output.WriteSuccess(response.Message)
                 return 0
         }
@@ -183,15 +183,15 @@ type RegistryLoginCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Registry) then
+            if String.IsNullOrWhiteSpace(settings.Registry) then
                 output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
                 return 1
-            elif String.IsNullOrEmpty(settings.Username) then
+            elif String.IsNullOrWhiteSpace(settings.Username) then
                 output.WriteError("Le nom d'utilisateur est requis (--username)")
                 return 1
             else
                 let password =
-                    if String.IsNullOrEmpty(settings.Password) then
+                    if String.IsNullOrWhiteSpace(settings.Password) then
                         AnsiConsole.Prompt(
                             TextPrompt<string>("Mot de passe :").Secret())
                     else
@@ -216,7 +216,7 @@ type RegistryLogoutCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Registry) then
+            if String.IsNullOrWhiteSpace(settings.Registry) then
                 output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
                 return 1
             else
@@ -251,10 +251,10 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Name) then
+            if String.IsNullOrWhiteSpace(settings.Name) then
                 output.WriteError("Le nom du conteneur est requis")
                 return 1
-            elif String.IsNullOrEmpty(settings.Image) then
+            elif String.IsNullOrWhiteSpace(settings.Image) then
                 output.WriteError("L'image est requise")
                 return 1
             else
@@ -274,7 +274,7 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
                         | _ -> None)
                     |> dict
                 let command =
-                    if not (String.IsNullOrEmpty settings.CommandLine) then
+                    if not (String.IsNullOrWhiteSpace settings.CommandLine) then
                         CommandLine.split settings.CommandLine
                     else
                         settings.Command |> Array.toList
@@ -310,7 +310,7 @@ type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -360,7 +360,7 @@ type ExecContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             elif settings.Command.Length = 0 then
@@ -428,10 +428,10 @@ type RenameContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
-            elif String.IsNullOrEmpty(settings.NewName) then
+            elif String.IsNullOrWhiteSpace(settings.NewName) then
                 output.WriteError("Le nouveau nom est requis")
                 return 1
             else
@@ -456,7 +456,7 @@ type TopContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -486,7 +486,7 @@ type StatsContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -544,7 +544,7 @@ type ImageInspectCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Ref) then
+            if String.IsNullOrWhiteSpace(settings.Ref) then
                 output.WriteError("La référence de l'image est requise")
                 return 1
             else
@@ -575,7 +575,7 @@ type ImageRemoveCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Ref) then
+            if String.IsNullOrWhiteSpace(settings.Ref) then
                 output.WriteError("La référence de l'image est requise")
                 return 1
             else
@@ -603,10 +603,10 @@ type ImageTagCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Source) then
+            if String.IsNullOrWhiteSpace(settings.Source) then
                 output.WriteError("La référence source est requise")
                 return 1
-            elif String.IsNullOrEmpty(settings.Target) then
+            elif String.IsNullOrWhiteSpace(settings.Target) then
                 output.WriteError("La référence cible est requise")
                 return 1
             else

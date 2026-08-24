@@ -57,7 +57,7 @@ let uninstallAll () = task {
             do! removeWindowsService serviceName
         let tokenPath = Diplo.Abstractions.AuthToken.authTokenPath
         if File.Exists(tokenPath) then
-            try File.Delete(tokenPath) with _ -> ()
+            try File.Delete(tokenPath) with ex -> eprintfn "  [!] Impossible de supprimer %s : %s" tokenPath ex.Message
             printfn "  [+] auth-token.json supprimé"
         let tokenDir = Diplo.Abstractions.AuthToken.authTokenDir
         if Directory.Exists(tokenDir) then
