@@ -15,7 +15,7 @@ type CloudAwsDriver(dataRoot: string) =
         | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'fsId' et 'region' sont requises pour le driver AWS")))
 
     let mountEfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
-        ProcessExec.runUnit "mount" [ "-o"; "nfsvers=4.1"; remotePath; targetPath ] (Some 30_000) None
+        ProcessExec.runUnit "mount" [ "-o"; "nfsvers=4.1"; remotePath; targetPath ] (Some ProcessExec.MountTimeoutMs) None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =

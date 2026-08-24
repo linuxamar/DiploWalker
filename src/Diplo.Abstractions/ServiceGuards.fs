@@ -7,6 +7,10 @@ open Grpc.Core
 [<RequireQualifiedAccess>]
 module ServiceGuards =
 
+    /// Message d'erreur standard pour l'identifiant de conteneur requis.
+    [<Literal>]
+    let ContainerIdRequired = "L'identifiant du conteneur est requis"
+
     /// Vérifie que la chaîne n'est pas null ou vide.
     let requireNonEmpty (value: string) (label: string) =
         if System.String.IsNullOrWhiteSpace(value) then

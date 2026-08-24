@@ -1,11 +1,9 @@
 namespace Diplo.Grpc
 
-open System
 open System.Collections.Generic
 open System.ServiceModel
 open System.Threading
 open System.Threading.Tasks
-open ProtoBuf.Grpc
 open Diplo.Grpc.Container
 
 [<ServiceContract>]

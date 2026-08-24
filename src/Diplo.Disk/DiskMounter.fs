@@ -2,6 +2,7 @@ namespace Diplo.Disk
 
 open System
 open System.IO
+open Serilog
 
 /// Volume monté pour un conteneur : chemin hôte à bind-mounter dans le
 /// conteneur (`ctr --mount type=bind,src=...`) et action de libération.
@@ -57,9 +58,14 @@ module DiskMounter =
                 Directory.CreateDirectory staging |> ignore
                 extractOrRaise source staging readOnly
                 let dispose () =
-                    try
-                        if not readOnly then FsImage.writeBack source staging
-                    finally
+                    if not readOnly then
+                        try
+                            FsImage.writeBack source staging
+                            // Suppression du staging uniquement après writeBack réussi
+                            Directory.Delete(staging, true)
+                        with ex ->
+                            Log.Error(ex, "Échec du write-back pour {Source} — le staging est conservé dans {Staging}", source, staging)
+                    else
                         try Directory.Delete(staging, true) with _ -> ()
                 { Source = source; HostPath = staging; Destination = destination; ReadOnly = readOnly; Dispose = dispose }
         else
@@ -75,9 +81,13 @@ module DiskMounter =
             elif not (Directory.Exists hostPath) then fun () -> ()
             else
                 fun () ->
-                    try
-                        if not readOnly then FsImage.writeBack source hostPath
-                    finally
+                    if not readOnly then
+                        try
+                            FsImage.writeBack source hostPath
+                            Directory.Delete(hostPath, true)
+                        with ex ->
+                            Log.Error(ex, "Échec du write-back pour {Source} — le staging est conservé dans {Staging}", source, hostPath)
+                    else
                         try Directory.Delete(hostPath, true) with _ -> ()
         { Source = source; HostPath = hostPath; Destination = destination; ReadOnly = readOnly; Dispose = dispose }
 

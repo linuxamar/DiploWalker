@@ -2,6 +2,8 @@
 !include "WinVer.nsh"
 !include "LogicLib.nsh"
 
+SetCompressor /SOLID lzma
+
 ; ── Définitions par défaut (surchargeables via -D) ──────────────────────────
 !ifndef APP_VERSION
   !define APP_VERSION "1.0.0"
@@ -170,7 +172,7 @@ FunctionEnd
 Section "Diplo.GUI" SecGui
   SectionIn RO
   SetOutPath "$INSTDIR\Diplo.Gui"
-  File /r "${PUBLISH_ROOT}\Diplo.Gui\*.*"
+  File /r /x "*.pdb" "${PUBLISH_ROOT}\Diplo.Gui\*.*"
 
   CreateShortCut "$DESKTOP\Diplo GUI.lnk"                "$INSTDIR\Diplo.Gui\Diplo.Gui.exe"
   CreateDirectory  "$SMPROGRAMS\${APP_NAME}"
@@ -180,7 +182,7 @@ SectionEnd
 Section "Diplo.CLI" SecCli
   SectionIn RO
   SetOutPath "$INSTDIR\Diplo.Cli"
-  File /r "${PUBLISH_ROOT}\Diplo.Cli\*.*"
+  File /r /x "*.pdb" "${PUBLISH_ROOT}\Diplo.Cli\*.*"
 
   Push "$INSTDIR\Diplo.Cli"
   Call AddToPath
@@ -191,7 +193,7 @@ SectionEnd
 Section "Diplo.Installer" SecInst
   SectionIn RO
   SetOutPath "$INSTDIR\Diplo.Installer"
-  File /r "${PUBLISH_ROOT}\Diplo.Installer\*.*"
+  File /r /x "*.pdb" "${PUBLISH_ROOT}\Diplo.Installer\*.*"
 SectionEnd
 
 Section -Additional

@@ -3,6 +3,7 @@ namespace Diplo.Cli.Network
 open System
 open System.Threading
 open System.Threading.Tasks
+open Diplo.Abstractions
 open Diplo.Core.Clients
 open Diplo.Grpc
 open Diplo.Core.Output
@@ -151,7 +152,7 @@ type ConnectCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
             elif String.IsNullOrEmpty(settings.ContainerId) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateNetworkClient()
@@ -187,7 +188,7 @@ type DisconnectCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
             elif String.IsNullOrEmpty(settings.ContainerId) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateNetworkClient()
@@ -239,7 +240,7 @@ type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteError("La commande CNI est requise (ADD ou DEL)")
                 return 1
             elif String.IsNullOrEmpty(settings.ContainerId) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             elif String.IsNullOrEmpty(settings.NetnsPath) then
                 output.WriteError("Le chemin du namespace réseau est requis")

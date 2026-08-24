@@ -308,11 +308,14 @@ type ComposeOrchestrator(output: IOutputPort) =
                         output.WriteSuccess(sprintf "  Construction de %s → %s..." svc.Name svc.Image)
                         let psi = ProcessStartInfo(
                             FileName = "docker",
-                            Arguments = sprintf "build -t %s \"%s\"" svc.Image resolvedPath,
                             UseShellExecute = false,
                             RedirectStandardOutput = true,
                             RedirectStandardError = true,
                             CreateNoWindow = true)
+                        psi.ArgumentList.Add("build")
+                        psi.ArgumentList.Add("-t")
+                        psi.ArgumentList.Add(svc.Image)
+                        psi.ArgumentList.Add(resolvedPath)
                         psi.EnvironmentVariables.["DOCKER_BUILDKIT"] <- "1"
                         use proc = new Process()
                         proc.StartInfo <- psi

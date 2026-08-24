@@ -30,9 +30,12 @@ let saveToken (token: string) =
         Directory.CreateDirectory(authTokenDir) |> ignore
     let expiresAt = DateTime.UtcNow.AddHours(24.0)
     let json = JsonSerializer.Serialize({ Token = token; ExpiresAt = expiresAt }, jsonOptions)
-    File.WriteAllText(authTokenPath, json)
+    // Écriture atomique : d'abord dans un fichier temporaire avec ACL
+    // restrictif, puis remplacement atomique — aucune fenêtre d'exposition.
+    let tmpPath = authTokenPath + "." + Guid.NewGuid().ToString("N") + ".tmp"
     try
-        let fileInfo = new FileInfo(authTokenPath)
+        File.WriteAllText(tmpPath, json)
+        let fileInfo = new FileInfo(tmpPath)
         let acl = fileInfo.GetAccessControl()
         acl.SetAccessRuleProtection(true, false)
         let currentUser = WindowsIdentity.GetCurrent()
@@ -43,8 +46,11 @@ let saveToken (token: string) =
         )
         acl.AddAccessRule(rule)
         fileInfo.SetAccessControl(acl)
+        try File.Replace(tmpPath, authTokenPath, null)
+        with :? FileNotFoundException -> File.Move(tmpPath, authTokenPath)
     with ex ->
-        Log.Error(ex, "Impossible de définir les ACL NTFS sur {Path}" , authTokenPath)
+        try File.Delete(tmpPath) with _ -> ()
+        Log.Error(ex, "Impossible de sauvegarder le token dans {Path}" , authTokenPath)
         failwithf "Sécurité du token compromise: impossible de protéger %s" authTokenPath
 
 /// Cache du token avec TTL pour éviter les lectures disque répétées.
@@ -82,7 +88,9 @@ type private TokenCache() =
                     lastLoadUtc <- now
             else
                 cachedToken <- None
-        with _ -> cachedToken <- None
+        with ex ->
+            Log.Warning(ex, "Erreur lors de la lecture du token dans {Path}", authTokenPath)
+            cachedToken <- None
 
     member _.GetToken() : string option =
         lock lockObj (fun () ->

@@ -295,22 +295,22 @@ module NetworkServiceImplTests =
         ex.InnerException.Message |> should haveSubstring "L'identifiant du conteneur"
 
     [<Fact>]
-    let ``RunCniPlugin avec commande non autorisee retourne erreur`` () =
+    let ``RunCniPlugin avec commande non autorisee lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = { PluginPath = @"C:\Program Files\containerd\cni\bin\bridge.exe"; Command = "EXEC"; ContainerId = "ct123"; NetnsPath = ""; Config = Unchecked.defaultof<CniConfiguration> }
-        let response = (svc :> INetworkService).RunCniPlugin(req, ctx).Result
-        response.Success |> should equal false
-        response.Message |> should haveSubstring "Erreur lors de l'exécution du plugin CNI"
+        let req = { PluginPath = @"C:\Program Files\containerd\cni\bin\bridge.exe"; Command = "EXEC"; ContainerId = "ct123"; NetnsPath = @"\\.\pipe\netns-test"; Config = Unchecked.defaultof<CniConfiguration> }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> INetworkService).RunCniPlugin(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
     [<Fact>]
-    let ``RunCniPlugin avec plugin hors repertoire autorise retourne erreur`` () =
+    let ``RunCniPlugin avec plugin hors repertoire autorise lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
-        let req = { PluginPath = @"C:\evil\malware.exe"; Command = "ADD"; ContainerId = "ct123"; NetnsPath = ""; Config = Unchecked.defaultof<CniConfiguration> }
-        let response = (svc :> INetworkService).RunCniPlugin(req, ctx).Result
-        response.Success |> should equal false
-        response.Message |> should haveSubstring "Erreur lors de l'exécution du plugin CNI"
+        let req = { PluginPath = @"C:\evil\malware.exe"; Command = "ADD"; ContainerId = "ct123"; NetnsPath = @"\\.\pipe\netns-test"; Config = Unchecked.defaultof<CniConfiguration> }
+        let ex = Assert.Throws<AggregateException>(fun () -> (svc :> INetworkService).RunCniPlugin(req, ctx).Result |> ignore)
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
     [<Fact>]
     let ``PruneNetworks supprime tous les reseaux existants`` () =

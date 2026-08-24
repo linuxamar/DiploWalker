@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Security.Cryptography
 open System.Text.Json
+open Serilog
 open Diplo.Abstractions
 
 /// Persistance des identifiants de registres de conteneurs (login/logout).
@@ -49,7 +50,9 @@ module RegistryAuth =
                     ProtectedData.Unprotect(Convert.FromBase64String(encoded), null, DataProtectionScope.CurrentUser))
             else
                 System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded))
-        with _ -> ""
+        with ex ->
+            Log.Warning(ex, "Impossible de déchiffrer le mot de passe chiffré ( données potentiellement corrompues)")
+            ""
 
     /// Charge les identifiants persistés (Map registre -> identifiant).
     /// Retourne un état vide si le fichier est absent ou illisible.
@@ -64,8 +67,12 @@ module RegistryAuth =
                     if isNull (box entries) then Map.empty
                     else entries |> Seq.map (fun e -> e.Registry, e) |> Map.ofSeq
         with
-        | :? JsonException -> Map.empty
-        | _ -> Map.empty
+        | :? JsonException as ex ->
+            Log.Warning(ex, "Fichier d'authentification registre corrompu: {Path}", path)
+            Map.empty
+        | ex ->
+            Log.Warning(ex, "Erreur lors de la lecture du fichier d'authentification registre: {Path}", path)
+            Map.empty
 
     /// Enregistre les identifiants (écriture atomique : fichier temporaire puis remplacement).
     let save (path: string) (entries: seq<RegistryEntry>) =

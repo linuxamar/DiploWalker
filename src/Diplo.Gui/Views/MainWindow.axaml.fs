@@ -19,7 +19,8 @@ type MainWindow() as this =
         let assembly = typeof<MainWindow>.Assembly
         let baseDir = AppContext.BaseDirectory
         for dll in Directory.GetFiles(baseDir, "Avalonia*.dll") do
-            try Assembly.LoadFrom(dll) |> ignore with _ -> ()
+            try Assembly.LoadFrom(dll) |> ignore
+            with ex -> Serilog.Log.Debug(ex, "Chargement de l'assembly {Dll} ignoré", Path.GetFileName(dll))
         use stream = assembly.GetManifestResourceStream("Diplo.Gui.Views.MainWindow.axaml")
         AvaloniaRuntimeXamlLoader.Load(stream, assembly, this) |> ignore
         use iconStream = assembly.GetManifestResourceStream("Diplo.Gui.Diplo.ico")
@@ -28,6 +29,8 @@ type MainWindow() as this =
         viewModel.VolumeTab.SetStorageProvider(this.StorageProvider)
         viewModel.ComposeTab.SetStorageProvider(this.StorageProvider)
         this.setUpComposeEditor()
+        let aboutItem = this.FindControl<MenuItem>("AboutMenuItem")
+        aboutItem.Command <- Diplo.Gui.ViewModels.RelayCommand(Action(fun () -> this.OnAbout(null, RoutedEventArgs())))
 
     member private this.setUpComposeEditor() =
         let host = this.FindControl<Panel>("ComposeEditorHost")

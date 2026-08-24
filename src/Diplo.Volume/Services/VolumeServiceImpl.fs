@@ -57,14 +57,20 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                     if request.Driver = StorageDriverType.Local && driverOpts.ContainsKey("driver") then
                         DriverMappings.parseVolumeDriver driverOpts.["driver"]
                     else request.Driver
-                let driver = getDriver driverType
-                let (id, mountpoint) = driver.CreateVolume(name, driverOpts, labels)
-                return
-                    { CreateVolumeResponse.Id = id
-                      Name = name
-                      Driver = driverType
-                      Mountpoint = mountpoint
-                      CreatedAt = DateTime.UtcNow.ToString("o") }
+                try
+                    let driver = getDriver driverType
+                    let (id, mountpoint) = driver.CreateVolume(name, driverOpts, labels)
+                    return
+                        { CreateVolumeResponse.Id = id
+                          Name = name
+                          Driver = driverType
+                          Mountpoint = mountpoint
+                          CreatedAt = DateTime.UtcNow.ToString("o") }
+                with
+                | :? RpcException as rpcEx -> return raise rpcEx
+                | ex ->
+                    Log.Warning(ex, "Erreur lors de la création du volume {Name} avec le driver {Driver}", name, driverType)
+                    return raise (RpcException(Status(StatusCode.Internal, sprintf "Erreur lors de la création du volume '%s': %s" name ex.Message)))
             }
 
         member _.RemoveVolume(request, _context) =
@@ -177,7 +183,9 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                             let (_, mountpoint) = driver.MountVolume(request.Id, request.TargetPath, options)
                             Some mountpoint
                         with :? RpcException -> reraise ()
-                           | _ -> None
+                           | ex ->
+                            Log.Warning(ex, "Le driver {Driver} n'a pas pu monter le volume {VolumeId}", driver.GetType().Name, request.Id)
+                            None
                     let result =
                         registry.GetAll()
                         |> List.tryPick tryMount
@@ -206,7 +214,9 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                             let (_, message) = driver.UnmountVolume(request.Id, request.TargetPath)
                             Some message
                         with :? RpcException -> reraise ()
-                           | _ -> None
+                           | ex ->
+                            Log.Warning(ex, "Le driver {Driver} n'a pas pu démonter le volume {VolumeId}", driver.GetType().Name, request.Id)
+                            None
                     let result =
                         registry.GetAll()
                         |> List.tryPick tryUnmount

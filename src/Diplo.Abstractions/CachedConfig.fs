@@ -1,7 +1,5 @@
 namespace Diplo.Abstractions
 
-open System
-
 /// Cache générique avec invalidation manuelle, protégé par un verrou.
 /// Fournit un chargement paresseux (lazy) avec relecture à la demande.
 type CachedConfig<'T>(loader: unit -> 'T) =

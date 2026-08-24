@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
+open Diplo.Abstractions
 open Diplo.Cli
 open Diplo.Core
 open Diplo.Core.Clients
@@ -55,7 +56,7 @@ type InspectContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -87,7 +88,7 @@ type StartContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -109,7 +110,7 @@ type StopContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -131,7 +132,7 @@ type DeleteContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -310,7 +311,7 @@ type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -360,7 +361,7 @@ type ExecContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             elif settings.Command.Length = 0 then
                 output.WriteError("Au moins une commande est requise")
@@ -428,7 +429,7 @@ type RenameContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             elif String.IsNullOrEmpty(settings.NewName) then
                 output.WriteError("Le nouveau nom est requis")
@@ -456,7 +457,7 @@ type TopContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -486,7 +487,7 @@ type StatsContainerCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrEmpty(settings.Id) then
-                output.WriteError("L'identifiant du conteneur est requis")
+                output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
                 use client = clients.CreateContainerClient()

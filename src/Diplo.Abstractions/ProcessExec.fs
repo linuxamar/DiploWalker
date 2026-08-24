@@ -13,6 +13,10 @@ module ProcessExec =
 
     let private defaultTimeoutMs = 60_000
 
+    /// Délai d'attente pour les opérations de montage/démontage (30 secondes).
+    [<Literal>]
+    let MountTimeoutMs = 30_000
+
     let private timeoutMsOr (timeoutMs: int option) = defaultArg timeoutMs defaultTimeoutMs
 
     /// Exécute `fileName` avec `args` et renvoie `(code, stdout, stderr)`.
@@ -70,39 +74,42 @@ module ProcessExec =
     let runUnit (fileName: string) (args: seq<string>) (timeoutMs: int option) (input: string option) : unit =
         run fileName args timeoutMs input |> ignore
 
-    /// Exécute une commande PowerShell avec les paramètres spécifiés.
-    let runPowerShell (command: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
+    /// Encode un script PowerShell en Base64 UTF-16LE pour -EncodedCommand.
+    /// Évite l'injection via la ligne de commande (les valeurs sont dans le script,
+    /// pas dans argv).
+    let private encodeScript (script: string) =
+        let bytes = System.Text.Encoding.Unicode.GetBytes(script)
+        Convert.ToBase64String(bytes)
+
+    /// Exécute un script PowerShell encodé avec les paramètres nomméss.
+    /// Partagé par runPowerShell et runPowerShellScript.
+    let private runEncodedScript (scriptBody: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
         let timeout = timeoutMsOr timeoutMs
         let script =
             let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
-            let body = sprintf "%s -%s" command (parameters |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i]) |> String.concat " -")
-            sprintf "{ param(%s) %s }" (paramNames |> String.concat ", ") body
+            sprintf "{ param(%s) %s }" (paramNames |> String.concat ", ") scriptBody
+        let encoded = encodeScript script
         let args =
             [ yield "-NoProfile"
               yield "-NonInteractive"
-              yield "-Command"
-              yield script
-              yield! parameters |> List.map snd ]
-        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) None
+              yield "-EncodedCommand"
+              yield encoded ]
+        let input = parameters |> List.map snd |> String.concat "\n" |> Some
+        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) input
         if code <> 0 then
             let detail = if String.IsNullOrWhiteSpace stderr then "" else " " + stderr.Trim()
             raise (InvalidOperationException(sprintf "PowerShell a échoué (code %d):%s" code detail))
         stdout
 
-    /// Exécute un script PowerShell brut avec des paramètres nommés.
-    let runPowerShellScript (scriptBody: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
-        let timeout = timeoutMsOr timeoutMs
-        let script =
+    /// Exécute une commande PowerShell avec les paramètres spécifiés.
+    /// Utilise -EncodedCommand pour un binding sûr des paramètres (pas de concaténation dans argv).
+    let runPowerShell (command: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
+        let scriptBody =
             let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
-            sprintf "{ param(%s) %s }" (paramNames |> String.concat ", ") scriptBody
-        let args =
-            [ yield "-NoProfile"
-              yield "-NonInteractive"
-              yield "-Command"
-              yield script
-              yield! parameters |> List.map snd ]
-        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) None
-        if code <> 0 then
-            let detail = if String.IsNullOrWhiteSpace stderr then "" else " " + stderr.Trim()
-            raise (InvalidOperationException(sprintf "PowerShell a échoué (code %d):%s" code detail))
-        stdout
+            sprintf "%s -%s" command (parameters |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i]) |> String.concat " -")
+        runEncodedScript scriptBody parameters timeoutMs
+
+    /// Exécute un script PowerShell brut avec des paramètres nommés.
+    /// Utilise -EncodedCommand pour un binding sûr des paramètres.
+    let runPowerShellScript (scriptBody: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
+        runEncodedScript scriptBody parameters timeoutMs

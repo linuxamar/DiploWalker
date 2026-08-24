@@ -67,6 +67,10 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 Log.Warning("Limite de processus ({PidLimit}) ignorée à la création : non prise en charge par `ctr container create` de cette version", pidLimit)
             ctrArgs.Add(image)
             ctrArgs.Add(id)
+            // Validation des commandes/args avant injection dans ctr
+            if command.Length > 0 || args.Length > 0 then
+                let fullCommand = Array.append command args
+                SecurityValidation.validateCommand fullCommand
             for c in command do ctrArgs.Add(c)
             for a in args do ctrArgs.Add(a)
             let output = runCtr (ctrArgs |> Seq.toList)
@@ -82,17 +86,17 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.StartContainerWithLogs(namespaceName, id, logFile) =
             validateNsId namespaceName id
+            let psi = ProcessStartInfo(ctrPath)
+            for a in nsArgs namespaceName [ "task"; "start"; id ] do
+                psi.ArgumentList.Add(a)
+            psi.RedirectStandardOutput <- true
+            psi.RedirectStandardError <- true
+            psi.UseShellExecute <- false
+            psi.CreateNoWindow <- true
+            let proc = Process.Start(psi)
+            if isNull proc then
+                raise (InvalidOperationException(sprintf "Impossible de démarrer le processus ctr pour le conteneur %s" id))
             try
-                let psi = ProcessStartInfo(ctrPath)
-                for a in nsArgs namespaceName [ "task"; "start"; id ] do
-                    psi.ArgumentList.Add(a)
-                psi.RedirectStandardOutput <- true
-                psi.RedirectStandardError <- true
-                psi.UseShellExecute <- false
-                psi.CreateNoWindow <- true
-                let proc = Process.Start(psi)
-                if isNull proc then
-                    raise (InvalidOperationException(sprintf "Impossible de démarrer le processus ctr pour le conteneur %s" id))
                 let dir = Path.GetDirectoryName(logFile)
                 if not (String.IsNullOrEmpty(dir)) then Directory.CreateDirectory(dir) |> ignore
                 let writer = new StreamWriter(logFile, true)
@@ -118,7 +122,11 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 proc.BeginErrorReadLine()
                 Log.Information("Conteneur {ContainerId} démarré, logs capturés dans {LogFile}", id, logFile)
             with ex ->
+                // Nettoyage du processus en cas d'échec de configuration
+                try proc.Kill(true) with _ -> ()
+                try proc.Dispose() with _ -> ()
                 Log.Error(ex, "Erreur lors du démarrage avec capture des logs du conteneur {ContainerId}", id)
+                reraise ()
 
         member _.StopContainer(namespaceName, id, timeoutSeconds) : Task =
             validateNsId namespaceName id
@@ -313,7 +321,9 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     proc.StandardInput.Close())
                 let pumpOut = Task.Run(fun () -> proc.StandardOutput.BaseStream.CopyTo(stdout))
                 let pumpErr = Task.Run(fun () -> proc.StandardError.BaseStream.CopyTo(stderr))
-                proc.WaitForExit()
+                let exited = proc.WaitForExit(600_000)
+                if not exited then
+                    Log.Warning("Timeout (600s) lors de l'exécution en flux dans le conteneur {ContainerId}", id)
                 Task.WaitAll(pumpOut, pumpErr)
                 pumpIn.Wait()
                 proc.ExitCode

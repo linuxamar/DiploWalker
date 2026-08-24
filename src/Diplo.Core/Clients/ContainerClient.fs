@@ -58,7 +58,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.StartAsync(id: string, ?attach: bool, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             let ct = defaultArg ct CancellationToken.None
             let! response = client.StartContainer({ Id = id; Attach = defaultArg attach false }, ct)
             return response
@@ -66,7 +66,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.StopAsync(id: string, ?timeoutSeconds: int, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             let timeout = defaultArg timeoutSeconds 10
             let ct = defaultArg ct CancellationToken.None
             let! response = client.StopContainer({ Id = id; TimeoutSeconds = timeout }, ct)
@@ -75,7 +75,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.DeleteAsync(id: string, ?force: bool, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             let f = defaultArg force false
             let ct = defaultArg ct CancellationToken.None
             let! response = client.DeleteContainer({ Id = id; Force = f }, ct)
@@ -84,7 +84,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.InspectAsync(id: string, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             let ct = defaultArg ct CancellationToken.None
             let! response = client.InspectContainer({ Id = id }, ct)
             return response
@@ -104,13 +104,13 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
     /// (tail/since) puis, si `follow` est vrai, les nouvelles lignes jusqu'à la
     /// sortie du conteneur ou l'annulation via `ct`.
     member _.GetLogsStream(id: string, ?follow: bool, ?tail: int, ?since: string, ?ct: CancellationToken) : IAsyncEnumerable<ContainerLogEntry> =
-        if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+        if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
         let request = { Id = id; Follow = defaultArg follow false; Tail = defaultArg tail 100; Since = defaultArg since "" }
         client.GetContainerLogs(request, defaultArg ct CancellationToken.None)
 
     member _.GetLogs(id: string, ?follow: bool, ?tail: int, ?since: string, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             let ct = defaultArg ct CancellationToken.None
             let entries = ResizeArray()
             let enumerator = (this.GetLogsStream(id, ?follow = follow, ?tail = tail, ?since = since, ?ct = Some ct)).GetAsyncEnumerator(ct)
@@ -129,24 +129,24 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.Exec(id: string, command: IEnumerable<string>, ?attachStdout: bool, ?attachStderr: bool, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             let aOut = defaultArg attachStdout true
             let aErr = defaultArg attachStderr true
             let ct = defaultArg ct CancellationToken.None
             let request = { Id = id; Command = ResizeArray<string>(); AttachStdin = false; AttachStdout = aOut; AttachStderr = aErr }
             for c in command do request.Command.Add(c)
             let outputs = ResizeArray()
-            do!
-                task {
-                    let enumerator = client.ExecInContainer(request, ct).GetAsyncEnumerator(ct)
-                    let mutable moving = true
-                    while moving do
-                        let! hasNext = enumerator.MoveNextAsync().AsTask()
-                        if hasNext then
-                            outputs.Add(enumerator.Current)
-                        else
-                            moving <- false
-                }
+            let enumerator = client.ExecInContainer(request, ct).GetAsyncEnumerator(ct)
+            try
+                let mutable moving = true
+                while moving do
+                    let! hasNext = enumerator.MoveNextAsync().AsTask()
+                    if hasNext then
+                        outputs.Add(enumerator.Current)
+                    else
+                        moving <- false
+            finally
+                enumerator.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
             return outputs :> seq<ExecOutput>
         }
 
@@ -193,7 +193,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.RenameContainerAsync(id: string, newName: string, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             if String.IsNullOrEmpty(newName) then invalidArg (nameof newName) "Le nouveau nom est requis"
             let ct = defaultArg ct CancellationToken.None
             let! response = client.RenameContainer({ Id = id; NewName = newName }, ct)
@@ -202,7 +202,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.TopContainerAsync(id: string, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             let ct = defaultArg ct CancellationToken.None
             let! response = client.TopContainer({ Id = id }, ct)
             return response
@@ -210,7 +210,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     member _.GetContainerStatsAsync(id: string, ?ct: CancellationToken) =
         task {
-            if String.IsNullOrEmpty(id) then invalidArg (nameof id) "L'identifiant du conteneur est requis"
+            if String.IsNullOrEmpty(id) then invalidArg (nameof id) ServiceGuards.ContainerIdRequired
             let ct = defaultArg ct CancellationToken.None
             let! response = client.GetContainerStats({ Id = id }, ct)
             return response

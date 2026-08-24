@@ -130,19 +130,22 @@ type LocalVolumeDriver(dataRoot: string) =
                 raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
             let mountDir = mountPath id targetPath
             SecurityValidation.validatePath mountDir mountsDir "Le chemin de montage"
-            Directory.CreateDirectory(mountDir) |> ignore
-            // Sur Windows, on simule le mount en copiant les fichiers
-            if Directory.Exists(src) then
-                let rec copyDir (source: string) (target: string) =
-                    Directory.CreateDirectory(target) |> ignore
-                    for file in Directory.GetFiles(source) do
-                        let destFile = Path.Combine(target, Path.GetFileName(file))
-                        File.Copy(file, destFile, true)
-                    for subdir in Directory.GetDirectories(source) do
-                        let destSub = Path.Combine(target, Path.GetFileName(subdir))
-                        copyDir subdir destSub
-                copyDir src mountDir
-            (true, mountDir)
+            try
+                Directory.CreateDirectory(mountDir) |> ignore
+                if Directory.Exists(src) then
+                    let rec copyDir (source: string) (target: string) =
+                        Directory.CreateDirectory(target) |> ignore
+                        for file in Directory.GetFiles(source) do
+                            let destFile = Path.Combine(target, Path.GetFileName(file))
+                            File.Copy(file, destFile, true)
+                        for subdir in Directory.GetDirectories(source) do
+                            let destSub = Path.Combine(target, Path.GetFileName(subdir))
+                            copyDir subdir destSub
+                    copyDir src mountDir
+                (true, mountDir)
+            with ex ->
+                try Directory.Delete(mountDir, true) with _ -> ()
+                raise (RpcException(Status(StatusCode.Internal, sprintf "Erreur lors du montage du volume '%s': %s" id ex.Message)))
         )
 
     member _.UnmountVolume(id: string, targetPath: string) =

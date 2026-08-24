@@ -181,12 +181,13 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                 if String.IsNullOrEmpty(pluginPath) then
                     return { RunCniPluginResponse.Success = false; Ifname = ""; Ipv4Address = ""; Gateway = ""; Message = "Chemin du plugin CNI non spécifié" }
                 else
+                    let resolvedPluginPath = SecurityValidation.validateCniPluginPath pluginPath
+                    SecurityValidation.validateNetnsPath request.NetnsPath "Le chemin netns"
+                    let command =
+                        if String.IsNullOrEmpty(request.Command) then "ADD"
+                        else request.Command
+                    SecurityValidation.validateCniCommand command
                     try
-                        let resolvedPluginPath = SecurityValidation.validateCniPluginPath pluginPath
-                        let command =
-                            if String.IsNullOrEmpty(request.Command) then "ADD"
-                            else request.Command
-                        SecurityValidation.validateCniCommand command
                         let configJson =
                             if not (obj.ReferenceEquals(request.Config, null)) then
                                 SecurityValidation.validateCidr request.Config.Subnet "Le sous-réseau CNI"
@@ -205,7 +206,6 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                             else "{}"
                         let args =
                             [ command
-                              "--config"
                               "--container-id"; request.ContainerId
                               "--netns"; request.NetnsPath ]
                         let code, stdout, stderr = ProcessExec.runWithResult resolvedPluginPath args (Some 60_000) (Some configJson)
@@ -224,7 +224,9 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                               Ipv4Address = ipv4Addr
                               Gateway = gw
                               Message = msg }
-                    with ex ->
+                    with
+                    | :? RpcException as rpcEx -> return raise rpcEx
+                    | ex ->
                         Log.Error(ex, "Erreur lors de l'exécution du plugin CNI {PluginPath}", pluginPath)
                         return { RunCniPluginResponse.Success = false; Ifname = ""; Ipv4Address = ""; Gateway = ""; Message = "Erreur lors de l'exécution du plugin CNI" }
             }
