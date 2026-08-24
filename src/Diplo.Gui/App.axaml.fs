@@ -10,7 +10,7 @@ type App() =
     inherit Application()
 
     override this.Initialize() =
-        this.RequestedThemeVariant <- ThemeVariant.Dark
+        this.RequestedThemeVariant <- ThemeVariant.Default
         this.Styles.Add(FluentTheme())
 
     override this.OnFrameworkInitializationCompleted() =
