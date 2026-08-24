@@ -14,20 +14,23 @@ module MountParser =
         text.Split([| '\r'; '\n'; ';' |], StringSplitOptions.RemoveEmptyEntries)
         |> Array.choose (fun line ->
             let parts = line.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
+
             let valueOf (prefix: string) =
                 parts
                 |> Array.tryFind (fun p -> p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 |> Option.map (fun p -> p.Substring(prefix.Length))
+
             match valueOf "src=", valueOf "dst=" with
             | Some src, Some dst ->
-                let readOnly = parts |> Array.exists (fun p -> p.Equals("ro", StringComparison.OrdinalIgnoreCase))
-                Some (src, dst, readOnly)
+                let readOnly =
+                    parts
+                    |> Array.exists (fun p -> p.Equals("ro", StringComparison.OrdinalIgnoreCase))
+
+                Some(src, dst, readOnly)
             | _ -> None)
         |> Array.toList
 
     /// Analyse une liste de spécifications (une par élément), comme
     /// l'option de ligne de commande répétable.
     let parseArray (values: string[]) : (string * string * bool) list =
-        values
-        |> Array.collect (fun v -> parse v |> List.toArray)
-        |> Array.toList
+        values |> Array.collect (fun v -> parse v |> List.toArray) |> Array.toList

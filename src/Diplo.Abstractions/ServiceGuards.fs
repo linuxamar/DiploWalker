@@ -17,8 +17,7 @@ module ServiceGuards =
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s ne peut pas être vide" label)))
 
     /// Vérifie que l'identifiant est valide (alphanumériques, tirets, underscores, max 128).
-    let requireId (id: string) (label: string) =
-        SecurityValidation.validateId id label
+    let requireId (id: string) (label: string) = SecurityValidation.validateId id label
 
     /// Vérifie que l'identifiant de conteneur est valide.
     let requireContainerId (id: string) =
@@ -27,17 +26,28 @@ module ServiceGuards =
     /// Vérifie que la valeur est un entier positif.
     let requirePositive (value: int) (label: string) =
         if value <= 0 then
-            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s doit être positif (reçu : %d)" label value)))
+            raise (
+                RpcException(Status(StatusCode.InvalidArgument, sprintf "%s doit être positif (reçu : %d)" label value))
+            )
 
     /// Vérifie que la valeur est un entier positif (int64).
     let requirePositiveInt64 (value: int64) (label: string) =
         if value <= 0L then
-            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s doit être positif (reçu : %d)" label value)))
+            raise (
+                RpcException(Status(StatusCode.InvalidArgument, sprintf "%s doit être positif (reçu : %d)" label value))
+            )
 
     /// Vérifie que la valeur est dans l'intervalle [min, max].
     let requireInRange (value: int) (min: int) (max: int) (label: string) =
         if value < min || value > max then
-            raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s doit être entre %d et %d (reçu : %d)" label min max value)))
+            raise (
+                RpcException(
+                    Status(
+                        StatusCode.InvalidArgument,
+                        sprintf "%s doit être entre %d et %d (reçu : %d)" label min max value
+                    )
+                )
+            )
 
     /// Vérifie que le chemin est sûr (anti-traversal, pas de caractères dangereux).
     let requireSafePath (path: string) (label: string) =

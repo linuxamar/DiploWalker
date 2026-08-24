@@ -33,8 +33,14 @@ module DriverMappings =
 
     let isValidVolumeDriver (s: string) =
         let lower = s.ToLowerInvariant()
-        lower = "local" || lower = "nfs" || lower = "smb"
-        || lower = "azure" || lower = "aws" || lower = "gcp" || lower = "iso"
+
+        lower = "local"
+        || lower = "nfs"
+        || lower = "smb"
+        || lower = "azure"
+        || lower = "aws"
+        || lower = "gcp"
+        || lower = "iso"
 
     let allVolumeDriverNames = [ "local"; "nfs"; "smb"; "azure"; "aws"; "gcp"; "iso" ]
 
@@ -52,12 +58,18 @@ module DriverMappings =
         match s.ToLowerInvariant() with
         | "bridge" -> NetworkDriver.Bridge
         | "none" -> NetworkDriver.None
-        | "custom_cni" | "cni" -> NetworkDriver.CustomCni
+        | "custom_cni"
+        | "cni" -> NetworkDriver.CustomCni
         | "pod" -> NetworkDriver.Pod
         | _ -> NetworkDriver.Bridge
 
     let isValidNetworkDriver (s: string) =
         let lower = s.ToLowerInvariant()
-        lower = "bridge" || lower = "none" || lower = "custom_cni" || lower = "cni" || lower = "pod"
+
+        lower = "bridge"
+        || lower = "none"
+        || lower = "custom_cni"
+        || lower = "cni"
+        || lower = "pod"
 
     let allNetworkDriverNames = [ "bridge"; "none"; "custom_cni"; "pod" ]

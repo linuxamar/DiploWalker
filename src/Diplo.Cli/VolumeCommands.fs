@@ -29,19 +29,18 @@ type ListVolumesCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteTable(
                     response.Volumes,
                     [| "ID"; "Nom"; "Driver"; "Point de montage"; "État" |],
-                    fun v ->
-                        [| v.Id
-                           v.Name
-                           v.Driver.ToString()
-                           v.Mountpoint
-                           v.State.ToString() |])
+                    fun v -> [| v.Id; v.Name; v.Driver.ToString(); v.Mountpoint; v.State.ToString() |]
+                )
+
             return 0
         }
 
 // ── inspect ───────────────────────────────────────────────────────
 type InspectVolumeSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
 
 type InspectVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<InspectVolumeSettings>()
@@ -69,15 +68,33 @@ type InspectVolumeCommand(output: IOutputPort, clients: IDiploClients) =
 // ── create ────────────────────────────────────────────────────────
 type CreateVolumeSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<NAME>")>] member val Name: string = null with get, set
-    [<CommandOption("--driver")>] member val Driver: string = "local" with get, set
-    [<CommandOption("--path")>] member val Path: string = null with get, set
-    [<CommandOption("--server")>] member val Server: string = null with get, set
-    [<CommandOption("--share")>] member val Share: string = null with get, set
-    [<CommandOption("--username")>] member val Username: string = null with get, set
-    [<CommandOption("--password")>] member val Password: string = null with get, set
-    [<CommandOption("--export")>] member val Export: string = null with get, set
-    [<CommandOption("--opt")>] member val Opts: string[] = [||] with get, set
+
+    [<CommandArgument(0, "<NAME>")>]
+    member val Name: string = null with get, set
+
+    [<CommandOption("--driver")>]
+    member val Driver: string = "local" with get, set
+
+    [<CommandOption("--path")>]
+    member val Path: string = null with get, set
+
+    [<CommandOption("--server")>]
+    member val Server: string = null with get, set
+
+    [<CommandOption("--share")>]
+    member val Share: string = null with get, set
+
+    [<CommandOption("--username")>]
+    member val Username: string = null with get, set
+
+    [<CommandOption("--password")>]
+    member val Password: string = null with get, set
+
+    [<CommandOption("--export")>]
+    member val Export: string = null with get, set
+
+    [<CommandOption("--opt")>]
+    member val Opts: string[] = [||] with get, set
 
 type CreateVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<CreateVolumeSettings>()
@@ -91,37 +108,54 @@ type CreateVolumeCommand(output: IOutputPort, clients: IDiploClients) =
             elif not (DriverMappings.isValidVolumeDriver settings.Driver) then
                 output.WriteError(sprintf "Driver inconnu: %s" settings.Driver)
                 return 1
-            elif settings.Driver.ToLowerInvariant() = "smb" && (String.IsNullOrWhiteSpace settings.Server || String.IsNullOrWhiteSpace settings.Share) then
+            elif
+                settings.Driver.ToLowerInvariant() = "smb"
+                && (String.IsNullOrWhiteSpace settings.Server
+                    || String.IsNullOrWhiteSpace settings.Share)
+            then
                 output.WriteError("Le driver SMB requiert les options --server et --share")
                 return 1
-            elif settings.Driver.ToLowerInvariant() = "nfs" && (String.IsNullOrWhiteSpace settings.Server || String.IsNullOrWhiteSpace settings.Export) then
+            elif
+                settings.Driver.ToLowerInvariant() = "nfs"
+                && (String.IsNullOrWhiteSpace settings.Server
+                    || String.IsNullOrWhiteSpace settings.Export)
+            then
                 output.WriteError("Le driver NFS requiert les options --server et --export")
                 return 1
             else
-                let driverType =
-                    DriverMappings.parseVolumeDriver settings.Driver
+                let driverType = DriverMappings.parseVolumeDriver settings.Driver
 
                 let driverOpts = System.Collections.Generic.Dictionary<string, string>()
+
                 let addOpt (key: string) (value: string) =
                     if not (String.IsNullOrWhiteSpace value) then
                         driverOpts.[key] <- value
+
                 addOpt "path" settings.Path
                 addOpt "server" settings.Server
                 addOpt "share" settings.Share
                 addOpt "username" settings.Username
                 addOpt "password" settings.Password
                 addOpt "export" settings.Export
+
                 for pair in settings.Opts do
                     match pair.Split('=', 2) with
                     | [| k; v |] when not (String.IsNullOrWhiteSpace k) -> driverOpts.[k] <- v
                     | _ -> ()
 
                 use client = clients.CreateVolumeClient()
+
                 let! response =
                     client.CreateAsync(
                         name = settings.Name,
                         driver = driverType,
-                        ?driverOpts = (if driverOpts.Count > 0 then Some(driverOpts :> IDictionary<string, string>) else None))
+                        ?driverOpts =
+                            (if driverOpts.Count > 0 then
+                                 Some(driverOpts :> IDictionary<string, string>)
+                             else
+                                 None)
+                    )
+
                 output.WriteSuccess(sprintf "Volume %s créé (ID: %s)" response.Name response.Id)
                 return 0
         }
@@ -129,8 +163,12 @@ type CreateVolumeCommand(output: IOutputPort, clients: IDiploClients) =
 // ── remove ────────────────────────────────────────────────────────
 type RemoveVolumeSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandOption("-f|--force")>] member val Force = false with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandOption("-f|--force")>]
+    member val Force = false with get, set
 
 type RemoveVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RemoveVolumeSettings>()
@@ -144,6 +182,7 @@ type RemoveVolumeCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateVolumeClient()
                 let! response = client.RemoveAsync(settings.Id, settings.Force)
+
                 if response.Success then
                     output.WriteSuccess(response.Message)
                     return 0
@@ -155,8 +194,12 @@ type RemoveVolumeCommand(output: IOutputPort, clients: IDiploClients) =
 // ── mount ─────────────────────────────────────────────────────────
 type MountSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandArgument(1, "<TARGET>")>] member val Target: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandArgument(1, "<TARGET>")>]
+    member val Target: string = null with get, set
 
 type MountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<MountSettings>()
@@ -170,15 +213,23 @@ type MountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateVolumeClient()
                 let! response = client.MountAsync(settings.Id, settings.Target)
-                output.WriteSuccess(sprintf "Volume %s monté sur %s (%s)" settings.Id settings.Target response.Mountpoint)
+
+                output.WriteSuccess(
+                    sprintf "Volume %s monté sur %s (%s)" settings.Id settings.Target response.Mountpoint
+                )
+
                 return 0
         }
 
 // ── unmount ───────────────────────────────────────────────────────
 type UnmountSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandArgument(1, "<TARGET>")>] member val Target: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandArgument(1, "<TARGET>")>]
+    member val Target: string = null with get, set
 
 type UnmountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<UnmountSettings>()
@@ -208,11 +259,14 @@ type PruneVolumesCommand(output: IOutputPort, clients: IDiploClients) =
         task {
             use client = clients.CreateVolumeClient()
             let! response = client.PruneVolumesAsync()
+
             if response.Count > 0 then
                 output.WriteSuccess(response.Message)
+
                 for id in response.VolumesDeleted do
                     output.WriteLine(sprintf "  - %s" id)
             else
                 output.WriteWarning("Aucun volume à supprimer.")
+
             return 0
         }

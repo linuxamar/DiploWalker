@@ -56,18 +56,18 @@ let ``MockOutputPort.Clear remet tout à zéro`` () =
 let ``ComposeTabViewModel expose les 6 commandes ICommand`` () =
     let port = MockOutputPort()
     let vm = ComposeTabViewModel(port)
-    vm.ComposeUpCommand     |> should not' (be Null)
-    vm.ComposeDownCommand   |> should not' (be Null)
-    vm.ComposePsCommand     |> should not' (be Null)
-    vm.ComposeLogsCommand   |> should not' (be Null)
-    vm.ComposePullCommand   |> should not' (be Null)
-    vm.ComposeBuildCommand  |> should not' (be Null)
+    vm.ComposeUpCommand |> should not' (be Null)
+    vm.ComposeDownCommand |> should not' (be Null)
+    vm.ComposePsCommand |> should not' (be Null)
+    vm.ComposeLogsCommand |> should not' (be Null)
+    vm.ComposePullCommand |> should not' (be Null)
+    vm.ComposeBuildCommand |> should not' (be Null)
 
 [<Fact>]
 let ``ComposeTabViewModel etat initial`` () =
     let port = MockOutputPort()
     let vm = ComposeTabViewModel(port)
-    vm.ComposeFilePath   |> should equal ""
+    vm.ComposeFilePath |> should equal ""
     vm.ComposeServiceName |> should equal ""
     vm.ComposeServices.Count |> should equal 0
 
@@ -88,37 +88,37 @@ let ``ComposeTabViewModel proprietes declenchent PropertyChanged`` () =
 let ``ContainerTabViewModel expose les commandes ICommand`` () =
     let port = MockOutputPort()
     let vm = new ContainerTabViewModel(port)
-    vm.ListContainersCommand     |> should not' (be Null)
-    vm.StartContainerCommand     |> should not' (be Null)
-    vm.StopContainerCommand      |> should not' (be Null)
-    vm.DeleteContainerCommand    |> should not' (be Null)
-    vm.InspectContainerCommand   |> should not' (be Null)
-    vm.CreateContainerCommand    |> should not' (be Null)
-    vm.RenameContainerCommand    |> should not' (be Null)
-    vm.PullImageCommand          |> should not' (be Null)
-    vm.VersionCommand            |> should not' (be Null)
-    vm.TopContainerCommand       |> should not' (be Null)
-    vm.StatsContainerCommand     |> should not' (be Null)
-    vm.GetContainerLogsCommand   |> should not' (be Null)
-    vm.ExecInContainerCommand    |> should not' (be Null)
-    vm.ListNamespacesCommand     |> should not' (be Null)
-    vm.ListImagesCommand         |> should not' (be Null)
-    vm.InspectImageCommand       |> should not' (be Null)
-    vm.RemoveImageCommand        |> should not' (be Null)
-    vm.TagImageCommand           |> should not' (be Null)
-    vm.RegistryLoginCommand      |> should not' (be Null)
-    vm.RegistryLogoutCommand     |> should not' (be Null)
+    vm.ListContainersCommand |> should not' (be Null)
+    vm.StartContainerCommand |> should not' (be Null)
+    vm.StopContainerCommand |> should not' (be Null)
+    vm.DeleteContainerCommand |> should not' (be Null)
+    vm.InspectContainerCommand |> should not' (be Null)
+    vm.CreateContainerCommand |> should not' (be Null)
+    vm.RenameContainerCommand |> should not' (be Null)
+    vm.PullImageCommand |> should not' (be Null)
+    vm.VersionCommand |> should not' (be Null)
+    vm.TopContainerCommand |> should not' (be Null)
+    vm.StatsContainerCommand |> should not' (be Null)
+    vm.GetContainerLogsCommand |> should not' (be Null)
+    vm.ExecInContainerCommand |> should not' (be Null)
+    vm.ListNamespacesCommand |> should not' (be Null)
+    vm.ListImagesCommand |> should not' (be Null)
+    vm.InspectImageCommand |> should not' (be Null)
+    vm.RemoveImageCommand |> should not' (be Null)
+    vm.TagImageCommand |> should not' (be Null)
+    vm.RegistryLoginCommand |> should not' (be Null)
+    vm.RegistryLogoutCommand |> should not' (be Null)
 
 [<Fact>]
 let ``ContainerTabViewModel etat initial`` () =
     let port = MockOutputPort()
     let vm = new ContainerTabViewModel(port)
-    vm.ContainerIdInput     |> should equal ""
-    vm.ContainerNameInput   |> should equal ""
-    vm.ContainerMounts      |> should equal ""
-    vm.ContainerTimeout     |> should equal 10
-    vm.Containers.Count     |> should equal 0
-    vm.Images.Count         |> should equal 0
+    vm.ContainerIdInput |> should equal ""
+    vm.ContainerNameInput |> should equal ""
+    vm.ContainerMounts |> should equal ""
+    vm.ContainerTimeout |> should equal 10
+    vm.Containers.Count |> should equal 0
+    vm.Images.Count |> should equal 0
 
 [<Fact>]
 let ``ContainerTabViewModel user pull etat initial`` () =
@@ -139,9 +139,9 @@ let ``ContainerTabViewModel user pull declenche PropertyChanged`` () =
 let ``ContainerTabViewModel registres etat initial`` () =
     let port = MockOutputPort()
     let vm = new ContainerTabViewModel(port)
-    vm.RegistryInput           |> should equal ""
-    vm.RegistryUsernameInput   |> should equal ""
-    vm.RegistryPasswordInput   |> should equal ""
+    vm.RegistryInput |> should equal ""
+    vm.RegistryUsernameInput |> should equal ""
+    vm.RegistryPasswordInput |> should equal ""
 
 [<Fact>]
 let ``ContainerTabViewModel proprietes registres declenchent PropertyChanged`` () =
@@ -175,32 +175,32 @@ let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
 let ``VolumeTabViewModel expose les 10 commandes ICommand`` () =
     let port = MockOutputPort()
     let vm = VolumeTabViewModel(port)
-    vm.ListVolumesCommand     |> should not' (be Null)
-    vm.InspectVolumeCommand   |> should not' (be Null)
-    vm.CreateVolumeCommand    |> should not' (be Null)
-    vm.RemoveVolumeCommand    |> should not' (be Null)
-    vm.MountVolumeCommand     |> should not' (be Null)
-    vm.UnmountVolumeCommand   |> should not' (be Null)
-    vm.PruneVolumesCommand    |> should not' (be Null)
-    vm.CreateImageCommand     |> should not' (be Null)
-    vm.BrowseSourceCommand    |> should not' (be Null)
-    vm.BrowseDestCommand      |> should not' (be Null)
+    vm.ListVolumesCommand |> should not' (be Null)
+    vm.InspectVolumeCommand |> should not' (be Null)
+    vm.CreateVolumeCommand |> should not' (be Null)
+    vm.RemoveVolumeCommand |> should not' (be Null)
+    vm.MountVolumeCommand |> should not' (be Null)
+    vm.UnmountVolumeCommand |> should not' (be Null)
+    vm.PruneVolumesCommand |> should not' (be Null)
+    vm.CreateImageCommand |> should not' (be Null)
+    vm.BrowseSourceCommand |> should not' (be Null)
+    vm.BrowseDestCommand |> should not' (be Null)
 
 [<Fact>]
 let ``VolumeTabViewModel etat initial image disque`` () =
     let port = MockOutputPort()
     let vm = VolumeTabViewModel(port)
-    vm.ImageSourceDir  |> should equal ""
-    vm.ImageDestPath   |> should equal ""
-    vm.ImageFormat     |> should equal "raw"
+    vm.ImageSourceDir |> should equal ""
+    vm.ImageDestPath |> should equal ""
+    vm.ImageFormat |> should equal "raw"
 
 [<Fact>]
 let ``VolumeTabViewModel etat initial`` () =
     let port = MockOutputPort()
     let vm = VolumeTabViewModel(port)
-    vm.VolumeIdInput     |> should equal ""
-    vm.VolumeNameInput   |> should equal ""
-    vm.Volumes.Count     |> should equal 0
+    vm.VolumeIdInput |> should equal ""
+    vm.VolumeNameInput |> should equal ""
+    vm.Volumes.Count |> should equal 0
 
 // ── NetworkTabViewModel ─────────────────────────────────────█
 
@@ -208,43 +208,49 @@ let ``VolumeTabViewModel etat initial`` () =
 let ``NetworkTabViewModel expose les 8 commandes ICommand`` () =
     let port = MockOutputPort()
     let vm = NetworkTabViewModel(port)
-    vm.ListNetworksCommand       |> should not' (be Null)
-    vm.InspectNetworkCommand     |> should not' (be Null)
-    vm.CreateNetworkCommand      |> should not' (be Null)
-    vm.RemoveNetworkCommand      |> should not' (be Null)
-    vm.ConnectNetworkCommand     |> should not' (be Null)
-    vm.DisconnectNetworkCommand  |> should not' (be Null)
-    vm.RunCniPluginCommand       |> should not' (be Null)
-    vm.PruneNetworksCommand      |> should not' (be Null)
+    vm.ListNetworksCommand |> should not' (be Null)
+    vm.InspectNetworkCommand |> should not' (be Null)
+    vm.CreateNetworkCommand |> should not' (be Null)
+    vm.RemoveNetworkCommand |> should not' (be Null)
+    vm.ConnectNetworkCommand |> should not' (be Null)
+    vm.DisconnectNetworkCommand |> should not' (be Null)
+    vm.RunCniPluginCommand |> should not' (be Null)
+    vm.PruneNetworksCommand |> should not' (be Null)
 
 [<Fact>]
 let ``NetworkTabViewModel etat initial`` () =
     let port = MockOutputPort()
     let vm = NetworkTabViewModel(port)
-    vm.NetworkIdInput   |> should equal ""
+    vm.NetworkIdInput |> should equal ""
     vm.NetworkNameInput |> should equal ""
-    vm.Networks.Count   |> should equal 0
+    vm.Networks.Count |> should equal 0
 
 // ── SettingsTabViewModel ────────────────────────────────
 
 let private withConfigHome (action: string -> unit) =
     let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
-    let home = Path.Combine(Path.GetTempPath(), "diplo-gui-config-" + Guid.NewGuid().ToString("N"))
+
+    let home =
+        Path.Combine(Path.GetTempPath(), "diplo-gui-config-" + Guid.NewGuid().ToString("N"))
+
     Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", home)
+
     try
         action home
     finally
         Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
-        DiploConfig.invalidate()
-        if Directory.Exists home then Directory.Delete(home, true)
+        DiploConfig.invalidate ()
+
+        if Directory.Exists home then
+            Directory.Delete(home, true)
 
 [<Fact>]
 let ``SettingsTabViewModel expose les commandes ICommand`` () =
     withConfigHome (fun _ ->
         let port = MockOutputPort()
         let vm = SettingsTabViewModel(port)
-        vm.SaveCommand     |> should not' (be Null)
-        vm.ReloadCommand   |> should not' (be Null))
+        vm.SaveCommand |> should not' (be Null)
+        vm.ReloadCommand |> should not' (be Null))
 
 [<Fact>]
 let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
@@ -271,7 +277,11 @@ let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` ()
         c |> should equal (Some "http://pipe:/diplo-container")
         v |> should equal (Some "http://localhost:9002")
         n |> should equal (Some "http://localhost:9003")
-        port.Messages |> Seq.exists (fun m -> m.Contains "Configuration client enregistrée") |> should equal true
+
+        port.Messages
+        |> Seq.exists (fun m -> m.Contains "Configuration client enregistrée")
+        |> should equal true
+
         vm.StatusMessage |> should haveSubstring "Configuration enregistrée")
 
 [<Fact>]
@@ -292,8 +302,11 @@ let ``SettingsTabViewModel SaveCommand applique la configuration sans redemarrag
         vm.VolumeAddress <- "localhost:9002"
         vm.NetworkAddress <- "localhost:9003"
         (vm.SaveCommand).Execute(null)
-        DiploConfig.containerAddress() |> should equal (Some "http://pipe:/diplo-container")
-        DiploConfig.volumeAddress() |> should equal (Some "http://localhost:9002"))
+
+        DiploConfig.containerAddress ()
+        |> should equal (Some "http://pipe:/diplo-container")
+
+        DiploConfig.volumeAddress () |> should equal (Some "http://localhost:9002"))
 
 [<Fact>]
 let ``SettingsTabViewModel ReloadCommand relit la configuration depuis le disque`` () =
@@ -321,23 +334,36 @@ let private streamOf (lines: string list) : IAsyncEnumerable<ContainerLogEntry> 
     { new IAsyncEnumerable<ContainerLogEntry> with
         member _.GetAsyncEnumerator(_ct) =
             let e = (lines |> List.map fakeEntry |> Seq.ofList).GetEnumerator()
+
             { new IAsyncEnumerator<ContainerLogEntry> with
                 member _.Current = e.Current
                 member _.MoveNextAsync() = ValueTask<bool>(e.MoveNext())
-                member _.DisposeAsync() = e.Dispose(); ValueTask() } }
+
+                member _.DisposeAsync() =
+                    e.Dispose()
+                    ValueTask() } }
 
 let private fakeLogsSource () : IContainerLogsSource =
     { new IContainerLogsSource with
         member _.GetStream(id, follow, tail, since, ct) = streamOf [ "ligne 1"; "ligne 2" ]
+
         member _.GetSnapshot(id, tail, since, ct) =
-            task { return seq { fakeEntry "ligne 1"; fakeEntry "ligne 2" } }
+            task {
+                return
+                    seq {
+                        fakeEntry "ligne 1"
+                        fakeEntry "ligne 2"
+                    }
+            }
       interface IDisposable with
-        member _.Dispose() = () }
+          member _.Dispose() = () }
 
 let private waitUntil (predicate: unit -> bool) =
     let sw = Diagnostics.Stopwatch.StartNew()
+
     while not (predicate ()) && sw.ElapsedMilliseconds < 2000L do
         Thread.Sleep(20)
+
     predicate ()
 
 [<Fact>]
@@ -375,6 +401,7 @@ let ``ComposeEditorViewModel etat initial`` () =
 [<Fact>]
 let ``ComposeEditorViewModel LoadFile charge le contenu`` () =
     let dir = TestHelpers.createTempDir "editor-test"
+
     try
         let path = IO.Path.Combine(dir, "docker-compose.yml")
         IO.File.WriteAllText(path, "version: \"3.8\"\nservices:\n  web:\n    image: nginx\n")
@@ -427,6 +454,7 @@ let ``ComposeEditorViewModel Validate detecte un document vide`` () =
 [<Fact>]
 let ``ComposeEditorViewModel Save ecrit sur le disque`` () =
     let dir = TestHelpers.createTempDir "editor-save"
+
     try
         let path = IO.Path.Combine(dir, "docker-compose.yml")
         let vm = ComposeEditorViewModel()
@@ -453,10 +481,10 @@ let ``ComposeEditorViewModel proprietes declenchent PropertyChanged`` () =
 let ``ComposeTabViewModel expose les commandes de l'editeur`` () =
     let port = MockOutputPort()
     let vm = ComposeTabViewModel(port)
-    vm.OpenComposeFileCommand     |> should not' (be Null)
-    vm.SaveComposeFileCommand     |> should not' (be Null)
+    vm.OpenComposeFileCommand |> should not' (be Null)
+    vm.SaveComposeFileCommand |> should not' (be Null)
     vm.ValidateComposeFileCommand |> should not' (be Null)
-    vm.InspectImageCommand        |> should not' (be Null)
+    vm.InspectImageCommand |> should not' (be Null)
 
 [<Fact>]
 let ``ComposeTabViewModel ComposeEditor n'est pas null`` () =
@@ -500,11 +528,14 @@ let ``ComposeTabViewModel SaveComposeFile sans fichier ouvre le dialogue`` () =
     let vm = ComposeTabViewModel(port)
     (vm.SaveComposeFileCommand :> System.Windows.Input.ICommand).Execute(null)
     // Sans storageProvider, écrit un avertissement
-    port.Warnings |> Seq.exists (fun w -> w.Contains "Fournisseur") |> should equal true
+    port.Warnings
+    |> Seq.exists (fun w -> w.Contains "Fournisseur")
+    |> should equal true
 
 [<Fact>]
 let ``ComposeTabViewModel ComposeFilePath charge l'editeur`` () =
     let dir = TestHelpers.createTempDir "compose-load"
+
     try
         let path = IO.Path.Combine(dir, "docker-compose.yml")
         IO.File.WriteAllText(path, "services:\n  web:\n    image: nginx\n")

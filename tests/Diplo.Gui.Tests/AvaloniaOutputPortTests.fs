@@ -7,20 +7,16 @@ open Diplo.Gui.Services
 // ── LogLevel ──────────────────────────────────────────────────
 
 [<Fact>]
-let ``LogLevel.Info est reconnu`` () =
-    Info |> should equal Info
+let ``LogLevel.Info est reconnu`` () = Info |> should equal Info
 
 [<Fact>]
-let ``LogLevel.Success est reconnu`` () =
-    Success |> should equal Success
+let ``LogLevel.Success est reconnu`` () = Success |> should equal Success
 
 [<Fact>]
-let ``LogLevel.Warning est reconnu`` () =
-    Warning |> should equal Warning
+let ``LogLevel.Warning est reconnu`` () = Warning |> should equal Warning
 
 [<Fact>]
-let ``LogLevel.Error est reconnu`` () =
-    Error |> should equal Error
+let ``LogLevel.Error est reconnu`` () = Error |> should equal Error
 
 [<Fact>]
 let ``LogLevel discriminent sont distincts`` () =

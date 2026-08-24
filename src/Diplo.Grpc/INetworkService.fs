@@ -12,13 +12,16 @@ type INetworkService =
 
     abstract member RemoveNetwork: request: RemoveNetworkRequest * ct: CancellationToken -> Task<RemoveNetworkResponse>
 
-    abstract member InspectNetwork: request: InspectNetworkRequest * ct: CancellationToken -> Task<InspectNetworkResponse>
+    abstract member InspectNetwork:
+        request: InspectNetworkRequest * ct: CancellationToken -> Task<InspectNetworkResponse>
 
     abstract member ListNetworks: request: ListNetworksRequest * ct: CancellationToken -> Task<ListNetworksResponse>
 
-    abstract member ConnectContainer: request: ConnectContainerRequest * ct: CancellationToken -> Task<ConnectContainerResponse>
+    abstract member ConnectContainer:
+        request: ConnectContainerRequest * ct: CancellationToken -> Task<ConnectContainerResponse>
 
-    abstract member DisconnectContainer: request: DisconnectContainerRequest * ct: CancellationToken -> Task<DisconnectContainerResponse>
+    abstract member DisconnectContainer:
+        request: DisconnectContainerRequest * ct: CancellationToken -> Task<DisconnectContainerResponse>
 
     abstract member RunCniPlugin: request: RunCniPluginRequest * ct: CancellationToken -> Task<RunCniPluginResponse>
 

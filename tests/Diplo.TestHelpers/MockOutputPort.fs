@@ -19,7 +19,9 @@ type MockOutputPort() =
     member _.Successes = successes |> Seq.toList
     member _.Warnings = warnings |> Seq.toList
     member _.Tables = tables |> Seq.toList
-    member _.HasOutput = lines.Count > 0 || errors.Count > 0 || successes.Count > 0 || warnings.Count > 0
+
+    member _.HasOutput =
+        lines.Count > 0 || errors.Count > 0 || successes.Count > 0 || warnings.Count > 0
 
     member _.Reset() =
         lines.Clear()

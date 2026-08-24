@@ -11,13 +11,12 @@ open Diplo.Core.Output
 open Diplo.Grpc.Volume
 open Diplo.Disk
 
-type VolumeDisplayInfo = {
-    Id: string
-    Nom: string
-    Driver: string
-    PointDeMontage: string
-    Taille: string
-}
+type VolumeDisplayInfo =
+    { Id: string
+      Nom: string
+      Driver: string
+      PointDeMontage: string
+      Taille: string }
 
 type VolumeTabViewModel(outputPort: IOutputPort) as this =
     inherit ViewModelBase()
@@ -33,14 +32,20 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     let mutable imageSourceDir = ""
     let mutable imageDestPath = ""
     let mutable imageFormat = "raw"
-    let mutable storageProvider : IStorageProvider = null
+    let mutable storageProvider: IStorageProvider = null
 
     let listVolumesCmd = RelayCommand(Action(fun () -> this.ListVolumes() |> ignore))
-    let inspectVolumeCmd = RelayCommand(Action(fun () -> this.InspectVolume() |> ignore))
+
+    let inspectVolumeCmd =
+        RelayCommand(Action(fun () -> this.InspectVolume() |> ignore))
+
     let createVolumeCmd = RelayCommand(Action(fun () -> this.CreateVolume() |> ignore))
     let removeVolumeCmd = RelayCommand(Action(fun () -> this.RemoveVolume() |> ignore))
     let mountVolumeCmd = RelayCommand(Action(fun () -> this.MountVolume() |> ignore))
-    let unmountVolumeCmd = RelayCommand(Action(fun () -> this.UnmountVolume() |> ignore))
+
+    let unmountVolumeCmd =
+        RelayCommand(Action(fun () -> this.UnmountVolume() |> ignore))
+
     let pruneVolumesCmd = RelayCommand(Action(fun () -> this.PruneVolumes() |> ignore))
     let createImageCmd = RelayCommand(Action(fun () -> this.CreateImage() |> ignore))
     let browseSourceCmd = RelayCommand(Action(fun () -> this.BrowseSource() |> ignore))
@@ -48,17 +53,55 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
 
     member _.Volumes = volumes
 
-    member _.VolumeIdInput with get () = volumeIdInput and set v = volumeIdInput <- v; this.OnPropertyChanged()
-    member _.VolumeNameInput with get () = volumeNameInput and set v = volumeNameInput <- v; this.OnPropertyChanged()
-    member _.VolumeDriver with get () = volumeDriver and set v = volumeDriver <- v; this.OnPropertyChanged()
-    member _.VolumeTargetPath with get () = volumeTargetPath and set v = volumeTargetPath <- v; this.OnPropertyChanged()
-    member _.VolumeForce with get () = volumeForce and set v = volumeForce <- v; this.OnPropertyChanged()
-    member _.ImageSourceDir with get () = imageSourceDir and set v = imageSourceDir <- v; this.OnPropertyChanged()
-    member _.ImageDestPath with get () = imageDestPath and set v = imageDestPath <- v; this.OnPropertyChanged()
-    member _.ImageFormat with get () = imageFormat and set v = imageFormat <- v; this.OnPropertyChanged()
+    member _.VolumeIdInput
+        with get () = volumeIdInput
+        and set v =
+            volumeIdInput <- v
+            this.OnPropertyChanged()
 
-    member _.SetStorageProvider(sp: IStorageProvider) =
-        storageProvider <- sp
+    member _.VolumeNameInput
+        with get () = volumeNameInput
+        and set v =
+            volumeNameInput <- v
+            this.OnPropertyChanged()
+
+    member _.VolumeDriver
+        with get () = volumeDriver
+        and set v =
+            volumeDriver <- v
+            this.OnPropertyChanged()
+
+    member _.VolumeTargetPath
+        with get () = volumeTargetPath
+        and set v =
+            volumeTargetPath <- v
+            this.OnPropertyChanged()
+
+    member _.VolumeForce
+        with get () = volumeForce
+        and set v =
+            volumeForce <- v
+            this.OnPropertyChanged()
+
+    member _.ImageSourceDir
+        with get () = imageSourceDir
+        and set v =
+            imageSourceDir <- v
+            this.OnPropertyChanged()
+
+    member _.ImageDestPath
+        with get () = imageDestPath
+        and set v =
+            imageDestPath <- v
+            this.OnPropertyChanged()
+
+    member _.ImageFormat
+        with get () = imageFormat
+        and set v =
+            imageFormat <- v
+            this.OnPropertyChanged()
+
+    member _.SetStorageProvider(sp: IStorageProvider) = storageProvider <- sp
 
     member _.ListVolumesCommand = listVolumesCmd
     member _.InspectVolumeCommand = inspectVolumeCmd
@@ -73,51 +116,69 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
 
     member private this.BrowseSource() =
         task {
-            if isNull storageProvider then ()
+            if isNull storageProvider then
+                ()
             else
-                let folders = storageProvider.OpenFolderPickerAsync(FolderPickerOpenOptions(
-                    Title = "Sélectionner le répertoire source",
-                    AllowMultiple = false))
+                let folders =
+                    storageProvider.OpenFolderPickerAsync(
+                        FolderPickerOpenOptions(Title = "Sélectionner le répertoire source", AllowMultiple = false)
+                    )
+
                 let! result = folders
+
                 if result.Count > 0 then
                     this.ImageSourceDir <- result.[0].Path.LocalPath
-        } |> ignore
+        }
+        |> ignore
 
     member private this.BrowseDest() =
         task {
-            if isNull storageProvider then ()
+            if isNull storageProvider then
+                ()
             else
-                let files = storageProvider.OpenFilePickerAsync(FilePickerOpenOptions(
-                    Title = "Enregistrer l'image disque sous",
-                    AllowMultiple = false,
-                    FileTypeFilter = [
-                        FilePickerFileType("VHD", Patterns = [| "*.vhd" |])
-                        FilePickerFileType("VHDX", Patterns = [| "*.vhdx" |])
-                        FilePickerFileType("VMDK", Patterns = [| "*.vmdk" |])
-                        FilePickerFileType("VDI", Patterns = [| "*.vdi" |])
-                        FilePickerFileType("Raw", Patterns = [| "*.img"; "*.raw" |])
-                        FilePickerFileType("Tous", Patterns = [| "*.*" |])
-                    ]))
+                let files =
+                    storageProvider.OpenFilePickerAsync(
+                        FilePickerOpenOptions(
+                            Title = "Enregistrer l'image disque sous",
+                            AllowMultiple = false,
+                            FileTypeFilter =
+                                [ FilePickerFileType("VHD", Patterns = [| "*.vhd" |])
+                                  FilePickerFileType("VHDX", Patterns = [| "*.vhdx" |])
+                                  FilePickerFileType("VMDK", Patterns = [| "*.vmdk" |])
+                                  FilePickerFileType("VDI", Patterns = [| "*.vdi" |])
+                                  FilePickerFileType("Raw", Patterns = [| "*.img"; "*.raw" |])
+                                  FilePickerFileType("Tous", Patterns = [| "*.*" |]) ]
+                        )
+                    )
+
                 let! result = files
+
                 if result.Count > 0 then
                     this.ImageDestPath <- result.[0].Path.LocalPath
-        } |> ignore
+        }
+        |> ignore
 
     member private this.ListVolumes() =
         Cmd.run outputPort (fun () ->
             task {
                 let! response = volumeClient.ListAsync()
+
                 Dispatcher.UIThread.Post(fun () ->
                     volumes.Clear()
+
                     for v in response.Volumes do
-                        volumes.Add({
-                            Id = v.Id
-                            Nom = v.Name
-                            Driver = v.Driver.ToString()
-                            PointDeMontage = v.Mountpoint
-                            Taille = if v.SizeBytes > 0L then sprintf "%d octets" v.SizeBytes else "-"
-                        })
-                )
+                        volumes.Add(
+                            { Id = v.Id
+                              Nom = v.Name
+                              Driver = v.Driver.ToString()
+                              PointDeMontage = v.Mountpoint
+                              Taille =
+                                if v.SizeBytes > 0L then
+                                    sprintf "%d octets" v.SizeBytes
+                                else
+                                    "-" }
+                        ))
+
                 outputPort.WriteSuccess(sprintf "%d volume(s) trouvé(s)" response.Volumes.Count)
             })
 
@@ -130,6 +191,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                 outputPort.WriteLine(sprintf "Driver: %s" (response.Driver.ToString()))
                 outputPort.WriteLine(sprintf "Point de montage: %s" response.Mountpoint)
                 outputPort.WriteLine(sprintf "État: %s" (response.State.ToString()))
+
                 if response.SizeBytes > 0L then
                     outputPort.WriteLine(sprintf "Taille: %d octets" response.SizeBytes)
             })
@@ -137,8 +199,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member private this.CreateVolume() =
         Cmd.run outputPort (fun () ->
             task {
-                let driverEnum =
-                    DriverMappings.parseVolumeDriver this.VolumeDriver
+                let driverEnum = DriverMappings.parseVolumeDriver this.VolumeDriver
                 let! response = volumeClient.CreateAsync(name = this.VolumeNameInput, driver = driverEnum)
                 outputPort.WriteSuccess(sprintf "Volume %s créé (ID: %s)" this.VolumeNameInput response.Id)
             })
@@ -147,6 +208,7 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
         Cmd.run outputPort (fun () ->
             task {
                 let! response = volumeClient.RemoveAsync(id = this.VolumeIdInput, force = this.VolumeForce)
+
                 if response.Success then
                     outputPort.WriteSuccess(sprintf "Volume %s supprimé" this.VolumeIdInput)
                 else
@@ -157,14 +219,20 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
         Cmd.run outputPort (fun () ->
             task {
                 let! response = volumeClient.MountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
-                outputPort.WriteSuccess(sprintf "Volume %s monté sur %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
+
+                outputPort.WriteSuccess(
+                    sprintf "Volume %s monté sur %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message
+                )
             })
 
     member private this.UnmountVolume() =
         Cmd.run outputPort (fun () ->
             task {
                 let! response = volumeClient.UnmountAsync(id = this.VolumeIdInput, targetPath = this.VolumeTargetPath)
-                outputPort.WriteSuccess(sprintf "Volume %s démonté de %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message)
+
+                outputPort.WriteSuccess(
+                    sprintf "Volume %s démonté de %s - %s" this.VolumeIdInput this.VolumeTargetPath response.Message
+                )
             })
 
     member private this.PruneVolumes() =
@@ -190,12 +258,25 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                         | "vhdx" -> Some DiskFormat.Vhdx
                         | "vmdk" -> Some DiskFormat.Vmdk
                         | "vdi" -> Some DiskFormat.Vdi
-                        | "raw" | "" -> Some DiskFormat.Raw
-                        | other -> outputPort.WriteError(sprintf "Format inconnu : '%s' (utilisez vhd, vhdx, vmdk, vdi ou raw)" other); None
+                        | "raw"
+                        | "" -> Some DiskFormat.Raw
+                        | other ->
+                            outputPort.WriteError(
+                                sprintf "Format inconnu : '%s' (utilisez vhd, vhdx, vmdk, vdi ou raw)" other
+                            )
+
+                            None
+
                     match formatOpt with
                     | None -> ()
                     | Some format ->
-                        outputPort.WriteLine(sprintf "Création de l'image '%s' au format %s…" this.ImageDestPath (DiskFormat.toString format))
+                        outputPort.WriteLine(
+                            sprintf
+                                "Création de l'image '%s' au format %s…"
+                                this.ImageDestPath
+                                (DiskFormat.toString format)
+                        )
+
                         let result = FsImage.create this.ImageSourceDir this.ImageDestPath format
                         let size = System.IO.FileInfo(result).Length
                         outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))

@@ -14,13 +14,20 @@ module AtomicFile =
     /// créé au besoin).
     let write (path: string) (content: string) : unit =
         let dir = Path.GetDirectoryName(path)
+
         if not (String.IsNullOrEmpty dir) && not (Directory.Exists dir) then
             Directory.CreateDirectory(dir) |> ignore
+
         let name = Path.GetFileName(path)
+
         let tmp =
-            if String.IsNullOrEmpty dir then name + "." + Guid.NewGuid().ToString("N") + ".tmp"
-            else Path.Combine(dir, name + "." + Guid.NewGuid().ToString("N") + ".tmp")
+            if String.IsNullOrEmpty dir then
+                name + "." + Guid.NewGuid().ToString("N") + ".tmp"
+            else
+                Path.Combine(dir, name + "." + Guid.NewGuid().ToString("N") + ".tmp")
+
         File.WriteAllText(tmp, content)
+
         try
             File.Replace(tmp, path, null)
         with :? FileNotFoundException ->

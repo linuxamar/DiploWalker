@@ -28,14 +28,17 @@ type MainWindowViewModel() as this =
     let updateLog () =
         logText.Clear() |> ignore
         let start = max 0 (outputPort.LogLines.Count - maxLogLines)
+
         for i in start .. outputPort.LogLines.Count - 1 do
             logText.AppendLine(outputPort.LogLines.[i].DisplayText) |> ignore
+
         this.OnPropertyChanged(nameof this.LogOutput)
 
-    do outputPort.LogLines.CollectionChanged.Add(fun _ ->
-        Dispatcher.UIThread.Post(fun () ->
-            trimLogLines ()
-            updateLog ()))
+    do
+        outputPort.LogLines.CollectionChanged.Add(fun _ ->
+            Dispatcher.UIThread.Post(fun () ->
+                trimLogLines ()
+                updateLog ()))
 
     member _.OutputPort = outputPort :> IOutputPort
     member _.LogOutput = logText.ToString()
@@ -47,13 +50,18 @@ type MainWindowViewModel() as this =
     member _.SettingsTab = settingsTab
 
     member _.QuitCommand: ICommand =
-        RelayCommand(Action(fun () ->
-            match Application.Current.ApplicationLifetime with
-            | :? IClassicDesktopStyleApplicationLifetime as desktop ->
-                desktop.Shutdown(0)
-            | _ -> ()))
+        RelayCommand(
+            Action(fun () ->
+                match Application.Current.ApplicationLifetime with
+                | :? IClassicDesktopStyleApplicationLifetime as desktop -> desktop.Shutdown(0)
+                | _ -> ())
+        )
 
     member _.AboutCommand: ICommand =
-        RelayCommand(Action(fun () ->
-            (outputPort :> IOutputPort).WriteLine("Diplo — Gestion Docker")
-            (outputPort :> IOutputPort).WriteLine("Interface graphique Avalonia pour la gestion de conteneurs, volumes et réseaux.")))
+        RelayCommand(
+            Action(fun () ->
+                (outputPort :> IOutputPort).WriteLine("Diplo — Gestion Docker")
+
+                (outputPort :> IOutputPort)
+                    .WriteLine("Interface graphique Avalonia pour la gestion de conteneurs, volumes et réseaux."))
+        )

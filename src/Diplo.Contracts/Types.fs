@@ -15,10 +15,9 @@ module Types =
         | Failed
 
     /// Informations sur un conteneur
-    type ContainerInfo = {
-        Id: ContainerId
-        Name: string
-        Image: string
-        State: ContainerState
-        CreatedAt: System.DateTime
-    }
+    type ContainerInfo =
+        { Id: ContainerId
+          Name: string
+          Image: string
+          State: ContainerState
+          CreatedAt: System.DateTime }

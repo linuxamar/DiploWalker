@@ -11,6 +11,7 @@ module CommandLine =
         let tokens = ResizeArray<string>()
         let current = StringBuilder()
         let mutable inQuotes = false
+
         for c in line do
             match c with
             | '"' -> inQuotes <- not inQuotes
@@ -19,9 +20,10 @@ module CommandLine =
                     tokens.Add(current.ToString())
                     current.Clear() |> ignore
             | c -> current.Append(c) |> ignore
+
         if current.Length > 0 then
             tokens.Add(current.ToString())
+
         tokens |> List.ofSeq
 
-    let join (args: string seq) : string =
-        System.String.Join(" ", args)
+    let join (args: string seq) : string = System.String.Join(" ", args)

@@ -5,6 +5,8 @@ namespace Diplo.Core.Clients
 type DiploClients() =
 
     interface IDiploClients with
-        member _.CreateContainerClient() = new ContainerClient() :> IContainerClient
+        member _.CreateContainerClient() =
+            new ContainerClient() :> IContainerClient
+
         member _.CreateNetworkClient() = new NetworkClient() :> INetworkClient
         member _.CreateVolumeClient() = new VolumeClient() :> IVolumeClient

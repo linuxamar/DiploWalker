@@ -9,20 +9,12 @@ type RelayCommand(execute: Action<obj>, canExecute: Func<obj, bool>) =
 
     let canExecuteChanged = Event<EventHandler, EventArgs>()
 
-    new(execute: Action) =
-        RelayCommand(
-            Action<obj>(fun _ -> execute.Invoke()),
-            Func<obj, bool>(fun _ -> true))
+    new(execute: Action) = RelayCommand(Action<obj>(fun _ -> execute.Invoke()), Func<obj, bool>(fun _ -> true))
 
-    new(execute: Func<obj, bool>) =
-        RelayCommand(
-            Action<obj>(fun o -> ignore (execute.Invoke(o))),
-            execute)
+    new(execute: Func<obj, bool>) = RelayCommand(Action<obj>(fun o -> ignore (execute.Invoke(o))), execute)
 
     new(execute: Action, canExecute: Func<bool>) =
-        RelayCommand(
-            Action<obj>(fun _ -> execute.Invoke()),
-            Func<obj, bool>(fun _ -> canExecute.Invoke()))
+        RelayCommand(Action<obj>(fun _ -> execute.Invoke()), Func<obj, bool>(fun _ -> canExecute.Invoke()))
 
     member _.RaiseCanExecuteChanged() =
         canExecuteChanged.Trigger(null, EventArgs.Empty)
@@ -30,6 +22,7 @@ type RelayCommand(execute: Action<obj>, canExecute: Func<obj, bool>) =
     interface ICommand with
         member _.CanExecute(param) = canExecute.Invoke(param)
         member _.Execute(param) = execute.Invoke(param)
+
         [<CLIEvent>]
         member _.CanExecuteChanged = canExecuteChanged.Publish
 
@@ -39,8 +32,8 @@ type ViewModelBase() =
     let propertyChanged = Event<PropertyChangedEventHandler, PropertyChangedEventArgs>()
 
     member this.OnPropertyChanged([<CallerMemberName>] ?name: string) =
-        name |> Option.iter (fun n ->
-            propertyChanged.Trigger(this, PropertyChangedEventArgs(n)))
+        name
+        |> Option.iter (fun n -> propertyChanged.Trigger(this, PropertyChangedEventArgs(n)))
 
     [<CLIEvent>]
     member _.PropertyChanged = propertyChanged.Publish

@@ -47,18 +47,18 @@ module NetworkConfigTests =
 
     [<Fact>]
     let ``round-trip serialisation preserves tous les champs`` () =
-        let config = {
-            defaultConfig with
+        let config =
+            { defaultConfig with
                 CniVersion = "0.4.0"
                 NatName = "custom-nat"
                 Subnet = "10.0.0.0/16"
                 Gateway = "10.0.0.1"
                 MasterInterface = "Ethernet 2"
                 AutoDetect = false
-                SubnetCandidates = ["192.168.0.0/16"]
+                SubnetCandidates = [ "192.168.0.0/16" ]
                 PortMappings = false
-                Dns = false
-        }
+                Dns = false }
+
         let json = serializeConfig config
         let restored = deserializeConfig json
         restored.CniVersion |> should equal "0.4.0"
@@ -67,7 +67,7 @@ module NetworkConfigTests =
         restored.Gateway |> should equal "10.0.0.1"
         restored.MasterInterface |> should equal "Ethernet 2"
         restored.AutoDetect |> should equal false
-        restored.SubnetCandidates |> should equal ["192.168.0.0/16"]
+        restored.SubnetCandidates |> should equal [ "192.168.0.0/16" ]
         restored.PortMappings |> should equal false
         restored.Dns |> should equal false
 
@@ -75,7 +75,9 @@ module NetworkConfigTests =
 
     [<Fact>]
     let ``loadConfig retourne defaultConfig si fichier absent`` () =
-        let tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "network.json")
+        let tempPath =
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "network.json")
+
         let config = loadConfig (Some tempPath)
         config.CniVersion |> should equal defaultConfig.CniVersion
         config.NatName |> should equal defaultConfig.NatName
@@ -85,12 +87,13 @@ module NetworkConfigTests =
         let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
         Directory.CreateDirectory(tempDir) |> ignore
         let tempPath = Path.Combine(tempDir, "network.json")
-        let config = {
-            defaultConfig with
+
+        let config =
+            { defaultConfig with
                 CniVersion = "0.4.0"
                 NatName = "test-nat"
-                Subnet = "10.10.0.0/16"
-        }
+                Subnet = "10.10.0.0/16" }
+
         saveConfig (Some tempPath) config
         let loaded = loadConfig (Some tempPath)
         loaded.CniVersion |> should equal "0.4.0"
@@ -123,28 +126,28 @@ module NetworkConfigTests =
 
     [<Fact>]
     let ``findAvailableSubnet retourne le premier candidat non utilise`` () =
-        let candidates = ["172.18.0.0/16"; "172.19.0.0/16"; "172.20.0.0/16"]
+        let candidates = [ "172.18.0.0/16"; "172.19.0.0/16"; "172.20.0.0/16" ]
         let used = Set.empty
         let result = findAvailableSubnet candidates used
         result |> should equal "172.18.0.0/16"
 
     [<Fact>]
     let ``findAvailableSubnet saute les prefixes utilises`` () =
-        let candidates = ["172.18.0.0/16"; "172.19.0.0/16"; "172.20.0.0/16"]
-        let used = Set.ofList ["172.18.1.5"]
+        let candidates = [ "172.18.0.0/16"; "172.19.0.0/16"; "172.20.0.0/16" ]
+        let used = Set.ofList [ "172.18.1.5" ]
         let result = findAvailableSubnet candidates used
         result |> should equal "172.19.0.0/16"
 
     [<Fact>]
     let ``findAvailableSubnet saute tous les prefixes utilises et prend le premier`` () =
-        let candidates = ["172.18.0.0/16"; "172.19.0.0/16"]
-        let used = Set.ofList ["172.18.1.5"; "172.19.2.1"]
+        let candidates = [ "172.18.0.0/16"; "172.19.0.0/16" ]
+        let used = Set.ofList [ "172.18.1.5"; "172.19.2.1" ]
         let result = findAvailableSubnet candidates used
         result |> should equal "172.18.0.0/16"
 
     [<Fact>]
     let ``findAvailableSubnet avec une seule candidate retourne cette candidate`` () =
-        let candidates = ["10.244.0.0/16"]
+        let candidates = [ "10.244.0.0/16" ]
         let result = findAvailableSubnet candidates Set.empty
         result |> should equal "10.244.0.0/16"
 
@@ -166,19 +169,31 @@ module NetworkConfigTests =
 
     [<Fact>]
     let ``resolveSubnet retourne le subnet specifie si non vide`` () =
-        let config = { defaultConfig with Subnet = "192.168.1.0/24"; AutoDetect = true }
+        let config =
+            { defaultConfig with
+                Subnet = "192.168.1.0/24"
+                AutoDetect = true }
+
         let result = resolveSubnet config Set.empty
         result |> should equal "192.168.1.0/24"
 
     [<Fact>]
     let ``resolveSubnet auto-detecte si subnet vide et AutoDetect true`` () =
-        let config = { defaultConfig with Subnet = ""; AutoDetect = true }
+        let config =
+            { defaultConfig with
+                Subnet = ""
+                AutoDetect = true }
+
         let result = resolveSubnet config Set.empty
         result |> should not' (equal "")
 
     [<Fact>]
     let ``resolveSubnet prend le premier candidat si subnet vide et AutoDetect false`` () =
-        let config = { defaultConfig with Subnet = ""; AutoDetect = false }
+        let config =
+            { defaultConfig with
+                Subnet = ""
+                AutoDetect = false }
+
         let result = resolveSubnet config Set.empty
         result |> should equal (defaultBridgeCandidates |> List.head)
 
@@ -186,7 +201,10 @@ module NetworkConfigTests =
 
     [<Fact>]
     let ``resolveGateway retourne le gateway specifie si non vide`` () =
-        let config = { defaultConfig with Gateway = "10.0.0.254" }
+        let config =
+            { defaultConfig with
+                Gateway = "10.0.0.254" }
+
         let result = resolveGateway config "10.0.0.0/16"
         result |> should equal "10.0.0.254"
 
@@ -200,32 +218,52 @@ module NetworkConfigTests =
 
     [<Fact>]
     let ``generateCniConflistJson contient le bon cniVersion`` () =
-        let config = { defaultConfig with CniVersion = "1.0.0"; NatName = "nat" }
+        let config =
+            { defaultConfig with
+                CniVersion = "1.0.0"
+                NatName = "nat" }
+
         let json = generateCniConflistJson config "172.20.0.0/16" "172.20.0.1"
         json.Contains("\"cniVersion\": \"1.0.0\"") |> should equal true
 
     [<Fact>]
     let ``generateCniConflistJson contient le bon subnet`` () =
-        let config = { defaultConfig with CniVersion = "1.0.0" }
+        let config =
+            { defaultConfig with
+                CniVersion = "1.0.0" }
+
         let json = generateCniConflistJson config "10.100.0.0/16" "10.100.0.1"
         json.Contains("\"subnet\": \"10.100.0.0/16\"") |> should equal true
 
     [<Fact>]
     let ``generateCniConflistJson contient le bon gateway`` () =
-        let config = { defaultConfig with CniVersion = "1.0.0" }
+        let config =
+            { defaultConfig with
+                CniVersion = "1.0.0" }
+
         let json = generateCniConflistJson config "172.20.0.0/16" "172.20.0.1"
         json.Contains("\"gateway\": \"172.20.0.1\"") |> should equal true
 
     [<Fact>]
     let ``generateCniConflistJson contient portMappings et dns`` () =
-        let config = { defaultConfig with CniVersion = "1.0.0"; PortMappings = true; Dns = true }
+        let config =
+            { defaultConfig with
+                CniVersion = "1.0.0"
+                PortMappings = true
+                Dns = true }
+
         let json = generateCniConflistJson config "172.20.0.0/16" "172.20.0.1"
         json.Contains("\"portMappings\": true") |> should equal true
         json.Contains("\"dns\": true") |> should equal true
 
     [<Fact>]
     let ``generateCniConflistJson contient le type nat et master`` () =
-        let config = { defaultConfig with CniVersion = "1.0.0"; NatName = "nat"; MasterInterface = "Ethernet" }
+        let config =
+            { defaultConfig with
+                CniVersion = "1.0.0"
+                NatName = "nat"
+                MasterInterface = "Ethernet" }
+
         let json = generateCniConflistJson config "172.20.0.0/16" "172.20.0.1"
         json.Contains("\"type\": \"nat\"") |> should equal true
         json.Contains("\"master\": \"Ethernet\"") |> should equal true
@@ -237,16 +275,17 @@ module NetworkConfigTests =
         let tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
         Directory.CreateDirectory(tempDir) |> ignore
         let tempPath = Path.Combine(tempDir, "network.json")
-        let customConfig = {
-            defaultConfig with
+
+        let customConfig =
+            { defaultConfig with
                 CniVersion = "0.4.0"
                 NatName = "custom-nat"
                 MasterInterface = "Ethernet 2"
                 AutoDetect = false
-                SubnetCandidates = ["192.168.100.0/24"; "192.168.101.0/24"]
+                SubnetCandidates = [ "192.168.100.0/24"; "192.168.101.0/24" ]
                 Subnet = "192.168.100.0/24"
-                Gateway = "192.168.100.1"
-        }
+                Gateway = "192.168.100.1" }
+
         saveConfig (Some tempPath) customConfig
         let (config, subnet, gateway) = resolveAll (Some tempPath)
         config.CniVersion |> should equal "0.4.0"
@@ -262,7 +301,9 @@ module NetworkConfigTests =
 
     [<Fact>]
     let ``resolveAll avec defaultConfig fonctionne sans fichier`` () =
-        let tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "nonexistent.json")
+        let tempPath =
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "nonexistent.json")
+
         let (config, subnet, gateway) = resolveAll (Some tempPath)
         config.CniVersion |> should equal "1.0.0"
         subnet |> should not' (equal "")

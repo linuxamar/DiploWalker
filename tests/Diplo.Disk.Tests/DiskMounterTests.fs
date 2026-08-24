@@ -10,6 +10,7 @@ module DiskMounterTests =
 
     let private run (f: string -> string -> unit) =
         let root = TestImage.createTempDir ()
+
         try
             let img = Path.Combine(root, "test.img")
             f root img
@@ -53,7 +54,9 @@ module DiskMounterTests =
 
     [<Fact>]
     let ``mount leve une exception si la source n'existe pas`` () =
-        let missing = Path.Combine(Path.GetTempPath(), "diplo-absent-" + Guid.NewGuid().ToString("N"))
+        let missing =
+            Path.Combine(Path.GetTempPath(), "diplo-absent-" + Guid.NewGuid().ToString("N"))
+
         (fun () -> DiskMounter.mount missing "/data" false |> ignore)
         |> should throw typeof<System.Exception>
 
@@ -61,6 +64,7 @@ module DiskMounterTests =
     let ``mount refuse les images qcow v1`` () =
         run (fun root img ->
             File.WriteAllBytes(img, [| 0x51uy; 0x46uy; 0x49uy; 0xFEuy |])
+
             (fun () -> DiskMounter.mount img "/data" false |> ignore)
             |> should throw typeof<System.Exception>)
 
@@ -68,6 +72,7 @@ module DiskMounterTests =
     let ``mount refuse un format inconnu`` () =
         run (fun root img ->
             File.WriteAllBytes(img, Array.create 1024 0xABuy)
+
             (fun () -> DiskMounter.mount img "/data" false |> ignore)
             |> should throw typeof<System.Exception>)
 
@@ -85,7 +90,10 @@ module DiskMounterTests =
         run (fun root img ->
             TestImage.createFat img [ "hello.txt", "v1" ]
             let vol = DiskMounter.mount img "/data" false
-            let restored = DiskMounter.rehydrate vol.Source vol.HostPath vol.Destination vol.ReadOnly
+
+            let restored =
+                DiskMounter.rehydrate vol.Source vol.HostPath vol.Destination vol.ReadOnly
+
             File.WriteAllText(Path.Combine(restored.HostPath, "hello.txt"), "v2")
             restored.Dispose()
             let re = Path.Combine(root, "re")
@@ -98,7 +106,10 @@ module DiskMounterTests =
             let src = Path.Combine(root, "src")
             Directory.CreateDirectory src |> ignore
             let vol = DiskMounter.mount src "/data" false
-            let restored = DiskMounter.rehydrate vol.Source vol.HostPath vol.Destination vol.ReadOnly
+
+            let restored =
+                DiskMounter.rehydrate vol.Source vol.HostPath vol.Destination vol.ReadOnly
+
             restored.Dispose()
             Directory.Exists src |> should equal true)
 
@@ -109,19 +120,30 @@ module DiskMounterTests =
             let vol = DiskMounter.mount img "/data" false
             let hostPath = vol.HostPath
             Directory.Delete(hostPath, true)
-            let restored = DiskMounter.rehydrate vol.Source hostPath vol.Destination vol.ReadOnly
+
+            let restored =
+                DiskMounter.rehydrate vol.Source hostPath vol.Destination vol.ReadOnly
+
             restored.Dispose())
 
     [<Fact>]
     let ``MountState fait un aller-retour de persistance`` () =
         run (fun root _ ->
             let path = Path.Combine(root, "state.json")
-            let entries: (string * MountState.MountEntry list) list = [
-                "c1", [ { Source = "C:\\data.img"; HostPath = "C:\\staging-c1"; Destination = "C:\\app"; ReadOnly = false } ]
-                "c2", [ { Source = "C:\\keys"; HostPath = "C:\\keys"; Destination = "C:\\keys"; ReadOnly = true } ]
-            ]
+
+            let entries: (string * MountState.MountEntry list) list =
+                [ "c1",
+                  [ { Source = "C:\\data.img"
+                      HostPath = "C:\\staging-c1"
+                      Destination = "C:\\app"
+                      ReadOnly = false } ]
+                  "c2",
+                  [ { Source = "C:\\keys"
+                      HostPath = "C:\\keys"
+                      Destination = "C:\\keys"
+                      ReadOnly = true } ] ]
+
             MountState.save path entries
             let loaded = MountState.load path
             loaded.Count |> should equal 2
             loaded.["c1"].Head.HostPath |> should equal "C:\\staging-c1")
-

@@ -12,4 +12,6 @@ type ContainerDetailUserControl() as this =
         use stream =
             typeof<ContainerDetailUserControl>.Assembly
                 .GetManifestResourceStream("Diplo.Gui.UserControls.ContainerDetailUserControl.axaml")
-        AvaloniaRuntimeXamlLoader.Load(stream, typeof<ContainerDetailUserControl>.Assembly, this) |> ignore
+
+        AvaloniaRuntimeXamlLoader.Load(stream, typeof<ContainerDetailUserControl>.Assembly, this)
+        |> ignore

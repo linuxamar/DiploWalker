@@ -53,13 +53,16 @@ module ``Vérification de la structure des commandes CLI`` =
     [<Fact>]
     let ``PullSettings porte l'option --user`` () =
         let attr =
-            typeof<PullSettings>.GetProperty("User")
+            typeof<PullSettings>
+                .GetProperty("User")
                 .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+
         let longNames =
             attr
             |> Array.tryPick (function
-                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some(a.LongNames |> Seq.toArray)
                 | _ -> None)
+
         longNames |> should equal (Some [| "user" |])
 
     [<Fact>]
@@ -315,13 +318,16 @@ module ``Vérification des paramètres des commandes`` =
     [<Fact>]
     let ``CreateImageSettings porte l'option --format`` () =
         let attr =
-            typeof<CreateImageSettings>.GetProperty("Format")
+            typeof<CreateImageSettings>
+                .GetProperty("Format")
                 .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+
         let longNames =
             attr
             |> Array.tryPick (function
-                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some(a.LongNames |> Seq.toArray)
                 | _ -> None)
+
         longNames |> should equal (Some [| "format" |])
 
     open Diplo.Cli.Container
@@ -344,25 +350,31 @@ module ``Vérification des paramètres des commandes`` =
     [<Fact>]
     let ``RegistryLoginSettings porte l'option --username`` () =
         let attr =
-            typeof<RegistryLoginSettings>.GetProperty("Username")
+            typeof<RegistryLoginSettings>
+                .GetProperty("Username")
                 .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+
         let longNames =
             attr
             |> Array.tryPick (function
-                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some(a.LongNames |> Seq.toArray)
                 | _ -> None)
+
         longNames |> should equal (Some [| "username" |])
 
     [<Fact>]
     let ``RegistryLoginSettings porte l'option --password`` () =
         let attr =
-            typeof<RegistryLoginSettings>.GetProperty("Password")
+            typeof<RegistryLoginSettings>
+                .GetProperty("Password")
                 .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+
         let longNames =
             attr
             |> Array.tryPick (function
-                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some(a.LongNames |> Seq.toArray)
                 | _ -> None)
+
         longNames |> should equal (Some [| "password" |])
 
     [<Fact>]
@@ -396,13 +408,16 @@ module ``Vérification des paramètres des commandes`` =
     [<Fact>]
     let ``CreateContainerSettings.Mounts porte l'option --mount`` () =
         let attr =
-            typeof<CreateContainerSettings>.GetProperty("Mounts")
+            typeof<CreateContainerSettings>
+                .GetProperty("Mounts")
                 .GetCustomAttributes(typeof<Spectre.Console.Cli.CommandOptionAttribute>, false)
+
         let longNames =
             attr
             |> Array.tryPick (function
-                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some (a.LongNames |> Seq.toArray)
+                | :? Spectre.Console.Cli.CommandOptionAttribute as a -> Some(a.LongNames |> Seq.toArray)
                 | _ -> None)
+
         longNames |> should equal (Some [| "mount" |])
 
     // --- Volume inspect/mount/unmount ---

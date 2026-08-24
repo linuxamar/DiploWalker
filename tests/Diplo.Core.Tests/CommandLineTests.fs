@@ -16,16 +16,16 @@ module CommandLineTests =
 
     [<Fact>]
     let ``split preserve les espaces entre guillemets`` () =
-        split "cmd /c \"echo bonjour le monde\"" |> should equal [ "cmd"; "/c"; "echo bonjour le monde" ]
+        split "cmd /c \"echo bonjour le monde\""
+        |> should equal [ "cmd"; "/c"; "echo bonjour le monde" ]
 
     [<Fact>]
     let ``split retire les guillemets`` () =
-        split "exec \"C:\\Program Files\\app.exe\" --flag" |> should equal [ "exec"; "C:\\Program Files\\app.exe"; "--flag" ]
+        split "exec \"C:\\Program Files\\app.exe\" --flag"
+        |> should equal [ "exec"; "C:\\Program Files\\app.exe"; "--flag" ]
 
     [<Fact>]
-    let ``split sur une chaine vide retourne une liste vide`` () =
-        split "" |> should be Empty
+    let ``split sur une chaine vide retourne une liste vide`` () = split "" |> should be Empty
 
     [<Fact>]
-    let ``split sur une chaine de guillemets vides retourne une liste vide`` () =
-        split "\"\"" |> should be Empty
+    let ``split sur une chaine de guillemets vides retourne une liste vide`` () = split "\"\"" |> should be Empty

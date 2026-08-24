@@ -14,8 +14,9 @@ module DiploConfigTests =
     let ``configPath sans variable d'environnement pointe vers diplo.json du répertoire courant`` () =
         let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
         Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", null)
+
         try
-            DiploConfig.configPath()
+            DiploConfig.configPath ()
             |> should equal (Path.Combine(Directory.GetCurrentDirectory(), "diplo.json"))
         finally
             Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
@@ -25,16 +26,18 @@ module DiploConfigTests =
         let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
         let custom = Path.Combine(Path.GetTempPath(), "diplo-config-home")
         Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", custom)
+
         try
-            DiploConfig.configPath()
-            |> should equal (Path.Combine(custom, "diplo.json"))
+            DiploConfig.configPath () |> should equal (Path.Combine(custom, "diplo.json"))
         finally
             Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
 
     // ── load ───────────────────────────────────────────────────────
 
     let private tempFile (content: string) =
-        let dir = Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+        let dir =
+            Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+
         Directory.CreateDirectory(dir) |> ignore
         let path = Path.Combine(dir, "diplo.json")
         File.WriteAllText(path, content)
@@ -42,7 +45,10 @@ module DiploConfigTests =
 
     [<Fact>]
     let ``load avec fichier valide renvoie les adresses normalisées`` () =
-        let dir, path = tempFile """{ "container": { "address": "localhost:5001" }, "network": { "address": "http://pipe:/diplo-network" } }"""
+        let dir, path =
+            tempFile
+                """{ "container": { "address": "localhost:5001" }, "network": { "address": "http://pipe:/diplo-network" } }"""
+
         try
             let (c, v, n) = DiploConfig.load path
             c |> should equal (Some "http://localhost:5001")
@@ -53,7 +59,9 @@ module DiploConfigTests =
 
     [<Fact>]
     let ``load avec fichier absent renvoie des None (repli par défaut)`` () =
-        let path = Path.Combine(Path.GetTempPath(), "diplo-config-absente-" + Guid.NewGuid().ToString("N"), "diplo.json")
+        let path =
+            Path.Combine(Path.GetTempPath(), "diplo-config-absente-" + Guid.NewGuid().ToString("N"), "diplo.json")
+
         let (c, v, n) = DiploConfig.load path
         c |> should equal None
         v |> should equal None
@@ -62,6 +70,7 @@ module DiploConfigTests =
     [<Fact>]
     let ``load avec fichier malformé renvoie des None (repli par défaut)`` () =
         let dir, path = tempFile "{ pas du json ]"
+
         try
             let (c, v, n) = DiploConfig.load path
             c |> should equal None
@@ -73,13 +82,16 @@ module DiploConfigTests =
     // ── save ───────────────────────────────────────────────────────
 
     let private tempDir () =
-        let dir = Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+        let dir =
+            Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+
         Directory.CreateDirectory(dir) |> ignore
         dir
 
     [<Fact>]
     let ``save écrit un fichier relu par load`` () =
         let dir = tempDir ()
+
         try
             let path = Path.Combine(dir, "diplo.json")
             DiploConfig.save path "localhost:5001" "localhost:5002" "http://pipe:/diplo-network"
@@ -93,9 +105,15 @@ module DiploConfigTests =
     [<Fact>]
     let ``save préserve namespace et logLevel existants`` () =
         let dir = tempDir ()
+
         try
             let path = Path.Combine(dir, "diplo.json")
-            File.WriteAllText(path, """{ "container": { "address": "localhost:5001", "namespace": "prod" }, "volume": { "address": "localhost:5002" }, "network": { "address": "localhost:5003" }, "logLevel": "Debug" }""")
+
+            File.WriteAllText(
+                path,
+                """{ "container": { "address": "localhost:5001", "namespace": "prod" }, "volume": { "address": "localhost:5002" }, "network": { "address": "localhost:5003" }, "logLevel": "Debug" }"""
+            )
+
             DiploConfig.save path "localhost:9001" "localhost:9002" "localhost:9003"
             let content = File.ReadAllText path
             content |> should haveSubstring "\"namespace\": \"prod\""
@@ -109,6 +127,7 @@ module DiploConfigTests =
     [<Fact>]
     let ``save sans fichier existant n'ajoute pas de metadata`` () =
         let dir = tempDir ()
+
         try
             let path = Path.Combine(dir, "diplo.json")
             DiploConfig.save path "localhost:5001" "localhost:5002" "localhost:5003"
@@ -121,6 +140,7 @@ module DiploConfigTests =
     [<Fact>]
     let ``save crée le répertoire parent manquant`` () =
         let dir = tempDir ()
+
         try
             let nested = Path.Combine(dir, "sous", "dossier")
             let path = Path.Combine(nested, "diplo.json")
@@ -134,22 +154,28 @@ module DiploConfigTests =
     [<Fact>]
     let ``invalidate vide le cache et relit la configuration`` () =
         let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
-        let home = Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+
+        let home =
+            Path.Combine(Path.GetTempPath(), "diplo-config-test-" + Guid.NewGuid().ToString("N"))
+
         Directory.CreateDirectory(home) |> ignore
         Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", home)
+
         try
             let path = Path.Combine(home, "diplo.json")
             DiploConfig.save path "localhost:5001" "localhost:5002" "localhost:5003"
-            DiploConfig.invalidate()
-            DiploConfig.containerAddress() |> should equal (Some "http://localhost:5001")
+            DiploConfig.invalidate ()
+            DiploConfig.containerAddress () |> should equal (Some "http://localhost:5001")
             DiploConfig.save path "localhost:9001" "localhost:9002" "localhost:9003"
-            DiploConfig.containerAddress() |> should equal (Some "http://localhost:5001")
-            DiploConfig.invalidate()
-            DiploConfig.containerAddress() |> should equal (Some "http://localhost:9001")
+            DiploConfig.containerAddress () |> should equal (Some "http://localhost:5001")
+            DiploConfig.invalidate ()
+            DiploConfig.containerAddress () |> should equal (Some "http://localhost:9001")
         finally
             Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
-            DiploConfig.invalidate()
-            if Directory.Exists home then Directory.Delete(home, true)
+            DiploConfig.invalidate ()
+
+            if Directory.Exists home then
+                Directory.Delete(home, true)
 
     // ── normalizeAddress ────────────────────────────────────────────
 
@@ -177,7 +203,9 @@ module DiploConfigTests =
 
     [<Fact>]
     let ``parse avec toutes les sections renvoie les adresses normalisées`` () =
-        let json = """{ "container": { "address": "localhost:5001" }, "volume": { "address": "localhost:5002" }, "network": { "address": "http://pipe:/diplo-network" } }"""
+        let json =
+            """{ "container": { "address": "localhost:5001" }, "volume": { "address": "localhost:5002" }, "network": { "address": "http://pipe:/diplo-network" } }"""
+
         let (c, v, n) = DiploConfig.parse json
         c |> should equal (Some "http://localhost:5001")
         v |> should equal (Some "http://localhost:5002")

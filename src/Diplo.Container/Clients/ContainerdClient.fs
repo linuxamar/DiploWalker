@@ -18,8 +18,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
     let logPollIntervalMs = defaultArg logPollIntervalMs 500
     let ctrPath = defaultArg ctrPath "ctr"
 
-    let runCtr (args: string list) =
-        runner.RunWithArgs(ctrPath, args)
+    let runCtr (args: string list) = runner.RunWithArgs(ctrPath, args)
 
     let nsArgs (namespaceName: string) (subcommand: string list) =
         "--namespace" :: namespaceName :: subcommand
@@ -36,114 +35,176 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         SecurityValidation.validateId namespaceName "Le namespace"
 
     interface IContainerdClient with
-        member _.CreateContainer(namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit, mounts) =
+        member _.CreateContainer
+            (namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit, mounts)
+            =
             validateNsId namespaceName id
             SecurityValidation.validateImage image
             let ctrArgs = ResizeArray()
             ctrArgs.AddRange(nsArgs namespaceName [ "container"; "create" ])
+
             for (k, v) in labels |> Map.toList do
                 SecurityValidation.validateLabel k v
                 ctrArgs.Add("--label")
                 ctrArgs.Add(sprintf "%s=%s" k v)
+
             for (k, v) in env |> Map.toList do
                 ctrArgs.Add("--env")
                 ctrArgs.Add(sprintf "%s=%s" k v)
+
             for (src, dst, readOnly) in mounts do
                 SecurityValidation.validateVolumePath src "La source du volume"
+
                 if String.IsNullOrEmpty(dst) then
                     invalidArg "dst" "La destination du montage ne peut pas être vide"
+
                 if dst.Contains("..") then
-                    invalidArg "dst" (sprintf "La destination du montage contient une traversée de répertoire interdite: '%s'" dst)
+                    invalidArg
+                        "dst"
+                        (sprintf "La destination du montage contient une traversée de répertoire interdite: '%s'" dst)
+
                 ctrArgs.Add("--mount")
                 let options = if readOnly then "rbind,ro" else "rbind"
                 ctrArgs.Add(sprintf "type=bind,src=%s,dst=%s,options=%s" src dst options)
+
             if memoryLimit > 0L then
                 ctrArgs.Add("--memory-limit")
                 ctrArgs.Add(string memoryLimit)
+
             if cpuShares > 0L then
                 ctrArgs.Add("--cpu-shares")
                 ctrArgs.Add(string cpuShares)
+
             if pidLimit > 0u then
-                Log.Warning("Limite de processus ({PidLimit}) ignorée à la création : non prise en charge par `ctr container create` de cette version", pidLimit)
+                Log.Warning(
+                    "Limite de processus ({PidLimit}) ignorée à la création : non prise en charge par `ctr container create` de cette version",
+                    pidLimit
+                )
+
             ctrArgs.Add(image)
             ctrArgs.Add(id)
             // Validation des commandes/args avant injection dans ctr
             if command.Length > 0 || args.Length > 0 then
                 let fullCommand = Array.append command args
                 SecurityValidation.validateCommand fullCommand
-            for c in command do ctrArgs.Add(c)
-            for a in args do ctrArgs.Add(a)
+
+            for c in command do
+                ctrArgs.Add(c)
+
+            for a in args do
+                ctrArgs.Add(a)
+
             let output = runCtr (ctrArgs |> Seq.toList)
             let trimmed = output.Trim()
             if String.IsNullOrEmpty(trimmed) then id else trimmed
 
         member _.StartContainer(namespaceName, id, detach) =
             validateNsId namespaceName id
+
             let args =
-                if detach then nsArgs namespaceName [ "task"; "start"; "--detach"; id ]
-                else nsArgs namespaceName [ "task"; "start"; id ]
+                if detach then
+                    nsArgs namespaceName [ "task"; "start"; "--detach"; id ]
+                else
+                    nsArgs namespaceName [ "task"; "start"; id ]
+
             runCtr args |> ignore
 
         member _.StartContainerWithLogs(namespaceName, id, logFile) =
             validateNsId namespaceName id
             let psi = ProcessStartInfo(ctrPath)
+
             for a in nsArgs namespaceName [ "task"; "start"; id ] do
                 psi.ArgumentList.Add(a)
+
             psi.RedirectStandardOutput <- true
             psi.RedirectStandardError <- true
             psi.UseShellExecute <- false
             psi.CreateNoWindow <- true
             let proc = Process.Start(psi)
+
             if isNull proc then
-                raise (InvalidOperationException(sprintf "Impossible de démarrer le processus ctr pour le conteneur %s" id))
+                raise (
+                    InvalidOperationException(sprintf "Impossible de démarrer le processus ctr pour le conteneur %s" id)
+                )
+
             try
                 let dir = Path.GetDirectoryName(logFile)
-                if not (String.IsNullOrEmpty(dir)) then Directory.CreateDirectory(dir) |> ignore
+
+                if not (String.IsNullOrEmpty(dir)) then
+                    Directory.CreateDirectory(dir) |> ignore
+
                 let writer = new StreamWriter(logFile, true)
                 writer.AutoFlush <- true
                 let mutable disposed = false
+
                 let append (data: string) =
                     if not (isNull data) then
                         lock writer (fun () ->
-                            if not disposed then writer.WriteLine(data))
+                            if not disposed then
+                                writer.WriteLine(data))
+
                 let closeWriter () =
                     lock writer (fun () ->
                         if not disposed then
                             writer.Flush()
                             writer.Dispose()
                             disposed <- true)
+
                 proc.OutputDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> append e.Data))
                 proc.ErrorDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> append e.Data))
                 proc.EnableRaisingEvents <- true
-                proc.Exited.AddHandler(EventHandler(fun _ _ ->
-                    closeWriter ()
-                    proc.Dispose()))
+
+                proc.Exited.AddHandler(
+                    EventHandler(fun _ _ ->
+                        closeWriter ()
+                        proc.Dispose())
+                )
+
                 proc.BeginOutputReadLine()
                 proc.BeginErrorReadLine()
                 Log.Information("Conteneur {ContainerId} démarré, logs capturés dans {LogFile}", id, logFile)
             with ex ->
                 // Nettoyage du processus en cas d'échec de configuration
-                try proc.Kill(true) with _ -> ()
-                try proc.Dispose() with _ -> ()
+                try
+                    proc.Kill(true)
+                with _ ->
+                    ()
+
+                try
+                    proc.Dispose()
+                with _ ->
+                    ()
+
                 Log.Error(ex, "Erreur lors du démarrage avec capture des logs du conteneur {ContainerId}", id)
                 reraise ()
 
         member _.StopContainer(namespaceName, id, timeoutSeconds) : Task =
             validateNsId namespaceName id
-            runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGTERM"; id ]) |> ignore
+
+            runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGTERM"; id ])
+            |> ignore
+
             task {
                 if timeoutSeconds > 0 then
                     let capped = min timeoutSeconds 300
                     do! Task.Delay(capped * 1000)
-            } :> Task
+            }
+            :> Task
 
         member _.DeleteContainer(namespaceName, id, force) =
             validateNsId namespaceName id
+
             if force then
-                try runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGKILL"; id ]) |> ignore
-                with ex -> Log.Warning(ex, "Erreur lors de l'arrêt forcé du conteneur {ContainerId}", id)
-                try runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
-                with ex -> Log.Warning(ex, "Erreur lors de la suppression du conteneur {ContainerId}", id)
+                try
+                    runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGKILL"; id ])
+                    |> ignore
+                with ex ->
+                    Log.Warning(ex, "Erreur lors de l'arrêt forcé du conteneur {ContainerId}", id)
+
+                try
+                    runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
+                with ex ->
+                    Log.Warning(ex, "Erreur lors de la suppression du conteneur {ContainerId}", id)
             else
                 runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
 
@@ -157,41 +218,58 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.WaitForContainerExit(namespaceName, id, timeoutSeconds) =
             validateNsId namespaceName id
+
             let deadline =
-                if timeoutSeconds > 0 then Some (DateTime.UtcNow.AddSeconds(float timeoutSeconds))
-                else None
+                if timeoutSeconds > 0 then
+                    Some(DateTime.UtcNow.AddSeconds(float timeoutSeconds))
+                else
+                    None
+
             let currentStatus () =
                 try
                     let output = runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+
                     output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                     |> Array.tryFind (fun line ->
-                        let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                        let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
                         parts.Length >= 1 && parts[0].Equals(id, StringComparison.OrdinalIgnoreCase))
                     |> Option.map (fun line ->
-                        let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                        let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
                         if parts.Length >= 3 then parts[2] else "unknown")
                     |> Option.defaultValue "unknown"
                 with ex ->
                     Log.Warning(ex, "Erreur lors de l'attente de sortie du conteneur {ContainerId}", id)
                     "unknown"
+
             let rec loop () =
                 let status = currentStatus ()
+
                 match status.ToUpperInvariant() with
-                | "STOPPED" | "DELETED" | "UNKNOWN" | "PAUSED" -> 0
+                | "STOPPED"
+                | "DELETED"
+                | "UNKNOWN"
+                | "PAUSED" -> 0
                 | _ ->
                     match deadline with
                     | Some d when DateTime.UtcNow >= d -> -1
                     | _ ->
                         Thread.Sleep(1000)
                         loop ()
+
             loop ()
 
         member _.UpdateContainer(namespaceName, id, memoryLimit, cpuShares, pidLimit) =
             validateNsId namespaceName id
+
             if memoryLimit > 0L || cpuShares > 0 || pidLimit > 0 then
-                raise (RpcException(Status(
-                    StatusCode.Unimplemented,
-                    "La mise à jour des limites d'un conteneur n'est pas disponible avec cette version de ctr : la sous-commande `ctr task update` est absente")))
+                raise (
+                    RpcException(
+                        Status(
+                            StatusCode.Unimplemented,
+                            "La mise à jour des limites d'un conteneur n'est pas disponible avec cette version de ctr : la sous-commande `ctr task update` est absente"
+                        )
+                    )
+                )
 
         member _.InspectContainer(namespaceName, id) =
             validateNsId namespaceName id
@@ -200,26 +278,38 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.ListContainers(namespaceName, all) =
             validateNs namespaceName
+
             let ids =
                 runCtr (nsArgs namespaceName [ "container"; "list"; "--quiet" ])
-                |> fun output -> output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+                |> fun output ->
+                    output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                 |> Array.toList
-            if all then ids
+
+            if all then
+                ids
             else
                 let running =
                     runCtr (nsArgs namespaceName [ "tasks"; "list" ])
                     |> fun output ->
                         output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                         |> Array.choose (fun line ->
-                            let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
-                            if parts.Length >= 3 && parts[2].Equals("RUNNING", StringComparison.OrdinalIgnoreCase) then Some parts[0]
-                            else None)
+                            let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
+
+                            if
+                                parts.Length >= 3
+                                && parts[2].Equals("RUNNING", StringComparison.OrdinalIgnoreCase)
+                            then
+                                Some parts[0]
+                            else
+                                None)
                         |> Set.ofArray
+
                 ids |> List.filter running.Contains
 
         member _.GetContainerLogs(namespaceName, id, tail, follow, since) =
             validateNsId namespaceName id
             let lines = ContainerLogs.read id tail since
+
             if lines.Length = 0 then
                 [ "Aucun journal pour ce conteneur (le conteneur doit être démarré en mode détaché pour capturer ses logs)" ]
             else
@@ -229,59 +319,81 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             validateNsId namespaceName id
             let channel = System.Threading.Channels.Channel.CreateUnbounded<string>()
             let writer = channel.Writer
+
             let isContainerRunning () =
                 try
                     runCtr (nsArgs namespaceName [ "tasks"; "list" ])
                     |> fun output ->
                         output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                         |> Array.exists (fun line ->
-                            let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                            let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
+
                             parts.Length >= 3
                             && parts[0].Equals(id, StringComparison.OrdinalIgnoreCase)
                             && parts[2].Equals("RUNNING", StringComparison.OrdinalIgnoreCase))
                 with ex ->
                     Log.Warning(ex, "Erreur lors du suivi des logs du conteneur {ContainerId}", id)
                     false
+
             let producer (cancel: CancellationToken) =
                 async {
                     try
                         let snapshot = ContainerLogs.read id tail since
-                        for l in snapshot do writer.TryWrite(l) |> ignore
+
+                        for l in snapshot do
+                            writer.TryWrite(l) |> ignore
+
                         let mutable lastOffset = ContainerLogs.fileLength id
                         let mutable running = true
+
                         while running && not cancel.IsCancellationRequested do
                             let lines, offset = ContainerLogs.readIncremental id lastOffset
                             lastOffset <- offset
-                            for l in lines do writer.TryWrite(l) |> ignore
+
+                            for l in lines do
+                                writer.TryWrite(l) |> ignore
+
                             if isContainerRunning () then
                                 do! Async.Sleep logPollIntervalMs
                             else
                                 // courte grâce au writer pour vider les derniers octets
                                 do! Async.Sleep 150
                                 let fin, _ = ContainerLogs.readIncremental id lastOffset
-                                for l in fin do writer.TryWrite(l) |> ignore
+
+                                for l in fin do
+                                    writer.TryWrite(l) |> ignore
+
                                 running <- false
+
                         writer.TryComplete() |> ignore
                     with ex ->
                         writer.TryComplete(ex) |> ignore
                 }
+
             { new IAsyncEnumerable<string> with
                 member _.GetAsyncEnumerator(ct2) =
                     let cts = CancellationTokenSource.CreateLinkedTokenSource(ct, ct2)
                     producer cts.Token |> Async.StartAsTask |> ignore
                     let mutable current = ""
+
                     { new IAsyncEnumerator<string> with
                         member _.Current = current
+
                         member _.MoveNextAsync() =
                             let read = channel.Reader.ReadAsync(cts.Token)
+
                             let task =
-                                read.AsTask().ContinueWith(fun (t: Task<string>) ->
-                                    if t.IsCompletedSuccessfully then
-                                        current <- t.Result
-                                        true
-                                    else
-                                        false)
+                                read
+                                    .AsTask()
+                                    .ContinueWith(fun (t: Task<string>) ->
+                                        if t.IsCompletedSuccessfully then
+                                            current <- t.Result
+                                            true
+                                        else
+                                            false)
+
                             ValueTask<bool>(task)
+
                         member _.DisposeAsync() =
                             writer.TryComplete() |> ignore
                             ValueTask() } }
@@ -289,10 +401,17 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         member _.ExecInContainer(namespaceName, id, command) =
             validateNsId namespaceName id
             SecurityValidation.validateCommand command
+
             let args =
-                [ yield "--namespace"; yield namespaceName
-                  yield "tasks"; yield "exec"; yield "--exec-id"; yield sprintf "exec-%s" (Guid.NewGuid().ToString("N")); yield id ]
+                [ yield "--namespace"
+                  yield namespaceName
+                  yield "tasks"
+                  yield "exec"
+                  yield "--exec-id"
+                  yield sprintf "exec-%s" (Guid.NewGuid().ToString("N"))
+                  yield id ]
                 @ (command |> Array.toList)
+
             try
                 let output = runCtr args
                 output
@@ -303,27 +422,42 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         member _.StartExec(namespaceName, id, command, stdin, stdout, stderr) =
             validateNsId namespaceName id
             SecurityValidation.validateCommand command
+
             let args =
-                [ yield "--namespace"; yield namespaceName
-                  yield "tasks"; yield "exec"; yield "--exec-id"; yield sprintf "exec-%s" (Guid.NewGuid().ToString("N")); yield id ]
+                [ yield "--namespace"
+                  yield namespaceName
+                  yield "tasks"
+                  yield "exec"
+                  yield "--exec-id"
+                  yield sprintf "exec-%s" (Guid.NewGuid().ToString("N"))
+                  yield id ]
                 @ (command |> Array.toList)
+
             try
                 let psi = ProcessStartInfo(ctrPath)
-                for a in args do psi.ArgumentList.Add(a)
+
+                for a in args do
+                    psi.ArgumentList.Add(a)
+
                 psi.RedirectStandardInput <- true
                 psi.RedirectStandardOutput <- true
                 psi.RedirectStandardError <- true
                 psi.UseShellExecute <- false
                 psi.CreateNoWindow <- true
                 use proc = Process.Start(psi)
-                let pumpIn = Task.Run(fun () ->
-                    stdin.CopyTo(proc.StandardInput.BaseStream)
-                    proc.StandardInput.Close())
+
+                let pumpIn =
+                    Task.Run(fun () ->
+                        stdin.CopyTo(proc.StandardInput.BaseStream)
+                        proc.StandardInput.Close())
+
                 let pumpOut = Task.Run(fun () -> proc.StandardOutput.BaseStream.CopyTo(stdout))
                 let pumpErr = Task.Run(fun () -> proc.StandardError.BaseStream.CopyTo(stderr))
                 let exited = proc.WaitForExit(600_000)
+
                 if not exited then
                     Log.Warning("Timeout (600s) lors de l'exécution en flux dans le conteneur {ContainerId}", id)
+
                 Task.WaitAll(pumpOut, pumpErr)
                 pumpIn.Wait()
                 proc.ExitCode
@@ -333,22 +467,38 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.TaskInfo(namespaceName, id) =
             validateNsId namespaceName id
+
             try
                 let output = runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+
                 let row =
                     output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                     |> Array.tryFind (fun line ->
-                        let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                        let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
                         parts.Length >= 1 && parts[0].Equals(id, StringComparison.OrdinalIgnoreCase))
+
                 match row with
                 | None ->
                     use doc = JsonDocument.Parse("{}")
                     doc.RootElement.Clone()
                 | Some line ->
-                    let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
-                    let pid = if parts.Length >= 2 && parts[1] <> "-" then parts[1] else "0"
+                    let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
+
+                    let pid =
+                        if parts.Length >= 2 && parts[1] <> "-" then
+                            parts[1]
+                        else
+                            "0"
+
                     let status = if parts.Length >= 3 then parts[2] else "unknown"
-                    let json = System.Text.Json.JsonSerializer.Serialize({| status = status; pid = pid; exited_at = "" |})
+
+                    let json =
+                        System.Text.Json.JsonSerializer.Serialize(
+                            {| status = status
+                               pid = pid
+                               exited_at = "" |}
+                        )
+
                     use doc = JsonDocument.Parse(json)
                     doc.RootElement.Clone()
             with ex ->
@@ -358,34 +508,45 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.PullImage(image, userArg) =
             SecurityValidation.validateImage image
+
             let registry =
                 let firstSegment = image.Split('/').[0]
-                if firstSegment.Contains('.') || firstSegment.Contains(':') || firstSegment.Equals("localhost", StringComparison.OrdinalIgnoreCase)
-                then firstSegment
-                else "docker.io"
+
+                if
+                    firstSegment.Contains('.')
+                    || firstSegment.Contains(':')
+                    || firstSegment.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                then
+                    firstSegment
+                else
+                    "docker.io"
+
             let userArg =
                 match userArg with
                 | Some u -> Some u
                 | None -> RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) registry
+
             let args =
                 match userArg with
                 | Some userArg -> [ "image"; "pull"; "--user"; userArg; image ]
                 | None -> [ "image"; "pull"; image ]
+
             let output = runCtr args
             output.Trim()
 
         member _.Version() =
             try
                 let output = runCtr [ "version" ]
-                let lines =
-                    output.Split('\n')
-                    |> Array.map (fun line -> line.Trim())
+                let lines = output.Split('\n') |> Array.map (fun line -> line.Trim())
+
                 let valueOf (prefix: string) =
                     lines
                     |> Array.tryPick (fun line ->
                         if line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
                             Some(line.Substring(prefix.Length).Trim())
-                        else None)
+                        else
+                            None)
+
                 match valueOf "Version:" with
                 | Some version ->
                     let revision = defaultArg (valueOf "Revision:") ""
@@ -398,6 +559,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         member _.Namespaces() =
             try
                 let output = runCtr [ "namespace"; "list"; "--quiet" ]
+
                 output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                 |> Array.toList
             with ex ->
@@ -419,6 +581,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.TopContainer(namespaceName, id) =
             validateNsId namespaceName id
+
             try
                 let output = runCtr (nsArgs namespaceName [ "task"; "ps"; id ])
                 output
@@ -428,6 +591,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.GetContainerStats(namespaceName, id) =
             validateNsId namespaceName id
+
             try
                 let output = runCtr (nsArgs namespaceName [ "task"; "metrics"; id ])
                 parseJson output
@@ -438,19 +602,27 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.ListImages(namespaceName) =
             validateNs namespaceName
+
             try
                 let output = runCtr (nsArgs namespaceName [ "image"; "list" ])
-                let lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+
+                let lines =
+                    output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                 // Filtre la ligne d'en-tête "REF TYPE DIGEST ..." de `ctr image list`.
                 let dataLines =
-                    lines |> Array.filter (fun line ->
-                        let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                    lines
+                    |> Array.filter (fun line ->
+                        let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
                         not (parts.Length >= 1 && parts[0].Equals("REF", StringComparison.OrdinalIgnoreCase)))
+
                 dataLines
                 |> Array.map (fun line ->
-                    let parts = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                    let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
                     let id = if parts.Length >= 2 then parts[0] else line
-                    let json = System.Text.Json.JsonSerializer.Serialize({| id = id; repository = id; ref = id |})
+
+                    let json =
+                        System.Text.Json.JsonSerializer.Serialize({| id = id; repository = id; ref = id |})
+
                     parseJson json)
                 |> Array.toList
             with ex ->
@@ -460,6 +632,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         member _.InspectImage(namespaceName, imageRef) =
             validateNs namespaceName
             SecurityValidation.validateImage imageRef
+
             try
                 let output = runCtr (nsArgs namespaceName [ "image"; "info"; imageRef ])
                 parseJson output
@@ -471,6 +644,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         member _.RemoveImage(namespaceName, imageRef) =
             validateNs namespaceName
             SecurityValidation.validateImage imageRef
+
             try
                 runCtr (nsArgs namespaceName [ "image"; "remove"; imageRef ]) |> ignore
                 sprintf "Image %s supprimée" imageRef
@@ -492,5 +666,6 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         member _.ImportImage(namespaceName, tarFile) =
             validateNs namespaceName
             let output = runCtr (nsArgs namespaceName [ "image"; "import"; tarFile ])
+
             output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
             |> Array.toList

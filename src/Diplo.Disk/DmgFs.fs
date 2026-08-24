@@ -12,9 +12,10 @@ module DmgFs =
     let private tryOpenDisk (sourcePath: string) =
         try
             let fs = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read)
+
             try
                 let disk = new Dmg.Disk(fs, Ownership.Dispose)
-                Some (disk :> VirtualDisk)
+                Some(disk :> VirtualDisk)
             with ex ->
                 fs.Dispose()
                 reraise ()
@@ -29,19 +30,21 @@ module DmgFs =
         let vm = new VolumeManager(disk)
         let logical = vm.GetLogicalVolumes() |> Seq.cast<VolumeInfo>
         let physical = vm.GetPhysicalVolumes() |> Seq.cast<VolumeInfo>
+
         Seq.append logical physical
         |> Seq.choose (fun v ->
             let detected = FileSystemManager.DetectFileSystems v
-            if detected.Count > 0 then Some (v, detected.[0]) else None)
+            if detected.Count > 0 then Some(v, detected.[0]) else None)
         |> Seq.tryHead
         |> function
-            | Some (volume, fsi) -> Some (fsi.Open volume)
+            | Some(volume, fsi) -> Some(fsi.Open volume)
             | None -> None
 
     let rec private copyDirectory (fs: DiscFileSystem) (fsDir: string) (realRoot: string) (counter: int ref) =
         let sep = Path.DirectorySeparatorChar
         let dir = realRoot + fsDir.TrimStart('/', '\\').Replace('/', sep)
         Directory.CreateDirectory(dir) |> ignore
+
         for file in fs.GetFiles fsDir do
             let relPath = file.TrimStart('/', '\\').Replace('/', sep)
             let target = Path.Combine(realRoot, relPath)
@@ -50,6 +53,7 @@ module DmgFs =
             use dst = File.Create target
             src.CopyTo dst
             counter := !counter + 1
+
         for sub in fs.GetDirectories fsDir do
             copyDirectory fs sub realRoot counter
 
@@ -59,28 +63,40 @@ module DmgFs =
             use src = File.OpenRead file
             use dst = fs.OpenFile(fsPath, FileMode.Create, FileAccess.Write)
             src.CopyTo dst
+
         for dir in Directory.GetDirectories realDir do
             let fsPath = fsDir.TrimEnd('\\', '/') + "/" + Path.GetFileName dir
-            if not (fs.DirectoryExists fsPath) then fs.CreateDirectory fsPath
+
+            if not (fs.DirectoryExists fsPath) then
+                fs.CreateDirectory fsPath
+
             copyIntoFs fs fsPath dir
 
     let rec private deleteFsEntries (fs: DiscFileSystem) (fsDir: string) (realRoot: string) =
         for file in fs.GetFiles fsDir do
             let relPath = file.TrimStart('/', '\\').Replace('/', Path.DirectorySeparatorChar)
-            if not (File.Exists(Path.Combine(realRoot, relPath))) then fs.DeleteFile file
+
+            if not (File.Exists(Path.Combine(realRoot, relPath))) then
+                fs.DeleteFile file
+
         for sub in fs.GetDirectories fsDir do
             let relSub = sub.TrimStart('/', '\\').Replace('/', Path.DirectorySeparatorChar)
             deleteFsEntries fs sub realRoot
-            if not (Directory.Exists(Path.Combine(realRoot, relSub))) then fs.DeleteDirectory(sub, false)
+
+            if not (Directory.Exists(Path.Combine(realRoot, relSub))) then
+                fs.DeleteDirectory(sub, false)
 
     /// Tente d'extraire une image DMG via DiscUtils.
     let tryExtract (sourcePath: string) (targetDir: string) : int option =
-        if not (File.Exists(sourcePath)) then None
+        if not (File.Exists(sourcePath)) then
+            None
         else
             let diskOpt = tryOpenDisk sourcePath
+
             match diskOpt with
             | Some disk ->
                 use _disk = disk
+
                 match openFileSystem disk with
                 | Some fs ->
                     use _fs = fs
@@ -91,5 +107,4 @@ module DmgFs =
             | None -> None
 
     /// Reecrit le contenu de sourceDir dans l'image DMG.
-    let tryWriteBack (_sourcePath: string) (_sourceDir: string) : bool =
-        false
+    let tryWriteBack (_sourcePath: string) (_sourceDir: string) : bool = false

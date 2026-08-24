@@ -9,7 +9,12 @@ type CachedConfigTests() =
     [<Fact>]
     let ``Value charge via le loader une première fois`` () =
         let mutable callCount = 0
-        let loader = fun () -> callCount <- callCount + 1; 42
+
+        let loader =
+            fun () ->
+                callCount <- callCount + 1
+                42
+
         let cache = CachedConfig<int>(loader)
         cache.Value |> should equal 42
         callCount |> should equal 1
@@ -17,7 +22,12 @@ type CachedConfigTests() =
     [<Fact>]
     let ``Value retourne la valeur cache sans recharger`` () =
         let mutable callCount = 0
-        let loader = fun () -> callCount <- callCount + 1; 42
+
+        let loader =
+            fun () ->
+                callCount <- callCount + 1
+                42
+
         let cache = CachedConfig<int>(loader)
         cache.Value |> ignore
         cache.Value |> ignore
@@ -26,7 +36,12 @@ type CachedConfigTests() =
     [<Fact>]
     let ``Invalidate force le rechargement`` () =
         let mutable callCount = 0
-        let loader = fun () -> callCount <- callCount + 1; callCount
+
+        let loader =
+            fun () ->
+                callCount <- callCount + 1
+                callCount
+
         let cache = CachedConfig<int>(loader)
         cache.Value |> should equal 1
         cache.Invalidate()
@@ -35,7 +50,12 @@ type CachedConfigTests() =
     [<Fact>]
     let ``Load recharge explicitement`` () =
         let mutable callCount = 0
-        let loader = fun () -> callCount <- callCount + 1; callCount
+
+        let loader =
+            fun () ->
+                callCount <- callCount + 1
+                callCount
+
         let cache = CachedConfig<int>(loader)
         cache.Load() |> should equal 1
         cache.Load() |> should equal 2

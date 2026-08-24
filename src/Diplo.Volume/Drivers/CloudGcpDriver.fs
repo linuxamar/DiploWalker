@@ -12,7 +12,15 @@ type CloudGcpDriver(dataRoot: string) =
     let buildFilestorePath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "ipAddress", driverOpts |> Map.tryFind "volumeName" with
         | Some ip, Some volName -> sprintf "%s:/%s" ip volName
-        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'ipAddress' et 'volumeName' sont requises pour le driver GCP")))
+        | _ ->
+            raise (
+                RpcException(
+                    Status(
+                        StatusCode.InvalidArgument,
+                        "Les options 'ipAddress' et 'volumeName' sont requises pour le driver GCP"
+                    )
+                )
+            )
 
     let mountNfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
         ProcessExec.runUnit "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some ProcessExec.MountTimeoutMs) None
@@ -33,4 +41,5 @@ type CloudGcpDriver(dataRoot: string) =
         member _.UnmountVolume(id, targetPath) =
             RemoteDriverHelpers.unmountVolume id targetPath RemoteDriverHelpers.unmountNfsLike
 
-        member _.PruneVolumes() = RemoteDriverHelpers.pruneCloudVolumes store
+        member _.PruneVolumes() =
+            RemoteDriverHelpers.pruneCloudVolumes store

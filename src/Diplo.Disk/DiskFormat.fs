@@ -43,12 +43,14 @@ module DiskFormat =
     /// en début de fichier.
     let detect (path: string) : Format =
         use fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+
         if fs.Length < 4L then
             Raw
         else
             let head = Array.zeroCreate<byte> 16
             fs.Position <- 0L
             let headRead = fs.Read(head, 0, 16)
+
             if headRead < 4 then
                 Raw
             else
@@ -56,30 +58,36 @@ module DiskFormat =
                 let isQcow1 = startsWith head 0 [| byte 'Q'; byte 'F'; byte 'I'; 0xFEuy |]
                 let isVhdx = headRead >= 8 && Encoding.ASCII.GetString(head, 0, 8) = "vhdxfile"
                 let isVmdk = startsWith head 0 [| byte 'K'; byte 'D'; byte 'M'; byte 'V' |]
-                if isQcow2 then Qcow2
-                elif isQcow1 then Qcow1
-                elif isVhdx then Vhdx
-                elif isVmdk then Vmdk
+
+                if isQcow2 then
+                    Qcow2
+                elif isQcow1 then
+                    Qcow1
+                elif isVhdx then
+                    Vhdx
+                elif isVmdk then
+                    Vmdk
                 else
                     let isVdi =
                         fs.Length >= 72L
-                        && startsWith head 0
-                            [| 0x7Euy; 0x10uy; 0x10uy; 0x10uy
-                               0x4Duy; 0x61uy; 0x63uy; 0x20uy |]
+                        && startsWith head 0 [| 0x7Euy; 0x10uy; 0x10uy; 0x10uy; 0x4Duy; 0x61uy; 0x63uy; 0x20uy |]
+
                     let isDmg =
-                        fs.Length >= 4L
-                        && startsWith head 0
-                            [| 0x78uy; 0x6Buy; 0x6Fuy; 0x6Cuy |]
+                        fs.Length >= 4L && startsWith head 0 [| 0x78uy; 0x6Buy; 0x6Fuy; 0x6Cuy |]
+
                     let isParallels =
                         fs.Length >= 8L
-                        && startsWith head 0
-                            [| 0x70uy; 0x61uy; 0x72uy; 0x61uy
-                               0x0Duy; 0x0Auy; 0x1Auy; 0x0Auy |]
-                    if isVdi then Vdi
-                    elif isDmg then Dmg
-                    elif isParallels then Parallels
+                        && startsWith head 0 [| 0x70uy; 0x61uy; 0x72uy; 0x61uy; 0x0Duy; 0x0Auy; 0x1Auy; 0x0Auy |]
+
+                    if isVdi then
+                        Vdi
+                    elif isDmg then
+                        Dmg
+                    elif isParallels then
+                        Parallels
                     else
                         let foot = Array.zeroCreate<byte> 512
+
                         if fs.Length < 512L then
                             Raw
                         else
@@ -92,5 +100,13 @@ module DiskFormat =
     /// moteur de montage (c'est-à-dire un fichier, pas un répertoire).
     let isDiskImage (format: Format) =
         match format with
-        | Qcow2 | Qcow1 | Vhd | Vhdx | Vmdk | Vdi | Dmg | Parallels | Raw -> true
+        | Qcow2
+        | Qcow1
+        | Vhd
+        | Vhdx
+        | Vmdk
+        | Vdi
+        | Dmg
+        | Parallels
+        | Raw -> true
         | Unknown -> false

@@ -29,12 +29,15 @@ let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
 
     if useTcp then
         Log.Information("Écoute TCP sur localhost:{Port}", grpcPort)
-        opts.Listen(IPAddress.Loopback, grpcPort, fun listenOpts ->
-            listenOpts.Protocols <- HttpProtocols.Http2) |> ignore
+
+        opts.Listen(IPAddress.Loopback, grpcPort, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
+        |> ignore
+
     if usePipes then
         Log.Information("Écoute Named Pipe: {PipeName}", pipeName)
-        opts.ListenNamedPipe(pipeName, fun listenOpts ->
-            listenOpts.Protocols <- HttpProtocols.Http2) |> ignore
+
+        opts.ListenNamedPipe(pipeName, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
+        |> ignore
 
 let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
     // Kestrel active CurrentUserOnly par défaut ; il faut le désactiver pour
@@ -44,39 +47,60 @@ let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
     opts.CurrentUserOnly <- false
     let pipeSecurity = PipeSecurity()
     let currentUser = WindowsIdentity.GetCurrent()
-    let allowRule = PipeAccessRule(
-        currentUser.User,
-        PipeAccessRights.FullControl,
-        AccessControlType.Allow)
+
+    let allowRule =
+        PipeAccessRule(currentUser.User, PipeAccessRights.FullControl, AccessControlType.Allow)
+
     pipeSecurity.AddAccessRule(allowRule)
     opts.PipeSecurity <- pipeSecurity
 
-let runGrpcHost (serviceName: string) (args: string[]) (configureServices: WebApplicationBuilder -> unit) (mapGrpcService: WebApplication -> unit) =
+let runGrpcHost
+    (serviceName: string)
+    (args: string[])
+    (configureServices: WebApplicationBuilder -> unit)
+    (mapGrpcService: WebApplication -> unit)
+    =
     Log.Logger <-
         let baseConfig =
             LoggerConfiguration()
                 .WriteTo.Console()
-                .WriteTo.File(sprintf "logs/diplo-%s-.log" (serviceName.ToLowerInvariant()), rollingInterval = RollingInterval.Day)
+                .WriteTo.File(
+                    sprintf "logs/diplo-%s-.log" (serviceName.ToLowerInvariant()),
+                    rollingInterval = RollingInterval.Day
+                )
+
         let loggerConfig =
             if OperatingSystem.IsWindows() then
                 baseConfig.WriteTo.EventLog(logName = serviceName, source = serviceName, manageEventSource = true)
             else
                 baseConfig
+
         loggerConfig.CreateLogger()
 
     try
         Log.Information("Démarrage du service {ServiceName}", serviceName)
         let builder = WebApplication.CreateBuilder(args)
-        builder.Services.AddWindowsService(fun opts -> opts.ServiceName <- serviceName) |> ignore
+
+        builder.Services.AddWindowsService(fun opts -> opts.ServiceName <- serviceName)
+        |> ignore
+
         builder.Services.AddSerilog() |> ignore
         builder.Services.AddGrpcHealthChecks() |> ignore
         builder.Services.AddHealthChecks() |> ignore
         configureServices builder
-        builder.Services.Configure<Grpc.AspNetCore.Server.GrpcServiceOptions>(fun (opts: Grpc.AspNetCore.Server.GrpcServiceOptions) ->
-            opts.MaxReceiveMessageSize <- Nullable(grpcMaxMessageSize)
-            opts.MaxSendMessageSize <- Nullable(grpcMaxMessageSize)) |> ignore
-        builder.WebHost.ConfigureKestrel(fun ctx opts -> configureKestrel ctx.Configuration opts) |> ignore
-        builder.WebHost.UseNamedPipes(fun opts -> configureNamedPipeSecurity opts) |> ignore
+
+        builder.Services.Configure<Grpc.AspNetCore.Server.GrpcServiceOptions>
+            (fun (opts: Grpc.AspNetCore.Server.GrpcServiceOptions) ->
+                opts.MaxReceiveMessageSize <- Nullable(grpcMaxMessageSize)
+                opts.MaxSendMessageSize <- Nullable(grpcMaxMessageSize))
+        |> ignore
+
+        builder.WebHost.ConfigureKestrel(fun ctx opts -> configureKestrel ctx.Configuration opts)
+        |> ignore
+
+        builder.WebHost.UseNamedPipes(fun opts -> configureNamedPipeSecurity opts)
+        |> ignore
+
         let app = builder.Build()
         app.UseMiddleware<TokenAuthMiddleware>() |> ignore
         mapGrpcService app
@@ -84,9 +108,16 @@ let runGrpcHost (serviceName: string) (args: string[]) (configureServices: WebAp
         app.MapHealthChecks("/healthz") |> ignore
 
         let lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>()
-        lifetime.ApplicationStarted.Register(fun () -> Log.Information("Service {ServiceName} démarré", serviceName)) |> ignore
-        lifetime.ApplicationStopping.Register(fun () -> Log.Information("Service {ServiceName} arrêt en cours...", serviceName)) |> ignore
-        lifetime.ApplicationStopped.Register(fun () -> Log.Information("Service {ServiceName} arrêté", serviceName)) |> ignore
+
+        lifetime.ApplicationStarted.Register(fun () -> Log.Information("Service {ServiceName} démarré", serviceName))
+        |> ignore
+
+        lifetime.ApplicationStopping.Register(fun () ->
+            Log.Information("Service {ServiceName} arrêt en cours...", serviceName))
+        |> ignore
+
+        lifetime.ApplicationStopped.Register(fun () -> Log.Information("Service {ServiceName} arrêté", serviceName))
+        |> ignore
 
         app.Run()
         0

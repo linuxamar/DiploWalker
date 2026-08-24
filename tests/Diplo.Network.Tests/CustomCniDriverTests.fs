@@ -18,6 +18,7 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``Create avec subnet explicit le utilise`` () =
         let driver = createDriver ()
+
         match driver.Create("cni-net", "10.244.0.0/16", "10.244.0.1", "", Map.empty, Map.empty) with
         | Ok info ->
             info.Name |> should equal "cni-net"
@@ -29,6 +30,7 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``Create sans gateway genere un gateway par defaut`` () =
         let driver = createDriver ()
+
         match driver.Create("auto-net", "172.30.0.0/16", "", "", Map.empty, Map.empty) with
         | Ok info ->
             info.Subnet |> should equal "172.30.0.0/16"
@@ -38,6 +40,7 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``Inspect retourne Ok pour un reseau existant`` () =
         let driver = createDriver ()
+
         match driver.Create("inspect-cni", "10.244.0.0/16", "", "", Map.empty, Map.empty) with
         | Ok created ->
             match driver.Inspect(created.Id) with
@@ -48,6 +51,7 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``Inspect retourne Error pour un id inexistant`` () =
         let driver = createDriver ()
+
         match driver.Inspect("nonexistent") with
         | Error _ -> ()
         | Ok _ -> failwith "Inspect devrait retourner Error"
@@ -55,6 +59,7 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``Remove retourne Ok pour un reseau existant`` () =
         let driver = createDriver ()
+
         match driver.Create("remove-cni", "10.244.0.0/16", "", "", Map.empty, Map.empty) with
         | Ok created ->
             match driver.Remove(created.Id, false) with
@@ -65,6 +70,7 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``Remove retourne Error pour un id inexistant`` () =
         let driver = createDriver ()
+
         match driver.Remove("nonexistent", false) with
         | Error _ -> ()
         | Ok _ -> failwith "Remove devrait retourner Error"
@@ -72,8 +78,13 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``List retourne tous les reseaux crees`` () =
         let driver = createDriver ()
-        driver.Create("cni-list-1", "10.244.0.0/16", "", "", Map.empty, Map.empty) |> ignore
-        driver.Create("cni-list-2", "10.245.0.0/16", "", "", Map.empty, Map.empty) |> ignore
+
+        driver.Create("cni-list-1", "10.244.0.0/16", "", "", Map.empty, Map.empty)
+        |> ignore
+
+        driver.Create("cni-list-2", "10.245.0.0/16", "", "", Map.empty, Map.empty)
+        |> ignore
+
         match driver.List() with
         | Ok networks -> networks.Length |> should equal 2
         | Error msg -> failwithf "List a echoue: %s" msg
@@ -81,6 +92,7 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``Connect sans plugin retourne Ok`` () =
         let driver = createDriver ()
+
         match driver.Create("conn-cni", "10.244.0.0/16", "", "", Map.empty, Map.empty) with
         | Ok created ->
             match driver.Connect(created.Id, "container-abc", "", None, Map.empty) with
@@ -93,6 +105,7 @@ module CustomCniDriverTests =
     [<Fact>]
     let ``Disconnect sans plugin retourne Ok`` () =
         let driver = createDriver ()
+
         match driver.Create("disc-cni", "10.244.0.0/16", "", "", Map.empty, Map.empty) with
         | Ok created ->
             match driver.Disconnect(created.Id, "container-abc", "endpoint-xyz", false) with

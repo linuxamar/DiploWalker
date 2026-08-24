@@ -12,7 +12,8 @@ type DriverMappingsTests() =
 
     [<Fact>]
     let ``volumeDriverToString retourne local pour Local`` () =
-        DriverMappings.volumeDriverToString StorageDriverType.Local |> should equal "local"
+        DriverMappings.volumeDriverToString StorageDriverType.Local
+        |> should equal "local"
 
     [<Fact>]
     let ``volumeDriverToString retourne nfs pour Nfs`` () =
@@ -24,15 +25,18 @@ type DriverMappingsTests() =
 
     [<Fact>]
     let ``volumeDriverToString retourne azure pour CloudAzure`` () =
-        DriverMappings.volumeDriverToString StorageDriverType.CloudAzure |> should equal "azure"
+        DriverMappings.volumeDriverToString StorageDriverType.CloudAzure
+        |> should equal "azure"
 
     [<Fact>]
     let ``volumeDriverToString retourne aws pour CloudAws`` () =
-        DriverMappings.volumeDriverToString StorageDriverType.CloudAws |> should equal "aws"
+        DriverMappings.volumeDriverToString StorageDriverType.CloudAws
+        |> should equal "aws"
 
     [<Fact>]
     let ``volumeDriverToString retourne gcp pour CloudGcp`` () =
-        DriverMappings.volumeDriverToString StorageDriverType.CloudGcp |> should equal "gcp"
+        DriverMappings.volumeDriverToString StorageDriverType.CloudGcp
+        |> should equal "gcp"
 
     [<Fact>]
     let ``volumeDriverToString retourne iso pour Iso`` () =
@@ -48,7 +52,8 @@ type DriverMappingsTests() =
 
     [<Fact>]
     let ``parseVolumeDriver retourne Local pour valeur inconnue`` () =
-        DriverMappings.parseVolumeDriver "unknown" |> should equal StorageDriverType.Local
+        DriverMappings.parseVolumeDriver "unknown"
+        |> should equal StorageDriverType.Local
 
     [<Fact>]
     let ``isValidVolumeDriver retourne true pour nfs`` () =
@@ -70,7 +75,8 @@ type DriverMappingsTests() =
 
     [<Fact>]
     let ``networkDriverToString retourne bridge pour Bridge`` () =
-        DriverMappings.networkDriverToString NetworkDriver.Bridge |> should equal "bridge"
+        DriverMappings.networkDriverToString NetworkDriver.Bridge
+        |> should equal "bridge"
 
     [<Fact>]
     let ``networkDriverToString retourne none pour None`` () =
@@ -78,7 +84,8 @@ type DriverMappingsTests() =
 
     [<Fact>]
     let ``networkDriverToString retourne custom_cni pour CustomCni`` () =
-        DriverMappings.networkDriverToString NetworkDriver.CustomCni |> should equal "custom_cni"
+        DriverMappings.networkDriverToString NetworkDriver.CustomCni
+        |> should equal "custom_cni"
 
     [<Fact>]
     let ``networkDriverToString retourne pod pour Pod`` () =

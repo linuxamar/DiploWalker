@@ -16,8 +16,12 @@ open Spectre.Console
 // ── list ──────────────────────────────────────────────────────────
 type ListSettings() =
     inherit CommandSettings()
-    [<CommandOption("-a|--all")>] member val All = false with get, set
-    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+    [<CommandOption("-a|--all")>]
+    member val All = false with get, set
+
+    [<CommandOption("--namespace")>]
+    member val Namespace: string = null with get, set
 
 type ListCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ListSettings>()
@@ -35,19 +39,18 @@ type ListCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteTable(
                     response.Containers,
                     [| "ID"; "Nom"; "Image"; "État"; "Créé" |],
-                    fun c ->
-                        [| c.Id
-                           c.Name
-                           c.Image
-                           c.State.ToString()
-                           c.CreatedAt |])
+                    fun c -> [| c.Id; c.Name; c.Image; c.State.ToString(); c.CreatedAt |]
+                )
+
             return 0
         }
 
 // ── inspect ───────────────────────────────────────────────────────
 type InspectContainerSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
 
 type InspectContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<InspectContainerSettings>()
@@ -77,9 +80,13 @@ type InspectContainerCommand(output: IOutputPort, clients: IDiploClients) =
 // ── start ─────────────────────────────────────────────────────────
 type StartSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
     /// Démarre en attaché à la console (sinon non interactif, en arrière-plan).
-    [<CommandOption("-a|--attach")>] member val Attach = false with get, set
+    [<CommandOption("-a|--attach")>]
+    member val Attach = false with get, set
 
 type StartContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<StartSettings>()
@@ -100,8 +107,12 @@ type StartContainerCommand(output: IOutputPort, clients: IDiploClients) =
 // ── stop ──────────────────────────────────────────────────────────
 type StopSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandOption("-t|--timeout")>] member val Timeout = 10 with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandOption("-t|--timeout")>]
+    member val Timeout = 10 with get, set
 
 type StopContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<StopSettings>()
@@ -122,8 +133,12 @@ type StopContainerCommand(output: IOutputPort, clients: IDiploClients) =
 // ── delete ────────────────────────────────────────────────────────
 type DeleteSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandOption("-f|--force")>] member val Force = false with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandOption("-f|--force")>]
+    member val Force = false with get, set
 
 type DeleteContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<DeleteSettings>()
@@ -137,6 +152,7 @@ type DeleteContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let! response = client.DeleteAsync(settings.Id, settings.Force)
+
                 if response.Success then
                     output.WriteSuccess(response.Message)
                     return 0
@@ -148,8 +164,12 @@ type DeleteContainerCommand(output: IOutputPort, clients: IDiploClients) =
 // ── pull ──────────────────────────────────────────────────────────
 type PullSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<IMAGE>")>] member val Image: string = null with get, set
-    [<CommandOption("--user")>] member val User: string = null with get, set
+
+    [<CommandArgument(0, "<IMAGE>")>]
+    member val Image: string = null with get, set
+
+    [<CommandOption("--user")>]
+    member val User: string = null with get, set
 
 type PullImageCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<PullSettings>()
@@ -162,10 +182,17 @@ type PullImageCommand(output: IOutputPort, clients: IDiploClients) =
                 return 1
             else
                 use client = clients.CreateContainerClient()
+
                 let! response =
                     client.PullImageAsync(
                         settings.Image,
-                        ?user = (if String.IsNullOrWhiteSpace(settings.User) then None else Some settings.User))
+                        ?user =
+                            (if String.IsNullOrWhiteSpace(settings.User) then
+                                 None
+                             else
+                                 Some settings.User)
+                    )
+
                 output.WriteSuccess(response.Message)
                 return 0
         }
@@ -173,9 +200,15 @@ type PullImageCommand(output: IOutputPort, clients: IDiploClients) =
 // ── login / logout (registres) ────────────────────────────────────
 type RegistryLoginSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<REGISTRY>")>] member val Registry: string = null with get, set
-    [<CommandOption("--username")>] member val Username: string = null with get, set
-    [<CommandOption("--password")>] member val Password: string = null with get, set
+
+    [<CommandArgument(0, "<REGISTRY>")>]
+    member val Registry: string = null with get, set
+
+    [<CommandOption("--username")>]
+    member val Username: string = null with get, set
+
+    [<CommandOption("--password")>]
+    member val Password: string = null with get, set
 
 type RegistryLoginCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RegistryLoginSettings>()
@@ -192,12 +225,13 @@ type RegistryLoginCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 let password =
                     if String.IsNullOrWhiteSpace(settings.Password) then
-                        AnsiConsole.Prompt(
-                            TextPrompt<string>("Mot de passe :").Secret())
+                        AnsiConsole.Prompt(TextPrompt<string>("Mot de passe :").Secret())
                     else
                         settings.Password
+
                 use client = clients.CreateContainerClient()
                 let! response = client.LoginRegistryAsync(settings.Registry, settings.Username, password)
+
                 if response.Success then
                     output.WriteSuccess(response.Message)
                     return 0
@@ -208,7 +242,9 @@ type RegistryLoginCommand(output: IOutputPort, clients: IDiploClients) =
 
 type RegistryLogoutSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<REGISTRY>")>] member val Registry: string = null with get, set
+
+    [<CommandArgument(0, "<REGISTRY>")>]
+    member val Registry: string = null with get, set
 
 type RegistryLogoutCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RegistryLogoutSettings>()
@@ -222,6 +258,7 @@ type RegistryLogoutCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let! response = client.LogoutRegistryAsync(settings.Registry)
+
                 if response.Success then
                     output.WriteSuccess(response.Message)
                     return 0
@@ -234,16 +271,36 @@ type RegistryLogoutCommand(output: IOutputPort, clients: IDiploClients) =
 
 type CreateContainerSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<IMAGE>")>] member val Image: string = null with get, set
-    [<CommandArgument(1, "<NAME>")>] member val Name: string = null with get, set
-    [<CommandOption("--env")>] member val Env: string[] = [||] with get, set
-    [<CommandOption("--command")>] member val Command: string[] = [||] with get, set
-    [<CommandOption("-c|--cmd")>] member val CommandLine: string = null with get, set
-    [<CommandOption("--label")>] member val Labels: string[] = [||] with get, set
-    [<CommandOption("--mount")>] member val Mounts: string[] = [||] with get, set
-    [<CommandOption("--pid-limit")>] member val PidLimit = 0u with get, set
-    [<CommandOption("--memory-limit")>] member val MemoryLimit = 0L with get, set
-    [<CommandOption("--cpu-shares")>] member val CpuShares = 0L with get, set
+
+    [<CommandArgument(0, "<IMAGE>")>]
+    member val Image: string = null with get, set
+
+    [<CommandArgument(1, "<NAME>")>]
+    member val Name: string = null with get, set
+
+    [<CommandOption("--env")>]
+    member val Env: string[] = [||] with get, set
+
+    [<CommandOption("--command")>]
+    member val Command: string[] = [||] with get, set
+
+    [<CommandOption("-c|--cmd")>]
+    member val CommandLine: string = null with get, set
+
+    [<CommandOption("--label")>]
+    member val Labels: string[] = [||] with get, set
+
+    [<CommandOption("--mount")>]
+    member val Mounts: string[] = [||] with get, set
+
+    [<CommandOption("--pid-limit")>]
+    member val PidLimit = 0u with get, set
+
+    [<CommandOption("--memory-limit")>]
+    member val MemoryLimit = 0L with get, set
+
+    [<CommandOption("--cpu-shares")>]
+    member val CpuShares = 0L with get, set
 
 type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<CreateContainerSettings>()
@@ -259,26 +316,31 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
                 return 1
             else
                 use client = clients.CreateContainerClient()
+
                 let env =
                     settings.Env
                     |> Array.choose (fun e ->
                         match e.Split('=', 2) with
-                        | [| k; v |] -> Some (k, v)
+                        | [| k; v |] -> Some(k, v)
                         | _ -> None)
                     |> dict
+
                 let labels =
                     settings.Labels
                     |> Array.choose (fun l ->
                         match l.Split('=', 2) with
-                        | [| k; v |] -> Some (k, v)
+                        | [| k; v |] -> Some(k, v)
                         | _ -> None)
                     |> dict
+
                 let command =
                     if not (String.IsNullOrWhiteSpace settings.CommandLine) then
                         CommandLine.split settings.CommandLine
                     else
                         settings.Command |> Array.toList
+
                 let mounts = MountParser.parseArray settings.Mounts
+
                 let! response =
                     client.CreateAsync(
                         name = settings.Name,
@@ -286,10 +348,24 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
                         ?env = (if env.Count > 0 then Some env else None),
                         ?command = (if command.IsEmpty then None else Some command),
                         ?labels = (if labels.Count > 0 then Some labels else None),
-                        ?pidLimit = (if settings.PidLimit > 0u then Some(int settings.PidLimit) else None),
-                        ?memoryLimit = (if settings.MemoryLimit > 0L then Some settings.MemoryLimit else None),
-                        ?cpuShares = (if settings.CpuShares > 0L then Some(int settings.CpuShares) else None),
-                        ?mounts = (if mounts.IsEmpty then None else Some mounts))
+                        ?pidLimit =
+                            (if settings.PidLimit > 0u then
+                                 Some(int settings.PidLimit)
+                             else
+                                 None),
+                        ?memoryLimit =
+                            (if settings.MemoryLimit > 0L then
+                                 Some settings.MemoryLimit
+                             else
+                                 None),
+                        ?cpuShares =
+                            (if settings.CpuShares > 0L then
+                                 Some(int settings.CpuShares)
+                             else
+                                 None),
+                        ?mounts = (if mounts.IsEmpty then None else Some mounts)
+                    )
+
                 output.WriteSuccess(sprintf "Conteneur %s créé (%s)" response.Name (response.State.ToString()))
                 output.WriteLine(sprintf "  ID      : %s" response.Id)
                 output.WriteLine(sprintf "  Créé    : %s" response.CreatedAt)
@@ -299,10 +375,18 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
 // ── logs ──────────────────────────────────────────────────────────
 type LogsContainerSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandOption("-f|--follow")>] member val Follow = false with get, set
-    [<CommandOption("-n|--tail")>] member val Tail = 100 with get, set
-    [<CommandOption("--since")>] member val Since: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandOption("-f|--follow")>]
+    member val Follow = false with get, set
+
+    [<CommandOption("-n|--tail")>]
+    member val Tail = 100 with get, set
+
+    [<CommandOption("--since")>]
+    member val Since: string = null with get, set
 
 type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<LogsContainerSettings>()
@@ -316,33 +400,48 @@ type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let since = if isNull settings.Since then "" else settings.Since
+
                 try
                     if settings.Follow then
                         use ctrlC = new CtrlCHandler()
                         use linked = CancellationTokenSource.CreateLinkedTokenSource(ct, ctrlC.Token)
                         let followCt = linked.Token
-                        let stream = client.GetLogsStream(settings.Id, follow = true, tail = settings.Tail, since = since, ct = followCt)
+
+                        let stream =
+                            client.GetLogsStream(
+                                settings.Id,
+                                follow = true,
+                                tail = settings.Tail,
+                                since = since,
+                                ct = followCt
+                            )
+
                         let enumerator = stream.GetAsyncEnumerator(followCt)
+
                         try
                             let mutable moving = true
+
                             while moving do
                                 let! hasNext = enumerator.MoveNextAsync().AsTask()
+
                                 if hasNext then
-                                    output.WriteLine(sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log)
+                                    output.WriteLine(
+                                        sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log
+                                    )
                                 else
                                     moving <- false
                         finally
                             enumerator.DisposeAsync().AsTask() |> ignore
                     else
                         let! entries = client.GetLogs(settings.Id, tail = settings.Tail, since = since, ct = ct)
+
                         for entry in entries do
                             output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
+
                     return 0
                 with
-                | :? Grpc.Core.RpcException as rex when rex.StatusCode = Grpc.Core.StatusCode.Cancelled ->
-                    return 0
-                | :? OperationCanceledException ->
-                    return 0
+                | :? Grpc.Core.RpcException as rex when rex.StatusCode = Grpc.Core.StatusCode.Cancelled -> return 0
+                | :? OperationCanceledException -> return 0
                 | ex ->
                     output.WriteError(ex.Message)
                     return 1
@@ -351,8 +450,12 @@ type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
 // ── exec ──────────────────────────────────────────────────────────
 type ExecContainerSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandArgument(1, "<COMMAND>")>] member val Command: string[] = [||] with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandArgument(1, "<COMMAND>")>]
+    member val Command: string[] = [||] with get, set
 
 type ExecContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ExecContainerSettings>()
@@ -369,8 +472,10 @@ type ExecContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let! entries = client.Exec(settings.Id, settings.Command :> seq<string>)
+
                 for entry in entries do
                     output.WriteLine(System.Text.Encoding.UTF8.GetString(entry.Data))
+
                 return 0
         }
 
@@ -386,12 +491,15 @@ type NamespacesCommand(output: IOutputPort, clients: IDiploClients) =
         task {
             use client = clients.CreateContainerClient()
             let! response = client.ListNamespacesAsync()
+
             if response.Namespaces.Count = 0 then
                 output.WriteWarning("Aucun namespace trouvé.")
             else
                 output.WriteSuccess("Namespaces disponibles :")
+
                 for ns in response.Namespaces do
                     output.WriteLine(sprintf "  - %s" ns)
+
             return 0
         }
 
@@ -419,8 +527,12 @@ type VersionCommand(output: IOutputPort, clients: IDiploClients) =
 // ── rename ────────────────────────────────────────────────────────
 type RenameContainerSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandArgument(1, "<NEW_NAME>")>] member val NewName: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandArgument(1, "<NEW_NAME>")>]
+    member val NewName: string = null with get, set
 
 type RenameContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RenameContainerSettings>()
@@ -437,6 +549,7 @@ type RenameContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let! response = client.RenameContainerAsync(settings.Id, settings.NewName)
+
                 if response.Success then
                     output.WriteSuccess(response.Message)
                     return 0
@@ -448,7 +561,9 @@ type RenameContainerCommand(output: IOutputPort, clients: IDiploClients) =
 // ── top ───────────────────────────────────────────────────────────
 type TopContainerSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
 
 type TopContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<TopContainerSettings>()
@@ -462,23 +577,25 @@ type TopContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let! response = client.TopContainerAsync(settings.Id)
+
                 if response.Processes.Count = 0 then
                     output.WriteWarning("Aucun processus trouvé dans le conteneur.")
                 else
                     output.WriteTable(
                         response.Processes,
                         [| "PID"; "Utilisateur"; "Commande" |],
-                        fun p ->
-                            [| string p.Pid
-                               p.User
-                               p.Command |])
+                        fun p -> [| string p.Pid; p.User; p.Command |]
+                    )
+
                 return 0
         }
 
 // ── stats ─────────────────────────────────────────────────────────
 type StatsContainerSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
 
 type StatsContainerCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<StatsContainerSettings>()
@@ -506,7 +623,9 @@ type StatsContainerCommand(output: IOutputPort, clients: IDiploClients) =
 // ── image list ────────────────────────────────────────────────────
 type ImageListSettings() =
     inherit CommandSettings()
-    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+    [<CommandOption("--namespace")>]
+    member val Namespace: string = null with get, set
 
 type ImageListCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ImageListSettings>()
@@ -517,26 +636,28 @@ type ImageListCommand(output: IOutputPort, clients: IDiploClients) =
             use client = clients.CreateContainerClient()
             let ns = if isNull settings.Namespace then "" else settings.Namespace
             let! response = client.ListImagesAsync(ns)
+
             if response.Images.Count = 0 then
                 output.WriteWarning("Aucune image trouvée.")
             else
                 output.WriteTable(
                     response.Images,
                     [| "ID"; "Référentiel"; "Tag"; "Taille"; "Créé" |],
-                    fun img ->
-                        [| img.Id
-                           img.Repository
-                           img.Tag
-                           string img.Size
-                           img.CreatedAt |])
+                    fun img -> [| img.Id; img.Repository; img.Tag; string img.Size; img.CreatedAt |]
+                )
+
             return 0
         }
 
 // ── image inspect ─────────────────────────────────────────────────
 type ImageInspectSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<REF>")>] member val Ref: string = null with get, set
-    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+    [<CommandArgument(0, "<REF>")>]
+    member val Ref: string = null with get, set
+
+    [<CommandOption("--namespace")>]
+    member val Namespace: string = null with get, set
 
 type ImageInspectCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ImageInspectSettings>()
@@ -557,17 +678,23 @@ type ImageInspectCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteLine(sprintf "  Tag          : %s" response.Tag)
                 output.WriteLine(sprintf "  Taille       : %d octets" response.Size)
                 output.WriteLine(sprintf "  Créé         : %s" response.CreatedAt)
+
                 if response.Labels.Count > 0 then
                     for kv in response.Labels do
                         output.WriteLine(sprintf "  Label        : %s=%s" kv.Key kv.Value)
+
                 return 0
         }
 
 // ── image remove ──────────────────────────────────────────────────
 type ImageRemoveSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<REF>")>] member val Ref: string = null with get, set
-    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+    [<CommandArgument(0, "<REF>")>]
+    member val Ref: string = null with get, set
+
+    [<CommandOption("--namespace")>]
+    member val Namespace: string = null with get, set
 
 type ImageRemoveCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ImageRemoveSettings>()
@@ -582,6 +709,7 @@ type ImageRemoveCommand(output: IOutputPort, clients: IDiploClients) =
                 use client = clients.CreateContainerClient()
                 let ns = if isNull settings.Namespace then "" else settings.Namespace
                 let! response = client.RemoveImageAsync(settings.Ref, ns)
+
                 if response.Success then
                     output.WriteSuccess(response.Message)
                     return 0
@@ -593,9 +721,15 @@ type ImageRemoveCommand(output: IOutputPort, clients: IDiploClients) =
 // ── image tag ─────────────────────────────────────────────────────
 type ImageTagSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<SOURCE>")>] member val Source: string = null with get, set
-    [<CommandArgument(1, "<TARGET>")>] member val Target: string = null with get, set
-    [<CommandOption("--namespace")>] member val Namespace: string = null with get, set
+
+    [<CommandArgument(0, "<SOURCE>")>]
+    member val Source: string = null with get, set
+
+    [<CommandArgument(1, "<TARGET>")>]
+    member val Target: string = null with get, set
+
+    [<CommandOption("--namespace")>]
+    member val Namespace: string = null with get, set
 
 type ImageTagCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ImageTagSettings>()

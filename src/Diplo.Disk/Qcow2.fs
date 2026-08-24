@@ -53,20 +53,30 @@ module Qcow2 =
 
     let private readFully (s: Stream) (buffer: byte[]) =
         let mutable total = 0
+
         while total < buffer.Length do
             let r = s.Read(buffer, total, buffer.Length - total)
-            if r <= 0 then failwith "Fichier qcow2 tronqué (lecture incomplète)"
+
+            if r <= 0 then
+                failwith "Fichier qcow2 tronqué (lecture incomplète)"
+
             total <- total + r
 
     let private be16 (d: byte[]) (o: int) = (int d.[o] <<< 8) ||| int d.[o + 1]
 
     let private be32 (d: byte[]) (o: int) =
-        (int64 d.[o] <<< 24) ||| (int64 d.[o + 1] <<< 16) ||| (int64 d.[o + 2] <<< 8) ||| int64 d.[o + 3]
+        (int64 d.[o] <<< 24)
+        ||| (int64 d.[o + 1] <<< 16)
+        ||| (int64 d.[o + 2] <<< 8)
+        ||| int64 d.[o + 3]
         |> int32
 
     let private be64 (d: byte[]) (o: int) =
         let mutable v = 0L
-        for i in 0 .. 7 do v <- (v <<< 8) ||| int64 d.[o + i]
+
+        for i in 0..7 do
+            v <- (v <<< 8) ||| int64 d.[o + i]
+
         v
 
     let private putBe16 (v: int) (d: byte[]) (o: int) =
@@ -96,34 +106,54 @@ module Qcow2 =
         let buf = Array.zeroCreate<byte> 128
         stream.Position <- 0L
         readFully stream buf
-        if not (buf.[0] = byte 'Q' && buf.[1] = byte 'F' && buf.[2] = byte 'I' && buf.[3] = 0xFBuy) then
+
+        if
+            not (
+                buf.[0] = byte 'Q'
+                && buf.[1] = byte 'F'
+                && buf.[2] = byte 'I'
+                && buf.[3] = 0xFBuy
+            )
+        then
             failwith "En-tête qcow2 invalide (signature 'QFI' absente)"
+
         let version = be32 buf 4
+
         if version <> 2 && version <> 3 then
             failwithf "Version qcow2 %d non prise en charge (versions 2 et 3 uniquement)" version
+
         if be64 buf 8 <> 0L then
             failwith "Les images qcow2 avec fichier de sauvegarde (backing file) ne sont pas prises en charge"
+
         let clusterBits = be32 buf 20
+
         if clusterBits < 9 || clusterBits > 21 then
             failwithf "Taille de cluster qcow2 invalide (cluster_bits = %d)" clusterBits
+
         let virtualSize = be64 buf 24
+
         if virtualSize <= 0L then
             failwith "Image qcow2 invalide (taille virtuelle nulle)"
+
         if be32 buf 32 <> 0 then
             failwith "Les images qcow2 chiffrées ne sont pas prises en charge"
+
         let l1Size = be32 buf 36
         let l1TableOffset = be64 buf 40
         let refcountTableOffset = be64 buf 48
         let refcountTableClusters = be32 buf 56
-        let refcountOrder =
-            if version = 3 then be32 buf 96 else 4
+        let refcountOrder = if version = 3 then be32 buf 96 else 4
         let refcountBits = 1 <<< refcountOrder
+
         if refcountBits <> 16 then
             failwithf "Largeur de refcount %d non prise en charge (seul 16 bits l'est)" refcountBits
+
         if version = 3 then
             let incompatible = be32 buf 72
+
             if incompatible &&& 4 <> 0 then
                 failwith "Les images qcow2 avec fichier de données externe ne sont pas prises en charge"
+
         { Version = version
           ClusterBits = clusterBits
           ClusterSize = 1 <<< clusterBits
@@ -143,9 +173,13 @@ module Qcow2 =
     let private readAt (s: Stream) (offset: int64) (buffer: byte[]) (bufferOffset: int) (count: int) =
         s.Position <- offset
         let mutable total = 0
+
         while total < count do
             let r = s.Read(buffer, bufferOffset + total, count - total)
-            if r <= 0 then failwith "Lecture au-delà de la fin du fichier qcow2"
+
+            if r <= 0 then
+                failwith "Lecture au-delà de la fin du fichier qcow2"
+
             total <- total + r
 
     let private readUInt64At (s: Stream) (offset: int64) : int64 =
@@ -168,7 +202,9 @@ module Qcow2 =
 
     let private readRefcount (s: Stream) (h: Header) (n: int64) : int =
         let blockOffset = refcountBlockOffset s h n
-        if blockOffset = 0L then 0
+
+        if blockOffset = 0L then
+            0
         else
             let idx = int (n % int64 (refcountsPerBlock h))
             let b = Array.zeroCreate<byte> 2
@@ -177,8 +213,10 @@ module Qcow2 =
 
     let private writeRefcount (s: Stream) (h: Header) (n: int64) (value: int) =
         let blockOffset = refcountBlockOffset s h n
+
         if blockOffset = 0L then
             failwithf "Image qcow2 saturée : aucun bloc de refcount pour le cluster %d (limite du pilote MVP)" n
+
         let idx = int (n % int64 (refcountsPerBlock h))
         let b = Array.zeroCreate<byte> 2
         putBe16 value b 0
@@ -193,9 +231,13 @@ module Qcow2 =
         let maxClusters = int64 h.RefcountTableClusters * int64 (refcountsPerBlock h)
         let mutable n = 1L
         let mutable found = -1L
+
         while found < 0L && n < maxClusters do
             if readRefcount s h n = 0 then found <- n else n <- n + 1L
-        if found < 0L then failwith "Image qcow2 pleine : aucun cluster libre disponible"
+
+        if found < 0L then
+            failwith "Image qcow2 pleine : aucun cluster libre disponible"
+
         found
 
     // ── lecture ────────────────────────────────────────────────────────────
@@ -204,25 +246,37 @@ module Qcow2 =
     /// Les clusters non alloués et les clusters « zéros » sont lus comme des zéros.
     let readBytesAt (s: Stream) (h: Header) (virtualOffset: int64) (count: int) : byte[] =
         if virtualOffset < 0L || virtualOffset + int64 count > h.VirtualSize then
-            failwithf "Lecture hors de l'image qcow2 (offset %d, %d octets, taille %d)" virtualOffset count h.VirtualSize
+            failwithf
+                "Lecture hors de l'image qcow2 (offset %d, %d octets, taille %d)"
+                virtualOffset
+                count
+                h.VirtualSize
+
         let out = Array.zeroCreate<byte> count
         let l1Shift = l1Shift h
         let l2Entries = l2Entries h
         let mutable pos = virtualOffset
         let mutable outPos = 0
         let mutable remaining = count
+
         while remaining > 0 do
             let l1Index = int (pos >>> l1Shift)
+
             if l1Index >= h.L1Size then
                 failwithf "Index de table L1 %d hors limites (l1_size = %d)" l1Index h.L1Size
+
             let l2Index = int ((pos >>> h.ClusterBits) &&& int64 (l2Entries - 1))
             let inCluster = int (pos &&& int64 (h.ClusterSize - 1))
             let toCopy = min remaining (h.ClusterSize - inCluster)
-            let l2Offset = readUInt64At s (h.L1TableOffset + int64 l1Index * 8L) &&& hostOffsetMask
+
+            let l2Offset =
+                readUInt64At s (h.L1TableOffset + int64 l1Index * 8L) &&& hostOffsetMask
+
             if l2Offset = 0L then
                 Array.Clear(out, outPos, toCopy)
             else
                 let desc = readUInt64At s (l2Offset + int64 l2Index * 8L)
+
                 if desc = 0L || desc &&& zeroReadFlag <> 0L then
                     Array.Clear(out, outPos, toCopy)
                 elif desc &&& compressedFlag <> 0L then
@@ -230,9 +284,11 @@ module Qcow2 =
                 else
                     let hostOffset = desc &&& hostOffsetMask
                     readAt s (hostOffset + int64 inCluster) out outPos toCopy
+
             pos <- pos + int64 toCopy
             outPos <- outPos + toCopy
             remaining <- remaining - toCopy
+
         out
 
     // ── écriture ───────────────────────────────────────────────────────────
@@ -246,16 +302,24 @@ module Qcow2 =
     /// modèle lecture-modification-écriture.
     let writeBytesAt (s: Stream) (h: Header) (virtualOffset: int64) (data: byte[]) =
         if virtualOffset < 0L || virtualOffset + int64 data.Length > h.VirtualSize then
-            failwithf "Écriture hors de l'image qcow2 (offset %d, %d octets, taille %d)" virtualOffset data.Length h.VirtualSize
+            failwithf
+                "Écriture hors de l'image qcow2 (offset %d, %d octets, taille %d)"
+                virtualOffset
+                data.Length
+                h.VirtualSize
+
         let l1Shift = l1Shift h
         let l2Entries = l2Entries h
         let mutable pos = virtualOffset
         let mutable dataPos = 0
         let mutable remaining = data.Length
+
         while remaining > 0 do
             let l1Index = int (pos >>> l1Shift)
+
             if l1Index >= h.L1Size then
                 failwithf "Index de table L1 %d hors limites (l1_size = %d)" l1Index h.L1Size
+
             let l2Index = int ((pos >>> h.ClusterBits) &&& int64 (l2Entries - 1))
             let inCluster = int (pos &&& int64 (h.ClusterSize - 1))
             let toWrite = min remaining (h.ClusterSize - inCluster)
@@ -263,6 +327,7 @@ module Qcow2 =
 
             let mutable l2Offset =
                 readUInt64At s (h.L1TableOffset + int64 l1Index * 8L) &&& hostOffsetMask
+
             if l2Offset = 0L then
                 let newL2 = findFreeCluster s h
                 let zero = Array.zeroCreate<byte> h.ClusterSize
@@ -273,6 +338,7 @@ module Qcow2 =
                 l2Offset <- newL2 * int64 h.ClusterSize
 
             let desc = readUInt64At s (l2Offset + int64 l2Index * 8L)
+
             if desc = 0L || desc &&& zeroReadFlag <> 0L || desc &&& compressedFlag <> 0L then
                 let newCluster = findFreeCluster s h
                 let zero = Array.zeroCreate<byte> h.ClusterSize
@@ -293,6 +359,7 @@ module Qcow2 =
             pos <- pos + int64 toWrite
             dataPos <- dataPos + toWrite
             remaining <- remaining - toWrite
+
         s.Flush()
 
     // ── redimensionnement ──────────────────────────────────────────────────
@@ -311,16 +378,23 @@ module Qcow2 =
     /// Décrémente le refcount du cluster hôte `n` (jamais sous zéro).
     let private freeCluster (s: Stream) (h: Header) (n: int64) =
         let rc = readRefcount s h n
-        if rc <= 0 then failwithf "Refcount incohérent pour le cluster %d (valeur %d)" n rc
+
+        if rc <= 0 then
+            failwithf "Refcount incohérent pour le cluster %d (valeur %d)" n rc
+
         writeRefcount s h n (rc - 1)
 
     /// Libère un cluster de données référencé par un descripteur L2 et remet
     /// le descripteur à zéro. Les clusters compressés sont laissés intacts.
     let private freeDataEntry (s: Stream) (h: Header) (entryPos: int64) =
         let desc = readUInt64At s entryPos
+
         if desc <> 0L && desc &&& compressedFlag = 0L then
             let host = desc &&& hostOffsetMask
-            if host <> 0L then freeCluster s h (host / int64 h.ClusterSize)
+
+            if host <> 0L then
+                freeCluster s h (host / int64 h.ClusterSize)
+
             writeUInt64At s entryPos 0L
 
     /// Recherche `count` clusters hôtes libres contigus (évite le cluster 0).
@@ -329,14 +403,22 @@ module Qcow2 =
         let maxClusters = refcountedClusters h
         let mutable n = 1L
         let mutable found = -1L
+
         while found < 0L && n + int64 count - 1L < maxClusters do
             let mutable ok = true
             let mutable i = 0
+
             while ok && i < count do
-                if readRefcount s h (n + int64 i) <> 0 then ok <- false
+                if readRefcount s h (n + int64 i) <> 0 then
+                    ok <- false
+
                 i <- i + 1
-            if ok then found <- n
+
+            if ok then
+                found <- n
+
             n <- n + 1L
+
         if found >= 0L then found * int64 h.ClusterSize else -1L
 
     /// Libère les clusters de données et les tables L2 au-delà de
@@ -349,18 +431,23 @@ module Qcow2 =
         for l1Index in firstFullL1 .. h.L1Size - 1 do
             let l1Pos = h.L1TableOffset + int64 l1Index * 8L
             let l2Offset = readUInt64At s l1Pos &&& hostOffsetMask
+
             if l2Offset <> 0L then
                 for l2Index in 0 .. l2Entries - 1 do
                     freeDataEntry s h (l2Offset + int64 l2Index * 8L)
+
                 freeCluster s h (l2Offset / int64 h.ClusterSize)
                 writeUInt64At s l1Pos 0L
         // table L2 partiellement couverte par la nouvelle taille
         let inCoverage = newVirtualSize % coverage
+
         if inCoverage <> 0L && firstFullL1 < h.L1Size then
             let l1Pos = h.L1TableOffset + int64 firstFullL1 * 8L
             let l2Offset = readUInt64At s l1Pos &&& hostOffsetMask
+
             if l2Offset <> 0L then
                 let startL2 = int (inCoverage / int64 h.ClusterSize)
+
                 for l2Index in startL2 .. l2Entries - 1 do
                     freeDataEntry s h (l2Offset + int64 l2Index * 8L)
 
@@ -368,9 +455,13 @@ module Qcow2 =
     let private highestUsedCluster (s: Stream) (h: Header) : int64 =
         let mutable n = refcountedClusters h - 1L
         let mutable found = 0L
+
         while found = 0L && n >= 0L do
-            if readRefcount s h n <> 0 then found <- n
+            if readRefcount s h n <> 0 then
+                found <- n
+
             n <- n - 1L
+
         found
 
     /// Redimensionne l'image qcow2 à `newVirtualSize` octets (agrandissement
@@ -382,8 +473,11 @@ module Qcow2 =
     let resize (s: Stream) (newVirtualSize: int64) : Header =
         if newVirtualSize <= 0L then
             invalidArg (nameof newVirtualSize) "La nouvelle taille virtuelle doit être positive"
+
         let h = readHeader s
-        if newVirtualSize = h.VirtualSize then h
+
+        if newVirtualSize = h.VirtualSize then
+            h
         else
             let newL1Size = l1EntriesNeeded h newVirtualSize
             let oldClusters = int (ceilDiv (int64 h.L1Size * 8L) (int64 h.ClusterSize))
@@ -393,26 +487,36 @@ module Qcow2 =
                 freeBeyond s h newVirtualSize
 
             let mutable newL1Offset = h.L1TableOffset
+
             if newClusters <> oldClusters then
                 let offset = findFreeContiguous s h newClusters
+
                 if offset < 0L then
                     failwith "Aucun espace libre contigu pour la table L1 (limite du pilote MVP)"
+
                 let copyCount = min h.L1Size newL1Size
                 let entryBytes = copyCount * 8
+
                 if entryBytes > 0 then
                     let buffer = Array.zeroCreate<byte> entryBytes
                     readAt s h.L1TableOffset buffer 0 entryBytes
                     s.Position <- offset
                     s.Write(buffer, 0, entryBytes)
+
                 let totalBytes = newClusters * h.ClusterSize
+
                 if totalBytes > entryBytes then
                     let zeros = Array.zeroCreate<byte> (totalBytes - entryBytes)
                     s.Write(zeros, 0, zeros.Length)
+
                 s.Flush()
+
                 for i in 0 .. newClusters - 1 do
                     writeRefcount s h (offset / int64 h.ClusterSize + int64 i) 1
+
                 for i in 0 .. oldClusters - 1 do
                     freeCluster s h (h.L1TableOffset / int64 h.ClusterSize + int64 i)
+
                 newL1Offset <- offset
 
             // croissance sans relocalisation : zéro sur les nouvelles entrées L1
@@ -432,6 +536,7 @@ module Qcow2 =
 
             // troncature du fichier à la dernière position utile
             let endOffset = (highestUsedCluster s h + 1L) * int64 h.ClusterSize
+
             if s.Length > endOffset then
                 s.SetLength(endOffset)
                 s.Flush()
@@ -461,7 +566,9 @@ type Qcow2Stream(path: string, access: FileAccess) =
 
     override _.Read(buffer, offset, count) =
         let count = int (min (int64 count) (max 0L (header.VirtualSize - position)))
-        if count <= 0 then 0
+
+        if count <= 0 then
+            0
         else
             let data = Qcow2.readBytesAt fs header position count
             Array.Copy(data, 0, buffer, offset, count)
@@ -483,6 +590,7 @@ type Qcow2Stream(path: string, access: FileAccess) =
             | SeekOrigin.Begin -> offset
             | SeekOrigin.Current -> position + offset
             | _ -> header.VirtualSize + offset
+
         position
 
     override _.SetLength(value: int64) =
@@ -492,6 +600,11 @@ type Qcow2Stream(path: string, access: FileAccess) =
     override _.Dispose(disposing) =
         if not released then
             released <- true
+
             if disposing then
-                try fs.Flush() finally fs.Dispose()
+                try
+                    fs.Flush()
+                finally
+                    fs.Dispose()
+
         base.Dispose(disposing)

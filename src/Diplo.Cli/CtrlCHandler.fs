@@ -8,9 +8,11 @@ open System.Threading
 /// par les commandes bloquantes (suivi de journaux).
 type CtrlCHandler() =
     let cts = new CancellationTokenSource()
-    let handler = ConsoleCancelEventHandler(fun _ e ->
-        e.Cancel <- true
-        cts.Cancel())
+
+    let handler =
+        ConsoleCancelEventHandler(fun _ e ->
+            e.Cancel <- true
+            cts.Cancel())
 
     do Console.CancelKeyPress.AddHandler(handler)
 

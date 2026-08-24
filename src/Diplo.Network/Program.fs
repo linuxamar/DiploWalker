@@ -9,7 +9,9 @@ open ProtoBuf.Grpc.Server
 
 [<EntryPoint>]
 let main args =
-    runGrpcHost "Diplo.Network" args
+    runGrpcHost
+        "Diplo.Network"
+        args
         (fun builder ->
             builder.Services.AddCodeFirstGrpc() |> ignore
             let drivers = Dictionary<NetworkDriver, INetworkDriver>()
@@ -17,6 +19,11 @@ let main args =
             drivers.[NetworkDriver.CustomCni] <- CustomCniDriver() :> INetworkDriver
             drivers.[NetworkDriver.``None``] <- NoneDriver() :> INetworkDriver
             drivers.[NetworkDriver.``Pod``] <- PodDriver() :> INetworkDriver
-            builder.Services.AddSingleton<IReadOnlyDictionary<NetworkDriver, INetworkDriver>>(drivers :> IReadOnlyDictionary<_, _>) |> ignore
+
+            builder.Services.AddSingleton<IReadOnlyDictionary<NetworkDriver, INetworkDriver>>(
+                drivers :> IReadOnlyDictionary<_, _>
+            )
+            |> ignore
+
             builder.Services.AddSingleton<NetworkServiceImpl>() |> ignore)
         (fun app -> app.MapGrpcService<NetworkServiceImpl>() |> ignore)

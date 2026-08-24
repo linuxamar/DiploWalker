@@ -67,6 +67,7 @@ type InitConfigCommand(output: IOutputPort) =
                     settings.Path
 
             let dir = Path.GetDirectoryName(filePath)
+
             if not (String.IsNullOrWhiteSpace(dir)) && not (Directory.Exists(dir)) then
                 Directory.CreateDirectory(dir) |> ignore
 

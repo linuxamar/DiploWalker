@@ -20,13 +20,16 @@ type LocalVolumeDriver(dataRoot: string) =
     do
         if not (Directory.Exists(volumesDir)) then
             Directory.CreateDirectory(volumesDir) |> ignore
+
         if not (Directory.Exists(mountsDir)) then
             Directory.CreateDirectory(mountsDir) |> ignore
 
     // Synchronisation pour éviter les conditions de course entre Mount/Unmount/Remove
-    let lockObj = obj()
+    let lockObj = obj ()
 
-    let metaPath (id: string) = Path.Combine(volumesDir, id, "meta.json")
+    let metaPath (id: string) =
+        Path.Combine(volumesDir, id, "meta.json")
+
     let dataPath (id: string) = Path.Combine(volumesDir, id, "_data")
     let mountPath (id: string) (target: string) = Path.Combine(mountsDir, id, target)
 
@@ -36,12 +39,12 @@ type LocalVolumeDriver(dataRoot: string) =
     // renvoie ce répertoire ; sinon le répertoire _data interne au volume.
     let resolveDataPath (id: string) =
         let file = metaPath id
+
         if File.Exists(file) then
             try
                 let elem =
-                    JsonSerializer.Deserialize<JsonElement>(
-                        File.ReadAllText file,
-                        JsonSerializerOptions(MaxDepth = 32))
+                    JsonSerializer.Deserialize<JsonElement>(File.ReadAllText file, JsonSerializerOptions(MaxDepth = 32))
+
                 match elem.TryGetProperty "driverOpts" with
                 | true, opts when opts.ValueKind = JsonValueKind.Object ->
                     match opts.TryGetProperty "path" with
@@ -50,13 +53,16 @@ type LocalVolumeDriver(dataRoot: string) =
                         if String.IsNullOrWhiteSpace p then dataPath id else p
                     | _ -> dataPath id
                 | _ -> dataPath id
-            with _ -> dataPath id
-        else dataPath id
+            with _ ->
+                dataPath id
+        else
+            dataPath id
 
     member _.CreateVolume(name: string, driverOpts: Map<string, string>, labels: Map<string, string>) =
-        let id = generateId()
+        let id = generateId ()
         let dir = Path.Combine(volumesDir, id)
         Directory.CreateDirectory(dir) |> ignore
+
         let dataDir =
             match driverOpts.TryFind "path" with
             | Some p when not (String.IsNullOrWhiteSpace p) ->
@@ -70,147 +76,212 @@ type LocalVolumeDriver(dataRoot: string) =
                 let d = Path.Combine(dir, "_data")
                 Directory.CreateDirectory(d) |> ignore
                 d
-        let meta = {|
-            id = id
-            name = name
-            driver = "local"
-            mountpoint = dataDir
-            labels = labels
-            driverOpts = driverOpts
-            createdAt = DateTime.UtcNow
-        |}
+
+        let meta =
+            {| id = id
+               name = name
+               driver = "local"
+               mountpoint = dataDir
+               labels = labels
+               driverOpts = driverOpts
+               createdAt = DateTime.UtcNow |}
+
         AtomicFile.write (metaPath id) (JsonSerializer.Serialize(meta))
         (id, meta.mountpoint)
 
     member _.RemoveVolume(id: string, force: bool) =
         SecurityValidation.validateId id "L'identifiant du volume"
+
         lock lockObj (fun () ->
             let dir = Path.Combine(volumesDir, id)
             let mountFile = Path.Combine(mountsDir, id)
+
             if Directory.Exists(mountFile) && not force then
-                raise (RpcException(Status(StatusCode.FailedPrecondition, "Le volume est monté. Utilisez force=true pour forcer la suppression.")))
+                raise (
+                    RpcException(
+                        Status(
+                            StatusCode.FailedPrecondition,
+                            "Le volume est monté. Utilisez force=true pour forcer la suppression."
+                        )
+                    )
+                )
+
             let dirExisted = Directory.Exists(dir)
-            try if dirExisted then Directory.Delete(dir, true)
+
+            try
+                if dirExisted then
+                    Directory.Delete(dir, true)
             with :? System.IO.DirectoryNotFoundException ->
                 Log.Warning("Répertoire de volume déjà supprimé: {VolumeId}", id)
-            try if Directory.Exists(mountFile) then Directory.Delete(mountFile, true)
+
+            try
+                if Directory.Exists(mountFile) then
+                    Directory.Delete(mountFile, true)
             with :? System.IO.DirectoryNotFoundException ->
                 Log.Warning("Répertoire de montage déjà supprimé: {VolumeId}", id)
-            dirExisted
-        )
+
+            dirExisted)
 
     member _.InspectVolume(id: string) =
         SecurityValidation.validateId id "L'identifiant du volume"
         let file = metaPath id
+
         if File.Exists(file) then
             let content = File.ReadAllText(file)
+
             JsonSerializer.Deserialize<JsonElement>(content, JsonSerializerOptions(MaxDepth = 32))
             |> Some
-        else None
+        else
+            None
 
     member _.ListVolumes(filters: Map<string, string>) =
-        if not (Directory.Exists(volumesDir)) then []
+        if not (Directory.Exists(volumesDir)) then
+            []
         else
             Directory.GetDirectories(volumesDir)
             |> Array.choose (fun dir ->
                 let metaFile = Path.Combine(dir, "meta.json")
+
                 if File.Exists(metaFile) then
                     let content = File.ReadAllText(metaFile)
-                    let elem = JsonSerializer.Deserialize<JsonElement>(content, JsonSerializerOptions(MaxDepth = 32))
+
+                    let elem =
+                        JsonSerializer.Deserialize<JsonElement>(content, JsonSerializerOptions(MaxDepth = 32))
+
                     Some elem
-                else None)
+                else
+                    None)
             |> Array.toList
 
     member _.MountVolume(id: string, targetPath: string, options: string) =
         SecurityValidation.validateId id "L'identifiant du volume"
         SecurityValidation.validateVolumePath targetPath "Le chemin cible"
+
         lock lockObj (fun () ->
             let src = resolveDataPath id
+
             if not (Directory.Exists(src)) then
                 raise (RpcException(Status(StatusCode.NotFound, sprintf "Volume '%s' introuvable" id)))
+
             let mountDir = mountPath id targetPath
             SecurityValidation.validatePath mountDir mountsDir "Le chemin de montage"
+
             try
                 Directory.CreateDirectory(mountDir) |> ignore
+
                 if Directory.Exists(src) then
                     let rec copyDir (source: string) (target: string) =
                         Directory.CreateDirectory(target) |> ignore
+
                         for file in Directory.GetFiles(source) do
                             let destFile = Path.Combine(target, Path.GetFileName(file))
                             File.Copy(file, destFile, true)
+
                         for subdir in Directory.GetDirectories(source) do
                             let destSub = Path.Combine(target, Path.GetFileName(subdir))
                             copyDir subdir destSub
+
                     copyDir src mountDir
+
                 (true, mountDir)
             with ex ->
-                try Directory.Delete(mountDir, true) with _ -> ()
-                raise (RpcException(Status(StatusCode.Internal, sprintf "Erreur lors du montage du volume '%s': %s" id ex.Message)))
-        )
+                try
+                    Directory.Delete(mountDir, true)
+                with _ ->
+                    ()
+
+                raise (
+                    RpcException(
+                        Status(StatusCode.Internal, sprintf "Erreur lors du montage du volume '%s': %s" id ex.Message)
+                    )
+                ))
 
     member _.UnmountVolume(id: string, targetPath: string) =
         SecurityValidation.validateId id "L'identifiant du volume"
         SecurityValidation.validateVolumePath targetPath "Le chemin cible"
         let mountDir = mountPath id targetPath
         SecurityValidation.validatePath mountDir mountsDir "Le chemin de montage"
+
         lock lockObj (fun () ->
             if Directory.Exists(mountDir) then
-                Directory.Delete(mountDir, true)
-        )
+                Directory.Delete(mountDir, true))
+
         (true, "Démonté")
 
     member _.GetVolumeSize(id: string) =
         SecurityValidation.validateId id "L'identifiant du volume"
+
         lock lockObj (fun () ->
             let dir = resolveDataPath id
             let dirFull = Path.GetFullPath(dir)
+
             if Directory.Exists(dir) then
                 let mutable totalBytes = 0L
-                let mutable visited = System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
+
+                let mutable visited =
+                    System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
+
                 let queue = System.Collections.Generic.Queue<string>()
                 queue.Enqueue(dirFull) |> ignore
+
                 while queue.Count > 0 do
                     let current = queue.Dequeue()
+
                     if visited.Add(current) then
                         try
                             for file in Directory.GetFiles(current) do
-                                try totalBytes <- totalBytes + FileInfo(file).Length
-                                with _ -> ()
+                                try
+                                    totalBytes <- totalBytes + FileInfo(file).Length
+                                with _ ->
+                                    ()
+
                             for subdir in Directory.GetDirectories(current) do
                                 let subFull = Path.GetFullPath(subdir)
                                 // Détecter les boucles de symlinks
                                 if subFull.StartsWith(dirFull, StringComparison.OrdinalIgnoreCase) then
                                     queue.Enqueue(subFull)
-                        with _ -> ()
+                        with _ ->
+                            ()
+
                 totalBytes
-            else 0L
-        )
+            else
+                0L)
 
     member _.PruneVolumes() =
         lock lockObj (fun () ->
-            if not (Directory.Exists(volumesDir)) then []
+            if not (Directory.Exists(volumesDir)) then
+                []
             else
                 let removed = ResizeArray<string>()
+
                 for dir in Directory.GetDirectories(volumesDir) do
                     let mountFile = Path.Combine(mountsDir, Path.GetFileName(dir))
-                    if Directory.Exists(mountFile) then ()
+
+                    if Directory.Exists(mountFile) then
+                        ()
                     else
                         let metaFile = Path.Combine(dir, "meta.json")
+
                         if File.Exists(metaFile) then
                             try
                                 Directory.Delete(dir, true)
                                 removed.Add(Path.GetFileName(dir))
                             with ex ->
                                 Log.Warning(ex, "Erreur lors du nettoyage du volume {VolumeId}", Path.GetFileName(dir))
-                removed |> Seq.toList
-        )
+
+                removed |> Seq.toList)
 
     interface IVolumeDriver with
-        member this.CreateVolume(name, driverOpts, labels) = this.CreateVolume(name, driverOpts, labels)
+        member this.CreateVolume(name, driverOpts, labels) =
+            this.CreateVolume(name, driverOpts, labels)
+
         member this.RemoveVolume(id, force) = this.RemoveVolume(id, force)
         member this.InspectVolume(id) = this.InspectVolume(id)
         member this.ListVolumes(filters) = this.ListVolumes(filters)
-        member this.MountVolume(id, targetPath, options) = this.MountVolume(id, targetPath, options)
+
+        member this.MountVolume(id, targetPath, options) =
+            this.MountVolume(id, targetPath, options)
+
         member this.UnmountVolume(id, targetPath) = this.UnmountVolume(id, targetPath)
         member this.GetVolumeSize(id) = this.GetVolumeSize(id)
         member this.PruneVolumes() = this.PruneVolumes()

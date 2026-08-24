@@ -26,20 +26,25 @@ module VolumeIntegrationTests =
     open Diplo.Abstractions.SecurityValidation
     open Diplo.TestHelpers
 
-    do addAllowedVolumeDir(Path.GetTempPath())
+    do addAllowedVolumeDir (Path.GetTempPath())
 
     let private startApp () =
         let dataRoot = TestHelpers.createTempDir "vol"
         let builder = WebApplication.CreateBuilder()
         builder.Services.AddCodeFirstGrpc() |> ignore
+
         builder.Services.AddSingleton<VolumeDriverRegistry>(fun _ ->
             let reg = VolumeDriverRegistry()
             reg.Register(StorageDriverType.Local, LocalVolumeDriver(dataRoot) :> Interfaces.IVolumeDriver)
-            reg) |> ignore
+            reg)
+        |> ignore
+
         builder.Services.AddSingleton<VolumeServiceImpl>() |> ignore
+
         builder.WebHost.ConfigureKestrel(fun opts ->
-            opts.Listen(System.Net.IPAddress.Loopback, 0, fun lo ->
-                lo.Protocols <- HttpProtocols.Http2)) |> ignore
+            opts.Listen(System.Net.IPAddress.Loopback, 0, fun lo -> lo.Protocols <- HttpProtocols.Http2))
+        |> ignore
+
         let app = builder.Build()
         app.MapGrpcService<VolumeServiceImpl>() |> ignore
         app.StartAsync().GetAwaiter().GetResult()
@@ -53,21 +58,29 @@ module VolumeIntegrationTests =
 
     let private withVolumeApp (f: string -> 'a) =
         let app, address, dataRoot = startApp ()
-        try f address
-        finally stopApp app dataRoot
+
+        try
+            f address
+        finally
+            stopApp app dataRoot
 
     let private startPipeApp (pipeName: string) =
         let dataRoot = TestHelpers.createTempDir "pipe"
         let builder = WebApplication.CreateBuilder()
         builder.Services.AddCodeFirstGrpc() |> ignore
+
         builder.Services.AddSingleton<VolumeDriverRegistry>(fun _ ->
             let reg = VolumeDriverRegistry()
             reg.Register(StorageDriverType.Local, LocalVolumeDriver(dataRoot) :> Interfaces.IVolumeDriver)
-            reg) |> ignore
+            reg)
+        |> ignore
+
         builder.Services.AddSingleton<VolumeServiceImpl>() |> ignore
+
         builder.WebHost.ConfigureKestrel(fun opts ->
-            opts.ListenNamedPipe(pipeName, fun lo ->
-                lo.Protocols <- HttpProtocols.Http2)) |> ignore
+            opts.ListenNamedPipe(pipeName, fun lo -> lo.Protocols <- HttpProtocols.Http2))
+        |> ignore
+
         let app = builder.Build()
         app.MapGrpcService<VolumeServiceImpl>() |> ignore
         app.StartAsync().GetAwaiter().GetResult()
@@ -82,9 +95,12 @@ module VolumeIntegrationTests =
         interface IVolumeService with
             member _.CreateVolume(request, ct) =
                 _attempts <- _attempts + 1
+
                 if _attempts = 1 then
                     raise (RpcException(Status(StatusCode.Unavailable, "panne simulée")))
+
                 inner.CreateVolume(request, ct)
+
             member _.RemoveVolume(request, ct) = inner.RemoveVolume(request, ct)
             member _.InspectVolume(request, ct) = inner.InspectVolume(request, ct)
             member _.ListVolumes(request, ct) = inner.ListVolumes(request, ct)
@@ -96,8 +112,11 @@ module VolumeIntegrationTests =
         let builder = WebApplication.CreateBuilder()
         builder.Services.AddCodeFirstGrpc() |> ignore
         builder.Services.AddSingleton<FailingOnceVolumeService>(svc) |> ignore
+
         builder.WebHost.ConfigureKestrel(fun opts ->
-            opts.Listen(System.Net.IPAddress.Loopback, 0, fun lo -> lo.Protocols <- HttpProtocols.Http2)) |> ignore
+            opts.Listen(System.Net.IPAddress.Loopback, 0, fun lo -> lo.Protocols <- HttpProtocols.Http2))
+        |> ignore
+
         let app = builder.Build()
         app.MapGrpcService<FailingOnceVolumeService>() |> ignore
         app.StartAsync().GetAwaiter().GetResult()
@@ -111,10 +130,17 @@ module VolumeIntegrationTests =
         reg.Register(StorageDriverType.Local, LocalVolumeDriver(dataRoot) :> Interfaces.IVolumeDriver)
         let svc = FailingOnceVolumeService(VolumeServiceImpl(reg))
         let app, address = startRetryApp svc
+
         try
             use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IVolumeService>()
-            let req = { Name = "retried-volume"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
+
+            let req =
+                { Name = "retried-volume"
+                  Driver = StorageDriverType.Local
+                  DriverOpts = Dictionary()
+                  Labels = Dictionary() }
+
             let result = client.CreateVolume(req, CancellationToken.None).Result
             result.Name |> should equal "retried-volume"
             svc.Attempts |> should equal 2
@@ -125,10 +151,17 @@ module VolumeIntegrationTests =
     let ``CreateVolume via named pipe fonctionne de bout en bout`` () =
         let pipeName = "diplo-volume-test-" + Guid.NewGuid().ToString("N")
         let app, dataRoot = startPipeApp pipeName
+
         try
             use channel = DiploChannel.forAddress (sprintf "http://pipe:/%s" pipeName)
             let client = channel.CreateGrpcService<IVolumeService>()
-            let req = { Name = "pipe-volume"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
+
+            let req =
+                { Name = "pipe-volume"
+                  Driver = StorageDriverType.Local
+                  DriverOpts = Dictionary()
+                  Labels = Dictionary() }
+
             let result = client.CreateVolume(req, CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
             result.Name |> should equal "pipe-volume"
@@ -140,57 +173,88 @@ module VolumeIntegrationTests =
         withVolumeApp (fun address ->
             use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IVolumeService>()
-            let req = { Name = "grpc-volume"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
+
+            let req =
+                { Name = "grpc-volume"
+                  Driver = StorageDriverType.Local
+                  DriverOpts = Dictionary()
+                  Labels = Dictionary() }
+
             let result = client.CreateVolume(req, CancellationToken.None).Result
             String.IsNullOrEmpty(result.Id) |> should equal false
             result.Name |> should equal "grpc-volume"
             result.Driver |> should equal StorageDriverType.Local
             String.IsNullOrEmpty(result.Mountpoint) |> should equal false
-            String.IsNullOrEmpty(result.CreatedAt) |> should equal false
-        )
+            String.IsNullOrEmpty(result.CreatedAt) |> should equal false)
 
     [<Fact>]
     let ``CreateVolume puis RemoveVolume via gRPC`` () =
         withVolumeApp (fun address ->
             use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IVolumeService>()
-            let createReq = { Name = "to-delete-grpc"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
+
+            let createReq =
+                { Name = "to-delete-grpc"
+                  Driver = StorageDriverType.Local
+                  DriverOpts = Dictionary()
+                  Labels = Dictionary() }
+
             let createResult = client.CreateVolume(createReq, CancellationToken.None).Result
             let removeReq = { Id = createResult.Id; Force = false }
             let removeResult = client.RemoveVolume(removeReq, CancellationToken.None).Result
             removeResult.Success |> should equal true
-            removeResult.Message |> should equal "Volume supprimé"
-        )
+            removeResult.Message |> should equal "Volume supprimé")
 
     [<Fact>]
     let ``CreateVolume puis InspectVolume via gRPC`` () =
         withVolumeApp (fun address ->
             use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IVolumeService>()
-            let createReq = { Name = "inspect-me"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
+
+            let createReq =
+                { Name = "inspect-me"
+                  Driver = StorageDriverType.Local
+                  DriverOpts = Dictionary()
+                  Labels = Dictionary() }
+
             let createResult = client.CreateVolume(createReq, CancellationToken.None).Result
             let inspectReq = { Id = createResult.Id }
             let inspectResult = client.InspectVolume(inspectReq, CancellationToken.None).Result
             inspectResult.Id |> should equal createResult.Id
             inspectResult.Name |> should equal "inspect-me"
-            inspectResult.Driver |> should equal StorageDriverType.Local
-        )
+            inspectResult.Driver |> should equal StorageDriverType.Local)
 
     [<Fact>]
     let ``ListVolumes via gRPC retourne les volumes crees`` () =
         withVolumeApp (fun address ->
             use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IVolumeService>()
-            let req1 = { Name = "vol-a"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
-            let req2 = { Name = "vol-b"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
+
+            let req1 =
+                { Name = "vol-a"
+                  Driver = StorageDriverType.Local
+                  DriverOpts = Dictionary()
+                  Labels = Dictionary() }
+
+            let req2 =
+                { Name = "vol-b"
+                  Driver = StorageDriverType.Local
+                  DriverOpts = Dictionary()
+                  Labels = Dictionary() }
+
             client.CreateVolume(req1, CancellationToken.None).Result |> ignore
             client.CreateVolume(req2, CancellationToken.None).Result |> ignore
             let listReq = { Filters = Dictionary() }
             let listResult = client.ListVolumes(listReq, CancellationToken.None).Result
             listResult.Volumes.Count |> should equal 2
-            listResult.Volumes |> Seq.exists (fun v -> v.Name = "vol-a") |> should equal true
-            listResult.Volumes |> Seq.exists (fun v -> v.Name = "vol-b") |> should equal true
-        )
+
+            listResult.Volumes
+            |> Seq.exists (fun v -> v.Name = "vol-a")
+            |> should equal true
+
+            listResult.Volumes
+            |> Seq.exists (fun v -> v.Name = "vol-b")
+            |> should equal true)
 
     [<Fact>]
     let ``RemoveVolume sur volume inexistant via gRPC retourne echec`` () =
@@ -200,8 +264,7 @@ module VolumeIntegrationTests =
             let req = { Id = "nonexistent"; Force = false }
             let result = client.RemoveVolume(req, CancellationToken.None).Result
             result.Success |> should equal false
-            result.Message |> should haveSubstring "introuvable"
-        )
+            result.Message |> should haveSubstring "introuvable")
 
     [<Fact>]
     let ``InspectVolume sur volume inexistant via gRPC lance RpcException`` () =
@@ -209,19 +272,30 @@ module VolumeIntegrationTests =
             use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IVolumeService>()
             let req = { Id = "does-not-exist" }
-            let ex = Assert.Throws<AggregateException>(fun () -> client.InspectVolume(req, CancellationToken.None).Result |> ignore)
-            ex.InnerException.Message |> should haveSubstring "introuvable"
-        )
+
+            let ex =
+                Assert.Throws<AggregateException>(fun () ->
+                    client.InspectVolume(req, CancellationToken.None).Result |> ignore)
+
+            ex.InnerException.Message |> should haveSubstring "introuvable")
 
     [<Fact>]
     let ``CreateVolume avec nom injection via gRPC lance exception`` () =
         withVolumeApp (fun address ->
             use channel = DiploChannel.forAddress address
             let client = channel.CreateGrpcService<IVolumeService>()
-            let req = { Name = "test; rm -rf /"; Driver = StorageDriverType.Local; DriverOpts = Dictionary(); Labels = Dictionary() }
-            let ex = Assert.Throws<AggregateException>(fun () -> client.CreateVolume(req, CancellationToken.None).Result |> ignore)
-            ex.InnerException.Message |> should haveSubstring "Le nom du volume"
-        )
+
+            let req =
+                { Name = "test; rm -rf /"
+                  Driver = StorageDriverType.Local
+                  DriverOpts = Dictionary()
+                  Labels = Dictionary() }
+
+            let ex =
+                Assert.Throws<AggregateException>(fun () ->
+                    client.CreateVolume(req, CancellationToken.None).Result |> ignore)
+
+            ex.InnerException.Message |> should haveSubstring "Le nom du volume")
 
     [<Fact>]
     let ``PruneVolumes via gRPC retourne zero quand aucun volume`` () =
@@ -231,5 +305,4 @@ module VolumeIntegrationTests =
             let req: PruneVolumesRequest = { Placeholder = false }
             let result = client.PruneVolumes(req, CancellationToken.None).Result
             result.Count |> should equal 0
-            result.VolumesDeleted.Count |> should equal 0
-        )
+            result.VolumesDeleted.Count |> should equal 0)

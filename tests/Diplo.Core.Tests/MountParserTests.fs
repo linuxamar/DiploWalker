@@ -16,7 +16,9 @@ let ``parse analyse un montage en lecture seule`` () =
 
 [<Fact>]
 let ``parse ignore les lignes incompletes`` () =
-    let text = String.concat "\n" [ @"src=C:\donnees,dst=C:\conteneur\donnees"; @"src=C:\sans-destination" ]
+    let text =
+        String.concat "\n" [ @"src=C:\donnees,dst=C:\conteneur\donnees"; @"src=C:\sans-destination" ]
+
     MountParser.parse text
     |> should equal [ (@"C:\donnees", @"C:\conteneur\donnees", false) ]
 
@@ -28,12 +30,12 @@ let ``parse accepte plusieurs montages separes par un point-virgule`` () =
 [<Fact>]
 let ``parse accepte plusieurs montages separes par des retours a la ligne`` () =
     let text = String.concat "\n" [ @"src=C:\a,dst=D:\a"; @"src=C:\b,dst=D:\b,ro" ]
+
     MountParser.parse text
     |> should equal [ (@"C:\a", @"D:\a", false); (@"C:\b", @"D:\b", true) ]
 
 [<Fact>]
-let ``parse renvoie une liste vide sans texte`` () =
-    MountParser.parse "" |> should be Empty
+let ``parse renvoie une liste vide sans texte`` () = MountParser.parse "" |> should be Empty
 
 [<Fact>]
 let ``parseArray analyse un element par entree`` () =
