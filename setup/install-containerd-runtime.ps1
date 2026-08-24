@@ -52,7 +52,7 @@
 #>
 #Requires -Version 5.0
 
-[CmdletBinding(DefaultParameterSetName="Standard")]
+[CmdletBinding(DefaultParameterSetName = "Standard")]
 param(
     
     [string]
@@ -83,7 +83,7 @@ param(
     [string]
     $ContainerBaseImage,
 
-    [Parameter(ParameterSetName="Staging", Mandatory)]
+    [Parameter(ParameterSetName = "Staging", Mandatory)]
     [switch]
     $Staging,
 
@@ -101,8 +101,7 @@ $global:BootstrapTask = "ContainerBootstrap"
 $global:HyperVImage = "NanoServer"
 
 function
-Restart-And-Run()
-{
+Restart-And-Run() {
     Test-Admin
 
     Write-Output "Restart is required; restarting now..."
@@ -116,8 +115,7 @@ Restart-And-Run()
 
     $argList = $argList -replace "\.\\", "$pwd\"
 
-    if ((Split-Path -Parent -Path $scriptPath) -ne $pwd)
-    {
+    if ((Split-Path -Parent -Path $scriptPath) -ne $pwd) {
         $sourceScriptPath = $scriptPath
         $scriptPath = "$pwd\$($script:MyInvocation.MyCommand.Name)"
 
@@ -133,19 +131,15 @@ Restart-And-Run()
     Write-Output "Registering script to re-run at next user logon..."
     Register-ScheduledTask -TaskName $global:BootstrapTask -Action $action -Trigger $trigger -RunLevel Highest | Out-Null
 
-    try
-    {
-        if ($Force)
-        {
+    try {
+        if ($Force) {
             Restart-Computer -Force
         }
-        else
-        {
+        else {
             Restart-Computer
         }
     }
-    catch
-    {
+    catch {
         Write-Error $_
 
         Write-Output "Please restart your computer manually to continue script execution."
@@ -156,8 +150,7 @@ Restart-And-Run()
 
 
 function
-Install-Feature
-{
+Install-Feature {
     [CmdletBinding()]
     param(
         [ValidateNotNullOrEmpty()]
@@ -166,14 +159,11 @@ Install-Feature
     )
 
     Write-Output "Querying status of Windows feature: $FeatureName..."
-    if (Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue)
-    {
-        if ((Get-WindowsFeature $FeatureName).Installed)
-        {
+    if (Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue) {
+        if ((Get-WindowsFeature $FeatureName).Installed) {
             Write-Output "Feature $FeatureName is already enabled."
         }
-        else
-        {
+        else {
             Test-Admin
 
             Write-Output "Enabling feature $FeatureName..."
@@ -181,17 +171,13 @@ Install-Feature
 
         $featureInstall = Add-WindowsFeature $FeatureName
 
-        if ($featureInstall.RestartNeeded -eq "Yes")
-        {
+        if ($featureInstall.RestartNeeded -eq "Yes") {
             $global:RebootRequired = $true;
         }
     }
-    else
-    {
-        if ((Get-WindowsOptionalFeature -Online -FeatureName $FeatureName).State -eq "Disabled")
-        {
-            if (Test-Nano)
-            {
+    else {
+        if ((Get-WindowsOptionalFeature -Online -FeatureName $FeatureName).State -eq "Disabled") {
+            if (Test-Nano) {
                 throw "This NanoServer deployment does not include $FeatureName.  Please add the appropriate package"
             }
 
@@ -200,23 +186,19 @@ Install-Feature
             Write-Output "Enabling feature $FeatureName..."
             $feature = Enable-WindowsOptionalFeature -Online -FeatureName $FeatureName -All -NoRestart
 
-            if ($feature.RestartNeeded -eq "True")
-            {
+            if ($feature.RestartNeeded -eq "True") {
                 $global:RebootRequired = $true;
             }
         }
-        else
-        {
+        else {
             Write-Output "Feature $FeatureName is already enabled."
 
-            if (Test-Nano)
-            {
+            if (Test-Nano) {
                 #
                 # Get-WindowsEdition is not present on Nano.  On Nano, we assume reboot is not needed
                 #
             }
-            elseif ((Get-WindowsEdition -Online).RestartNeeded)
-            {
+            elseif ((Get-WindowsEdition -Online).RestartNeeded) {
                 $global:RebootRequired = $true;
             }
         }
@@ -225,33 +207,29 @@ Install-Feature
 
 
 function
-New-ContainerTransparentNetwork
-{
+New-ContainerTransparentNetwork {
     # Check if we've already created the container network
-    $networks = Get-HNSNetwork | Where-Object { $_.Name -eq "Transparent" }
-    if ($networks -ne $null)
-    {
+    $networks = Get-HnsNetwork | Where-Object { $_.Name -eq "Transparent" }
+    if ($networks -ne $null) {
         Write-Output "Container network (Transparent) already exists. Skipping network creation".
         return;
     }
 
     # Continue to create container network
-    if ($ExternalNetAdapter)
-    {
-        $netAdapter = (Get-NetAdapter | Where-Object {$_.Name -eq "$ExternalNetAdapter"})[0]
+    if ($ExternalNetAdapter) {
+        $netAdapter = (Get-NetAdapter | Where-Object { $_.Name -eq "$ExternalNetAdapter" })[0]
     }
-    else
-    {
-        $netAdapter = (Get-NetAdapter |Where-Object {($_.Status -eq 'Up') -and ($_.ConnectorPresent)})[0]
+    else {
+        $netAdapter = (Get-NetAdapter | Where-Object { ($_.Status -eq 'Up') -and ($_.ConnectorPresent) })[0]
     }
 
     Write-Output "Creating container network (Transparent)..."
     
     # Download and Install powershell module HNS-Network
-    $containerdPath='C:\Program Files\containerd\cni\bin\'
-    if (-not (Test-Path $containerdPath)){
+    $containerdPath = 'C:\Program Files\containerd\cni\bin\'
+    if (-not (Test-Path $containerdPath)) {
         $ReleaseAssets = Invoke-RestMethod "https://api.github.com/repos/microsoft/windows-container-networking/releases/latest"
-        $url        = ($ReleaseAssets.assets | ? name -Match "64.+zip$")
+        $url = ($ReleaseAssets.assets | ? name -Match "64.+zip$")
         curl.exe -LO $url.browser_download_url
         Expand-Archive -Path .\$($url.name) -DestinationPath $containerdPath
     }
@@ -264,14 +242,11 @@ New-ContainerTransparentNetwork
 
 
 function
-Install-ContainerDHost
-{
+Install-ContainerDHost {
     "If this file exists when Install-ContainerDHost.ps1 exits, the script failed!" | Out-File -FilePath $global:ErrorFile
 
-    if (Test-Client)
-    {
-        if (-not $HyperV)
-        {
+    if (Test-Client) {
+        if (-not $HyperV) {
             Write-Output "Enabling Hyper-V containers by default for Client SKU"
             $HyperV = $true
         }    
@@ -281,15 +256,12 @@ Install-ContainerDHost
     #
     Install-Feature -FeatureName Containers
 
-    if ($HyperV)
-    {
+    if ($HyperV) {
         Install-Feature -FeatureName Hyper-V
     }
 
-    if ($global:RebootRequired)
-    {
-        if ($NoRestart)
-        {
+    if ($global:RebootRequired) {
+        if ($NoRestart) {
             Write-Warning "A reboot is required; stopping script execution"
             exit
         }
@@ -300,71 +272,58 @@ Install-ContainerDHost
     #
     # Unregister the bootstrap task, if it was previously created
     #
-    if ($null -ne (Get-ScheduledTask -TaskName $global:BootstrapTask -ErrorAction SilentlyContinue))
-    {
+    if ($null -ne (Get-ScheduledTask -TaskName $global:BootstrapTask -ErrorAction SilentlyContinue)) {
         Unregister-ScheduledTask -TaskName $global:BootstrapTask -Confirm:$false
     }
 
     #
     # Configure networking
     #
-    if ($($PSCmdlet.ParameterSetName) -ne "Staging")
-    {
-        if ($TransparentNetwork)
-        {
+    if ($($PSCmdlet.ParameterSetName) -ne "Staging") {
+        if ($TransparentNetwork) {
             Write-Output "Waiting for Hyper-V Management..."
             $networks = $null
 
-            try
-            {
+            try {
                 $networks = Get-ContainerNetwork -ErrorAction SilentlyContinue
             }
-            catch
-            {
+            catch {
                 #
                 # If we can't query network, we are in bootstrap mode.  Assume no networks
                 #
             }
 
-            if ($networks.Count -eq 0)
-            {
+            if ($networks.Count -eq 0) {
                 Write-Output "Enabling container networking..."
                 New-ContainerTransparentNetwork
             }
-            else
-            {
+            else {
                 Write-Output "Networking is already configured.  Confirming configuration..."
                 
-                $transparentNetwork = $networks |Where-Object { $_.Mode -eq "Transparent" }
+                $transparentNetwork = $networks | Where-Object { $_.Mode -eq "Transparent" }
 
-                if ($null -eq $transparentNetwork)
-                {
+                if ($null -eq $transparentNetwork) {
                     Write-Output "We didn't find a configured external network; configuring now..."
                     New-ContainerTransparentNetwork
                 }
-                else
-                {
-                    if ($ExternalNetAdapter)
-                    {
-                        $netAdapters = (Get-NetAdapter | Where-Object {$_.Name -eq "$ExternalNetAdapter"})
+                else {
+                    if ($ExternalNetAdapter) {
+                        $netAdapters = (Get-NetAdapter | Where-Object { $_.Name -eq "$ExternalNetAdapter" })
 
-                        if ($netAdapters.Count -eq 0)
-                        {
+                        if ($netAdapters.Count -eq 0) {
                             throw "No adapters found that match the name $ExternalNetAdapter"
                         }
 
                         $netAdapter = $netAdapters[0]
                         $transparentNetwork = $networks | Where-Object { $_.NetworkAdapterName -eq $netAdapter.InterfaceDescription }
 
-                        if ($null-eq $transparentNetwork)
-                        {
+                        if ($null -eq $transparentNetwork) {
                             throw "One or more external networks are configured, but not on the requested adapter ($ExternalNetAdapter)"
                         }
 
                         Write-Output "Configured transparent network found: $($transparentNetwork.Name)"
                     }
-                    else
-                    {
+                    else {
                         Write-Output "Configured transparent network found: $($transparentNetwork.Name)"
                     }
                 }
@@ -375,12 +334,10 @@ Install-ContainerDHost
     #
     # Install, register, and start Containerd
     #
-    if (Test-Containerd)
-    {
+    if (Test-Containerd) {
         Write-Output "Containerd is already installed."
     }
-    else
-    {
+    else {
         Install-Containerd -ContainerDVersion $ContainerDVersion -NerdCTLVersion $NerdCTLVersion -ContainerBaseImage $ContainerBaseImage
     }
 
@@ -392,8 +349,7 @@ $global:ContainerDDataPath = "$($env:ProgramFiles)\container"
 $global:ContainerDServiceName = "containerd"
 
 function
-Copy-File
-{
+Copy-File {
     [CmdletBinding()]
     param(
         [string]
@@ -403,19 +359,15 @@ Copy-File
         $DestinationPath
     )
     
-    if ($SourcePath -eq $DestinationPath)
-    {
+    if ($SourcePath -eq $DestinationPath) {
         return
     }
           
-    if (Test-Path $SourcePath)
-    {
+    if (Test-Path $SourcePath) {
         Copy-Item -Path $SourcePath -Destination $DestinationPath
     }
-    elseif ($null -ne ($SourcePath -as [System.URI]).AbsoluteURI)
-    {
-        if (Test-Nano)
-        {
+    elseif ($null -ne ($SourcePath -as [System.URI]).AbsoluteURI) {
+        if (Test-Nano) {
             $handler = New-Object System.Net.Http.HttpClientHandler
             $client = New-Object System.Net.Http.HttpClient($handler)
             $client.Timeout = New-Object System.TimeSpan(0, 30, 0)
@@ -423,24 +375,20 @@ Copy-File
             $responseMsg = $client.GetAsync([System.Uri]::new($SourcePath), $cancelTokenSource.Token)
             $responseMsg.Wait()
 
-            if (!$responseMsg.IsCanceled)
-            {
+            if (!$responseMsg.IsCanceled) {
                 $response = $responseMsg.Result
-                if ($response.IsSuccessStatusCode)
-                {
+                if ($response.IsSuccessStatusCode) {
                     $downloadedFileStream = [System.IO.FileStream]::new($DestinationPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)
                     $copyStreamOp = $response.Content.CopyToAsync($downloadedFileStream)
                     $copyStreamOp.Wait()
                     $downloadedFileStream.Close()
-                    if ($null -ne $copyStreamOp.Exception)
-                    {
+                    if ($null -ne $copyStreamOp.Exception) {
                         throw $copyStreamOp.Exception
                     }      
                 }
             }  
         }
-        elseif ($PSVersionTable.PSVersion.Major -ge 5)
-        {
+        elseif ($PSVersionTable.PSVersion.Major -ge 5) {
             #
             # We disable progress display because it kills performance for large downloads (at least on 64-bit PowerShell)
             #
@@ -448,37 +396,32 @@ Copy-File
             Invoke-WebRequest -Uri $SourcePath -OutFile $DestinationPath -UseBasicParsing
             $ProgressPreference = 'Continue'
         }
-        else
-        {
+        else {
             $webClient = New-Object System.Net.WebClient
             $webClient.DownloadFile($SourcePath, $DestinationPath)
         } 
     }
-    else
-    {
+    else {
         throw "Cannot copy from $SourcePath"
     }
 }
 
 
 function 
-Test-Admin()
-{
+Test-Admin() {
     # Get the ID and security principal of the current user account
-    $myWindowsID=[System.Security.Principal.WindowsIdentity]::GetCurrent()
-    $myWindowsPrincipal=new-object System.Security.Principal.WindowsPrincipal($myWindowsID)
+    $myWindowsID = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    $myWindowsPrincipal = New-Object System.Security.Principal.WindowsPrincipal($myWindowsID)
   
     # Get the security principal for the Administrator role
-    $adminRole=[System.Security.Principal.WindowsBuiltInRole]::Administrator
+    $adminRole = [System.Security.Principal.WindowsBuiltInRole]::Administrator
   
     # Check to see if we are currently running "as Administrator"
-    if ($myWindowsPrincipal.IsInRole($adminRole))
-    {
+    if ($myWindowsPrincipal.IsInRole($adminRole)) {
         $global:AdminPriviledges = $true
         return
     }
-    else
-    {
+    else {
         #
         # We are not running "as Administrator"
         # Exit from the current, unelevated, process
@@ -489,43 +432,37 @@ Test-Admin()
 
 
 function 
-Test-Client()
-{
+Test-Client() {
     return (-not ((Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue) -or (Test-Nano)))
 }
 
 
 function 
-Test-Nano()
-{
+Test-Nano() {
     $EditionId = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name 'EditionID').EditionId
 
     return (($EditionId -eq "ServerStandardNano") -or 
-            ($EditionId -eq "ServerDataCenterNano") -or 
-            ($EditionId -eq "NanoServer") -or 
-            ($EditionId -eq "ServerTuva"))
+        ($EditionId -eq "ServerDataCenterNano") -or 
+        ($EditionId -eq "NanoServer") -or 
+        ($EditionId -eq "ServerTuva"))
 }
 
 
 function 
-Wait-Network()
-{
+Wait-Network() {
     $connectedAdapter = Get-NetAdapter | Where-Object ConnectorPresent
 
-    if ($null -eq $connectedAdapter)
-    {
+    if ($null -eq $connectedAdapter) {
         throw "No connected network"
     }
        
     $startTime = Get-Date
     $timeElapsed = $(Get-Date) - $startTime
 
-    while ($($timeElapsed).TotalMinutes -lt 5)
-    {
-        $readyNetAdapter = $connectedAdapter | Where-Object Status -eq 'Up'
+    while ($($timeElapsed).TotalMinutes -lt 5) {
+        $readyNetAdapter = $connectedAdapter | Where-Object Status -EQ 'Up'
 
-        if ($null -ne $readyNetAdapter)
-        {
+        if ($null -ne $readyNetAdapter) {
             return;
         }
 
@@ -540,8 +477,7 @@ Wait-Network()
 
 
 function 
-Install-Containerd()
-{
+Install-Containerd() {
     [CmdletBinding()]
     param(
         [string]
@@ -574,7 +510,8 @@ Install-Containerd()
     if ($ContainerdVersion) {
         $ContainerdZip = "containerd-$ContainerDVersion-windows-amd64.tar.gz"
         $URL = "https://github.com/containerd/containerd/releases/download/v$ContainerDVersion/$ContainerdZip"
-    } else {
+    }
+    else {
         $ReleaseAssets = Invoke-RestMethod "https://api.github.com/repos/containerd/containerd/releases/latest"
         $Release = ($ReleaseAssets.assets | ? name -Match "Windows.+64.+gz$")
         $URL = $Release.browser_download_url
@@ -588,7 +525,8 @@ Install-Containerd()
     if ($NerdCTLVersion) {
         $NerdCTLZip = "nerdctl-$NerdCTLVersion-windows-amd64.tar.gz"
         $URL = "https://github.com/containerd/nerdctl/releases/download/v$NerdCTLVersion/$NerdCTLZip"
-    } else {
+    }
+    else {
         $ReleaseAssets = Invoke-RestMethod "https://api.github.com/repos/containerd/nerdctl/releases/latest"
         $Release = ($ReleaseAssets.assets | ? name -Match "Windows.+64.+gz$")
         $URL = $Release.browser_download_url
@@ -602,7 +540,8 @@ Install-Containerd()
     if ($WinCNIVersion) {
         $WinCNIZip = "windows-container-networking-cni-amd64-v$WinCNIVersion.zip"
         $URL = "https://github.com/microsoft/windows-container-networking/releases/download/v$WinCNIVersion/$WinCNIZip"
-    } else {
+    }
+    else {
         $ReleaseAssets = Invoke-RestMethod "https://api.github.com/repos/microsoft/windows-container-networking/releases/latest"
         $Release = ($ReleaseAssets.assets | ? name -Match "Windows.+64.+zip$")
         $URL = $Release.browser_download_url
@@ -615,15 +554,17 @@ Install-Containerd()
     Write-Output "Adding $ContainerdPath, $NerdCTLPath, $WinCNIPath to the path"
 
     $NewPath = (Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager\Environment' -Name path).path
-    if($NewPath.contains("containerd")) {
+    if ($NewPath.contains("containerd")) {
         Write-Output "$ContainerdPath already in PATH"
-    } else {
+    }
+    else {
         $NewPath = "$NewPath;$ContainerdPath\bin;"
     }
 
-    if($NewPath.contains("nerdctl")) {
+    if ($NewPath.contains("nerdctl")) {
         Write-Output "$NerdCTLPath already in PATH"
-    } else {
+    }
+    else {
         $NewPath = "$NewPath;$NerdCTLPath;"
     }
 
@@ -651,7 +592,7 @@ Install-Containerd()
     #
     Wait-Containerd
 
-    if(-not [string]::IsNullOrEmpty($ContainerBaseImage)) {
+    if (-not [string]::IsNullOrEmpty($ContainerBaseImage)) {
         Write-Output "Attempting to pull specified base image: $ContainerBaseImage"
         nerdctl pull $ContainerBaseImage
     }
@@ -662,21 +603,18 @@ Install-Containerd()
 }
 
 function 
-Start-Containerd()
-{
+Start-Containerd() {
     Start-Service -Name $global:ContainerdServiceName
 }
 
 
 function 
-Stop-Containerd()
-{
+Stop-Containerd() {
     Stop-Service -Name $global:ContainerdServiceName
 }
 
 function
-Remove-Containerd() 
-{
+Remove-Containerd() {
     Stop-Containerd
     (Get-WmiObject -Class Win32_Service -Filter "Name='containerd'").delete()
     Remove-Item -r -Force "$Env:ProgramFiles\containerd"
@@ -684,8 +622,7 @@ Remove-Containerd()
 }
 
 function 
-Test-Containerd()
-{
+Test-Containerd() {
     $service = Get-Service -Name $global:ContainerdServiceName -ErrorAction SilentlyContinue
 
     return ($null -ne $service)
@@ -693,31 +630,25 @@ Test-Containerd()
 
 
 function 
-Wait-Containerd()
-{
+Wait-Containerd() {
     Write-Output "Waiting for Containerd daemon..."
     $containerdReady = $false
     $startTime = Get-Date
 
-    while (-not $containerdReady)
-    {
-        try
-        {
+    while (-not $containerdReady) {
+        try {
             nerdctl version | Out-Null
 
-            if (-not $?)
-            {
+            if (-not $?) {
                 throw "Containerd daemon is not running yet"
             }
 
             $containerdReady = $true
         }
-        catch 
-        {
+        catch {
             $timeElapsed = $(Get-Date) - $startTime
 
-            if ($($timeElapsed).TotalMinutes -ge 1)
-            {
+            if ($($timeElapsed).TotalMinutes -ge 1) {
                 throw "Containerd Daemon did not start successfully within 1 minute."
             } 
 
@@ -728,11 +659,9 @@ Wait-Containerd()
     Write-Output "Successfully connected to Containerd Daemon."
 }
 
-try
-{
+try {
     Install-ContainerDHost
 }
-catch 
-{
+catch {
     Write-Error $_
 }

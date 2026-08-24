@@ -6,12 +6,12 @@ Système distribué de microservices gRPC pour la gestion de conteneurs Windows.
 
 Diplo est composé de quatre services principaux communiquant via gRPC :
 
-| Service | Port | Description |
-|---------|------|-------------|
+| Service             | Port | Description                                                                                                |
+| ------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
 | **Diplo.Container** | 5001 | Cycle de vie des conteneurs via containerd — création, démarrage, arrêt, suppression et montage de volumes |
-| **Diplo.Volume** | 5002 | Gestion des volumes persistants |
-| **Diplo.Network** | 5003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge) |
-| **Diplo.Installer** | — | Installation et configuration de l'ensemble du système |
+| **Diplo.Volume**    | 5002 | Gestion des volumes persistants                                                                            |
+| **Diplo.Network**   | 5003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge)                                                 |
+| **Diplo.Installer** | —    | Installation et configuration de l'ensemble du système                                                     |
 
 ### Clients
 
@@ -32,35 +32,37 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 ### Versions supportées
 
-| Version | Build | containerd | Statut |
-|---------|-------|------------|--------|
+| Version                  | Build   | containerd  | Statut      |
+| ------------------------ | ------- | ----------- | ----------- |
 | Windows Server 2016 LTSC | ≤ 14393 | 1.6.x (LTS) | ✅ Supporté |
-| Windows Server 2019 LTSC | ≤ 17763 | 1.7.x | ✅ Supporté |
-| Windows Server 2022 LTSC | ≤ 20348 | 1.7.x | ✅ Supporté |
-| Windows Server 2025 LTSC | > 20348 | 1.7.x | ✅ Supporté |
+| Windows Server 2019 LTSC | ≤ 17763 | 1.7.x       | ✅ Supporté |
+| Windows Server 2022 LTSC | ≤ 20348 | 1.7.x       | ✅ Supporté |
+| Windows Server 2025 LTSC | > 20348 | 1.7.x       | ✅ Supporté |
 
 ### Nano Server vs Server Core
 
 Le choix de l'image de base Windows est crucial pour le fonctionnement de Diplo :
 
-| Capacité | Server Core | Nano Server |
-|----------|------------|-------------|
-| **Planificateur de tâches** (schtasks) | ✅ Complet — service Schedule présent, gestion CLI/PowerShell entièrement fonctionnelle | ⚠️ Partiel — la commande `schtasks` fonctionne en ligne de commande, mais le service Schedule est limité. Pas de PowerShell, pas de GUI. Fiable uniquement pour des scénarios simples. |
-| **Services Windows** (SCM) | ✅ Complet — Service Control Manager complet. `sc.exe create/start/stop/delete` entièrement fonctionnel. Applications .NET Worker Service hôteables. | ✅ Basique — le SCM (composant noyau) est présent. `sc.exe create`, `net start/stop` fonctionnent pour des services .NET Core/self-contained. Certains composants système manquants (AFD, TCP/IP Protocol Driver) peuvent limiter des services dépendants de pilotes réseau spécifiques. |
-| **containerd / conteneurs Windows** | ✅ Complet | ✅ Complet |
-| **Poids de l'image** | ~2 Go (compressé) | ~175 Mo (compressé) |
-| **.NET Framework traditionnel** | ✅ Supporté | ❌ Non disponible |
-| **.NET Core / .NET 10 (self-contained)** | ✅ Supporté | ✅ Supporté |
-| **PowerShell** | ✅ Disponible | ❌ Non inclus par défaut |
+| Capacité                                 | Server Core                                                                                                                                          | Nano Server                                                                                                                                                                                                                                                                              |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Planificateur de tâches** (schtasks)   | ✅ Complet — service Schedule présent, gestion CLI/PowerShell entièrement fonctionnelle                                                              | ⚠️ Partiel — la commande `schtasks` fonctionne en ligne de commande, mais le service Schedule est limité. Pas de PowerShell, pas de GUI. Fiable uniquement pour des scénarios simples.                                                                                                   |
+| **Services Windows** (SCM)               | ✅ Complet — Service Control Manager complet. `sc.exe create/start/stop/delete` entièrement fonctionnel. Applications .NET Worker Service hôteables. | ✅ Basique — le SCM (composant noyau) est présent. `sc.exe create`, `net start/stop` fonctionnent pour des services .NET Core/self-contained. Certains composants système manquants (AFD, TCP/IP Protocol Driver) peuvent limiter des services dépendants de pilotes réseau spécifiques. |
+| **containerd / conteneurs Windows**      | ✅ Complet                                                                                                                                           | ✅ Complet                                                                                                                                                                                                                                                                               |
+| **Poids de l'image**                     | ~2 Go (compressé)                                                                                                                                    | ~175 Mo (compressé)                                                                                                                                                                                                                                                                      |
+| **.NET Framework traditionnel**          | ✅ Supporté                                                                                                                                          | ❌ Non disponible                                                                                                                                                                                                                                                                        |
+| **.NET Core / .NET 10 (self-contained)** | ✅ Supporté                                                                                                                                          | ✅ Supporté                                                                                                                                                                                                                                                                              |
+| **PowerShell**                           | ✅ Disponible                                                                                                                                        | ❌ Non inclus par défaut                                                                                                                                                                                                                                                                 |
 
 ### Recommandation
 
 **Server Core** est recommandé pour Diplo lorsque :
+
 - Le planificateur de tâches (`schtasks`) est nécessaire pour des automatisations
 - Des services Windows robustes avec dépendances système sont requis
 - Un environnement PowerShell est souhaité pour l'administration
 
 **Nano Server** peut être utilisé lorsque :
+
 - Seuls des microservices .NET self-contained légers sont déployés
 - Le planificateur de tâches n'est pas requis
 - La taille minimale de l'image est prioritaire
@@ -83,6 +85,7 @@ Diplo.Installer.exe install
 ```
 
 L'installateur effectue automatiquement :
+
 1. Détection de la version de Windows Server
 2. Téléchargement et installation de containerd (1.6.x LTS ou 1.7.x selon la version)
 3. Installation des plugins CNI Microsoft (nat, overlay, l2bridge)
@@ -96,12 +99,12 @@ L'installateur effectue automatiquement :
 
 L'installateur NSIS embarque les certificats de la PKI Diplo et les importe automatiquement dans les magasins de certificats de la machine Windows :
 
-| Certificat | Magasin | Rôle |
-|------------|---------|------|
-| `Diplo Root CA` | Racines de confiance (Root) | Autorité racine de la PKI |
-| `Authentification` | CA intermédiaires | Authentification de services |
-| `CodeSigning` | CA intermédiaires | Signature de code (assemblies, installateur) |
-| `System` | CA intermédiaires | Certificats système (TLS, config) |
+| Certificat         | Magasin                     | Rôle                                         |
+| ------------------ | --------------------------- | -------------------------------------------- |
+| `Diplo Root CA`    | Racines de confiance (Root) | Autorité racine de la PKI                    |
+| `Authentification` | CA intermédiaires           | Authentification de services                 |
+| `CodeSigning`      | CA intermédiaires           | Signature de code (assemblies, installateur) |
+| `System`           | CA intermédiaires           | Certificats système (TLS, config)            |
 
 Cette importation permet la **validation automatique des chaînes de signature** sans manipulation manuelle — les binaires signés par la PKI Diplo sont reconnus nativement par Windows.
 
@@ -172,10 +175,13 @@ diplo config init --path C:\etc\diplo.json --transport pipe
 
 ```json
 {
-  "container": { "address": "http://pipe:/diplo-container", "namespace": "default" },
-  "volume":    { "address": "http://pipe:/diplo-volume" },
-  "network":   { "address": "http://pipe:/diplo-network" },
-  "logLevel":  "Information"
+    "container": {
+        "address": "http://pipe:/diplo-container",
+        "namespace": "default"
+    },
+    "volume": { "address": "http://pipe:/diplo-volume" },
+    "network": { "address": "http://pipe:/diplo-network" },
+    "logLevel": "Information"
 }
 ```
 
@@ -193,6 +199,7 @@ diplo config init --path C:\etc\diplo.json --transport pipe
 ```
 
 Options disponibles :
+
 - `-Clean` : Nettoyage avant build
 - `-Restore` : Restauration des packages NuGet
 - `-DoTests` : Exécution des tests
@@ -252,6 +259,7 @@ Diplo/
 ### Configuration containerd
 
 Le fichier `config.toml` est généré automatiquement par l'installateur avec :
+
 - Runtime `runhcs.v1` avec isolation process (pas de Hyper-V)
 - Sandbox image : `mcr.microsoft.com/windows/nanoserver:{version}`
 - Plugins CNI configurés pour le réseau NAT
@@ -261,6 +269,7 @@ Le fichier `config.toml` est généré automatiquement par l'installateur avec :
 ### Isolation
 
 Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
+
 - Plus léger et plus rapide à démarrer
 - Compatible avec Windows Server 2016+
 - Ne nécessite pas de virtualisation matérielle
@@ -270,20 +279,20 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 
 À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** gérées par `Diplo.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
 
-| Format | Extension(s) | R/W | Moteur |
-|--------|-------------|-----|--------|
-| **Qcow2** | `.qcow2` | R/W | Pilote maison (`Qcow2Stream`) |
-| **QCOW v1** | `.qcow` | R/W | Pilote maison (`Qcow1Stream`) |
-| **VHD** | `.vhd` | R/W | DiscUtils |
-| **VHDX** | `.vhdx` | R/W | DiscUtils |
-| **VMDK** | `.vmdk` | R/W | DiscUtils |
-| **VDI** | `.vdi` | R/W | DiscUtils |
-| **Raw** | `.img`, `.raw`, `.bin`, `.iso` | R/W | DiscUtils (FAT, NTFS, ext) |
-| **DMG** | `.dmg` | Lecture seule | DiscUtils |
-| **Parallels** | `.hdd`, `.hds` | R/W | Pilote maison (`ParallelsStream`) |
-| **Btrfs** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
-| **XFS** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
-| **HFS+** | (via Hawkynt) | R/W | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
+| Format        | Extension(s)                   | R/W           | Moteur                                       |
+| ------------- | ------------------------------ | ------------- | -------------------------------------------- |
+| **Qcow2**     | `.qcow2`                       | R/W           | Pilote maison (`Qcow2Stream`)                |
+| **QCOW v1**   | `.qcow`                        | R/W           | Pilote maison (`Qcow1Stream`)                |
+| **VHD**       | `.vhd`                         | R/W           | DiscUtils                                    |
+| **VHDX**      | `.vhdx`                        | R/W           | DiscUtils                                    |
+| **VMDK**      | `.vmdk`                        | R/W           | DiscUtils                                    |
+| **VDI**       | `.vdi`                         | R/W           | DiscUtils                                    |
+| **Raw**       | `.img`, `.raw`, `.bin`, `.iso` | R/W           | DiscUtils (FAT, NTFS, ext)                   |
+| **DMG**       | `.dmg`                         | Lecture seule | DiscUtils                                    |
+| **Parallels** | `.hdd`, `.hds`                 | R/W           | Pilote maison (`ParallelsStream`)            |
+| **Btrfs**     | (via Hawkynt)                  | R/W           | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
+| **XFS**       | (via Hawkynt)                  | R/W           | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
+| **HFS+**      | (via Hawkynt)                  | R/W           | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
 
 ### CLI
 
@@ -304,13 +313,13 @@ Les sources sont restreintes aux répertoires autorisés par la validation de s�
 diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw]
 ```
 
-| Format | Extension | Moteur | Note |
-|--------|-----------|--------|------|
-| **Raw** | `.img`, `.raw`, `.bin`, `.iso` | DiscUtils | Par défaut |
-| **VHD** | `.vhd` | DiscUtils | Virtual Hard Disk (dynamic) |
-| **VHDX** | `.vhdx` | DiscUtils | Virtual Hard Disk v2 (dynamic) |
-| **VMDK** | `.vmdk` | DiscUtils | Virtual Machine Disk (dynamic) |
-| **VDI** | `.vdi` | DiscUtils | VirtualBox Disk Image |
+| Format   | Extension                      | Moteur    | Note                           |
+| -------- | ------------------------------ | --------- | ------------------------------ |
+| **Raw**  | `.img`, `.raw`, `.bin`, `.iso` | DiscUtils | Par défaut                     |
+| **VHD**  | `.vhd`                         | DiscUtils | Virtual Hard Disk (dynamic)    |
+| **VHDX** | `.vhdx`                        | DiscUtils | Virtual Hard Disk v2 (dynamic) |
+| **VMDK** | `.vmdk`                        | DiscUtils | Virtual Machine Disk (dynamic) |
+| **VDI**  | `.vdi`                         | DiscUtils | VirtualBox Disk Image          |
 
 La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés. En cas d'erreur lors du formatage ou de la copie, le fichier partiel est automatiquement supprimé (rollback).
 
@@ -318,34 +327,35 @@ Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (
 
 ### Formats supportés — tableau récapitulatif
 
-| Format | Montage | Création image | Moteur |
-|--------|---------|----------------|--------|
-| Qcow2 | R/W | — | Pilote maison |
-| QCOW v1 | R/W | — | Pilote maison |
-| VHD | R/W | ✅ | DiscUtils |
-| VHDX | R/W | ✅ | DiscUtils |
-| VMDK | R/W | ✅ | DiscUtils |
-| VDI | R/W | ✅ | DiscUtils |
-| Raw | R/W | ✅ | DiscUtils |
-| DMG | Lecture seule | — | DiscUtils |
-| Parallels | R/W | — | Pilote maison |
-| Btrfs | R/W | — | Hawkynt (seuil 2 Go) |
-| XFS | R/W | — | Hawkynt (seuil 2 Go) |
-| HFS+ | R/W | — | Hawkynt (seuil 2 Go) |
+| Format    | Montage       | Création image | Moteur               |
+| --------- | ------------- | -------------- | -------------------- |
+| Qcow2     | R/W           | —              | Pilote maison        |
+| QCOW v1   | R/W           | —              | Pilote maison        |
+| VHD       | R/W           | ✅             | DiscUtils            |
+| VHDX      | R/W           | ✅             | DiscUtils            |
+| VMDK      | R/W           | ✅             | DiscUtils            |
+| VDI       | R/W           | ✅             | DiscUtils            |
+| Raw       | R/W           | ✅             | DiscUtils            |
+| DMG       | Lecture seule | —              | DiscUtils            |
+| Parallels | R/W           | —              | Pilote maison        |
+| Btrfs     | R/W           | —              | Hawkynt (seuil 2 Go) |
+| XFS       | R/W           | —              | Hawkynt (seuil 2 Go) |
+| HFS+      | R/W           | —              | Hawkynt (seuil 2 Go) |
 
 ### GUI
 
 L'interface graphique Avalonia utilise un thème système par défaut avec des onglets organisés :
 
 **Onglet Conteneurs** — Vue splitée avec :
+
 - **Toolbar** en haut : Lister, Créer, Télécharger, Inspecter, Espaces, Version
 - **Champs** : ID, Nom, Image, User (pull), Espace, Timeout, Tous, Forcer
 - **DataGrid** (gauche) : liste des conteneurs avec sélection
 - **ContainerDetailUserControl** (droite) : panneau de détail pour le conteneur sélectionné
-  - Propriétés : ID, Nom, Image, État, Créé le
-  - Actions : Démarrer, Arrêter, Supprimer, Renommer, Processus, Métriques
-  - Configuration : Nouveau nom, Montages
-  - Journaux & Exec : Suivre, Lignes, Depuis, Commande
+    - Propriétés : ID, Nom, Image, État, Créé le
+    - Actions : Démarrer, Arrêter, Supprimer, Renommer, Processus, Métriques
+    - Configuration : Nouveau nom, Montages
+    - Journaux & Exec : Suivre, Lignes, Depuis, Commande
 - **Images** (Expander repliable en bas) : Liste/Inspecter/Supprimer/Étiqueter
 
 **Onglet Volumes** — Liste + création d'images disque (sélection dossier/fichier, format)
@@ -442,25 +452,25 @@ diplo version
 
 ### Modules mutualisés
 
-| Module | Projet | Rôle |
-|--------|--------|------|
-| `JsonHelpers` | Abstractions | Extraction typée de propriétés `JsonElement` |
-| `DiploJson` | Abstractions | Options sérialisation JSON centralisées |
-| `ProcessExec` | Abstractions | Exécution processus externes + PowerShell |
-| `ServiceGuards` | Abstractions | Guards de validation d'entrée (RpcException) |
-| `CachedConfig<'T>` | Abstractions | Cache générique avec invalidation manuelle |
-| `DriverMappings` | Grpc | Mapping type↔string pour drivers volume et réseau |
-| `GrpcClientFactory` | Core | Construction canaux gRPC TCP/pipe avec retry |
-| `TestHelpers` | TestHelpers | Helpers temp dir pour les tests |
-| `HawkyntFs` | Disk | Adaptateur Hawkynt pour Btrfs/XFS/HFS+ R/W |
-| `VdiFs` | Disk | Adaptateur DiscUtils.Vdi pour VDI R/W |
-| `Qcow1Fs` | Disk | Pilote maison QCOW v1 |
-| `DmgFs` | Disk | Adaptateur DiscUtils.Dmg pour extraction DMG |
-| `ParallelsFs` | Disk | Pilote maison Parallels |
-| `FsImage` | Disk | Création, extraction et réécriture d'images disque |
-| `RemoteDriverHelpers` | Volume | Helpers mutualisés pour drivers distants (NFS, AWS, GCP, Azure, SMB) |
-| `Cmd` | Gui | Helpers try/with mutualisés pour commandes GUI |
-| `ContainerDetailUserControl` | Gui | UserControl détail conteneur sélectionné |
+| Module                       | Projet       | Rôle                                                                 |
+| ---------------------------- | ------------ | -------------------------------------------------------------------- |
+| `JsonHelpers`                | Abstractions | Extraction typée de propriétés `JsonElement`                         |
+| `DiploJson`                  | Abstractions | Options sérialisation JSON centralisées                              |
+| `ProcessExec`                | Abstractions | Exécution processus externes + PowerShell                            |
+| `ServiceGuards`              | Abstractions | Guards de validation d'entrée (RpcException)                         |
+| `CachedConfig<'T>`           | Abstractions | Cache générique avec invalidation manuelle                           |
+| `DriverMappings`             | Grpc         | Mapping type↔string pour drivers volume et réseau                    |
+| `GrpcClientFactory`          | Core         | Construction canaux gRPC TCP/pipe avec retry                         |
+| `TestHelpers`                | TestHelpers  | Helpers temp dir pour les tests                                      |
+| `HawkyntFs`                  | Disk         | Adaptateur Hawkynt pour Btrfs/XFS/HFS+ R/W                           |
+| `VdiFs`                      | Disk         | Adaptateur DiscUtils.Vdi pour VDI R/W                                |
+| `Qcow1Fs`                    | Disk         | Pilote maison QCOW v1                                                |
+| `DmgFs`                      | Disk         | Adaptateur DiscUtils.Dmg pour extraction DMG                         |
+| `ParallelsFs`                | Disk         | Pilote maison Parallels                                              |
+| `FsImage`                    | Disk         | Création, extraction et réécriture d'images disque                   |
+| `RemoteDriverHelpers`        | Volume       | Helpers mutualisés pour drivers distants (NFS, AWS, GCP, Azure, SMB) |
+| `Cmd`                        | Gui          | Helpers try/with mutualisés pour commandes GUI                       |
+| `ContainerDetailUserControl` | Gui          | UserControl détail conteneur sélectionné                             |
 
 ### Validation ctr v2 (≥ v2.0)
 

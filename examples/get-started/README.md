@@ -5,12 +5,12 @@ conteneur déployé. Un script PowerShell automatisé est également fourni.
 
 ## Prérequis
 
-| Composant | Version minimale | Vérification |
-|---|---|---|
-| Windows Server | 2016+ | `winver` |
-| .NET Runtime | 10.0 | `dotnet --version` |
-| Droits administrateur | — | PowerShell en tant qu'admin |
-| Espace disque | ~500 Mo | pour containerd + plugins CNI |
+| Composant             | Version minimale | Vérification                  |
+| --------------------- | ---------------- | ----------------------------- |
+| Windows Server        | 2016+            | `winver`                      |
+| .NET Runtime          | 10.0             | `dotnet --version`            |
+| Droits administrateur | —                | PowerShell en tant qu'admin   |
+| Espace disque         | ~500 Mo          | pour containerd + plugins CNI |
 
 ## Étapes manuelles
 
@@ -120,24 +120,24 @@ Le script effectue :
 
 ## Commandes Diplo de la vie courante
 
-| Commande | Description |
-|---|---|
-| `diplo container list` | Lister tous les conteneurs |
-| `diplo container image-list` | Lister les images disponibles |
-| `diplo container inspect <nom>` | Détails complets d'un conteneur |
-| `diplo container logs <nom>` | Logs en temps réel |
-| `diplo container exec <nom> <cmd>` | Exécuter une commande |
-| `diplo container stop <nom>` | Arrêter un conteneur |
-| `diplo container delete <nom>` | Supprimer un conteneur |
-| `diplo container stats <nom>` | Métriques CPU/mémoire/réseau |
-| `diplo container top <nom>` | Processus actifs |
-| `diplo container rename <ancien> <nouveau>` | Renommer un conteneur |
-| `diplo volume list` | Lister les volumes |
-| `diplo volume create <nom>` | Créer un volume |
-| `diplo network list` | Lister les réseaux |
-| `diplo network create <nom>` | Créer un réseau |
-| `diplo status check` | Vérifier tous les services |
-| `diplo config init` | Générer la config par défaut |
+| Commande                                    | Description                     |
+| ------------------------------------------- | ------------------------------- |
+| `diplo container list`                      | Lister tous les conteneurs      |
+| `diplo container image-list`                | Lister les images disponibles   |
+| `diplo container inspect <nom>`             | Détails complets d'un conteneur |
+| `diplo container logs <nom>`                | Logs en temps réel              |
+| `diplo container exec <nom> <cmd>`          | Exécuter une commande           |
+| `diplo container stop <nom>`                | Arrêter un conteneur            |
+| `diplo container delete <nom>`              | Supprimer un conteneur          |
+| `diplo container stats <nom>`               | Métriques CPU/mémoire/réseau    |
+| `diplo container top <nom>`                 | Processus actifs                |
+| `diplo container rename <ancien> <nouveau>` | Renommer un conteneur           |
+| `diplo volume list`                         | Lister les volumes              |
+| `diplo volume create <nom>`                 | Créer un volume                 |
+| `diplo network list`                        | Lister les réseaux              |
+| `diplo network create <nom>`                | Créer un réseau                 |
+| `diplo status check`                        | Vérifier tous les services      |
+| `diplo config init`                         | Générer la config par défaut    |
 
 ## Interface graphique
 
@@ -221,6 +221,7 @@ sc.exe start "Diplo.Container"
 #### « Le service a échoué au démarrage » (Erreur 1053/1067)
 
 Causes courantes :
+
 - **Port déjà utilisé** : un autre processus écoute sur le port 5001/5002/5003
 - **containerd absent** : le service containerd n'est pas installé ou démarré
 - **Fichier de config corrompu** : les fichiers JSON sont invalides
@@ -373,6 +374,7 @@ diplo volume inspect <ID>
 #### « Erreur lors du montage du volume »
 
 Causes courantes :
+
 - **Chemin source invalide** : le fichier ISO ou le répertoire n'existe pas
 - **Permissions insuffisantes** : le service n'a pas accès au chemin
 - **Lecteur déjà utilisé** : un autre processus utilise le même point de montage
@@ -388,6 +390,7 @@ diplo volume list
 #### « Aucun driver enregistré pour le type »
 
 Le type de volume n'est pas supporté. Types supportés :
+
 - `Local` — répertoires locaux
 - `SMB` — partages réseau SMB/CIFS
 - `NFS` — partages NFS
@@ -439,6 +442,7 @@ diplo network remove <RESEAU_ID>
 #### Format de disque non supporté
 
 Diplo supporte les formats suivants :
+
 - **Lecture/écriture** : VHD, VHDX, VMDK, VDI, QCOW2, QCOW1, Parallels, Raw
 - **Lecture seule** : DMG (Apple)
 

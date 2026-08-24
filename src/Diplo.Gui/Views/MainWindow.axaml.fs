@@ -70,25 +70,31 @@ type MainWindow() as this =
 
         let stack = StackPanel(Margin = Avalonia.Thickness(20.0), Spacing = 6.0)
 
-        let header = TextBlock(
-            Text = "Diplo GUI v0.1.0",
-            FontWeight = Avalonia.Media.FontWeight.Bold,
-            FontSize = 16.0)
+        let header =
+            TextBlock(Text = "Diplo GUI v0.1.0", FontWeight = Avalonia.Media.FontWeight.Bold, FontSize = 16.0)
+
         stack.Children.Add(header) |> ignore
 
-        let desc = TextBlock(
-            Text = "Gestion de conteneurs Docker via gRPC\nBasé sur Diplo CLI (Spectre.Console)",
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            FontSize = 13.0, Opacity = 0.8)
+        let desc =
+            TextBlock(
+                Text = "Gestion de conteneurs Docker via gRPC\nBasé sur Diplo CLI (Spectre.Console)",
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                FontSize = 13.0,
+                Opacity = 0.8
+            )
+
         stack.Children.Add(desc) |> ignore
 
         let sep1 = Separator(Margin = Avalonia.Thickness(0.0, 8.0))
         stack.Children.Add(sep1) |> ignore
 
-        let licTitle = TextBlock(
-            Text = "Licences des dépendances",
-            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-            FontSize = 13.0)
+        let licTitle =
+            TextBlock(
+                Text = "Licences des dépendances",
+                FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                FontSize = 13.0
+            )
+
         stack.Children.Add(licTitle) |> ignore
 
         let licenses =
@@ -98,27 +104,40 @@ type MainWindow() as this =
               "LGPL-3.0+ (1) : Hawkynt.FileFormats.FileSystems" ]
 
         for line in licenses do
-            let t = TextBlock(
-                Text = "  • " + line,
-                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                FontSize = 12.0, Opacity = 0.75)
+            let t =
+                TextBlock(
+                    Text = "  • " + line,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    FontSize = 12.0,
+                    Opacity = 0.75
+                )
+
             stack.Children.Add(t) |> ignore
 
         let sep2 = Separator(Margin = Avalonia.Thickness(0.0, 8.0))
         stack.Children.Add(sep2) |> ignore
 
-        let notice = TextBlock(
-            Text = "Voir THIRD-PARTY-NOTICES.txt pour le texte intégral des licences.",
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            FontSize = 11.0, Opacity = 0.6,
-            FontStyle = Avalonia.Media.FontStyle.Italic)
+        let notice =
+            TextBlock(
+                Text = "Voir THIRD-PARTY-NOTICES.txt pour le texte intégral des licences.",
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                FontSize = 11.0,
+                Opacity = 0.6,
+                FontStyle = Avalonia.Media.FontStyle.Italic
+            )
+
         stack.Children.Add(notice) |> ignore
 
         let outer = StackPanel()
+
         outer.Children.Add(
-            ScrollViewer(Content = stack,
-                         VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto)
-        ) |> ignore
+            ScrollViewer(
+                Content = stack,
+                VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+            )
+        )
+        |> ignore
+
         dialog.Content <- outer
 
         dialog.ShowDialog(this) |> ignore

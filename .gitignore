@@ -94,3 +94,6 @@ certificates/codesigning/leaves/**/*.key.pem
 certificates/codesigning/leaves/**/*.csr.pem
 certificates/codesigning/leaves/**/*.pfx
 certificates/**/*.pfx
+
+# Node.js
+node_modules/

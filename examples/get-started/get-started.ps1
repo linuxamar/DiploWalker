@@ -26,10 +26,10 @@ $ErrorActionPreference = "Stop"
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-$SetupExe   = Join-Path $PSScriptRoot "..\..\Diplo-Setup-1.0.0-x64.exe"
-$DiploDir   = "$env:ProgramFiles\Diplo"
-$CliExe     = Join-Path $DiploDir "Diplo.Cli\Diplo.Cli.exe"
-$ImageName  = "ServerCode"
+$SetupExe = Join-Path $PSScriptRoot "..\..\Diplo-Setup-1.0.0-x64.exe"
+$DiploDir = "$env:ProgramFiles\Diplo"
+$CliExe = Join-Path $DiploDir "Diplo.Cli\Diplo.Cli.exe"
+$ImageName = "ServerCode"
 $ContainerName = "mon-serveur"
 
 # ── Fonctions utilitaires ────────────────────────────────────────────────────
@@ -84,7 +84,8 @@ Write-Ok "Droits administrateur confirmés"
 $dotnetVersion = try { & dotnet --version 2>$null } catch { "" }
 if ($dotnetVersion -match "^10\.") {
     Write-Ok ".NET $dotnetVersion détecté"
-} else {
+}
+else {
     Write-Fail ".NET 10 non trouvé (version: $dotnetVersion)"
     Write-Info "Installez .NET 10 depuis https://dotnet.microsoft.com/download"
     exit 1
@@ -93,7 +94,8 @@ if ($dotnetVersion -match "^10\.") {
 # Vérifier l'installeur
 if (Test-Path $SetupExe) {
     Write-Ok "Installeur trouvé : $SetupExe"
-} else {
+}
+else {
     Write-Fail "Installeur introuvable : $SetupExe"
     Write-Info "Placez le fichier Diplo-Setup-*-x64.exe dans le répertoire du projet."
     exit 1
@@ -108,7 +110,8 @@ Write-Step "2/5" "Installation des services Diplo"
 if (Test-Path $CliExe) {
     Write-Info "Diplo déjà installé dans $DiploDir"
     Write-Info "Pour réinstaller, désinstallez d'abord via Windows Settings > Applications."
-} else {
+}
+else {
     Write-Info "Lancement de l'installeur NSIS..."
     Write-Info "  Une fenêtre d'installation va s'ouvrir."
     Write-Info "  Suivez les instructions à l'écran."
@@ -116,14 +119,15 @@ if (Test-Path $CliExe) {
     $process = Start-Process -FilePath $SetupExe -Wait -PassThru
     if ($process.ExitCode -eq 0) {
         Write-Ok "Installation terminée avec succès"
-    } else {
+    }
+    else {
         Write-Fail "L'installation a échoué (code : $($process.ExitCode))"
         exit 1
     }
 
     # Rafraîchir le PATH
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
-                [System.Environment]::GetEnvironmentVariable("Path", "User")
+        [System.Environment]::GetEnvironmentVariable("Path", "User")
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -143,7 +147,8 @@ foreach ($svcName in $services) {
 
     if ($svc.Status -eq "Running") {
         Write-Ok "$svcName déjà en cours d'exécution"
-    } else {
+    }
+    else {
         Write-Info "Démarrage de $svcName..."
         Start-Service -Name $svcName
         Start-Sleep -Seconds 2
@@ -151,7 +156,8 @@ foreach ($svcName in $services) {
         $svc = Get-Service -Name $svcName
         if ($svc.Status -eq "Running") {
             Write-Ok "$svcName démarré"
-        } else {
+        }
+        else {
             Write-Fail "$svcName n'a pas démarré (état : $($svc.Status))"
         }
     }
@@ -172,7 +178,8 @@ $pullCode = Invoke-Diplo @("container", "pull", $ImageName)
 
 if ($pullCode -eq 0) {
     Write-Ok "Image $ImageName téléchargée"
-} else {
+}
+else {
     Write-Fail "Échec du téléchargement de l'image (code : $pullCode)"
     Write-Info "Vérifiez votre connexion Internet et le nom de l'image."
     exit 1
@@ -209,7 +216,8 @@ $startCode = Invoke-Diplo @("container", "start", $ContainerName)
 
 if ($startCode -eq 0) {
     Write-Ok "Conteneur '$ContainerName' démarré"
-} else {
+}
+else {
     Write-Fail "Échec du démarrage du conteneur (code : $startCode)"
     exit 1
 }

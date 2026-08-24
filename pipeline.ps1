@@ -1,4 +1,4 @@
-﻿# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 #  pipeline.ps1  –  Build, tests et publication self-contained (Release)
 # ---------------------------------------------------------------------------
 #  Structure de sortie :
@@ -76,7 +76,7 @@ function Publish-Project {
     )
 
     $projectPath = Join-Path (Join-Path (Join-Path $PSScriptRoot "src") $ProjectName) "$ProjectName.fsproj"
-    $outputDir   = Join-Path (Join-Path $PublishRoot $Plat) $ProjectName
+    $outputDir = Join-Path (Join-Path $PublishRoot $Plat) $ProjectName
 
     if (-not (Test-Path $projectPath)) {
         # fallback .csproj (Diplo.Grpc ou futurs projets C#)
@@ -121,7 +121,7 @@ $timer = [System.Diagnostics.Stopwatch]::StartNew()
 
 # --- Calcul total étapes pour progression ----------------------------------
 
-$runTests   = $DoTests.IsPresent
+$runTests = $DoTests.IsPresent
 $runPublish = $DoPublish.IsPresent
 
 $testProjects = @(
@@ -138,9 +138,9 @@ $testProjects = @(
 )
 
 $totalSteps = 0
-if ($Clean)   { $totalSteps++ }
+if ($Clean) { $totalSteps++ }
 if ($Restore) { $totalSteps++ }
-if ($runTests)   { $totalSteps += $testProjects.Count }
+if ($runTests) { $totalSteps += $testProjects.Count }
 if ($runPublish) { $totalSteps += $Platforms.Count * $Projects.Count }
 $currentStep = 0
 
@@ -208,14 +208,16 @@ if ($runTests) {
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  ✗ Échec des tests : $test" -ForegroundColor Red
             $allPassed = $false
-        } else {
+        }
+        else {
             # Un projet non restauré peut sortir en code 0 sans exécuter les tests :
             # on vérifie que la DLL de test a réellement été produite.
             $testDll = Get-ChildItem -Path (Join-Path $PSScriptRoot "tests\$test\bin") -Filter "$test.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($null -eq $testDll) {
                 Write-Host "  ✗ Aucune DLL de test produite : $test — exécutez -Restore avant -DoTests" -ForegroundColor Red
                 $allPassed = $false
-            } else {
+            }
+            else {
                 Write-Host "  ✓ OK" -ForegroundColor Green
             }
         }
@@ -233,13 +235,13 @@ if ($runTests) {
 
 if ($runPublish) {
 
-foreach ($plat in $Platforms) {
-    foreach ($project in $Projects) {
-        $currentStep++
-        Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Publication : $project $plat ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
-        Publish-Project -ProjectName $project -Plat $plat
+    foreach ($plat in $Platforms) {
+        foreach ($project in $Projects) {
+            $currentStep++
+            Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Publication : $project $plat ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
+            Publish-Project -ProjectName $project -Plat $plat
+        }
     }
-}
 
 }
 
@@ -250,8 +252,8 @@ if ($runPublish) {
         $setupRoot = Join-Path $PSScriptRoot "setup"
         $setupScript = Join-Path $setupRoot "build.ps1"
         if (Test-Path $setupScript) {
-    Write-Host ""
-    Write-Host "═══ Package NSIS ($plat) ═══" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "═══ Package NSIS ($plat) ═══" -ForegroundColor Cyan
             $appVersion = (Select-Xml -Path (Join-Path $PSScriptRoot "Directory.Build.props") -XPath "//Version").Node.InnerText
             $setupArgs = @{ Version = $appVersion; Platform = $plat; Sign = $true }
             if ($SignCert) { $setupArgs.SignCert = $SignCert }
@@ -260,7 +262,8 @@ if ($runPublish) {
             & $setupScript @setupArgs
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "Le packaging NSIS a échoué pour $plat."
-            } else {
+            }
+            else {
                 Write-Host "  ✓ Package NSIS ($plat) créé." -ForegroundColor Green
             }
         }

@@ -523,7 +523,11 @@ type VersionCommand(output: IOutputPort, clients: IDiploClients) =
             output.WriteLine(sprintf "  Arch      : %s" v.Arch)
             output.WriteLine("")
             output.WriteLine("  Licences des dépendances :")
-            output.WriteLine("    MIT (22)              : Avalonia, FSharp.Core, DiscUtils, Microsoft, Spectre, YamlDotNet, ZstdSharp")
+
+            output.WriteLine(
+                "    MIT (22)              : Avalonia, FSharp.Core, DiscUtils, Microsoft, Spectre, YamlDotNet, ZstdSharp"
+            )
+
             output.WriteLine("    Apache-2.0 (13)       : gRPC, protobuf-net, Serilog, xunit")
             output.WriteLine("    BSD-3-Clause (1)      : Google.Protobuf")
             output.WriteLine("    LGPL-3.0+ (1)         : Hawkynt.FileFormats.FileSystems")

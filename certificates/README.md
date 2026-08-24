@@ -49,15 +49,15 @@ Toutes les clés sont du **RSA 8192 bits** et les signatures utilisent **SHA-384
 
 ## Contenu des répertoires
 
-| Répertoire | Rôle |
-|---|---|
-| `root-ca/` | Autorité racine (clé, certificat, base, config) |
-| `authentification/` | Intermédiaire « Authentification » (signe les feuilles d'authentification) |
-| `system/` | Intermédiaire « System » (signe les feuilles d'authentification des systèmes) |
-| `codesigning/` | Intermédiaire « CodeSigning » (signe les feuilles de signature de code) |
-| `codesigning/leaves/` | Une feuille de signature de code par projet (`leaves/<Projet>/`) |
-| `leaf-dll-validation/` | Certificat de signature des DLL chargées dynamiquement (parent : System) |
-| `leaf-config-encryption/` | Certificat de chiffrement des fichiers de configuration (parent : System) |
+| Répertoire                | Rôle                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `root-ca/`                | Autorité racine (clé, certificat, base, config)                               |
+| `authentification/`       | Intermédiaire « Authentification » (signe les feuilles d'authentification)    |
+| `system/`                 | Intermédiaire « System » (signe les feuilles d'authentification des systèmes) |
+| `codesigning/`            | Intermédiaire « CodeSigning » (signe les feuilles de signature de code)       |
+| `codesigning/leaves/`     | Une feuille de signature de code par projet (`leaves/<Projet>/`)              |
+| `leaf-dll-validation/`    | Certificat de signature des DLL chargées dynamiquement (parent : System)      |
+| `leaf-config-encryption/` | Certificat de chiffrement des fichiers de configuration (parent : System)     |
 
 Chaque autorité possède sa configuration `openssl.cnf` avec les sections `[ req ]`
 et `[ ca ]`, une base (`db/index.txt`, `db/serial`) et un dossier `certs/`.
@@ -144,11 +144,11 @@ Comportement :
 
 Réglages possibles (`-p:<Propriété>=...` ou dans un `.csproj`) :
 
-| Propriété | Rôle |
-|---|---|
-| `DiploSignOutputAfterBuild` | `false` pour désactiver la signature (défaut `true`) |
-| `DiploCodeSigningTimestampUrl` | URL RFC 3161 pour horodater la signature (défaut : vide) |
-| `DiploSigntoolExe` | Chemin explicite vers signtool.exe (sinon auto-détection) |
+| Propriété                      | Rôle                                                      |
+| ------------------------------ | --------------------------------------------------------- |
+| `DiploSignOutputAfterBuild`    | `false` pour désactiver la signature (défaut `true`)      |
+| `DiploCodeSigningTimestampUrl` | URL RFC 3161 pour horodater la signature (défaut : vide)  |
+| `DiploSigntoolExe`             | Chemin explicite vers signtool.exe (sinon auto-détection) |
 
 ### Vérifier une signature
 
@@ -173,7 +173,7 @@ dynamiquement a bien été produite par le projet Diplo. Le principe :
 
 1. **Signature** : la DLL est signée en Authenticode avec le PFX
    `leaf-dll-validation.pfx` (EKU `codeSigning`, chaîne `leaf-dll-validation ←
-   System ← Diplo Root CA`).
+System ← Diplo Root CA`).
 
 ```powershell
 signtool sign /fd SHA256 /f certificates/leaf-dll-validation/leaf-dll-validation.pfx `

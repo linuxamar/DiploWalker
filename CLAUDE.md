@@ -10,44 +10,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 11 projets source (.NET 10, F#) + 11 projets de test :
 
-| Projet | Rôle |
-|--------|------|
-| Diplo.Abstractions | Interfaces partagées, validation, sécurité, modules utilitaires mutualisés |
-| Diplo.Container | Service gRPC de gestion des conteneurs (containerd) — création, cycle de vie, montage de volumes (`--mount`) |
-| Diplo.Volume | Service gRPC de gestion des volumes persistants |
-| Diplo.Network | Service gRPC de gestion des réseaux (CNI) |
-| Diplo.Installer | Installation Windows (services, containerd, CNI) |
-| Diplo.Grpc | Types messages et interfaces de service gRPC (protobuf-net, code-first), mappings de drivers |
-| Diplo.Contracts | Types partagés entre services |
-| Diplo.Core | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `diplo.json` et support des named pipes (`http://pipe:/<nom>`), factory gRPC mutualisée |
-| Diplo.Disk | Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels) via DiscUtils/pilotes maison + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems. Création d'images disque (VHD, VHDX, VMDK, VDI, Raw) via `FsImage.create`. |
-| Diplo.Cli | Client CLI (Spectre.Console) |
-| Diplo.Gui | Interface graphique Avalonia |
+| Projet             | Rôle                                                                                                                                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Diplo.Abstractions | Interfaces partagées, validation, sécurité, modules utilitaires mutualisés                                                                                                                                                                                    |
+| Diplo.Container    | Service gRPC de gestion des conteneurs (containerd) — création, cycle de vie, montage de volumes (`--mount`)                                                                                                                                                  |
+| Diplo.Volume       | Service gRPC de gestion des volumes persistants                                                                                                                                                                                                               |
+| Diplo.Network      | Service gRPC de gestion des réseaux (CNI)                                                                                                                                                                                                                     |
+| Diplo.Installer    | Installation Windows (services, containerd, CNI)                                                                                                                                                                                                              |
+| Diplo.Grpc         | Types messages et interfaces de service gRPC (protobuf-net, code-first), mappings de drivers                                                                                                                                                                  |
+| Diplo.Contracts    | Types partagés entre services                                                                                                                                                                                                                                 |
+| Diplo.Core         | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `diplo.json` et support des named pipes (`http://pipe:/<nom>`), factory gRPC mutualisée                                                                 |
+| Diplo.Disk         | Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels) via DiscUtils/pilotes maison + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems. Création d'images disque (VHD, VHDX, VMDK, VDI, Raw) via `FsImage.create`. |
+| Diplo.Cli          | Client CLI (Spectre.Console)                                                                                                                                                                                                                                  |
+| Diplo.Gui          | Interface graphique Avalonia                                                                                                                                                                                                                                  |
 
 ### Modules mutualisés
 
 Les modules suivants ont été extraits du code dupliqué et centralisés dans Diplo.Abstractions / Diplo.Grpc :
 
-| Module | Projet | Rôle |
-|--------|--------|------|
-| `JsonHelpers` | Diplo.Abstractions | Extraction typée de propriétés depuis `JsonElement` (`tryGetString`, `tryGetInt64`, `tryGetDouble`, `tryGetBool`, `tryGetElement`, `tryGetStringValue`). Module `[<RequireQualifiedAccess>]` — appeler via `JsonHelpers.tryGetString`. |
-| `DiploJson` | Diplo.Abstractions | Options de sérialisation JSON centralisées (`defaultOptions`, `snakeCaseOptions`, `caseInsensitiveOptions`, `withMaxDepth`, `documentOptions`). |
-| `ProcessExec` | Diplo.Abstractions | Exécution de processus externes (`run`, `runWithResult`, `runUnit`) et commandes PowerShell (`runPowerShell`, `runPowerShellScript`). Gère le timeout, le Kill, et la lecture asynchrone stdout/stderr. `runUnit` exécute sans retourner la sortie standard (usage montage/démontage). |
-| `ServiceGuards` | Diplo.Abstractions | Guards de validation d'entrée réutilisables (`requireNonEmpty`, `requireId`, `requirePositive`, `requireInRange`, `requireSafePath`, `requireLocalAddress`, `requireSafeCommand`). Lèvent `RpcException(InvalidArgument)`. |
-| `CachedConfig<'T>` | Diplo.Abstractions | Cache générique avec invalidation manuelle, protégé par un verrou. Chargement paresseux via `Value`, invalidation via `Invalidate()`. |
-| `DriverMappings` | Diplo.Grpc | Mapping type↔string pour les drivers volume (`StorageDriverType`) et réseau (`NetworkDriver`). Fonctions `parse*`, `isValid*`, `*ToString`, `all*Names`. |
-| `GrpcClientFactory` | Diplo.Core | Construction de canaux gRPC TCP ou named pipe avec retry (5 tentatives, backoff exponentiel) et credentials par token. |
-| `TestHelpers` | Diplo.TestHelpers | Helpers pour les tests (`createTempDir`, `cleanupDir`). |
-| `Cmd` | Diplo.Gui | Helpers try/with mutualisés pour les commandes GUI (`run` async, `runSync` synchrone, `runSyncWith` avec callback d'erreur custom). |
-| `ContainerDetailUserControl` | Diplo.Gui | UserControl XAML pour le détail d'un conteneur sélectionné (propriétés, actions, montage, logs/exec). Chargé via `AvaloniaRuntimeXamlLoader`. |
-| `HawkyntFs` | Diplo.Disk | Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la réécriture de Btrfs, XFS et HFS+. Seuil de 2 Go pour éviter le tout-en-mémoire ; fallback DiscUtils au-delà. Tous les readers/streams utilisent `use` pour la libération garantie. |
-| `ComposeEditorViewModel` | Diplo.Gui | ViewModel de l'éditeur Compose (AvalonEdit) : chargement/sauvegarde de fichiers YAML, validation en temps réel (clé `services` absente, services sans `image` ni `build`), collection `Errors` exposée pour le bindind XAML. |
-| `RemoteDriverHelpers` | Diplo.Volume | Helpers mutualisés pour les 5 drivers distants (NFS, AWS EFS, GCP Filestore, Azure Files, SMB) : `mountVolume`, `unmountVolume`, `unmountNfsLike` (umount → fallback mount -u), `pruneCloudVolumes`. |
-| `VdiFs` | Diplo.Disk | Adaptateur DiscUtils.Vdi pour l'extraction et la réécriture R/W d'images VDI (VirtualBox). |
-| `Qcow1Fs` | Diplo.Disk | Pilote maison pour les images QCOW v1 (QFI\\xFE) : lecture/écriture in-place via `Qcow1Stream`. |
-| `DmgFs` | Diplo.Disk | Adaptateur DiscUtils.Dmg pour l'extraction (lecture seule) d'images DMG (Apple Disk Image). |
-| `ParallelsFs` | Diplo.Disk | Pilote maison pour les images Parallels (.hdd, .hds) : lecture/écriture in-place via `ParallelsStream`. |
-| `FsImage` | Diplo.Disk | Création d'images disque (`create`), extraction (`extract`) et réécriture (`writeBack`) de systèmes de fichiers. Chaîne d'adaptateurs Hawkynt → VdiFs → DmgFs → DiscUtils. Supporte Raw, VHD, VHDX, VMDK et VDI en création. |
+| Module                       | Projet             | Rôle                                                                                                                                                                                                                                                                                   |
+| ---------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JsonHelpers`                | Diplo.Abstractions | Extraction typée de propriétés depuis `JsonElement` (`tryGetString`, `tryGetInt64`, `tryGetDouble`, `tryGetBool`, `tryGetElement`, `tryGetStringValue`). Module `[<RequireQualifiedAccess>]` — appeler via `JsonHelpers.tryGetString`.                                                 |
+| `DiploJson`                  | Diplo.Abstractions | Options de sérialisation JSON centralisées (`defaultOptions`, `snakeCaseOptions`, `caseInsensitiveOptions`, `withMaxDepth`, `documentOptions`).                                                                                                                                        |
+| `ProcessExec`                | Diplo.Abstractions | Exécution de processus externes (`run`, `runWithResult`, `runUnit`) et commandes PowerShell (`runPowerShell`, `runPowerShellScript`). Gère le timeout, le Kill, et la lecture asynchrone stdout/stderr. `runUnit` exécute sans retourner la sortie standard (usage montage/démontage). |
+| `ServiceGuards`              | Diplo.Abstractions | Guards de validation d'entrée réutilisables (`requireNonEmpty`, `requireId`, `requirePositive`, `requireInRange`, `requireSafePath`, `requireLocalAddress`, `requireSafeCommand`). Lèvent `RpcException(InvalidArgument)`.                                                             |
+| `CachedConfig<'T>`           | Diplo.Abstractions | Cache générique avec invalidation manuelle, protégé par un verrou. Chargement paresseux via `Value`, invalidation via `Invalidate()`.                                                                                                                                                  |
+| `DriverMappings`             | Diplo.Grpc         | Mapping type↔string pour les drivers volume (`StorageDriverType`) et réseau (`NetworkDriver`). Fonctions `parse*`, `isValid*`, `*ToString`, `all*Names`.                                                                                                                               |
+| `GrpcClientFactory`          | Diplo.Core         | Construction de canaux gRPC TCP ou named pipe avec retry (5 tentatives, backoff exponentiel) et credentials par token.                                                                                                                                                                 |
+| `TestHelpers`                | Diplo.TestHelpers  | Helpers pour les tests (`createTempDir`, `cleanupDir`).                                                                                                                                                                                                                                |
+| `Cmd`                        | Diplo.Gui          | Helpers try/with mutualisés pour les commandes GUI (`run` async, `runSync` synchrone, `runSyncWith` avec callback d'erreur custom).                                                                                                                                                    |
+| `ContainerDetailUserControl` | Diplo.Gui          | UserControl XAML pour le détail d'un conteneur sélectionné (propriétés, actions, montage, logs/exec). Chargé via `AvaloniaRuntimeXamlLoader`.                                                                                                                                          |
+| `HawkyntFs`                  | Diplo.Disk         | Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la réécriture de Btrfs, XFS et HFS+. Seuil de 2 Go pour éviter le tout-en-mémoire ; fallback DiscUtils au-delà. Tous les readers/streams utilisent `use` pour la libération garantie.                                  |
+| `ComposeEditorViewModel`     | Diplo.Gui          | ViewModel de l'éditeur Compose (AvalonEdit) : chargement/sauvegarde de fichiers YAML, validation en temps réel (clé `services` absente, services sans `image` ni `build`), collection `Errors` exposée pour le bindind XAML.                                                           |
+| `RemoteDriverHelpers`        | Diplo.Volume       | Helpers mutualisés pour les 5 drivers distants (NFS, AWS EFS, GCP Filestore, Azure Files, SMB) : `mountVolume`, `unmountVolume`, `unmountNfsLike` (umount → fallback mount -u), `pruneCloudVolumes`.                                                                                   |
+| `VdiFs`                      | Diplo.Disk         | Adaptateur DiscUtils.Vdi pour l'extraction et la réécriture R/W d'images VDI (VirtualBox).                                                                                                                                                                                             |
+| `Qcow1Fs`                    | Diplo.Disk         | Pilote maison pour les images QCOW v1 (QFI\\xFE) : lecture/écriture in-place via `Qcow1Stream`.                                                                                                                                                                                        |
+| `DmgFs`                      | Diplo.Disk         | Adaptateur DiscUtils.Dmg pour l'extraction (lecture seule) d'images DMG (Apple Disk Image).                                                                                                                                                                                            |
+| `ParallelsFs`                | Diplo.Disk         | Pilote maison pour les images Parallels (.hdd, .hds) : lecture/écriture in-place via `ParallelsStream`.                                                                                                                                                                                |
+| `FsImage`                    | Diplo.Disk         | Création d'images disque (`create`), extraction (`extract`) et réécriture (`writeBack`) de systèmes de fichiers. Chaîne d'adaptateurs Hawkynt → VdiFs → DmgFs → DiscUtils. Supporte Raw, VHD, VHDX, VMDK et VDI en création.                                                           |
 
 ## Stack
 
