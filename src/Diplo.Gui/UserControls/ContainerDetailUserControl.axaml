@@ -9,9 +9,9 @@
                  Margin="10,8,0,6" FontSize="13" Opacity="0.9"/>
 
       <!-- Placeholder quand aucun conteneur sélectionné -->
-      <TextBlock Text="Sélectionnez un conteneur dans la liste"
-                 HorizontalAlignment="Center" VerticalAlignment="Center"
-                 Opacity="0.4" Margin="0,30" FontSize="13"
+      <TextBlock DockPanel.Dock="Top" Text="Sélectionnez un conteneur dans la liste"
+                 HorizontalAlignment="Center" Margin="0,30" FontSize="13"
+                 Opacity="0.4"
                  IsVisible="{Binding ContainerTab.HasSelection, Converter={x:Static BoolConverters.Not}}"/>
 
       <!-- Panneau détail (visible quand sélectionné) -->
