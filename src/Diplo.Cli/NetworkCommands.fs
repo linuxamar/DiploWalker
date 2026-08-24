@@ -50,7 +50,7 @@ type InspectNetworkCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
             else
@@ -86,7 +86,7 @@ type CreateNetworkCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Name) then
+            if String.IsNullOrWhiteSpace(settings.Name) then
                 output.WriteError("Le nom du réseau est requis")
                 return 1
             elif not (DriverMappings.isValidNetworkDriver settings.Driver) then
@@ -120,7 +120,7 @@ type RemoveNetworkCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
             else
@@ -148,10 +148,10 @@ type ConnectCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.NetworkId) then
+            if String.IsNullOrWhiteSpace(settings.NetworkId) then
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
-            elif String.IsNullOrEmpty(settings.ContainerId) then
+            elif String.IsNullOrWhiteSpace(settings.ContainerId) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -184,10 +184,10 @@ type DisconnectCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.NetworkId) then
+            if String.IsNullOrWhiteSpace(settings.NetworkId) then
                 output.WriteError("L'identifiant du réseau est requis")
                 return 1
-            elif String.IsNullOrEmpty(settings.ContainerId) then
+            elif String.IsNullOrWhiteSpace(settings.ContainerId) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             else
@@ -230,19 +230,19 @@ type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.PluginPath) then
+            if String.IsNullOrWhiteSpace(settings.PluginPath) then
                 output.WriteError("Le chemin du plugin CNI est requis")
                 return 1
             elif not (System.IO.Path.IsPathRooted(settings.PluginPath)) then
                 output.WriteError(sprintf "Le chemin du plugin CNI doit être absolu : %s" settings.PluginPath)
                 return 1
-            elif String.IsNullOrEmpty(settings.CniCommand) then
+            elif String.IsNullOrWhiteSpace(settings.CniCommand) then
                 output.WriteError("La commande CNI est requise (ADD ou DEL)")
                 return 1
-            elif String.IsNullOrEmpty(settings.ContainerId) then
+            elif String.IsNullOrWhiteSpace(settings.ContainerId) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
-            elif String.IsNullOrEmpty(settings.NetnsPath) then
+            elif String.IsNullOrWhiteSpace(settings.NetnsPath) then
                 output.WriteError("Le chemin du namespace réseau est requis")
                 return 1
             else
@@ -272,7 +272,7 @@ type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
                     output.WriteLine(sprintf "  Interface : %s" response.Ifname)
                     output.WriteLine(sprintf "  IPv4      : %s" response.Ipv4Address)
                     output.WriteLine(sprintf "  Passerelle: %s" response.Gateway)
-                    if not (System.String.IsNullOrEmpty(response.Message)) then
+                    if not (System.String.IsNullOrWhiteSpace(response.Message)) then
                         output.WriteLine(sprintf "  Message   : %s" response.Message)
                     return 0
                 else

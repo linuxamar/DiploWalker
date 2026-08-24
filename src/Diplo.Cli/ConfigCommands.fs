@@ -1,5 +1,6 @@
 namespace Diplo.Cli
 
+open System
 open System.IO
 open System.Threading
 open Spectre.Console.Cli
@@ -60,13 +61,13 @@ type InitConfigCommand(output: IOutputPort) =
         | None -> 1
         | Some content ->
             let filePath =
-                if System.String.IsNullOrEmpty(settings.Path) then
+                if String.IsNullOrWhiteSpace(settings.Path) then
                     Path.Combine(Directory.GetCurrentDirectory(), "diplo.json")
                 else
                     settings.Path
 
             let dir = Path.GetDirectoryName(filePath)
-            if not (System.String.IsNullOrEmpty(dir)) && not (Directory.Exists(dir)) then
+            if not (String.IsNullOrWhiteSpace(dir)) && not (Directory.Exists(dir)) then
                 Directory.CreateDirectory(dir) |> ignore
 
             File.WriteAllText(filePath, content)

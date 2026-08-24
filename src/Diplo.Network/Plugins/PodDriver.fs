@@ -35,7 +35,9 @@ type HnsPowerShellProvider() =
                         runPowershellWithArgs "Get-NetNat"
                             [ "-Name", natName; "-ErrorAction", "SilentlyContinue" ]
                     not (String.IsNullOrWhiteSpace(result))
-                with _ -> false
+                with ex ->
+                    Log.Debug(ex, "Vérification du NAT {NatName} échouée, hypothèse : inexistant", natName)
+                    false
             if not existing then
                 runPowershellWithArgs "New-NetNat"
                     [ "-Name", natName; "-InternalIPInterfaceAddressPrefix", subnet ] |> ignore

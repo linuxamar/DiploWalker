@@ -49,7 +49,7 @@ type InspectVolumeCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
             else
@@ -85,7 +85,7 @@ type CreateVolumeCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Name) then
+            if String.IsNullOrWhiteSpace(settings.Name) then
                 output.WriteError("Le nom du volume est requis")
                 return 1
             elif not (DriverMappings.isValidVolumeDriver settings.Driver) then
@@ -138,7 +138,7 @@ type RemoveVolumeCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
             else
@@ -164,7 +164,7 @@ type MountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
             else
@@ -186,7 +186,7 @@ type UnmountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
-            if String.IsNullOrEmpty(settings.Id) then
+            if String.IsNullOrWhiteSpace(settings.Id) then
                 output.WriteError("L'identifiant du volume est requis")
                 return 1
             else
