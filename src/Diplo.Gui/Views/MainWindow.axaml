@@ -64,7 +64,6 @@
                                   AutoGenerateColumns="False" IsReadOnly="True"
                                   GridLinesVisibility="Horizontal" CanUserResizeColumns="True"
                                   CanUserSortColumns="True"
-                                  Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
                                   SelectedItem="{Binding ContainerTab.SelectedContainer}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="90" />
@@ -76,7 +75,7 @@
                         </DataGrid>
 
                         <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
-                                      Background="#555" ResizeDirection="Columns" />
+                                      ResizeDirection="Columns" />
 
                         <!-- Détail du conteneur sélectionné -->
                         <uc:ContainerDetailUserControl Grid.Column="2" />
@@ -84,7 +83,7 @@
 
                     <!-- Section Images (réduite) -->
                     <Expander DockPanel.Dock="Bottom" Header="Images" Margin="0,4,0,0"
-                              Background="#1e1e1e" IsExpanded="False">
+                              IsExpanded="False">
                         <DockPanel>
                             <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
                                 <TextBlock Text="Réf. image :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
@@ -100,7 +99,6 @@
                             </WrapPanel>
                             <DataGrid ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
                                       IsReadOnly="True" GridLinesVisibility="Horizontal"
-                                      Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
                                       CanUserResizeColumns="True" CanUserSortColumns="True">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
@@ -159,8 +157,7 @@
                     </WrapPanel>
 
                     <DataGrid ItemsSource="{Binding VolumeTab.Volumes}" AutoGenerateColumns="False"
-                              IsReadOnly="True" GridLinesVisibility="Horizontal"
-                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0">
+                              IsReadOnly="True" GridLinesVisibility="Horizontal">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
                             <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="160" />
@@ -230,8 +227,7 @@
                     </WrapPanel>
 
                     <DataGrid ItemsSource="{Binding NetworkTab.Networks}" AutoGenerateColumns="False"
-                              IsReadOnly="True" GridLinesVisibility="Horizontal"
-                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0">
+                              IsReadOnly="True" GridLinesVisibility="Horizontal">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
                             <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="140" />
@@ -284,13 +280,11 @@
                     <ListBox DockPanel.Dock="Top"
                              Height="80" Margin="0,4,0,4"
                              ItemsSource="{Binding ComposeTab.ComposeEditor.Errors}"
-                             Background="#1e1e1e" Foreground="#d4d4d4"
-                             BorderThickness="1" BorderBrush="#333"
+                             BorderThickness="1"
                              DisplayMemberBinding="{Binding Message}" />
 
                     <DataGrid ItemsSource="{Binding ComposeTab.ComposeServices}" AutoGenerateColumns="False"
                               IsReadOnly="True" GridLinesVisibility="Horizontal"
-                              Background="#252526" Foreground="#d4d4d4" BorderThickness="0"
                               CanUserResizeColumns="True" CanUserSortColumns="True">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Service" Binding="{Binding Service}" Width="120" />
@@ -307,7 +301,7 @@
                 <StackPanel Margin="12">
                     <TextBlock Text="Configuration client (diplo.json)" FontWeight="Bold" />
                     <TextBlock Text="{Binding SettingsTab.ConfigPath}" TextWrapping="Wrap"
-                               Foreground="#aaa" Margin="0,2,0,12" />
+                               Margin="0,2,0,12" />
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <TextBlock Text="Adresse conteneurs :" Width="150" VerticalAlignment="Center" />
@@ -332,15 +326,15 @@
                     </StackPanel>
 
                     <TextBlock Text="{Binding SettingsTab.StatusMessage}" Margin="0,8,0,0"
-                               TextWrapping="Wrap" Foreground="#4ec9b0" />
+                               TextWrapping="Wrap" />
                     <TextBlock Text="Remarque : la configuration enregistrée est appliquée aux prochaines opérations des onglets."
-                               Margin="0,12,0,0" TextWrapping="Wrap" Foreground="#888" />
+                               Margin="0,12,0,0" TextWrapping="Wrap" />
                 </StackPanel>
             </TabItem>
         </TabControl>
 
             <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
-                          Background="#555" ResizeDirection="Rows" />
+                          ResizeDirection="Rows" />
 
             <Border Grid.Row="2" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}" BorderThickness="1" Margin="0,4,0,0">
                 <DockPanel>

@@ -25,7 +25,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (841 tests)
+- **Tests** : xUnit (877 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -224,7 +224,13 @@ Diplo/
 │   ├── Diplo.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
 │   ├── Diplo.Disk/             # Montage et création d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels)
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
-│   └── Diplo.Gui/              # Interface graphique Avalonia
+│   ├── Diplo.Gui/              # Interface graphique Avalonia
+│   │   ├── Views/MainWindow.axaml(.fs)
+│   │   ├── UserControls/ContainerDetailUserControl.axaml(.fs)
+│   │   ├── ViewModels/
+│   │   ├── Services/
+│   │   ├── App.axaml(.fs)
+│   │   └── Program.fs
 ├── tests/
 │   ├── Diplo.Abstractions.Tests/
 │   ├── Diplo.Cli.Tests/
@@ -329,9 +335,26 @@ Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (
 
 ### GUI
 
-L'onglet **Conteneurs** expose un champ « Montages: » au format identique (`src=...,dst=...[;ro]`), avec un montage par ligne ou séparé par des points-virgules.
+L'interface graphique Avalonia utilise un thème système par défaut avec des onglets organisés :
 
-L'onglet **Volumes** propose un panneau « Créer une image disque » avec sélection du répertoire source (bouton `…` avec sélecteur de dossier), du chemin de destination (bouton `…` avec sélecteur de fichier) et du format.
+**Onglet Conteneurs** — Vue splitée avec :
+- **Toolbar** en haut : Lister, Créer, Télécharger, Inspecter, Espaces, Version
+- **Champs** : ID, Nom, Image, User (pull), Espace, Timeout, Tous, Forcer
+- **DataGrid** (gauche) : liste des conteneurs avec sélection
+- **ContainerDetailUserControl** (droite) : panneau de détail pour le conteneur sélectionné
+  - Propriétés : ID, Nom, Image, État, Créé le
+  - Actions : Démarrer, Arrêter, Supprimer, Renommer, Processus, Métriques
+  - Configuration : Nouveau nom, Montages
+  - Journaux & Exec : Suivre, Lignes, Depuis, Commande
+- **Images** (Expander repliable en bas) : Liste/Inspecter/Supprimer/Étiqueter
+
+**Onglet Volumes** — Liste + création d'images disque (sélection dossier/fichier, format)
+
+**Onglet Réseaux** — Liste + création de réseaux
+
+**Onglet Compose** — Éditeur YAML avec colorisation syntaxique (AvalonEdit + TextMate) et validation temps réel
+
+**Onglet Paramètres** — Édition de `diplo.json` (adresses services, transport, namespace, logLevel)
 
 ## Authentification aux registres
 
@@ -435,6 +458,9 @@ diplo version
 | `DmgFs` | Disk | Adaptateur DiscUtils.Dmg pour extraction DMG |
 | `ParallelsFs` | Disk | Pilote maison Parallels |
 | `FsImage` | Disk | Création, extraction et réécriture d'images disque |
+| `RemoteDriverHelpers` | Volume | Helpers mutualisés pour drivers distants (NFS, AWS, GCP, Azure, SMB) |
+| `Cmd` | Gui | Helpers try/with mutualisés pour commandes GUI |
+| `ContainerDetailUserControl` | Gui | UserControl détail conteneur sélectionné |
 
 ### Validation ctr v2 (≥ v2.0)
 

@@ -39,6 +39,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 | `GrpcClientFactory` | Diplo.Core | Construction de canaux gRPC TCP ou named pipe avec retry (5 tentatives, backoff exponentiel) et credentials par token. |
 | `TestHelpers` | Diplo.TestHelpers | Helpers pour les tests (`createTempDir`, `cleanupDir`). |
 | `Cmd` | Diplo.Gui | Helpers try/with mutualisés pour les commandes GUI (`run` async, `runSync` synchrone, `runSyncWith` avec callback d'erreur custom). |
+| `ContainerDetailUserControl` | Diplo.Gui | UserControl XAML pour le détail d'un conteneur sélectionné (propriétés, actions, montage, logs/exec). Chargé via `AvaloniaRuntimeXamlLoader`. |
 | `HawkyntFs` | Diplo.Disk | Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la réécriture de Btrfs, XFS et HFS+. Seuil de 2 Go pour éviter le tout-en-mémoire ; fallback DiscUtils au-delà. Tous les readers/streams utilisent `use` pour la libération garantie. |
 | `ComposeEditorViewModel` | Diplo.Gui | ViewModel de l'éditeur Compose (AvalonEdit) : chargement/sauvegarde de fichiers YAML, validation en temps réel (clé `services` absente, services sans `image` ni `build`), collection `Errors` exposée pour le bindind XAML. |
 | `RemoteDriverHelpers` | Diplo.Volume | Helpers mutualisés pour les 5 drivers distants (NFS, AWS EFS, GCP Filestore, Azure Files, SMB) : `mountVolume`, `unmountVolume`, `unmountNfsLike` (umount → fallback mount -u), `pruneCloudVolumes`. |
@@ -54,7 +55,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
 - **GUI** : Avalonia 12.1.1 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 878 tests au total.
+- **Tests** : xUnit v4 + FsUnit.xUnit — 877 tests au total.
 
 ### Contraintes F#
 

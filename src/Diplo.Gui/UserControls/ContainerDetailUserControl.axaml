@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:CompileBindings="False">
 
-  <Border Background="#252526" BorderBrush="#333" BorderThickness="1" CornerRadius="4"
+  <Border BorderThickness="1" CornerRadius="4"
           Margin="0,0,0,4">
     <DockPanel>
       <TextBlock DockPanel.Dock="Top" Text="Détails du conteneur" FontWeight="Bold"
@@ -54,7 +54,7 @@
         </Grid>
 
         <!-- Séparateur -->
-        <Separator Background="#444" Margin="10,4,10,6"/>
+        <Separator Margin="10,4,10,6"/>
 
         <!-- Actions sur le conteneur sélectionné -->
         <WrapPanel Margin="10,0,0,6">
@@ -86,7 +86,7 @@
         </WrapPanel>
 
         <!-- Séparateur -->
-        <Separator Background="#444" Margin="10,4,10,6"/>
+        <Separator Margin="10,4,10,6"/>
 
         <!-- Logs & Exec -->
         <WrapPanel Margin="10,0,0,0">
