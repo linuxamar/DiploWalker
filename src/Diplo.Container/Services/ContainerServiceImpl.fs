@@ -107,6 +107,16 @@ module private ContainerStreaming =
                         ValueTask<bool>(t)
                     member _.DisposeAsync() = ValueTask() } }
 
+    /// Lance un producer task et observe ses exceptions pour éviter
+    /// UnobservedTaskException quand le GC finalise un Task faulté.
+    let observeProducerTask (name: string) (task: Task) =
+        task.ContinueWith(
+            (fun (t: Task) ->
+                if t.IsFaulted then
+                    Log.Warning(t.Exception, "Producer task terminé en erreur: {TaskName}", name)),
+            TaskContinuationOptions.OnlyOnFaulted)
+        |> ignore
+
 open ContainerStreaming
 
 [<ServiceContract(Name = "IContainerService")>]
@@ -557,7 +567,12 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                 if exitCode = -1 then
                     return { WaitContainerResponse.ExitCode = -1; State = ContainerState.Running; Message = "Timeout en attendant la sortie du conteneur" }
                 else
-                    return { WaitContainerResponse.ExitCode = exitCode; State = ContainerState.Stopped; Message = "Conteneur terminé" }
+                    let exitCodeFinal =
+                        try
+                            let info = client.InspectContainer(DefaultNamespace, request.Id)
+                            tryGetInt64 info "exit_code" |> int
+                        with _ -> exitCode
+                    return { WaitContainerResponse.ExitCode = exitCodeFinal; State = ContainerState.Stopped; Message = "Conteneur terminé" }
             }
 
         // ─── Update ─────────────────────────────────────────────────────────
@@ -620,7 +635,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                         Log.Error(ex, "Erreur lors du streaming des stats du conteneur {ContainerId}", request.Id)
                         channel.Writer.TryComplete(ex) |> ignore
                 }
-            Task.Run(fun () -> run() |> ignore) |> ignore
+            observeProducerTask "stats-stream" (Task.Run(fun () -> run() |> ignore)) |> ignore
             toAsyncEnumerable channel.Reader
 
         // ─── Événements ─────────────────────────────────────────────────────
@@ -680,7 +695,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                         Log.Error(ex, "Erreur lors du suivi des événements")
                         channel.Writer.TryComplete(ex) |> ignore
                 }
-            Task.Run(fun () -> run() |> ignore) |> ignore
+            observeProducerTask "events-stream" (Task.Run(fun () -> run() |> ignore)) |> ignore
             toAsyncEnumerable channel.Reader
 
         // ─── Exec bidirectionnel ────────────────────────────────────────────
@@ -697,7 +712,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                         else
                             let first = enumerator.Current
                             if String.IsNullOrEmpty(first.Id) then
-                                channel.Writer.TryComplete(RpcException(Status(StatusCode.InvalidArgument, "L'identifiant du conteneur est requis"))) |> ignore
+                                channel.Writer.TryComplete(RpcException(Status(StatusCode.InvalidArgument, ServiceGuards.ContainerIdRequired))) |> ignore
                             elif first.Command.Count = 0 then
                                 channel.Writer.TryComplete(RpcException(Status(StatusCode.InvalidArgument, "Au moins une commande est requise"))) |> ignore
                             else
@@ -754,7 +769,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                         enumerator.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
                         channel.Writer.TryComplete() |> ignore
                 }
-            Task.Run(fun () -> run() |> ignore) |> ignore
+            observeProducerTask "exec-stream" (Task.Run(fun () -> run() |> ignore)) |> ignore
             toAsyncEnumerable channel.Reader
 
         // ─── Copie de fichiers ──────────────────────────────────────────────
@@ -763,23 +778,27 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
             task {
                 ServiceGuards.requireContainerId request.Id
                 ServiceGuards.requireNonEmpty request.Path "Le chemin du fichier"
+                SecurityValidation.validateContainerPath request.Path "Le chemin du fichier"
                 let command = [| "base64"; request.Path |]
                 SecurityValidation.validateCommand command
                 let output = client.ExecInContainer(DefaultNamespace, request.Id, command)
-                try
-                    let data = Convert.FromBase64String(output.Trim())
-                    return { ReadFileResponse.Data = data; Success = true; Message = "" }
-                with ex ->
-                    Log.Warning(ex, "Impossible de lire le fichier {Path} dans le conteneur {ContainerId}", request.Path, request.Id)
-                    return { ReadFileResponse.Data = Array.empty; Success = false; Message = "Impossible de lire le fichier : " + ex.Message }
+                if output.StartsWith("Erreur d'exécution") then
+                    return { ReadFileResponse.Data = Array.empty; Success = false; Message = output }
+                else
+                    try
+                        let data = Convert.FromBase64String(output.Trim())
+                        return { ReadFileResponse.Data = data; Success = true; Message = "" }
+                    with ex ->
+                        Log.Warning(ex, "Impossible de décoder le fichier {Path} dans le conteneur {ContainerId}", request.Path, request.Id)
+                        return { ReadFileResponse.Data = Array.empty; Success = false; Message = "Impossible de lire le fichier : " + ex.Message }
             }
 
         member _.WriteFile(request, _context) =
             task {
                 ServiceGuards.requireContainerId request.Id
                 ServiceGuards.requireNonEmpty request.Path "Le chemin du fichier"
-                let command = [| "sh"; "-c"; "base64 -d > " + request.Path |]
                 SecurityValidation.validateContainerPath request.Path "Le chemin du fichier"
+                let command = [| "sh"; "-c"; sprintf "base64 -d > '%s'" request.Path |]
                 try
                     let base64 = Convert.ToBase64String(request.Data)
                     use stdin = new MemoryStream(Encoding.UTF8.GetBytes(base64))
@@ -854,7 +873,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                     finally
                         try File.Delete(tmp) with _ -> ()
                 }
-            Task.Run(fun () -> run() |> ignore) |> ignore
+            observeProducerTask "export-stream" (Task.Run(fun () -> run() |> ignore)) |> ignore
             toAsyncEnumerable channel.Reader
 
         member _.ImportImage(requests, _context) =

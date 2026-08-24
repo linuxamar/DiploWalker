@@ -3,7 +3,6 @@ namespace Diplo.Grpc
 open System.ServiceModel
 open System.Threading
 open System.Threading.Tasks
-open ProtoBuf.Grpc
 open Diplo.Grpc.Volume
 
 [<ServiceContract>]

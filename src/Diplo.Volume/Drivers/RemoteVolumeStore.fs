@@ -18,17 +18,23 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
 
     let generateId () = Guid.NewGuid().ToString("N")
 
+    /// Clés sensibles à supprimer avant persistance (credentials en clair interdit).
+    let sensitiveKeys = set [ "password"; "secret"; "token"; "apikey"; "api_key" ]
+
     member _.CreateVolume(name: string, remotePath: string, labels: Map<string, string>, driverOpts: Map<string, string>) =
         let id = generateId()
         let dir = Path.Combine(volumesDir, id)
         Directory.CreateDirectory(dir) |> ignore
+        let safeOpts =
+            driverOpts
+            |> Map.filter (fun k _ -> not (sensitiveKeys.Contains(k.ToLowerInvariant())))
         let meta = {|
             id = id
             name = name
             driver = driverName
             remotePath = remotePath
             labels = labels
-            driverOpts = driverOpts
+            driverOpts = safeOpts
             createdAt = DateTime.UtcNow
         |}
         AtomicFile.write (metaPath id) (JsonSerializer.Serialize(meta))

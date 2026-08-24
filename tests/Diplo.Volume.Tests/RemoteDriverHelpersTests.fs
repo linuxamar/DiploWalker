@@ -5,14 +5,15 @@ module RemoteDriverHelpersTests =
     open System
     open Xunit
     open FsUnit.Xunit
+    open Grpc.Core
     open Diplo.Volume.Drivers
 
     [<Fact>]
-    let ``unmountNfsLike ne propage pas l'exception si umount echoue`` () =
-        RemoteDriverHelpers.unmountNfsLike "/chemin/inexistant"
-        // ne doit pas lever d'exception (silencieux)
+    let ``unmountNfsLike propage RpcException si umount echoue`` () =
+        let ex = Assert.Throws<RpcException>(fun () -> RemoteDriverHelpers.unmountNfsLike "/chemin/inexistant" |> ignore)
+        ex.StatusCode |> should equal StatusCode.Internal
 
     [<Fact>]
-    let ``unmountNfsLike retourne unit`` () =
-        let result = RemoteDriverHelpers.unmountNfsLike "/tmp/test-unmount"
-        result |> should equal ()
+    let ``unmountNfsLike propage RpcException si chemin inexistant`` () =
+        let ex = Assert.Throws<RpcException>(fun () -> RemoteDriverHelpers.unmountNfsLike "/tmp/test-unmount" |> ignore)
+        ex.StatusCode |> should equal StatusCode.Internal

@@ -1,7 +1,6 @@
 namespace Diplo.Network.Plugins
 
 open System
-open System.Net.NetworkInformation
 open System.Collections.Concurrent
 open Serilog
 open Diplo.Abstractions
@@ -39,7 +38,9 @@ type BridgeNetworkDriver() =
                             runPowershellWithArgs "Get-VMSwitch"
                                 [ "-Name", name; "-ErrorAction", "SilentlyContinue" ]
                         not (String.IsNullOrWhiteSpace(result))
-                    with _ -> false
+                    with ex ->
+                        Log.Debug(ex, "Vérification du switch VM {Name} échouée, hypothèse : inexistant", name)
+                        false
                 if not existingSwitch then
                     runPowershellWithArgs "New-VMSwitch"
                         [ "-Name", name; "-SwitchType", "Internal"; "-AllowManagementOS", "$true" ]
@@ -53,7 +54,9 @@ type BridgeNetworkDriver() =
                                 runPowershellWithArgs "Get-NetNat"
                                     [ "-Name", natName; "-ErrorAction", "SilentlyContinue" ]
                             not (String.IsNullOrWhiteSpace(result))
-                        with _ -> false
+                        with ex ->
+                            Log.Debug(ex, "Vérification du NAT {NatName} échouée, hypothèse : inexistant", natName)
+                            false
                     if not existingNat then
                         runPowershellWithArgs "New-NetNat"
                             [ "-Name", natName; "-InternalIPInterfaceAddressPrefix", actualSubnet ]

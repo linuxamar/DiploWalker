@@ -58,8 +58,12 @@ module GrpcClientFactory =
                 let t =
                     task {
                         let pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous)
-                        do! pipe.ConnectAsync(ct)
-                        return pipe :> Stream
+                        try
+                            do! pipe.ConnectAsync(ct)
+                            return pipe :> Stream
+                        with ex ->
+                            pipe.Dispose()
+                            return raise ex
                     }
                 ValueTask<Stream>(t))
         let handler = new SocketsHttpHandler()

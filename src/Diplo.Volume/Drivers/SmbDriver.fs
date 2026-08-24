@@ -19,22 +19,16 @@ type SmbDriver(dataRoot: string) =
         let password = opts |> Map.tryFind "password"
         match user, password with
         | Some user, Some password ->
-            let server = remotePath.TrimStart('\\') |> fun p -> p.Split('\\').[0]
-            try
-                ProcessExec.runUnit "cmdkey" [ "/add:" + server; "/user:" + user; "/pass:" + password ] (Some 30_000) None
-                try
-                    ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None
-                finally
-                    try ProcessExec.runUnit "cmdkey" [ "/delete:" + server ] (Some 30_000) None
-                    with _ -> ()
-            with _ -> reraise ()
+            // Le mot de passe est passé via stdin (pas en ligne de commande)
+            // pour éviter l'exposition via WMI/Task Manager.
+            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some ProcessExec.MountTimeoutMs) (Some (password + "\n"))
         | Some user, None ->
-            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some 30_000) None
+            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ] (Some ProcessExec.MountTimeoutMs) None
         | None, _ ->
-            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/persistent:no" ] (Some 30_000) None
+            ProcessExec.runUnit "net" [ "use"; targetPath; remotePath; "/persistent:no" ] (Some ProcessExec.MountTimeoutMs) None
 
     let unmountSmb (targetPath: string) =
-        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some 30_000) None
+        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some ProcessExec.MountTimeoutMs) None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =

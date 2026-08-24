@@ -6,7 +6,6 @@ open System.IO.Compression
 open System.Net.Http
 open System.Runtime.InteropServices
 open System.Security.Cryptography
-open System.ServiceProcess
 open System.Text.Json
 open System.Text.Json.Nodes
 open Diplo.Abstractions

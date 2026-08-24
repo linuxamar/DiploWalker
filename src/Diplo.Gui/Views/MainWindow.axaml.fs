@@ -19,7 +19,8 @@ type MainWindow() as this =
         let assembly = typeof<MainWindow>.Assembly
         let baseDir = AppContext.BaseDirectory
         for dll in Directory.GetFiles(baseDir, "Avalonia*.dll") do
-            try Assembly.LoadFrom(dll) |> ignore with _ -> ()
+            try Assembly.LoadFrom(dll) |> ignore
+            with ex -> Serilog.Log.Debug(ex, "Chargement de l'assembly {Dll} ignoré", Path.GetFileName(dll))
         use stream = assembly.GetManifestResourceStream("Diplo.Gui.Views.MainWindow.axaml")
         AvaloniaRuntimeXamlLoader.Load(stream, assembly, this) |> ignore
         use iconStream = assembly.GetManifestResourceStream("Diplo.Gui.Diplo.ico")

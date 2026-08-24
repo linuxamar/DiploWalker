@@ -15,7 +15,7 @@ type CloudGcpDriver(dataRoot: string) =
         | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'ipAddress' et 'volumeName' sont requises pour le driver GCP")))
 
     let mountNfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
-        ProcessExec.runUnit "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some 30_000) None
+        ProcessExec.runUnit "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some ProcessExec.MountTimeoutMs) None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =

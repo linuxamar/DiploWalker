@@ -52,11 +52,13 @@ module RemoteDriverHelpers =
         unmountFn targetPath
         (true, "Démonté")
 
-    /// Démontage NFS-like : umount → fallback mount -u → silencieux.
+    /// Démontage NFS-like : umount → fallback mount -u → error.
     let unmountNfsLike (targetPath: string) =
-        try ProcessExec.runUnit "umount" [ targetPath ] (Some 30_000) None
-        with _ -> try ProcessExec.runUnit "mount" [ "-u"; targetPath ] (Some 30_000) None
-                  with _ -> ()
+        try ProcessExec.runUnit "umount" [ targetPath ] (Some ProcessExec.MountTimeoutMs) None
+        with _ ->
+            try ProcessExec.runUnit "mount" [ "-u"; targetPath ] (Some ProcessExec.MountTimeoutMs) None
+            with ex ->
+                raise (RpcException(Status(StatusCode.Internal, sprintf "Impossible de démonter '%s': %s" targetPath ex.Message)))
 
     /// Prune cloud partagé : itère sur le store et supprime tous les volumes.
     let pruneCloudVolumes (store: RemoteVolumeStore) =
