@@ -106,6 +106,41 @@
                    Margin="0,0,0,4" PlaceholderText="commande à exécuter"/>
         </WrapPanel>
 
+        <!-- Séparateur -->
+        <Separator Margin="10,4,10,6"/>
+
+        <!-- Images -->
+        <WrapPanel Margin="10,0,0,6">
+          <TextBlock Text="Réf. image :" VerticalAlignment="Center" Margin="0,0,4,4"
+                     Opacity="0.7"/>
+          <TextBox Text="{Binding ContainerTab.ContainerImageRef}" Width="200"
+                   Margin="0,0,12,4" PlaceholderText="image:tag (inspect/remove/tag)"/>
+          <TextBlock Text="Cible :" VerticalAlignment="Center" Margin="0,0,4,4"
+                     Opacity="0.7"/>
+          <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200"
+                   Margin="0,0,12,4" PlaceholderText="nouveau:tag (tag)"/>
+          <Button Content="📋 Lister" Command="{Binding ContainerTab.ListImagesCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectImageCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.RemoveImageCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="🏷 Étiqueter" Command="{Binding ContainerTab.TagImageCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+        </WrapPanel>
+
+        <DataGrid ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
+                  IsReadOnly="True" GridLinesVisibility="Horizontal"
+                  CanUserResizeColumns="True" CanUserSortColumns="True"
+                  MaxHeight="200" Margin="10,0,10,4">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
+            <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
+            <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
+            <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
+          </DataGrid.Columns>
+        </DataGrid>
+
       </StackPanel>
     </DockPanel>
   </Border>

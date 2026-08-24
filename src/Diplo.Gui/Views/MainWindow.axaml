@@ -81,34 +81,6 @@
                         <uc:ContainerDetailUserControl Grid.Column="2" />
                     </Grid>
 
-                    <!-- Section Images (réduite) -->
-                    <Expander DockPanel.Dock="Bottom" Header="Images" Margin="0,4,0,0"
-                              IsExpanded="False">
-                        <DockPanel>
-                            <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                                <TextBlock Text="Réf. image :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
-                                <TextBox Text="{Binding ContainerTab.ContainerImageRef}" Width="200" Margin="0,0,12,0"
-                                         PlaceholderText="image:tag (inspect/remove/tag)" />
-                                <TextBlock Text="Cible :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
-                                <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200" Margin="0,0,12,0"
-                                         PlaceholderText="nouveau:tag (tag)" />
-                                <Button Content="📋 Lister" Command="{Binding ContainerTab.ListImagesCommand}" Margin="0,0,4,0" />
-                                <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectImageCommand}" Margin="0,0,4,0" />
-                                <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.RemoveImageCommand}" Margin="0,0,4,0" />
-                                <Button Content="🏷 Étiqueter" Command="{Binding ContainerTab.TagImageCommand}" />
-                            </WrapPanel>
-                            <DataGrid ItemsSource="{Binding ContainerTab.Images}" AutoGenerateColumns="False"
-                                      IsReadOnly="True" GridLinesVisibility="Horizontal"
-                                      CanUserResizeColumns="True" CanUserSortColumns="True">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Référentiel" Binding="{Binding Référentiel}" Width="280" />
-                                    <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
-                                    <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
-                                    <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="140" />
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </DockPanel>
-                    </Expander>
                 </DockPanel>
             </TabItem>
 
