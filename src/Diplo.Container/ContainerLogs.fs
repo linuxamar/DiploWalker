@@ -31,27 +31,42 @@ module ContainerLogs =
     /// en écriture : File.ReadAllLines (partage strict) lèverait IOException.
     let read (id: string) (tail: int) (since: string) =
         let file = fileFor id
-        if not (File.Exists file) then [||]
+
+        if not (File.Exists file) then
+            [||]
         else
-            use fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
+            use fs =
+                new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
+
             use reader = new StreamReader(fs)
             let text = reader.ReadToEnd()
+
             let lines =
-                if String.IsNullOrEmpty text then [||]
+                if String.IsNullOrEmpty text then
+                    [||]
                 else
                     text.Split('\n', StringSplitOptions.RemoveEmptyEntries)
                     |> Array.map (fun l -> l.TrimEnd('\r'))
+
             let lines =
-                if String.IsNullOrEmpty since then lines
-                else lines |> Array.skipWhile (fun l -> String.CompareOrdinal(l, since) < 0)
-            if tail > 0 && lines.Length > tail then lines.[lines.Length - tail..]
-            else lines
+                if String.IsNullOrEmpty since then
+                    lines
+                else
+                    lines |> Array.skipWhile (fun l -> String.CompareOrdinal(l, since) < 0)
+
+            if tail > 0 && lines.Length > tail then
+                lines.[lines.Length - tail ..]
+            else
+                lines
 
     /// Longueur actuelle (en octets) du journal d'un conteneur (0 si absent).
     let fileLength (id: string) =
         let file = fileFor id
-        if not (File.Exists file) then 0L
-        else (FileInfo(file)).Length
+
+        if not (File.Exists file) then
+            0L
+        else
+            (FileInfo(file)).Length
 
     /// Lit les lignes complètes ajoutées au journal depuis l'octet `fromOffset`.
     ///
@@ -60,28 +75,45 @@ module ContainerLogs =
     /// la relire lors d'un prochain appel une fois le délimiteur écrit.
     let readIncremental (id: string) (fromOffset: int64) : string array * int64 =
         let file = fileFor id
-        if not (File.Exists file) then [||], fromOffset
+
+        if not (File.Exists file) then
+            [||], fromOffset
         else
-            use fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
+            use fs =
+                new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
+
             let length = fs.Length
-            if length <= fromOffset then [||], fromOffset
+
+            if length <= fromOffset then
+                [||], fromOffset
             else
                 let count = int (length - fromOffset)
                 let buffer = Array.zeroCreate<byte> count
                 fs.Position <- fromOffset
                 let mutable total = 0
+
                 while total < count do
                     let r = fs.Read(buffer, total, count - total)
-                    if r <= 0 then failwith "Lecture tronquée du journal"
+
+                    if r <= 0 then
+                        failwith "Lecture tronquée du journal"
+
                     total <- total + r
                 // index (en octets, relatif à fromOffset) du dernier délimiteur de ligne
                 let mutable lastNl = -1
+
                 for i in count - 1 .. -1 .. 0 do
-                    if lastNl < 0 && (buffer.[i] = 0x0Auy || buffer.[i] = 0x0Duy) then lastNl <- i
+                    if lastNl < 0 && (buffer.[i] = 0x0Auy || buffer.[i] = 0x0Duy) then
+                        lastNl <- i
+
                 if lastNl < 0 then
                     [||], fromOffset
                 else
                     let consumed = fromOffset + int64 (lastNl + 1)
                     let text = System.Text.Encoding.UTF8.GetString(buffer, 0, lastNl + 1)
-                    let lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries) |> Array.map (fun l -> l.TrimEnd('\r'))
+
+                    let lines =
+                        text.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                        |> Array.map (fun l -> l.TrimEnd('\r'))
+
                     lines, consumed

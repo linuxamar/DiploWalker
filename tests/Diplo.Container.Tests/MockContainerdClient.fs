@@ -29,15 +29,21 @@ type MockContainerdClient() =
     let createLabelsJson (labels: Map<string, string>) =
         let sb = System.Text.StringBuilder()
         sb.Append("{") |> ignore
+
         for i, (k, v) in labels |> Map.toList |> List.indexed do
-            if i > 0 then sb.Append(",") |> ignore
+            if i > 0 then
+                sb.Append(",") |> ignore
+
             sb.AppendFormat("\"{0}\":\"{1}\"", k, v) |> ignore
+
         sb.Append("}") |> ignore
         let doc = JsonDocument.Parse(sb.ToString()) |> keepDoc
         doc.RootElement
 
     interface IContainerdClient with
-        member _.CreateContainer(_namespaceName, id, image, _labels, _env, _command, _args, _memoryLimit, _cpuShares, _pidLimit, mounts) =
+        member _.CreateContainer
+            (_namespaceName, id, image, _labels, _env, _command, _args, _memoryLimit, _cpuShares, _pidLimit, mounts)
+            =
             containers <- containers |> Map.add id (Map.ofList [ "image", image; "id", id ])
             recordedMounts <- recordedMounts |> Map.add id mounts
             id
@@ -55,8 +61,17 @@ type MockContainerdClient() =
 
         member _.InspectContainer(_namespaceName, id) =
             let labelsJson = createLabelsJson (Map.ofList [ "app", "test"; "env", "dev" ])
-            let envJson = createLabelsJson (Map.ofList [ "ASPNETCORE_ENVIRONMENT", "Development" ])
-            let json = sprintf """{"id":"%s","image":"mcr.microsoft.com/dotnet/runtime:10.0","created_at":"2025-01-15T10:30:00Z","exit_code":0,"labels":%s,"env":%s}""" id (labelsJson.GetRawText()) (envJson.GetRawText())
+
+            let envJson =
+                createLabelsJson (Map.ofList [ "ASPNETCORE_ENVIRONMENT", "Development" ])
+
+            let json =
+                sprintf
+                    """{"id":"%s","image":"mcr.microsoft.com/dotnet/runtime:10.0","created_at":"2025-01-15T10:30:00Z","exit_code":0,"labels":%s,"env":%s}"""
+                    id
+                    (labelsJson.GetRawText())
+                    (envJson.GetRawText())
+
             let doc = JsonDocument.Parse(json) |> keepDoc
             doc.RootElement
 
@@ -65,7 +80,9 @@ type MockContainerdClient() =
                 let doc = JsonDocument.Parse(sprintf """{"pid":0,"status":"stopped"}""") |> keepDoc
                 doc.RootElement
             elif startedContainers |> Set.contains id then
-                let doc = JsonDocument.Parse(sprintf """{"pid":1234,"status":"running"}""") |> keepDoc
+                let doc =
+                    JsonDocument.Parse(sprintf """{"pid":1234,"status":"running"}""") |> keepDoc
+
                 doc.RootElement
             else
                 let doc = JsonDocument.Parse(sprintf """{"pid":0,"status":"created"}""") |> keepDoc
@@ -80,15 +97,23 @@ type MockContainerdClient() =
 
         member _.GetContainerLogsStream(_namespaceName, _id, _tail, _since, _ct) =
             let mutable yielded = false
+
             { new System.Collections.Generic.IAsyncEnumerable<string> with
                 member _.GetAsyncEnumerator(_ct) =
                     { new System.Collections.Generic.IAsyncEnumerator<string> with
-                        member _.Current = if yielded then "2025-01-15T10:30:02Z Listening on port 8080" else "2025-01-15T10:30:01Z Application started"
+                        member _.Current =
+                            if yielded then
+                                "2025-01-15T10:30:02Z Listening on port 8080"
+                            else
+                                "2025-01-15T10:30:01Z Application started"
+
                         member _.MoveNextAsync() =
-                            if yielded then ValueTask<bool>(false)
+                            if yielded then
+                                ValueTask<bool>(false)
                             else
                                 yielded <- true
                                 ValueTask<bool>(true)
+
                         member _.DisposeAsync() = ValueTask() } }
 
         member _.ExecInContainer(_namespaceName, _id, command) =
@@ -97,8 +122,7 @@ type MockContainerdClient() =
             else
                 sprintf "Output of: %s" (command |> String.concat " ")
 
-        member _.Version() =
-            "1.7.27 (revision: abc123)"
+        member _.Version() = "1.7.27 (revision: abc123)"
 
         member _.PullImage(image, _userArg) =
             pulledImages <- pulledImages |> Set.add image
@@ -106,24 +130,37 @@ type MockContainerdClient() =
 
         member _.Namespaces() = [ "default"; "moby" ]
 
-        member _.RenameContainer(_namespaceName, id, _newName) =
-            ()
+        member _.RenameContainer(_namespaceName, id, _newName) = ()
 
-        member _.TopContainer(_namespaceName, _id) =
-            "1234 root dotnet app.dll"
+        member _.TopContainer(_namespaceName, _id) = "1234 root dotnet app.dll"
 
         member _.GetContainerStats(_namespaceName, _id) =
-            JsonDocument.Parse("""{"cpu":{"usage":123456},"memory":{"usage":1048576,"limit":536870912},"pids":{"current":3}}""").RootElement
+            JsonDocument
+                .Parse("""{"cpu":{"usage":123456},"memory":{"usage":1048576,"limit":536870912},"pids":{"current":3}}""")
+                .RootElement
 
         member _.ListImages(_namespaceName) =
-            [
-                JsonDocument.Parse("""{"id":"nginx:latest","ref":"docker.io/library/nginx:latest","repository":"library/nginx","tag":"latest","size":18567432,"created_at":"2025-01-10T08:00:00Z"}""").RootElement
-                JsonDocument.Parse("""{"id":"redis:7","ref":"docker.io/library/redis:7","repository":"library/redis","tag":"7","size":138670845,"created_at":"2025-01-05T12:00:00Z"}""").RootElement
-            ]
+            [ JsonDocument
+                  .Parse(
+                      """{"id":"nginx:latest","ref":"docker.io/library/nginx:latest","repository":"library/nginx","tag":"latest","size":18567432,"created_at":"2025-01-10T08:00:00Z"}"""
+                  )
+                  .RootElement
+              JsonDocument
+                  .Parse(
+                      """{"id":"redis:7","ref":"docker.io/library/redis:7","repository":"library/redis","tag":"7","size":138670845,"created_at":"2025-01-05T12:00:00Z"}"""
+                  )
+                  .RootElement ]
 
         member _.InspectImage(_namespaceName, imageRef) =
             let repo = imageRef.Split([| ':' |]).[0]
-            let json = sprintf """{"id":"%s","ref":"%s","repository":"library/%s","tag":"latest","size":18567432,"created_at":"2025-01-10T08:00:00Z","labels":{"maintainer":"nginx"}}""" imageRef imageRef repo
+
+            let json =
+                sprintf
+                    """{"id":"%s","ref":"%s","repository":"library/%s","tag":"latest","size":18567432,"created_at":"2025-01-10T08:00:00Z","labels":{"maintainer":"nginx"}}"""
+                    imageRef
+                    imageRef
+                    repo
+
             let doc = JsonDocument.Parse(json) |> keepDoc
             doc.RootElement
 
@@ -131,8 +168,7 @@ type MockContainerdClient() =
             removedImages <- removedImages |> Set.add imageRef
             sprintf "Image %s supprimée" imageRef
 
-        member _.TagImage(_namespaceName, _source, _target) =
-            ()
+        member _.TagImage(_namespaceName, _source, _target) = ()
 
         member _.StartContainerWithLogs(_namespaceName, id, logFile) =
             startedContainers <- startedContainers |> Set.add id
@@ -168,7 +204,7 @@ type MockContainerdClient() =
             stdin.CopyTo(stdout)
             0
 
-    member this.Mock : IContainerdClient = this :> IContainerdClient
+    member this.Mock: IContainerdClient = this :> IContainerdClient
     member _.StopCalled = stopCalled
     member _.StoppedContainers = stoppedContainers
     member _.DeletedContainers = deletedContainers

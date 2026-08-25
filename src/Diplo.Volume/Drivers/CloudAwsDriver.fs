@@ -12,10 +12,22 @@ type CloudAwsDriver(dataRoot: string) =
     let buildEfsPath (driverOpts: Map<string, string>) =
         match driverOpts |> Map.tryFind "fsId", driverOpts |> Map.tryFind "region" with
         | Some fsId, Some region -> sprintf "%s.efs.%s.amazonaws.com:/" fsId region
-        | _ -> raise (RpcException(Status(StatusCode.InvalidArgument, "Les options 'fsId' et 'region' sont requises pour le driver AWS")))
+        | _ ->
+            raise (
+                RpcException(
+                    Status(
+                        StatusCode.InvalidArgument,
+                        "Les options 'fsId' et 'region' sont requises pour le driver AWS"
+                    )
+                )
+            )
 
     let mountEfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
-        ProcessExec.runUnit "mount" [ "-o"; "nfsvers=4.1"; remotePath; targetPath ] (Some ProcessExec.MountTimeoutMs) None
+        ProcessExec.runUnit
+            "mount"
+            [ "-o"; "nfsvers=4.1"; remotePath; targetPath ]
+            (Some ProcessExec.MountTimeoutMs)
+            None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =
@@ -33,4 +45,5 @@ type CloudAwsDriver(dataRoot: string) =
         member _.UnmountVolume(id, targetPath) =
             RemoteDriverHelpers.unmountVolume id targetPath RemoteDriverHelpers.unmountNfsLike
 
-        member _.PruneVolumes() = RemoteDriverHelpers.pruneCloudVolumes store
+        member _.PruneVolumes() =
+            RemoteDriverHelpers.pruneCloudVolumes store

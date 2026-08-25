@@ -22,7 +22,12 @@ module ProcessExec =
     /// Exécute `fileName` avec `args` et renvoie `(code, stdout, stderr)`.
     /// `input` (Some texte) alimente l'entrée standard ; `timeoutMs` borne la
     /// durée totale (None = 60 s) et déclenche un `Kill` en cas de dépassement.
-    let runWithResult (fileName: string) (args: seq<string>) (timeoutMs: int option) (input: string option) : int * string * string =
+    let runWithResult
+        (fileName: string)
+        (args: seq<string>)
+        (timeoutMs: int option)
+        (input: string option)
+        : int * string * string =
         let timeout = timeoutMsOr timeoutMs
         let psi = ProcessStartInfo()
         psi.FileName <- fileName
@@ -30,32 +35,46 @@ module ProcessExec =
         psi.RedirectStandardError <- true
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
+
         match input with
         | Some _ -> psi.RedirectStandardInput <- true
         | None -> ()
+
         for arg in args do
             psi.ArgumentList.Add(arg) |> ignore
+
         use proc = Process.Start(psi)
+
         if isNull proc then
             failwithf "Impossible de démarrer le processus '%s'" fileName
+
         let stdoutRead = proc.StandardOutput.ReadToEndAsync()
         let stderrRead = proc.StandardError.ReadToEndAsync()
+
         match input with
         | Some text ->
             proc.StandardInput.Write(text)
             proc.StandardInput.Close()
         | None -> ()
+
         let exited = proc.WaitForExitAsync()
         let completed = Task.WhenAny(exited, Task.Delay(timeout)).GetAwaiter().GetResult()
+
         if completed <> exited then
-            try proc.Kill(true) with _ -> ()
+            try
+                proc.Kill(true)
+            with _ ->
+                ()
             // Lectures interrompues par le Kill : on les laisse se terminer pour
             // éviter une exception de disposition sur le Process.
             try
                 stdoutRead.GetAwaiter().GetResult() |> ignore
                 stderrRead.GetAwaiter().GetResult() |> ignore
-            with _ -> ()
+            with _ ->
+                ()
+
             raise (TimeoutException(sprintf "Délai d'attente dépassé pour '%s' (%dms)" fileName timeout))
+
         let stdout = stdoutRead.GetAwaiter().GetResult()
         let stderr = stderrRead.GetAwaiter().GetResult()
         (proc.ExitCode, stdout, stderr)
@@ -65,9 +84,16 @@ module ProcessExec =
     /// est jointe au message). Paramètres comme `runWithResult`.
     let run (fileName: string) (args: seq<string>) (timeoutMs: int option) (input: string option) : string =
         let code, stdout, stderr = runWithResult fileName args timeoutMs input
+
         if code <> 0 then
-            let detail = if String.IsNullOrWhiteSpace stderr then "" else " " + stderr.Trim()
+            let detail =
+                if String.IsNullOrWhiteSpace stderr then
+                    ""
+                else
+                    " " + stderr.Trim()
+
             raise (InvalidOperationException(sprintf "La commande '%s' a échoué (code %d):%s" fileName code detail))
+
         stdout
 
     /// Exécute sans retourner la sortie (usage montage/démontage).
@@ -83,22 +109,37 @@ module ProcessExec =
 
     /// Exécute un script PowerShell encodé avec les paramètres nomméss.
     /// Partagé par runPowerShell et runPowerShellScript.
-    let private runEncodedScript (scriptBody: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
+    let private runEncodedScript
+        (scriptBody: string)
+        (parameters: (string * string) list)
+        (timeoutMs: int option)
+        : string =
         let timeout = timeoutMsOr timeoutMs
+
         let script =
             let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
             sprintf "{ param(%s) %s }" (paramNames |> String.concat ", ") scriptBody
+
         let encoded = encodeScript script
+
         let args =
             [ yield "-NoProfile"
               yield "-NonInteractive"
               yield "-EncodedCommand"
               yield encoded ]
+
         let input = parameters |> List.map snd |> String.concat "\n" |> Some
         let code, stdout, stderr = runWithResult "powershell" args (Some timeout) input
+
         if code <> 0 then
-            let detail = if String.IsNullOrWhiteSpace stderr then "" else " " + stderr.Trim()
+            let detail =
+                if String.IsNullOrWhiteSpace stderr then
+                    ""
+                else
+                    " " + stderr.Trim()
+
             raise (InvalidOperationException(sprintf "PowerShell a échoué (code %d):%s" code detail))
+
         stdout
 
     /// Exécute une commande PowerShell avec les paramètres spécifiés.
@@ -106,7 +147,14 @@ module ProcessExec =
     let runPowerShell (command: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
         let scriptBody =
             let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
-            sprintf "%s -%s" command (parameters |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i]) |> String.concat " -")
+
+            sprintf
+                "%s -%s"
+                command
+                (parameters
+                 |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i])
+                 |> String.concat " -")
+
         runEncodedScript scriptBody parameters timeoutMs
 
     /// Exécute un script PowerShell brut avec des paramètres nommés.

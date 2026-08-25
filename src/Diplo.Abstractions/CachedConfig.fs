@@ -3,7 +3,7 @@ namespace Diplo.Abstractions
 /// Cache générique avec invalidation manuelle, protégé par un verrou.
 /// Fournit un chargement paresseux (lazy) avec relecture à la demande.
 type CachedConfig<'T>(loader: unit -> 'T) =
-    let cacheLock = obj()
+    let cacheLock = obj ()
     let mutable cacheValue: 'T option = None
 
     /// Lit la valeur cache ; charge via `loader` si absent.
@@ -28,5 +28,4 @@ type CachedConfig<'T>(loader: unit -> 'T) =
             value)
 
     /// Indique si une valeur est actuellement en cache.
-    member _.IsCached =
-        lock cacheLock (fun () -> cacheValue.IsSome)
+    member _.IsCached = lock cacheLock (fun () -> cacheValue.IsSome)

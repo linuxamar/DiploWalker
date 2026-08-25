@@ -29,8 +29,7 @@ module DiploJson =
         o.MaxDepth <- maxDepth
         o
 
-    let documentOptions =
-        JsonDocumentOptions(MaxDepth = 64)
+    let documentOptions = JsonDocumentOptions(MaxDepth = 64)
 
     let withMaxDepthDoc (maxDepth: int) =
         JsonDocumentOptions(MaxDepth = maxDepth)

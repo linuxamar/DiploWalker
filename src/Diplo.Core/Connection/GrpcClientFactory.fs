@@ -43,8 +43,11 @@ module GrpcClientFactory =
         serviceConfig
 
     let private buildCredentials () =
-        let callCredentials = TokenInterceptor.createTokenCredentials()
-        let channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
+        let callCredentials = TokenInterceptor.createTokenCredentials ()
+
+        let channelCredentials =
+            ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
+
         let options = GrpcChannelOptions()
         options.Credentials <- channelCredentials
         options.UnsafeUseInsecureChannelCallCredentials <- true
@@ -53,11 +56,14 @@ module GrpcClientFactory =
 
     let private createPipeChannel (pipeName: string) =
         let options, _ = buildCredentials ()
+
         let connectCallback =
             Func<SocketsHttpConnectionContext, CancellationToken, ValueTask<Stream>>(fun _ ct ->
                 let t =
                     task {
-                        let pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous)
+                        let pipe =
+                            new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous)
+
                         try
                             do! pipe.ConnectAsync(ct)
                             return pipe :> Stream
@@ -65,7 +71,9 @@ module GrpcClientFactory =
                             pipe.Dispose()
                             return raise ex
                     }
+
                 ValueTask<Stream>(t))
+
         let handler = new SocketsHttpHandler()
         handler.ConnectCallback <- connectCallback
         handler.UseProxy <- false
@@ -80,6 +88,7 @@ module GrpcClientFactory =
     let private create (address: string) =
         SecurityValidation.validateGrpcAddress address
         let uri = Uri(address)
+
         if isPipeAddress uri then
             createPipeChannel (uri.PathAndQuery.TrimStart('/'))
         else
@@ -94,6 +103,9 @@ module GrpcClientFactory =
         match configAddress with
         | Some address -> forAddress address
         | None ->
-            if defaultPort = DefaultVolumePort then forVolume defaultPort
-            elif defaultPort = DefaultNetworkPort then forNetwork defaultPort
-            else forContainer defaultPort
+            if defaultPort = DefaultVolumePort then
+                forVolume defaultPort
+            elif defaultPort = DefaultNetworkPort then
+                forNetwork defaultPort
+            else
+                forContainer defaultPort

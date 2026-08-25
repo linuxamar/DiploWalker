@@ -12,17 +12,14 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateCommand avec commande vide lève une exception`` () =
-        (fun () -> validateCommand [||])
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand [||]) |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCommand avec null lève une exception`` () =
-        (fun () -> validateCommand null)
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand null) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec commande simple valide passe`` () =
-        validateCommand [| "ls" |]
+    let ``validateCommand avec commande simple valide passe`` () = validateCommand [| "ls" |]
 
     [<Fact>]
     let ``validateCommand avec arguments multiples valide passe`` () =
@@ -31,28 +28,23 @@ module SecurityValidationTests =
     [<Fact>]
     let ``validateCommand avec plus de 64 arguments lève une exception`` () =
         let args = Array.init 65 (fun i -> sprintf "arg%d" i)
-        (fun () -> validateCommand args)
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand args) |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCommand avec caractère point-virgule lève une exception`` () =
-        (fun () -> validateCommand [| "ls;rm" |])
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand [| "ls;rm" |]) |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCommand avec pipe lève une exception`` () =
-        (fun () -> validateCommand [| "ls|cat" |])
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand [| "ls|cat" |]) |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCommand avec backtick lève une exception`` () =
-        (fun () -> validateCommand [| "`whoami`" |])
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand [| "`whoami`" |]) |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCommand avec variable PATH interdite lève une exception`` () =
-        (fun () -> validateCommand [| "%PATH%" |])
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand [| "%PATH%" |]) |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCommand avec variable WINDIR interdite lève une exception`` () =
@@ -72,8 +64,7 @@ module SecurityValidationTests =
     [<Fact>]
     let ``validateCommand avec argument trop long lève une exception`` () =
         let longArg = String('a', 1025)
-        (fun () -> validateCommand [| longArg |])
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand [| longArg |]) |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCommand avec espace dans argument passe`` () =
@@ -87,47 +78,38 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateCommand avec redirection lève une exception`` () =
-        (fun () -> validateCommand [| "ls>out.txt" |])
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand [| "ls>out.txt" |]) |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCommand avec parenthèse lève une exception`` () =
-        (fun () -> validateCommand [| "ls(" |])
-        |> should throw typeof<Exception>
+        (fun () -> validateCommand [| "ls(" |]) |> should throw typeof<Exception>
 
     // ── validateCidr ────────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateCidr avec vide ne lève pas d'exception`` () =
-        validateCidr "" "test"
+    let ``validateCidr avec vide ne lève pas d'exception`` () = validateCidr "" "test"
 
     [<Fact>]
-    let ``validateCidr avec CIDR valide passe`` () =
-        validateCidr "192.168.1.0/24" "test"
+    let ``validateCidr avec CIDR valide passe`` () = validateCidr "192.168.1.0/24" "test"
 
     [<Fact>]
-    let ``validateCidr avec IP seule passe`` () =
-        validateCidr "10.0.0.1" "test"
+    let ``validateCidr avec IP seule passe`` () = validateCidr "10.0.0.1" "test"
 
     [<Fact>]
     let ``validateCidr avec octet > 255 lève une exception`` () =
-        (fun () -> validateCidr "256.0.0.1/24" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateCidr "256.0.0.1/24" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCidr avec octet négatif lève une exception`` () =
-        (fun () -> validateCidr "-1.0.0.1/24" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateCidr "-1.0.0.1/24" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCidr avec masque > 32 lève une exception`` () =
-        (fun () -> validateCidr "10.0.0.1/33" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateCidr "10.0.0.1/33" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCidr avec masque négatif lève une exception`` () =
-        (fun () -> validateCidr "10.0.0.1/-1" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateCidr "10.0.0.1/-1" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCidr avec trop de parties lève une exception`` () =
@@ -136,30 +118,24 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateCidr avec IP incomplète lève une exception`` () =
-        (fun () -> validateCidr "192.168.1" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateCidr "192.168.1" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCidr avec masque 0 est valide`` () =
-        validateCidr "10.0.0.0/0" "test"
+    let ``validateCidr avec masque 0 est valide`` () = validateCidr "10.0.0.0/0" "test"
 
     [<Fact>]
-    let ``validateCidr avec masque 32 est valide`` () =
-        validateCidr "10.0.0.1/32" "test"
+    let ``validateCidr avec masque 32 est valide`` () = validateCidr "10.0.0.1/32" "test"
 
     // ── validateIp ──────────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateIp avec vide ne lève pas d'exception`` () =
-        validateIp "" "test"
+    let ``validateIp avec vide ne lève pas d'exception`` () = validateIp "" "test"
 
     [<Fact>]
-    let ``validateIp avec IP valide passe`` () =
-        validateIp "192.168.1.1" "test"
+    let ``validateIp avec IP valide passe`` () = validateIp "192.168.1.1" "test"
 
     [<Fact>]
-    let ``validateIp avec 127.0.0.1 valide passe`` () =
-        validateIp "127.0.0.1" "test"
+    let ``validateIp avec 127.0.0.1 valide passe`` () = validateIp "127.0.0.1" "test"
 
     [<Fact>]
     let ``validateIp avec octet > 255 lève une exception`` () =
@@ -168,24 +144,20 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateIp avec 3 parties lève une exception`` () =
-        (fun () -> validateIp "192.168.1" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateIp "192.168.1" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateIp avec 5 parties lève une exception`` () =
-        (fun () -> validateIp "1.2.3.4.5" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateIp "1.2.3.4.5" "test") |> should throw typeof<Exception>
 
     // ── validateContainerId ──────────────────────────────────────────
 
     [<Fact>]
     let ``validateContainerId avec vide lève une exception`` () =
-        (fun () -> validateContainerId "")
-        |> should throw typeof<Exception>
+        (fun () -> validateContainerId "") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateContainerId avec hex valide passe`` () =
-        validateContainerId "abc123def456"
+    let ``validateContainerId avec hex valide passe`` () = validateContainerId "abc123def456"
 
     [<Fact>]
     let ``validateContainerId avec GUID valide passe`` () =
@@ -218,14 +190,12 @@ module SecurityValidationTests =
     [<Fact>]
     let ``validateContainerId trop long lève une exception`` () =
         let longId = String('a', 129)
-        (fun () -> validateContainerId longId)
-        |> should throw typeof<Exception>
+        (fun () -> validateContainerId longId) |> should throw typeof<Exception>
 
     // ── validateLabel ───────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateLabel avec clé et valeur valides passe`` () =
-        validateLabel "app" "my-app"
+    let ``validateLabel avec clé et valeur valides passe`` () = validateLabel "app" "my-app"
 
     [<Fact>]
     let ``validateLabel avec clé interdite lève une exception`` () =
@@ -244,34 +214,27 @@ module SecurityValidationTests =
     // ── validateCniCommand ──────────────────────────────────────────
 
     [<Fact>]
-    let ``validateCniCommand avec ADD valide passe`` () =
-        validateCniCommand "ADD"
+    let ``validateCniCommand avec ADD valide passe`` () = validateCniCommand "ADD"
 
     [<Fact>]
-    let ``validateCniCommand avec DEL valide passe`` () =
-        validateCniCommand "DEL"
+    let ``validateCniCommand avec DEL valide passe`` () = validateCniCommand "DEL"
 
     [<Fact>]
-    let ``validateCniCommand avec CHECK valide passe`` () =
-        validateCniCommand "CHECK"
+    let ``validateCniCommand avec CHECK valide passe`` () = validateCniCommand "CHECK"
 
     [<Fact>]
-    let ``validateCniCommand avec VERSION valide passe`` () =
-        validateCniCommand "VERSION"
+    let ``validateCniCommand avec VERSION valide passe`` () = validateCniCommand "VERSION"
 
     [<Fact>]
-    let ``validateCniCommand avec add en minuscule passe (case insensitive)`` () =
-        validateCniCommand "add"
+    let ``validateCniCommand avec add en minuscule passe (case insensitive)`` () = validateCniCommand "add"
 
     [<Fact>]
     let ``validateCniCommand avec commande inconnue lève une exception`` () =
-        (fun () -> validateCniCommand "EXEC")
-        |> should throw typeof<Exception>
+        (fun () -> validateCniCommand "EXEC") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateCniCommand avec vide lève une exception`` () =
-        (fun () -> validateCniCommand "")
-        |> should throw typeof<Exception>
+        (fun () -> validateCniCommand "") |> should throw typeof<Exception>
 
     // ── validateGrpcAddress ─────────────────────────────────────────
 
@@ -284,8 +247,7 @@ module SecurityValidationTests =
         validateGrpcAddress "http://127.0.0.1:5000"
 
     [<Fact>]
-    let ``validateGrpcAddress avec ::1 passe`` () =
-        validateGrpcAddress "http://[::1]:5000"
+    let ``validateGrpcAddress avec ::1 passe`` () = validateGrpcAddress "http://[::1]:5000"
 
     [<Fact>]
     let ``validateGrpcAddress avec https localhost passe`` () =
@@ -303,8 +265,7 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateGrpcAddress avec vide lève une exception`` () =
-        (fun () -> validateGrpcAddress "")
-        |> should throw typeof<Exception>
+        (fun () -> validateGrpcAddress "") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateGrpcAddress avec schéma ftp lève une exception`` () =
@@ -313,8 +274,7 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateGrpcAddress avec URL invalide lève une exception`` () =
-        (fun () -> validateGrpcAddress "not-a-url")
-        |> should throw typeof<Exception>
+        (fun () -> validateGrpcAddress "not-a-url") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateGrpcAddress avec adresse pipe valide passe`` () =
@@ -343,8 +303,7 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validatePath avec vide lève une exception`` () =
-        (fun () -> validatePath "" "/tmp" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validatePath "" "/tmp" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validatePath avec traversée .. lève une exception`` () =
@@ -357,8 +316,11 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validatePath qui sort du répertoire de base lève une exception`` () =
-        let baseDir = IO.Path.Combine(IO.Path.GetTempPath(), "diplo-test-" + Guid.NewGuid().ToString("N"))
+        let baseDir =
+            IO.Path.Combine(IO.Path.GetTempPath(), "diplo-test-" + Guid.NewGuid().ToString("N"))
+
         IO.Directory.CreateDirectory(baseDir) |> ignore
+
         try
             (fun () -> validatePath @"C:\Windows\System32\cmd.exe" baseDir "test")
             |> should throw typeof<Exception>
@@ -373,7 +335,14 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateCniPluginPath avec chemin dans répertoire autorisé retourne le chemin résolu`` () =
-        let allowedDir = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "containerd", "cni", "bin")
+        let allowedDir =
+            IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "containerd",
+                "cni",
+                "bin"
+            )
+
         let path = IO.Path.Combine(allowedDir, "bridge.exe")
         let result = validateCniPluginPath path
         result |> should not' (be NullOrEmptyString)
@@ -392,8 +361,7 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateVolumePath avec vide lève une exception`` () =
-        (fun () -> validateVolumePath "" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateVolumePath "" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateVolumePath avec traversée .. lève une exception`` () =
@@ -409,12 +377,10 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateName avec vide lève une exception`` () =
-        (fun () -> validateName "" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateName "" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateName valide passe`` () =
-        validateName "my-network" "test"
+    let ``validateName valide passe`` () = validateName "my-network" "test"
 
     [<Fact>]
     let ``validateName avec caractères interdits lève une exception`` () =
@@ -422,52 +388,43 @@ module SecurityValidationTests =
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateName avec points et tirets passe`` () =
-        validateName "test.name_v1" "test"
+    let ``validateName avec points et tirets passe`` () = validateName "test.name_v1" "test"
 
     [<Fact>]
     let ``validateName trop long lève une exception`` () =
         let longName = String('a', 65)
-        (fun () -> validateName longName "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateName longName "test") |> should throw typeof<Exception>
 
     // ── validateId ──────────────────────────────────────────────────
 
     [<Fact>]
     let ``validateId avec vide lève une exception`` () =
-        (fun () -> validateId "" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateId "" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateId valide passe`` () =
-        validateId "abc-123_def" "test"
+    let ``validateId valide passe`` () = validateId "abc-123_def" "test"
 
     [<Fact>]
     let ``validateId avec caractères interdits lève une exception`` () =
-        (fun () -> validateId "id;injection" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateId "id;injection" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateId avec espace lève une exception`` () =
-        (fun () -> validateId "id with space" "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateId "id with space" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateId trop long lève une exception`` () =
         let longId = String('a', 129)
-        (fun () -> validateId longId "test")
-        |> should throw typeof<Exception>
+        (fun () -> validateId longId "test") |> should throw typeof<Exception>
 
     // ── validateImage ───────────────────────────────────────────────
 
     [<Fact>]
     let ``validateImage avec vide lève une exception`` () =
-        (fun () -> validateImage "")
-        |> should throw typeof<Exception>
+        (fun () -> validateImage "") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateImage avec nom simple valide passe`` () =
-        validateImage "nginx"
+    let ``validateImage avec nom simple valide passe`` () = validateImage "nginx"
 
     [<Fact>]
     let ``validateImage avec registry et tag valide passe`` () =
@@ -475,15 +432,12 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateImage avec caractères interdits lève une exception`` () =
-        (fun () -> validateImage "image;rm -rf /")
-        |> should throw typeof<Exception>
+        (fun () -> validateImage "image;rm -rf /") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateImage avec digest valide passe`` () =
-        validateImage "nginx@sha256:abc123"
+    let ``validateImage avec digest valide passe`` () = validateImage "nginx@sha256:abc123"
 
     [<Fact>]
     let ``validateImage trop long lève une exception`` () =
         let longImage = String('a', 513)
-        (fun () -> validateImage longImage)
-        |> should throw typeof<Exception>
+        (fun () -> validateImage longImage) |> should throw typeof<Exception>

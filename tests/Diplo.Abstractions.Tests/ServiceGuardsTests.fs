@@ -27,8 +27,7 @@ type ServiceGuardsTests() =
         |> should throw typeof<RpcException>
 
     [<Fact>]
-    let ``requirePositive ne lève pas si positif`` () =
-        ServiceGuards.requirePositive 5 "Port"
+    let ``requirePositive ne lève pas si positif`` () = ServiceGuards.requirePositive 5 "Port"
 
     [<Fact>]
     let ``requirePositive lève si zero`` () =
@@ -73,8 +72,7 @@ type ServiceGuardsTests() =
         |> should throw typeof<RpcException>
 
     [<Fact>]
-    let ``requireContainerId ne lève pas si identifiant valide`` () =
-        ServiceGuards.requireContainerId "c-1"
+    let ``requireContainerId ne lève pas si identifiant valide`` () = ServiceGuards.requireContainerId "c-1"
 
     [<Fact>]
     let ``requireContainerId lève si identifiant vide`` () =

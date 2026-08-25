@@ -50,7 +50,10 @@ module TestImage =
         let refcountsPerBlock = 2048
         let dataClusters = virtualSize / clusterSize
         let usedClusters = dataClusters + 12L
-        let blocks = int ((usedClusters + int64 refcountsPerBlock - 1L) / int64 refcountsPerBlock)
+
+        let blocks =
+            int ((usedClusters + int64 refcountsPerBlock - 1L) / int64 refcountsPerBlock)
+
         let firstBlockCluster = 3L
 
         use fs = new FileStream(path, FileMode.Create, FileAccess.Write)
@@ -73,15 +76,19 @@ module TestImage =
         fs.Write(l1, 0, l1.Length)
 
         let refcountTable = Array.zeroCreate<byte> 4096
+
         for i in 0 .. blocks - 1 do
             putBe64 refcountTable (i * 8) ((firstBlockCluster + int64 i) * clusterSize)
+
         fs.Write(refcountTable, 0, refcountTable.Length)
 
         for i in 0 .. blocks - 1 do
             let block = Array.zeroCreate<byte> 4096
+
             if i = 0 then
-                for n in 0 .. 11 do
+                for n in 0..11 do
                     putBe16 block (n * 2) 1
+
             fs.Write(block, 0, block.Length)
 
     /// Écrit le contenu (chemin relatif, contenu texte) dans un système de
@@ -89,8 +96,10 @@ module TestImage =
     let private writeContents (fat: FatFileSystem) (contents: (string * string) list) =
         for (relPath, content) in contents do
             let parent = Path.GetDirectoryName(relPath)
+
             if not (String.IsNullOrEmpty parent) && not (fat.DirectoryExists parent) then
                 fat.CreateDirectory(parent)
+
             use w = fat.OpenFile(relPath, FileMode.Create, FileAccess.ReadWrite)
             use sw = new StreamWriter(w)
             sw.Write(content)
@@ -111,7 +120,10 @@ module TestImage =
     let createQcow2WithSize (path: string) (virtualSizeMb: int64) (contents: (string * string) list) =
         writeQcow2Skeleton path (virtualSizeMb * 1024L * 1024L)
         use stream = new Qcow2TestStream(path, FileAccess.ReadWrite)
-        use disk = Raw.Disk.Initialize(stream, Ownership.None, virtualSizeMb * 1024L * 1024L)
+
+        use disk =
+            Raw.Disk.Initialize(stream, Ownership.None, virtualSizeMb * 1024L * 1024L)
+
         BiosPartitionTable.Initialize(disk, WellKnownPartitionType.WindowsFat) |> ignore
         use fat = FatFileSystem.FormatPartition(disk, 0, "DIPLO")
         writeContents fat contents
@@ -119,8 +131,7 @@ module TestImage =
     /// Crée une image disque qcow2 (version 2) contenant un système de
     /// fichiers FAT 64 Mo formaté via DiscUtils, puis y écrit le contenu
     /// (chemin relatif, contenu texte) fourni.
-    let createQcow2 (path: string) (contents: (string * string) list) =
-        createQcow2WithSize path 64L (contents)
+    let createQcow2 (path: string) (contents: (string * string) list) = createQcow2WithSize path 64L (contents)
 
     /// Crée une image qcow2 (version 2) vide de `virtualSizeMo` Mo, sans
     /// système de fichiers (squelette seul) : utile pour les tests de
@@ -130,10 +141,16 @@ module TestImage =
 
     /// Répertoire temporaire unique.
     let createTempDir () =
-        let dir = Path.Combine(Path.GetTempPath(), "diplo-disk-test-" + Guid.NewGuid().ToString("N"))
+        let dir =
+            Path.Combine(Path.GetTempPath(), "diplo-disk-test-" + Guid.NewGuid().ToString("N"))
+
         Directory.CreateDirectory(dir) |> ignore
         dir
 
     /// Suppression récursive tolérante aux erreurs.
     let cleanupDir (dir: string) =
-        try if Directory.Exists(dir) then Directory.Delete(dir, true) with _ -> ()
+        try
+            if Directory.Exists(dir) then
+                Directory.Delete(dir, true)
+        with _ ->
+            ()

@@ -11,7 +11,8 @@ open Diplo.Grpc.Volume
 
 /// Fake IContainerClient : seuls les membres utilisés par les tests sont
 /// implémentés ; le reste lève NotImplementedException.
-type FakeContainerClient(delete: DeleteContainerResponse, create: CreateContainerResponse, login: LoginRegistryResponse) =
+type FakeContainerClient(delete: DeleteContainerResponse, create: CreateContainerResponse, login: LoginRegistryResponse)
+    =
 
     let mutable deleteCalls = 0
     let mutable createCalls = 0
@@ -29,7 +30,9 @@ type FakeContainerClient(delete: DeleteContainerResponse, create: CreateContaine
             deleteCalls <- deleteCalls + 1
             Task.FromResult(delete)
 
-        member _.CreateAsync(_name, _image, ?_env, ?_command, ?_args, ?_labels, ?_pidLimit, ?_memoryLimit, ?_cpuShares, ?_mounts, ?_ct) =
+        member _.CreateAsync
+            (_name, _image, ?_env, ?_command, ?_args, ?_labels, ?_pidLimit, ?_memoryLimit, ?_cpuShares, ?_mounts, ?_ct)
+            =
             createCalls <- createCalls + 1
             Task.FromResult(create)
 
@@ -69,7 +72,9 @@ type FakeNetworkClient(create: CreateNetworkResponse, runCni: RunCniPluginRespon
         member _.Dispose() = ()
 
     interface INetworkClient with
-        member _.CreateAsync(_name, ?_driver, ?_subnet, ?_gateway, ?_ipRange, ?_options, ?_labels, ?_cniPluginPath, ?_ct) =
+        member _.CreateAsync
+            (_name, ?_driver, ?_subnet, ?_gateway, ?_ipRange, ?_options, ?_labels, ?_cniPluginPath, ?_ct)
+            =
             createCalls <- createCalls + 1
             Task.FromResult(create)
 
@@ -80,8 +85,13 @@ type FakeNetworkClient(create: CreateNetworkResponse, runCni: RunCniPluginRespon
         member _.RemoveAsync(_id, ?_force, ?_ct) = raise (NotImplementedException())
         member _.InspectAsync(_id, ?_ct) = raise (NotImplementedException())
         member _.ListAsync(?_filters, ?_ct) = raise (NotImplementedException())
-        member _.ConnectAsync(_networkId, _containerId, ?_endpointId, ?_ipv4Address, ?_options, ?_ct) = raise (NotImplementedException())
-        member _.DisconnectAsync(_networkId, _containerId, ?_endpointId, ?_force, ?_ct) = raise (NotImplementedException())
+
+        member _.ConnectAsync(_networkId, _containerId, ?_endpointId, ?_ipv4Address, ?_options, ?_ct) =
+            raise (NotImplementedException())
+
+        member _.DisconnectAsync(_networkId, _containerId, ?_endpointId, ?_force, ?_ct) =
+            raise (NotImplementedException())
+
         member _.PruneNetworksAsync(?_ct) = raise (NotImplementedException())
 
 /// Fake IVolumeClient pour les tests.

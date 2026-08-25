@@ -35,14 +35,18 @@ type ListNetworksCommand(output: IOutputPort, clients: IDiploClients) =
                            n.Driver.ToString()
                            n.Subnet
                            n.Gateway
-                           string n.EndpointCount |])
+                           string n.EndpointCount |]
+                )
+
             return 0
         }
 
 // ── inspect ───────────────────────────────────────────────────────
 type InspectNetworkSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
 
 type InspectNetworkCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<InspectNetworkSettings>()
@@ -67,18 +71,30 @@ type InspectNetworkCommand(output: IOutputPort, clients: IDiploClients) =
 
                 if response.Endpoints.Count > 0 then
                     output.WriteLine("  Endpoints:")
+
                     for ep in response.Endpoints do
-                        output.WriteLine(sprintf "    - %s (%s) → %s" ep.ContainerId ep.Ipv4Address (ep.State.ToString()))
+                        output.WriteLine(
+                            sprintf "    - %s (%s) → %s" ep.ContainerId ep.Ipv4Address (ep.State.ToString())
+                        )
+
                 return 0
         }
 
 // ── create ────────────────────────────────────────────────────────
 type CreateNetworkSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<NAME>")>] member val Name: string = null with get, set
-    [<CommandOption("--driver")>] member val Driver = "bridge" with get, set
-    [<CommandOption("--subnet")>] member val Subnet: string = null with get, set
-    [<CommandOption("--gateway")>] member val Gateway: string = null with get, set
+
+    [<CommandArgument(0, "<NAME>")>]
+    member val Name: string = null with get, set
+
+    [<CommandOption("--driver")>]
+    member val Driver = "bridge" with get, set
+
+    [<CommandOption("--subnet")>]
+    member val Subnet: string = null with get, set
+
+    [<CommandOption("--gateway")>]
+    member val Gateway: string = null with get, set
 
 type CreateNetworkCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<CreateNetworkSettings>()
@@ -93,16 +109,17 @@ type CreateNetworkCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteError(sprintf "Driver inconnu: %s. Valeurs: bridge, none, custom_cni, pod" settings.Driver)
                 return 1
             else
-                let driver =
-                    DriverMappings.parseNetworkDriver settings.Driver
+                let driver = DriverMappings.parseNetworkDriver settings.Driver
 
                 use client = clients.CreateNetworkClient()
+
                 let! response =
                     client.CreateAsync(
                         name = settings.Name,
                         driver = driver,
                         subnet = (if isNull settings.Subnet then "" else settings.Subnet),
-                        gateway = (if isNull settings.Gateway then "" else settings.Gateway))
+                        gateway = (if isNull settings.Gateway then "" else settings.Gateway)
+                    )
 
                 output.WriteSuccess(sprintf "Réseau %s créé (ID: %s)" response.Name response.Id)
                 return 0
@@ -111,8 +128,12 @@ type CreateNetworkCommand(output: IOutputPort, clients: IDiploClients) =
 // ── remove ────────────────────────────────────────────────────────
 type RemoveNetworkSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<ID>")>] member val Id: string = null with get, set
-    [<CommandOption("-f|--force")>] member val Force = false with get, set
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandOption("-f|--force")>]
+    member val Force = false with get, set
 
 type RemoveNetworkCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RemoveNetworkSettings>()
@@ -126,6 +147,7 @@ type RemoveNetworkCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateNetworkClient()
                 let! response = client.RemoveAsync(settings.Id, settings.Force)
+
                 if response.Success then
                     output.WriteSuccess(response.Message)
                     return 0
@@ -137,10 +159,18 @@ type RemoveNetworkCommand(output: IOutputPort, clients: IDiploClients) =
 // ── connect ───────────────────────────────────────────────────────
 type ConnectSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<NETWORK_ID>")>] member val NetworkId: string = null with get, set
-    [<CommandArgument(1, "<CONTAINER_ID>")>] member val ContainerId: string = null with get, set
-    [<CommandOption("--endpoint-id")>] member val EndpointId: string = null with get, set
-    [<CommandOption("--ipv4")>] member val Ipv4Address: string = null with get, set
+
+    [<CommandArgument(0, "<NETWORK_ID>")>]
+    member val NetworkId: string = null with get, set
+
+    [<CommandArgument(1, "<CONTAINER_ID>")>]
+    member val ContainerId: string = null with get, set
+
+    [<CommandOption("--endpoint-id")>]
+    member val EndpointId: string = null with get, set
+
+    [<CommandOption("--ipv4")>]
+    member val Ipv4Address: string = null with get, set
 
 type ConnectCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<ConnectSettings>()
@@ -156,12 +186,22 @@ type ConnectCommand(output: IOutputPort, clients: IDiploClients) =
                 return 1
             else
                 use client = clients.CreateNetworkClient()
+
                 let! response =
                     client.ConnectAsync(
                         networkId = settings.NetworkId,
                         containerId = settings.ContainerId,
-                        endpointId = (if isNull settings.EndpointId then "" else settings.EndpointId),
-                        ipv4Address = (if isNull settings.Ipv4Address then "" else settings.Ipv4Address))
+                        endpointId =
+                            (if isNull settings.EndpointId then
+                                 ""
+                             else
+                                 settings.EndpointId),
+                        ipv4Address =
+                            (if isNull settings.Ipv4Address then
+                                 ""
+                             else
+                                 settings.Ipv4Address)
+                    )
 
                 output.WriteSuccess(response.Message)
                 output.WriteLine(sprintf "  Endpoint  : %s" response.EndpointId)
@@ -173,10 +213,18 @@ type ConnectCommand(output: IOutputPort, clients: IDiploClients) =
 // ── disconnect ────────────────────────────────────────────────────
 type DisconnectSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<NETWORK_ID>")>] member val NetworkId: string = null with get, set
-    [<CommandArgument(1, "<CONTAINER_ID>")>] member val ContainerId: string = null with get, set
-    [<CommandOption("--endpoint-id")>] member val EndpointId: string = null with get, set
-    [<CommandOption("-f|--force")>] member val Force = false with get, set
+
+    [<CommandArgument(0, "<NETWORK_ID>")>]
+    member val NetworkId: string = null with get, set
+
+    [<CommandArgument(1, "<CONTAINER_ID>")>]
+    member val ContainerId: string = null with get, set
+
+    [<CommandOption("--endpoint-id")>]
+    member val EndpointId: string = null with get, set
+
+    [<CommandOption("-f|--force")>]
+    member val Force = false with get, set
 
 type DisconnectCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<DisconnectSettings>()
@@ -192,12 +240,18 @@ type DisconnectCommand(output: IOutputPort, clients: IDiploClients) =
                 return 1
             else
                 use client = clients.CreateNetworkClient()
+
                 let! response =
                     client.DisconnectAsync(
                         networkId = settings.NetworkId,
                         containerId = settings.ContainerId,
-                        endpointId = (if isNull settings.EndpointId then "" else settings.EndpointId),
-                        force = settings.Force)
+                        endpointId =
+                            (if isNull settings.EndpointId then
+                                 ""
+                             else
+                                 settings.EndpointId),
+                        force = settings.Force
+                    )
 
                 if response.Success then
 
@@ -215,14 +269,30 @@ type DisconnectCommand(output: IOutputPort, clients: IDiploClients) =
 // ── run-cni-plugin ────────────────────────────────────────────────
 type RunCniPluginSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<PLUGIN_PATH>")>] member val PluginPath: string = null with get, set
-    [<CommandArgument(1, "<COMMAND>")>] member val CniCommand: string = null with get, set
-    [<CommandArgument(2, "<CONTAINER_ID>")>] member val ContainerId: string = null with get, set
-    [<CommandArgument(3, "<NETNS_PATH>")>] member val NetnsPath: string = null with get, set
-    [<CommandOption("--config-name")>] member val ConfigName: string = null with get, set
-    [<CommandOption("--config-type")>] member val ConfigType: string = null with get, set
-    [<CommandOption("--config-subnet")>] member val ConfigSubnet: string = null with get, set
-    [<CommandOption("--config-gateway")>] member val ConfigGateway: string = null with get, set
+
+    [<CommandArgument(0, "<PLUGIN_PATH>")>]
+    member val PluginPath: string = null with get, set
+
+    [<CommandArgument(1, "<COMMAND>")>]
+    member val CniCommand: string = null with get, set
+
+    [<CommandArgument(2, "<CONTAINER_ID>")>]
+    member val ContainerId: string = null with get, set
+
+    [<CommandArgument(3, "<NETNS_PATH>")>]
+    member val NetnsPath: string = null with get, set
+
+    [<CommandOption("--config-name")>]
+    member val ConfigName: string = null with get, set
+
+    [<CommandOption("--config-type")>]
+    member val ConfigType: string = null with get, set
+
+    [<CommandOption("--config-subnet")>]
+    member val ConfigSubnet: string = null with get, set
+
+    [<CommandOption("--config-gateway")>]
+    member val ConfigGateway: string = null with get, set
 
 type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<RunCniPluginSettings>()
@@ -247,33 +317,51 @@ type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
                 return 1
             else
                 use client = clients.CreateNetworkClient()
+
                 let config =
                     if isNull settings.ConfigType then
                         None
                     else
-                        Some { CniConfiguration.Name = (if isNull settings.ConfigName then "" else settings.ConfigName)
-                               Type = settings.ConfigType
-                               Subnet = (if isNull settings.ConfigSubnet then "" else settings.ConfigSubnet)
-                               Gateway = (if isNull settings.ConfigGateway then "" else settings.ConfigGateway)
-                               IpRange = ""
-                               HairpinMode = false
-                               IsDefaultGateway = false
-                               Dns = System.Collections.Generic.Dictionary<string, string>() }
+                        Some
+                            { CniConfiguration.Name =
+                                (if isNull settings.ConfigName then
+                                     ""
+                                 else
+                                     settings.ConfigName)
+                              Type = settings.ConfigType
+                              Subnet =
+                                (if isNull settings.ConfigSubnet then
+                                     ""
+                                 else
+                                     settings.ConfigSubnet)
+                              Gateway =
+                                (if isNull settings.ConfigGateway then
+                                     ""
+                                 else
+                                     settings.ConfigGateway)
+                              IpRange = ""
+                              HairpinMode = false
+                              IsDefaultGateway = false
+                              Dns = System.Collections.Generic.Dictionary<string, string>() }
+
                 let! response =
                     client.RunCniPluginAsync(
                         pluginPath = settings.PluginPath,
                         command = settings.CniCommand,
                         containerId = settings.ContainerId,
                         netnsPath = settings.NetnsPath,
-                        ?config = config)
+                        ?config = config
+                    )
 
                 if response.Success then
                     output.WriteSuccess("Plugin CNI exécuté avec succès")
                     output.WriteLine(sprintf "  Interface : %s" response.Ifname)
                     output.WriteLine(sprintf "  IPv4      : %s" response.Ipv4Address)
                     output.WriteLine(sprintf "  Passerelle: %s" response.Gateway)
+
                     if not (System.String.IsNullOrWhiteSpace(response.Message)) then
                         output.WriteLine(sprintf "  Message   : %s" response.Message)
+
                     return 0
                 else
                     output.WriteError(sprintf "Échec du plugin CNI: %s" response.Message)
@@ -292,11 +380,14 @@ type PruneNetworksCommand(output: IOutputPort, clients: IDiploClients) =
         task {
             use client = clients.CreateNetworkClient()
             let! response = client.PruneNetworksAsync()
+
             if response.Count > 0 then
                 output.WriteSuccess(response.Message)
+
                 for id in response.NetworksDeleted do
                     output.WriteLine(sprintf "  - %s" id)
             else
                 output.WriteWarning("Aucun réseau à supprimer.")
+
             return 0
         }

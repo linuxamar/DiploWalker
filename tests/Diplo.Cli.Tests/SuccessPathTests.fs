@@ -26,12 +26,28 @@ module SuccessPathTests =
     [<Fact>]
     let ``container delete en succès retourne 0 et écrit le message`` () =
         let output = MockOutputPort()
-        let client = new FakeContainerClient(
-            { Success = true; Message = "Conteneur supprimé" },
-            { Id = "c1"; Name = "app"; State = ContainerState.Stopped; CreatedAt = "" },
-            { Success = true; Message = "ok" })
-        let clients = FakeDiploClients(client, new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>), new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>))
-        let code = run (DeleteContainerCommand(output, clients)) (DeleteSettings(Id = "abc"))
+
+        let client =
+            new FakeContainerClient(
+                { Success = true
+                  Message = "Conteneur supprimé" },
+                { Id = "c1"
+                  Name = "app"
+                  State = ContainerState.Stopped
+                  CreatedAt = "" },
+                { Success = true; Message = "ok" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                client,
+                new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>)
+            )
+
+        let code =
+            run (DeleteContainerCommand(output, clients)) (DeleteSettings(Id = "abc"))
+
         code |> should equal 0
         output.Successes |> should contain "Conteneur supprimé"
         client.DeleteCalls |> should equal 1
@@ -39,24 +55,55 @@ module SuccessPathTests =
     [<Fact>]
     let ``container delete en échec retourne 1 et écrit l'erreur`` () =
         let output = MockOutputPort()
-        let client = new FakeContainerClient(
-            { Success = false; Message = "Conteneur introuvable" },
-            { Id = "c1"; Name = "app"; State = ContainerState.Stopped; CreatedAt = "" },
-            { Success = true; Message = "ok" })
-        let clients = FakeDiploClients(client, new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>), new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>))
-        let code = run (DeleteContainerCommand(output, clients)) (DeleteSettings(Id = "abc"))
+
+        let client =
+            new FakeContainerClient(
+                { Success = false
+                  Message = "Conteneur introuvable" },
+                { Id = "c1"
+                  Name = "app"
+                  State = ContainerState.Stopped
+                  CreatedAt = "" },
+                { Success = true; Message = "ok" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                client,
+                new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>)
+            )
+
+        let code =
+            run (DeleteContainerCommand(output, clients)) (DeleteSettings(Id = "abc"))
+
         code |> should equal 1
         output.Errors |> should contain "Conteneur introuvable"
 
     [<Fact>]
     let ``container create en succès retourne 0 et contacte le client`` () =
         let output = MockOutputPort()
-        let client = new FakeContainerClient(
-            { Success = true; Message = "ok" },
-            { Id = "c1"; Name = "app"; State = ContainerState.Running; CreatedAt = "2026-01-01" },
-            { Success = true; Message = "ok" })
-        let clients = FakeDiploClients(client, new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>), new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>))
-        let code = run (CreateContainerCommand(output, clients)) (CreateContainerSettings(Name = "app", Image = "nginx"))
+
+        let client =
+            new FakeContainerClient(
+                { Success = true; Message = "ok" },
+                { Id = "c1"
+                  Name = "app"
+                  State = ContainerState.Running
+                  CreatedAt = "2026-01-01" },
+                { Success = true; Message = "ok" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                client,
+                new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>)
+            )
+
+        let code =
+            run (CreateContainerCommand(output, clients)) (CreateContainerSettings(Name = "app", Image = "nginx"))
+
         code |> should equal 0
         client.CreateCalls |> should equal 1
         output.Successes |> should not' (be Empty)
@@ -64,12 +111,30 @@ module SuccessPathTests =
     [<Fact>]
     let ``registry login en succès retourne 0`` () =
         let output = MockOutputPort()
-        let client = new FakeContainerClient(
-            { Success = true; Message = "ok" },
-            { Id = "c1"; Name = "app"; State = ContainerState.Stopped; CreatedAt = "" },
-            { Success = true; Message = "Connexion établie" })
-        let clients = FakeDiploClients(client, new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>), new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>))
-        let code = run (RegistryLoginCommand(output, clients)) (RegistryLoginSettings(Registry = "reg", Username = "u", Password = "p"))
+
+        let client =
+            new FakeContainerClient(
+                { Success = true; Message = "ok" },
+                { Id = "c1"
+                  Name = "app"
+                  State = ContainerState.Stopped
+                  CreatedAt = "" },
+                { Success = true
+                  Message = "Connexion établie" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                client,
+                new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>)
+            )
+
+        let code =
+            run
+                (RegistryLoginCommand(output, clients))
+                (RegistryLoginSettings(Registry = "reg", Username = "u", Password = "p"))
+
         code |> should equal 0
         client.LoginCalls |> should equal 1
         output.Successes |> should contain "Connexion établie"
@@ -80,11 +145,27 @@ module SuccessPathTests =
     [<Fact>]
     let ``volume create en succès retourne 0`` () =
         let output = MockOutputPort()
-        let volume = new FakeVolumeClient(
-            { Id = "v1"; Name = "data"; Driver = StorageDriverType.Local; Mountpoint = "C:\\vols\\data"; CreatedAt = "" },
-            { Success = true; Message = "ok" })
-        let clients = FakeDiploClients(new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>), new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>), volume)
-        let code = run (CreateVolumeCommand(output, clients)) (CreateVolumeSettings(Name = "data"))
+
+        let volume =
+            new FakeVolumeClient(
+                { Id = "v1"
+                  Name = "data"
+                  Driver = StorageDriverType.Local
+                  Mountpoint = "C:\\vols\\data"
+                  CreatedAt = "" },
+                { Success = true; Message = "ok" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                volume
+            )
+
+        let code =
+            run (CreateVolumeCommand(output, clients)) (CreateVolumeSettings(Name = "data"))
+
         code |> should equal 0
         volume.CreateCalls |> should equal 1
         output.Successes |> should not' (be Empty)
@@ -92,11 +173,28 @@ module SuccessPathTests =
     [<Fact>]
     let ``volume remove en échec retourne 1 et écrit l'erreur`` () =
         let output = MockOutputPort()
-        let volume = new FakeVolumeClient(
-            { Id = "v1"; Name = "data"; Driver = StorageDriverType.Local; Mountpoint = ""; CreatedAt = "" },
-            { Success = false; Message = "Volume non trouvé" })
-        let clients = FakeDiploClients(new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>), new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>), volume)
-        let code = run (RemoveVolumeCommand(output, clients)) (RemoveVolumeSettings(Id = "v1"))
+
+        let volume =
+            new FakeVolumeClient(
+                { Id = "v1"
+                  Name = "data"
+                  Driver = StorageDriverType.Local
+                  Mountpoint = ""
+                  CreatedAt = "" },
+                { Success = false
+                  Message = "Volume non trouvé" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                new FakeNetworkClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                volume
+            )
+
+        let code =
+            run (RemoveVolumeCommand(output, clients)) (RemoveVolumeSettings(Id = "v1"))
+
         code |> should equal 1
         volume.RemoveCalls |> should equal 1
         output.Errors |> should contain "Volume non trouvé"
@@ -107,11 +205,32 @@ module SuccessPathTests =
     [<Fact>]
     let ``network create en succès retourne 0`` () =
         let output = MockOutputPort()
-        let network = new FakeNetworkClient(
-            { Id = "n1"; Name = "bridge1"; Driver = NetworkDriver.Bridge; Subnet = ""; Gateway = ""; CreatedAt = "" },
-            { Success = true; Ifname = ""; Ipv4Address = ""; Gateway = ""; Message = "" })
-        let clients = FakeDiploClients(new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>), network, new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>))
-        let code = run (CreateNetworkCommand(output, clients)) (CreateNetworkSettings(Name = "bridge1"))
+
+        let network =
+            new FakeNetworkClient(
+                { Id = "n1"
+                  Name = "bridge1"
+                  Driver = NetworkDriver.Bridge
+                  Subnet = ""
+                  Gateway = ""
+                  CreatedAt = "" },
+                { Success = true
+                  Ifname = ""
+                  Ipv4Address = ""
+                  Gateway = ""
+                  Message = "" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                network,
+                new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>)
+            )
+
+        let code =
+            run (CreateNetworkCommand(output, clients)) (CreateNetworkSettings(Name = "bridge1"))
+
         code |> should equal 0
         network.CreateCalls |> should equal 1
         output.Successes |> should not' (be Empty)
@@ -119,11 +238,39 @@ module SuccessPathTests =
     [<Fact>]
     let ``run-cni-plugin en succès retourne 0 et affiche l'interface`` () =
         let output = MockOutputPort()
-        let network = new FakeNetworkClient(
-            { Id = "n1"; Name = "b"; Driver = NetworkDriver.Bridge; Subnet = ""; Gateway = ""; CreatedAt = "" },
-            { Success = true; Ifname = "eth0"; Ipv4Address = "10.0.0.2"; Gateway = "10.0.0.1"; Message = "" })
-        let clients = FakeDiploClients(new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>), network, new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>))
-        let code = run (RunCniPluginCommand(output, clients)) (RunCniPluginSettings(PluginPath = "C:\\plugins\\x.exe", CniCommand = "ADD", ContainerId = "c", NetnsPath = "C:\\ns\\1"))
+
+        let network =
+            new FakeNetworkClient(
+                { Id = "n1"
+                  Name = "b"
+                  Driver = NetworkDriver.Bridge
+                  Subnet = ""
+                  Gateway = ""
+                  CreatedAt = "" },
+                { Success = true
+                  Ifname = "eth0"
+                  Ipv4Address = "10.0.0.2"
+                  Gateway = "10.0.0.1"
+                  Message = "" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                network,
+                new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>)
+            )
+
+        let code =
+            run
+                (RunCniPluginCommand(output, clients))
+                (RunCniPluginSettings(
+                    PluginPath = "C:\\plugins\\x.exe",
+                    CniCommand = "ADD",
+                    ContainerId = "c",
+                    NetnsPath = "C:\\ns\\1"
+                ))
+
         code |> should equal 0
         network.RunCniCalls |> should equal 1
         output.Successes |> should contain "Plugin CNI exécuté avec succès"
@@ -132,13 +279,43 @@ module SuccessPathTests =
     [<Fact>]
     let ``run-cni-plugin en échec retourne 1 et écrit l'erreur`` () =
         let output = MockOutputPort()
-        let network = new FakeNetworkClient(
-            { Id = "n1"; Name = "b"; Driver = NetworkDriver.Bridge; Subnet = ""; Gateway = ""; CreatedAt = "" },
-            { Success = false; Ifname = ""; Ipv4Address = ""; Gateway = ""; Message = "ADD a échoué" })
-        let clients = FakeDiploClients(new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>), network, new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>))
-        let code = run (RunCniPluginCommand(output, clients)) (RunCniPluginSettings(PluginPath = "C:\\plugins\\x.exe", CniCommand = "ADD", ContainerId = "c", NetnsPath = "C:\\ns\\1"))
+
+        let network =
+            new FakeNetworkClient(
+                { Id = "n1"
+                  Name = "b"
+                  Driver = NetworkDriver.Bridge
+                  Subnet = ""
+                  Gateway = ""
+                  CreatedAt = "" },
+                { Success = false
+                  Ifname = ""
+                  Ipv4Address = ""
+                  Gateway = ""
+                  Message = "ADD a échoué" }
+            )
+
+        let clients =
+            FakeDiploClients(
+                new FakeContainerClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>),
+                network,
+                new FakeVolumeClient(Unchecked.defaultof<_>, Unchecked.defaultof<_>)
+            )
+
+        let code =
+            run
+                (RunCniPluginCommand(output, clients))
+                (RunCniPluginSettings(
+                    PluginPath = "C:\\plugins\\x.exe",
+                    CniCommand = "ADD",
+                    ContainerId = "c",
+                    NetnsPath = "C:\\ns\\1"
+                ))
+
         code |> should equal 1
-        output.Errors |> should contain (sprintf "Échec du plugin CNI: %s" "ADD a échoué")
+
+        output.Errors
+        |> should contain (sprintf "Échec du plugin CNI: %s" "ADD a échoué")
 
     // ─── Disk ─────────────────────────────────────────────────────────
     open Diplo.Cli.Disk
@@ -147,12 +324,16 @@ module SuccessPathTests =
     let ``disk create-image en succès retourne 0 et écrit le succès`` () =
         let output = MockOutputPort()
         let root = TestHelpers.createTempDir "cli-disk"
+
         try
             let src = Path.Combine(root, "src")
             let dest = Path.Combine(root, "out", "test.vhd")
             Directory.CreateDirectory(src) |> ignore
             File.WriteAllText(Path.Combine(src, "hello.txt"), "contenu")
-            let code = run (CreateImageCommand(output)) (CreateImageSettings(Source = src, Dest = dest))
+
+            let code =
+                run (CreateImageCommand(output)) (CreateImageSettings(Source = src, Dest = dest))
+
             code |> should equal 0
             output.Successes |> should not' (be Empty)
             File.Exists(dest) |> should equal true

@@ -21,9 +21,12 @@ type SpectreOutputPort() =
 
         member _.WriteTable(items: IReadOnlyList<'T>, columns: string[], selector: 'T -> string[]) =
             let table = Table().Border(TableBorder.Rounded)
+
             for col in columns do
                 table.AddColumn(col) |> ignore
+
             for item in items do
                 let cells = selector item
                 table.AddRow(cells) |> ignore
+
             AnsiConsole.Write(table)

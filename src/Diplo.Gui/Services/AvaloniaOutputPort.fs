@@ -6,7 +6,11 @@ open System.Threading
 open Avalonia.Threading
 open Diplo.Core.Output
 
-type LogLevel = Info | Success | Warning | Error
+type LogLevel =
+    | Info
+    | Success
+    | Warning
+    | Error
 
 type LogEntry(text: string, level: LogLevel) =
     member _.Text = text
@@ -21,8 +25,10 @@ type AvaloniaOutputPort() =
     let tableRows = ObservableCollection<string[]>()
 
     let post (action: unit -> unit) =
-        if SynchronizationContext.Current <> null then action()
-        else Dispatcher.UIThread.Post(action)
+        if SynchronizationContext.Current <> null then
+            action ()
+        else
+            Dispatcher.UIThread.Post(action)
 
     member _.LogLines = logLines
     member _.TableColumns = tableColumns
@@ -42,17 +48,24 @@ type AvaloniaOutputPort() =
     interface IOutputPort with
         member _.WriteLine(text) =
             post (fun () -> logLines.Add(LogEntry(text, Info)))
+
         member _.WriteError(text) =
             post (fun () -> logLines.Add(LogEntry(text, Error)))
+
         member _.WriteSuccess(text) =
             post (fun () -> logLines.Add(LogEntry(text, Success)))
+
         member _.WriteWarning(text) =
             post (fun () -> logLines.Add(LogEntry(text, Warning)))
+
         member _.WriteTable(items, columns, selector) =
             post (fun () ->
                 tableColumns.Clear()
                 tableRows.Clear()
-                for col in columns do tableColumns.Add(col)
+
+                for col in columns do
+                    tableColumns.Add(col)
+
                 for item in items do
                     let row = selector item
                     tableRows.Add(row))

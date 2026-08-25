@@ -7,8 +7,7 @@ module AppSettingsJsonTests =
     open FsUnit.Xunit
     open Diplo.Installer.Core
 
-    let private parseJson (json: string) : JsonNode =
-        JsonNode.Parse(json)
+    let private parseJson (json: string) : JsonNode = JsonNode.Parse(json)
 
     [<Fact>]
     let ``buildAppSettingsJson returns valid JSON with all required sections`` () =
@@ -64,7 +63,9 @@ module AppSettingsJsonTests =
         let doc = parseJson json :?> JsonObject
         let logging = doc["Logging"] :?> JsonObject
         let logLevel = logging["LogLevel"] :?> JsonObject
-        logLevel["Microsoft.Hosting.Lifetime"].GetValue<string>() |> should equal "Information"
+
+        logLevel["Microsoft.Hosting.Lifetime"].GetValue<string>()
+        |> should equal "Information"
 
     [<Fact>]
     let ``buildAppSettingsJson uses different ports correctly`` () =

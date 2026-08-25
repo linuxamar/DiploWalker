@@ -9,8 +9,7 @@ open Grpc.Core
 let createTokenCredentials () : CallCredentials =
     CallCredentials.FromInterceptor(fun _context metadata ->
         task {
-            match AuthToken.loadToken() with
-            | Some token ->
-                metadata.Add("Authorization", sprintf "Bearer %s" token)
+            match AuthToken.loadToken () with
+            | Some token -> metadata.Add("Authorization", sprintf "Bearer %s" token)
             | None -> ()
         })

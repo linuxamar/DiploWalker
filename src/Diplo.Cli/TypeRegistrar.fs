@@ -6,13 +6,21 @@ open Microsoft.Extensions.DependencyInjection
 
 type TypeRegistrar() =
     let services = ServiceCollection()
-    do services.AddSingleton<Diplo.Core.Output.IOutputPort>(SpectreOutputPort()) |> ignore
-    do services.AddSingleton<Diplo.Core.Clients.IDiploClients>(Diplo.Core.Clients.DiploClients()) |> ignore
+
+    do
+        services.AddSingleton<Diplo.Core.Output.IOutputPort>(SpectreOutputPort())
+        |> ignore
+
+    do
+        services.AddSingleton<Diplo.Core.Clients.IDiploClients>(Diplo.Core.Clients.DiploClients())
+        |> ignore
+
     let buildProvider = lazy (services.BuildServiceProvider() :> IServiceProvider)
 
     interface ITypeRegistrar with
         member _.Build() =
             let provider = buildProvider.Value
+
             { new ITypeResolver with
                 member _.Resolve(type') = provider.GetService(type') }
 
@@ -23,4 +31,5 @@ type TypeRegistrar() =
             services.AddSingleton(serviceType, instance) |> ignore
 
         member _.RegisterLazy(serviceType, factory) =
-            services.AddSingleton(serviceType, Func<IServiceProvider, obj>(fun _ -> factory.Invoke())) |> ignore
+            services.AddSingleton(serviceType, Func<IServiceProvider, obj>(fun _ -> factory.Invoke()))
+            |> ignore

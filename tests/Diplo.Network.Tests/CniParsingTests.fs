@@ -84,6 +84,7 @@ module CniParsingTests =
                     }
                 ]
             }"""
+
         let ifname, ipv4, gw = parseCniResult json
         ifname |> should equal "eth0"
         ipv4 |> should equal "10.0.0.2/24"
@@ -107,6 +108,7 @@ module CniParsingTests =
                 ],
                 "dns": {"nameservers": ["8.8.8.8"]}
             }"""
+
         let ifname, ipv4, gw = parseCniResult json
         ifname |> should equal "eth0"
         ipv4 |> should equal "10.0.0.2/24"

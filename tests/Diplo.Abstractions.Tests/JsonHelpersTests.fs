@@ -7,8 +7,7 @@ open Diplo.Abstractions
 
 type JsonHelpersTests() =
 
-    let parseJson (json: string) =
-        JsonDocument.Parse(json).RootElement
+    let parseJson (json: string) = JsonDocument.Parse(json).RootElement
 
     [<Fact>]
     let ``tryGetString retourne la valeur string`` () =

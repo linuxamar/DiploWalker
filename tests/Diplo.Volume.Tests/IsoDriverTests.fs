@@ -10,7 +10,7 @@ module IsoDriverTests =
     open Diplo.Volume.Drivers
     open Diplo.Abstractions.SecurityValidation
 
-    do addAllowedVolumeDir(Path.GetTempPath())
+    do addAllowedVolumeDir (Path.GetTempPath())
 
     // Les images de test sont construites à la main, octet par octet, en
     // suivant la norme ECMA-167 3e édition (et son implémentation de référence
@@ -22,12 +22,18 @@ module IsoDriverTests =
     // `7z l image.iso` (liste du contenu).
 
     let createTempDir () =
-        let dir = Path.Combine(Path.GetTempPath(), "diplo-vol-test-" + Guid.NewGuid().ToString("N"))
+        let dir =
+            Path.Combine(Path.GetTempPath(), "diplo-vol-test-" + Guid.NewGuid().ToString("N"))
+
         Directory.CreateDirectory(dir) |> ignore
         dir
 
     let cleanupDir (dir: string) =
-        try if Directory.Exists(dir) then Directory.Delete(dir, true) with _ -> ()
+        try
+            if Directory.Exists(dir) then
+                Directory.Delete(dir, true)
+        with _ ->
+            ()
 
     let writeBothEndian (iso: byte[]) offset (value: int) =
         let v = uint32 value
@@ -74,7 +80,10 @@ module IsoDriverTests =
         let dotdot = writeRecord iso (rootOffset + dot) 20 2048 0x02uy [| 0x01uy |]
         let content = Encoding.UTF8.GetBytes("Bonjour ISO!\n")
         let name = Encoding.ASCII.GetBytes("HELLO.TXT;1")
-        writeRecord iso (rootOffset + dot + dotdot) 21 content.Length 0x00uy name |> ignore
+
+        writeRecord iso (rootOffset + dot + dotdot) 21 content.Length 0x00uy name
+        |> ignore
+
         Array.Copy(content, 0, iso, 21 * 2048, content.Length)
         iso
 
@@ -106,14 +115,17 @@ module IsoDriverTests =
     // descriptorCRC de la balise UDF (3/7.2).
     let crc16 (iso: byte[]) offset count =
         let mutable crc = 0us
+
         for i in 0 .. count - 1 do
             crc <- crc ^^^ (uint16 iso.[offset + i] <<< 8)
-            for _ in 0 .. 7 do
+
+            for _ in 0..7 do
                 crc <-
                     if (crc &&& 0x8000us) <> 0us then
                         (crc <<< 1) ^^^ 0x1021us
                     else
                         crc <<< 1
+
         crc
 
     // Finalise une balise UDF : longueur du CRC (octets 10/11), CRC du
@@ -125,8 +137,11 @@ module IsoDriverTests =
         let crc = crc16 iso (offset + 16) crcLen
         writeUInt16LE iso (offset + 8) (int crc)
         let mutable sum = 0uy
-        for i in 0 .. 15 do
-            if i <> 4 then sum <- sum + iso.[offset + i]
+
+        for i in 0..15 do
+            if i <> 4 then
+                sum <- sum + iso.[offset + i]
+
         iso.[offset + 4] <- sum
 
     // Écrit un identifiant de fichier (FID, 4/14.4) : balise 0x0101, version 1,
@@ -248,7 +263,9 @@ module IsoDriverTests =
         let fidLen1 = writeFid iso fidBlock 263 0uy helloName 2048 262
         let parentName = [| 0x08uy; 0x01uy |]
         let fidLen2 = writeFid iso (fidBlock + fidLen1) 263 0x08uy parentName 2048 261
-        if fidLen1 + fidLen2 <> 88 then failwith "FIDs racine : taille inattendue"
+
+        if fidLen1 + fidLen2 <> 88 then
+            failwith "FIDs racine : taille inattendue"
         // Ancre de fin de volume (ECMA-167 3/8.4.2) : l'AVDP du bloc 266, après
         // le dernier contenu (bloc 265), permet à 7-Zip de trouver la fin
         // d'archive (NoEndAnchor=false).
@@ -262,11 +279,9 @@ module IsoDriverTests =
         Array.Copy(content, 0, iso, 265 * 2048, content.Length)
         iso
 
-    let buildUdfDvd () =
-        buildUdfSingleFile "NSR03"
+    let buildUdfDvd () = buildUdfSingleFile "NSR03"
 
-    let buildUdfNsr02 () =
-        buildUdfSingleFile "NSR02"
+    let buildUdfNsr02 () = buildUdfSingleFile "NSR02"
 
     // Construit une image UDF plus riche, lisible par 7-Zip, couvrant :
     //   - un fichier multi-blocs (BIG.BIN) assemblé via trois short_ad ;
@@ -386,7 +401,9 @@ module IsoDriverTests =
         let fidLen1 = writeFid iso rootFid1 265 0uy bigName 2048 262
         let dossierName = Array.append [| 0x08uy |] (Encoding.ASCII.GetBytes("DOSSIER"))
         let fidLen2 = writeFid iso (rootFid1 + fidLen1) 265 0x02uy dossierName 2048 263
-        if fidLen1 + fidLen2 <> 96 then failwith "FIDs racine : taille inattendue"
+
+        if fidLen1 + fidLen2 <> 96 then
+            failwith "FIDs racine : taille inattendue"
         // Bloc 266 : FID « .. » de la racine.
         let rootFid2 = 266 * 2048
         let parentName = [| 0x08uy; 0x01uy |]
@@ -396,7 +413,9 @@ module IsoDriverTests =
         let sousName = Array.append [| 0x08uy |] (Encoding.ASCII.GetBytes("SOUS.TXT"))
         let fidLen3 = writeFid iso dirFid 267 0uy sousName 2048 264
         let fidLen4 = writeFid iso (dirFid + fidLen3) 267 0x08uy parentName 2048 263
-        if fidLen3 + fidLen4 <> 88 then failwith "FIDs de DOSSIER : taille inattendue"
+
+        if fidLen3 + fidLen4 <> 88 then
+            failwith "FIDs de DOSSIER : taille inattendue"
         // Ancre de fin de volume (ECMA-167 3/8.4.2) : l'AVDP du bloc 274, après
         // le dernier contenu (bloc 273), matérialise la fin d'archive pour 7-Zip
         // (NoEndAnchor=false).
@@ -431,8 +450,12 @@ module IsoDriverTests =
         iso
 
     let mountImage (driver: IsoDriver) (isoFile: string) =
-        let (id, _) = driver.CreateVolume("mount-udf", Map.ofList ["iso", isoFile], Map.empty)
-        let target = Path.Combine(Path.GetTempPath(), "diplo-vol-mnt-" + Guid.NewGuid().ToString("N"))
+        let (id, _) =
+            driver.CreateVolume("mount-udf", Map.ofList [ "iso", isoFile ], Map.empty)
+
+        let target =
+            Path.Combine(Path.GetTempPath(), "diplo-vol-mnt-" + Guid.NewGuid().ToString("N"))
+
         Directory.CreateDirectory(target) |> ignore
         let (success, mountDir) = driver.MountVolume(id, target, "")
         (success, mountDir, id)
@@ -440,57 +463,81 @@ module IsoDriverTests =
     [<Fact>]
     let ``CreateVolume cree un volume ISO et retourne id et chemin`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
-            let (id, mountpoint) = driver.CreateVolume("test-iso", Map.ofList ["iso", isoFile], Map.empty)
+
+            let (id, mountpoint) =
+                driver.CreateVolume("test-iso", Map.ofList [ "iso", isoFile ], Map.empty)
+
             String.IsNullOrEmpty(id) |> should equal false
             mountpoint |> should equal isoFile
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``CreateVolume sans option iso leve une exception`` () =
         let tempRoot = createTempDir ()
+
         try
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
+
             (fun () -> driver.CreateVolume("bad", Map.empty, Map.empty) |> ignore)
             |> should throw typeof<System.Exception>
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``CreateVolume avec fichier ISO inexistant leve une exception`` () =
         let tempRoot = createTempDir ()
+
         try
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
-            (fun () -> driver.CreateVolume("bad", Map.ofList ["iso", "Z:\\inexistant.iso"], Map.empty) |> ignore)
+
+            (fun () ->
+                driver.CreateVolume("bad", Map.ofList [ "iso", "Z:\\inexistant.iso" ], Map.empty)
+                |> ignore)
             |> should throw typeof<System.Exception>
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``MountVolume extrait les fichiers de l ISO`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
-            let (id, _) = driver.CreateVolume("mount-iso", Map.ofList ["iso", isoFile], Map.empty)
+
+            let (id, _) =
+                driver.CreateVolume("mount-iso", Map.ofList [ "iso", isoFile ], Map.empty)
+
             let target = Path.Combine(tempRoot, "mnt")
             Directory.CreateDirectory(target) |> ignore
             let (success, mountDir) = driver.MountVolume(id, target, "")
             success |> should equal true
             mountDir |> should equal target
-            File.ReadAllText(Path.Combine(mountDir, "HELLO.TXT")) |> should equal "Bonjour ISO!\n"
-        finally cleanupDir tempRoot
+
+            File.ReadAllText(Path.Combine(mountDir, "HELLO.TXT"))
+            |> should equal "Bonjour ISO!\n"
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``UnmountVolume supprime le repertoire de montage`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
-            let (id, _) = driver.CreateVolume("unmount-iso", Map.ofList ["iso", isoFile], Map.empty)
+
+            let (id, _) =
+                driver.CreateVolume("unmount-iso", Map.ofList [ "iso", isoFile ], Map.empty)
+
             let target = Path.Combine(tempRoot, "mnt")
             Directory.CreateDirectory(target) |> ignore
             driver.MountVolume(id, target, "") |> ignore
@@ -499,112 +546,149 @@ module IsoDriverTests =
             success |> should equal true
             msg |> should equal "Démonté"
             Directory.Exists(target) |> should equal false
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``InspectVolume retourne Some pour un volume ISO existant`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
-            let (id, _) = driver.CreateVolume("inspect-iso", Map.ofList ["iso", isoFile], Map.empty)
+
+            let (id, _) =
+                driver.CreateVolume("inspect-iso", Map.ofList [ "iso", isoFile ], Map.empty)
+
             let result = driver.InspectVolume(id)
             result.IsSome |> should equal true
             result.Value.GetProperty("name").GetString() |> should equal "inspect-iso"
             result.Value.GetProperty("driver").GetString() |> should equal "iso"
             result.Value.GetProperty("remotePath").GetString() |> should equal isoFile
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``RemoveVolume supprime le volume et retourne true`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
-            let (id, _) = driver.CreateVolume("delete-iso", Map.ofList ["iso", isoFile], Map.empty)
+
+            let (id, _) =
+                driver.CreateVolume("delete-iso", Map.ofList [ "iso", isoFile ], Map.empty)
+
             driver.RemoveVolume(id, false) |> should equal true
             driver.InspectVolume(id).IsNone |> should equal true
             File.Exists(isoFile) |> should equal true
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``RemoveVolume avec force supprime aussi le fichier ISO`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
-            let (id, _) = driver.CreateVolume("force-delete", Map.ofList ["iso", isoFile], Map.empty)
+
+            let (id, _) =
+                driver.CreateVolume("force-delete", Map.ofList [ "iso", isoFile ], Map.empty)
+
             driver.RemoveVolume(id, true) |> should equal true
             driver.InspectVolume(id).IsNone |> should equal true
             File.Exists(isoFile) |> should equal false
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``MountVolume extrait les fichiers d une image DVD UDF conforme`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfDvd ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
             let (success, mountDir, _) = mountImage driver isoFile
             success |> should equal true
-            File.ReadAllText(Path.Combine(mountDir, "HELLO.TXT")) |> should equal "Bonjour DVD!\n"
-        finally cleanupDir tempRoot
+
+            File.ReadAllText(Path.Combine(mountDir, "HELLO.TXT"))
+            |> should equal "Bonjour DVD!\n"
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``MountVolume extrait les fichiers d une image UDF 1.0 (NSR02)`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfNsr02 ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
             let (success, mountDir, _) = mountImage driver isoFile
             success |> should equal true
-            File.ReadAllText(Path.Combine(mountDir, "HELLO.TXT")) |> should equal "Bonjour DVD!\n"
-        finally cleanupDir tempRoot
+
+            File.ReadAllText(Path.Combine(mountDir, "HELLO.TXT"))
+            |> should equal "Bonjour DVD!\n"
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``MountVolume assemble un fichier multi-blocs (trois short_ad)`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfMultiBlock ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
             let (success, mountDir, _) = mountImage driver isoFile
             success |> should equal true
-            File.ReadAllText(Path.Combine(mountDir, "BIG.BIN")) |> should equal "BIGA\nBIGB\nBIGC\n"
-        finally cleanupDir tempRoot
+
+            File.ReadAllText(Path.Combine(mountDir, "BIG.BIN"))
+            |> should equal "BIGA\nBIGB\nBIGC\n"
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``MountVolume extrait des repertoires imbriques avec long_ad`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfMultiBlock ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
             let (success, mountDir, _) = mountImage driver isoFile
             success |> should equal true
-            File.ReadAllText(Path.Combine(mountDir, "DOSSIER", "SOUS.TXT")) |> should equal "Bonjour SOUS\n"
-        finally cleanupDir tempRoot
+
+            File.ReadAllText(Path.Combine(mountDir, "DOSSIER", "SOUS.TXT"))
+            |> should equal "Bonjour SOUS\n"
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``MountVolume extrait un fichier decrit par un extended_ad`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfExtendedAd ())
             let driver = IsoDriver(Path.Combine(tempRoot, "data"))
             let (success, mountDir, _) = mountImage driver isoFile
             success |> should equal true
-            File.ReadAllText(Path.Combine(mountDir, "HELLO.TXT")) |> should equal "Bonjour DVD!\n"
-        finally cleanupDir tempRoot
+
+            File.ReadAllText(Path.Combine(mountDir, "HELLO.TXT"))
+            |> should equal "Bonjour DVD!\n"
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``MountVolume parcourt un ICB de repertoire multi-blocs`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfMultiBlock ())
@@ -614,40 +698,57 @@ module IsoDriverTests =
             Directory.Exists(Path.Combine(mountDir, "DOSSIER")) |> should equal true
             File.Exists(Path.Combine(mountDir, "BIG.BIN")) |> should equal true
             File.Exists(Path.Combine(mountDir, "DOSSIER", "SOUS.TXT")) |> should equal true
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``IsoImage.readFile lit un fichier ISO9660 par son chemin`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
-            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/HELLO.TXT") |> should equal "Bonjour ISO!\n"
-        finally cleanupDir tempRoot
+
+            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/HELLO.TXT")
+            |> should equal "Bonjour ISO!\n"
+        finally
+            cleanupDir tempRoot
+
     [<Fact>]
     let ``IsoImage.readFile lit un fichier UDF par son chemin`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfDvd ())
-            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/HELLO.TXT") |> should equal "Bonjour DVD!\n"
-        finally cleanupDir tempRoot
+
+            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/HELLO.TXT")
+            |> should equal "Bonjour DVD!\n"
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``IsoImage.readFile lit un fichier UDF dans un sous-repertoire`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfMultiBlock ())
-            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/DOSSIER/SOUS.TXT") |> should equal "Bonjour SOUS\n"
-        finally cleanupDir tempRoot
+
+            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/DOSSIER/SOUS.TXT")
+            |> should equal "Bonjour SOUS\n"
+        finally
+            cleanupDir tempRoot
 
     [<Fact>]
     let ``IsoImage.readFile leve une exception si le fichier est absent`` () =
         let tempRoot = createTempDir ()
+
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
+
             (fun () -> IsoImage.readFile isoFile "/INEXISTANT.TXT" |> ignore)
             |> should throw typeof<System.Exception>
-        finally cleanupDir tempRoot
+        finally
+            cleanupDir tempRoot

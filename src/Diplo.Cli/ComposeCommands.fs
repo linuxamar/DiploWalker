@@ -9,7 +9,9 @@ open Spectre.Console.Cli
 // ── up ─────────────────────────────────────────────────────────────
 type ComposeUpSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+    [<CommandArgument(0, "<FILE>")>]
+    member val File: string = null with get, set
 
 type ComposeUpCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposeUpSettings>()
@@ -20,7 +22,7 @@ type ComposeUpCommand(output: IOutputPort) =
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
-                let orchestrator = new ComposeOrchestrator(output)
+                use orchestrator = new ComposeOrchestrator(output)
                 do! orchestrator.Up(settings.File)
                 return 0
         }
@@ -28,7 +30,9 @@ type ComposeUpCommand(output: IOutputPort) =
 // ── down ───────────────────────────────────────────────────────────
 type ComposeDownSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+    [<CommandArgument(0, "<FILE>")>]
+    member val File: string = null with get, set
 
 type ComposeDownCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposeDownSettings>()
@@ -39,7 +43,7 @@ type ComposeDownCommand(output: IOutputPort) =
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
-                let orchestrator = new ComposeOrchestrator(output)
+                use orchestrator = new ComposeOrchestrator(output)
                 do! orchestrator.Down(settings.File)
                 return 0
         }
@@ -47,7 +51,9 @@ type ComposeDownCommand(output: IOutputPort) =
 // ── ps ─────────────────────────────────────────────────────────────
 type ComposePsSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+    [<CommandArgument(0, "<FILE>")>]
+    member val File: string = null with get, set
 
 type ComposePsCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposePsSettings>()
@@ -58,7 +64,7 @@ type ComposePsCommand(output: IOutputPort) =
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
-                let orchestrator = new ComposeOrchestrator(output)
+                use orchestrator = new ComposeOrchestrator(output)
                 do! orchestrator.Ps(settings.File)
                 return 0
         }
@@ -66,8 +72,12 @@ type ComposePsCommand(output: IOutputPort) =
 // ── logs ───────────────────────────────────────────────────────────
 type ComposeLogsSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
-    [<CommandOption("-s|--service")>] member val Service: string = null with get, set
+
+    [<CommandArgument(0, "<FILE>")>]
+    member val File: string = null with get, set
+
+    [<CommandOption("-s|--service")>]
+    member val Service: string = null with get, set
 
 type ComposeLogsCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposeLogsSettings>()
@@ -78,8 +88,14 @@ type ComposeLogsCommand(output: IOutputPort) =
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
-                let orchestrator = new ComposeOrchestrator(output)
-                let service = if isNull settings.Service then None else Some settings.Service
+                use orchestrator = new ComposeOrchestrator(output)
+
+                let service =
+                    if isNull settings.Service then
+                        None
+                    else
+                        Some settings.Service
+
                 do! orchestrator.Logs(settings.File, service)
                 return 0
         }
@@ -87,7 +103,9 @@ type ComposeLogsCommand(output: IOutputPort) =
 // ── pull ───────────────────────────────────────────────────────────
 type ComposePullSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+    [<CommandArgument(0, "<FILE>")>]
+    member val File: string = null with get, set
 
 type ComposePullCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposePullSettings>()
@@ -98,7 +116,7 @@ type ComposePullCommand(output: IOutputPort) =
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
-                let orchestrator = new ComposeOrchestrator(output)
+                use orchestrator = new ComposeOrchestrator(output)
                 do! orchestrator.Pull(settings.File)
                 return 0
         }
@@ -106,7 +124,9 @@ type ComposePullCommand(output: IOutputPort) =
 // ── build ──────────────────────────────────────────────────────────
 type ComposeBuildSettings() =
     inherit CommandSettings()
-    [<CommandArgument(0, "<FILE>")>] member val File: string = null with get, set
+
+    [<CommandArgument(0, "<FILE>")>]
+    member val File: string = null with get, set
 
 type ComposeBuildCommand(output: IOutputPort) =
     inherit AsyncCommand<ComposeBuildSettings>()
@@ -117,7 +137,7 @@ type ComposeBuildCommand(output: IOutputPort) =
                 output.WriteError("Le chemin du fichier compose est requis")
                 return 1
             else
-                let orchestrator = new ComposeOrchestrator(output)
+                use orchestrator = new ComposeOrchestrator(output)
                 do! orchestrator.Build(settings.File)
                 return 0
         }

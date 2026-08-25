@@ -18,6 +18,7 @@ module HawkyntFsTests =
 
     let private run (f: string -> string -> unit) =
         let root = TestImage.createTempDir ()
+
         try
             let img = Path.Combine(root, "test.img")
             f root img
@@ -85,6 +86,7 @@ module HawkyntFsTests =
             let staging = Path.Combine(root, "staging")
             let n = FsImage.extract img staging false
             n |> should equal 1
+
             File.ReadAllText(Path.Combine(staging, "test.txt"))
             |> should equal "contenu Hawkynt")
 

@@ -21,28 +21,33 @@ module DiploConfig =
     /// - "http://pipe:/diplo-container" → inchangé (URL complète, canal par named pipe)
     let normalizeAddress (address: string) : string =
         let a = address.Trim()
-        if a.Contains("://") then a
-        else "http://" + a
+        if a.Contains("://") then a else "http://" + a
 
     let private getRaw (root: JsonElement) (section: string) (key: string) : string option =
         let mutable sectionEl = Unchecked.defaultof<JsonElement>
+
         if root.TryGetProperty(section, &sectionEl) then
             let mutable value = Unchecked.defaultof<JsonElement>
+
             if sectionEl.TryGetProperty(key, &value) && value.ValueKind = JsonValueKind.String then
                 let s = value.GetString()
                 if String.IsNullOrWhiteSpace(s) then None else Some s
-            else None
-        else None
+            else
+                None
+        else
+            None
 
     let private getAddress (root: JsonElement) (section: string) : string option =
         getRaw root section "address" |> Option.map normalizeAddress
 
     let private getTopLevel (root: JsonElement) (key: string) : string option =
         let mutable value = Unchecked.defaultof<JsonElement>
+
         if root.TryGetProperty(key, &value) && value.ValueKind = JsonValueKind.String then
             let s = value.GetString()
             if String.IsNullOrWhiteSpace(s) then None else Some s
-        else None
+        else
+            None
 
     let private parseConfig (json: string) : (string option * string option * string option) =
         try
@@ -57,7 +62,9 @@ module DiploConfig =
     let private readMeta (path: string) : (string option * string option) =
         try
             if File.Exists path then
-                use doc = JsonDocument.Parse(File.ReadAllText path, JsonDocumentOptions(MaxDepth = 8))
+                use doc =
+                    JsonDocument.Parse(File.ReadAllText path, JsonDocumentOptions(MaxDepth = 8))
+
                 let root = doc.RootElement
                 (getRaw root "container" "namespace", getTopLevel root "logLevel")
             else
@@ -70,6 +77,7 @@ module DiploConfig =
     /// 2. `diplo.json` dans le répertoire courant.
     let configPath () =
         let home = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
+
         if String.IsNullOrWhiteSpace(home) then
             Path.Combine(Directory.GetCurrentDirectory(), configFileName)
         else
@@ -78,13 +86,15 @@ module DiploConfig =
     /// Lit la configuration depuis un chemin explicite : None pour chaque section
     /// si le fichier est absent ou mal formé (repli sur les ports par défaut).
     let load (path: string) : (string option * string option * string option) =
-        if File.Exists path then parseConfig (File.ReadAllText path)
-        else (None, None, None)
+        if File.Exists path then
+            parseConfig (File.ReadAllText path)
+        else
+            (None, None, None)
 
     /// Cache de la configuration lue une seule fois par processus, vidé par
     /// `invalidate` (fichier volontairement ignoré s'il est absent ou mal formé :
     /// repli sur les ports par défaut).
-    let private cacheLock = obj()
+    let private cacheLock = obj ()
     let private cacheValue = ref None
 
     let private readCached () =
@@ -115,8 +125,7 @@ module DiploConfig =
         lock cacheLock (fun () -> cacheValue.Value <- None)
 
     /// Parse un texte JSON (exposé pour les tests).
-    let parse (json: string) : (string option * string option * string option) =
-        parseConfig json
+    let parse (json: string) : (string option * string option * string option) = parseConfig json
 
     /// Écrit la configuration client dans `path` (le répertoire parent est créé au
     /// besoin). Les champs `namespace` et `logLevel` déjà présents sont conservés.
@@ -124,7 +133,10 @@ module DiploConfig =
         let ns, logLevel = readMeta path
         let containerSection = JsonObject()
         containerSection["address"] <- JsonValue.Create(container)
-        ns |> Option.iter (fun n -> containerSection["namespace"] <- JsonValue.Create(n))
+
+        ns
+        |> Option.iter (fun n -> containerSection["namespace"] <- JsonValue.Create(n))
+
         let volumeSection = JsonObject()
         volumeSection["address"] <- JsonValue.Create(volume)
         let networkSection = JsonObject()
@@ -135,6 +147,8 @@ module DiploConfig =
         root["network"] <- networkSection
         logLevel |> Option.iter (fun l -> root["logLevel"] <- JsonValue.Create(l))
         let dir = Path.GetDirectoryName(path)
+
         if not (String.IsNullOrEmpty dir) && not (Directory.Exists dir) then
             Directory.CreateDirectory(dir) |> ignore
+
         File.WriteAllText(path, root.ToJsonString(JsonSerializerOptions(WriteIndented = true)))

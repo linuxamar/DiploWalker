@@ -6,7 +6,9 @@ open Diplo.Abstractions.Interfaces
 
 type MockVolumeDriver() =
 
-    let mutable volumes = Map.empty<string, string * string * Map<string, string> * Map<string, string>>
+    let mutable volumes =
+        Map.empty<string, string * string * Map<string, string> * Map<string, string>>
+
     let mutable mountedVolumes = Set.empty<string>
     let mutable pruneResult: string list = []
     let ownedDocs = System.Collections.Generic.List<JsonDocument>()
@@ -21,8 +23,17 @@ type MockVolumeDriver() =
             |> Map.toList
             |> List.map (fun (k, v) -> sprintf "\"%s\":\"%s\"" k v)
             |> String.concat ","
+
         let escapedMountpoint = mountpoint.Replace("\\", "\\\\")
-        let json = sprintf """{"id":"%s","name":"%s","mountpoint":"%s","labels":{%s},"createdAt":"2025-01-15T10:30:00Z"}""" id name escapedMountpoint labelsStr
+
+        let json =
+            sprintf
+                """{"id":"%s","name":"%s","mountpoint":"%s","labels":{%s},"createdAt":"2025-01-15T10:30:00Z"}"""
+                id
+                name
+                escapedMountpoint
+                labelsStr
+
         let doc = JsonDocument.Parse(json) |> keepDoc
         doc.RootElement
 
@@ -37,22 +48,24 @@ type MockVolumeDriver() =
             if volumes |> Map.containsKey id then
                 volumes <- volumes |> Map.remove id
                 true
-            else false
+            else
+                false
 
         member _.InspectVolume(id) =
             match volumes |> Map.tryFind id with
-            | Some (_, name, _, labels) ->
-                Some (createVolumeJson id name (sprintf "C:\\volumes\\%s\\_data" id) labels)
+            | Some(_, name, _, labels) -> Some(createVolumeJson id name (sprintf "C:\\volumes\\%s\\_data" id) labels)
             | None -> None
 
         member _.ListVolumes(_filters) =
             volumes
             |> Map.toList
-            |> List.map (fun (id, (_, name, _, labels)) -> createVolumeJson id name (sprintf "C:\\volumes\\%s\\_data" id) labels)
+            |> List.map (fun (id, (_, name, _, labels)) ->
+                createVolumeJson id name (sprintf "C:\\volumes\\%s\\_data" id) labels)
 
         member _.MountVolume(id, _targetPath, _options) =
             if not (volumes |> Map.containsKey id) then
                 failwithf "Volume %s introuvable" id
+
             mountedVolumes <- mountedVolumes |> Set.add id
             let mountDir = sprintf "C:\\mounts\\%s" id
             (true, mountDir)
@@ -62,12 +75,14 @@ type MockVolumeDriver() =
             (true, "Démonté")
 
         member _.PruneVolumes() = pruneResult
+
         member _.GetVolumeSize(id) =
             if volumes |> Map.containsKey id then 1024L else 0L
 
-    member this.Mock : IVolumeDriver = this :> IVolumeDriver
+    member this.Mock: IVolumeDriver = this :> IVolumeDriver
     member _.Volumes = volumes
     member _.MountedVolumes = mountedVolumes
+
     member _.PruneResult
-        with get() = pruneResult
-        and set(value) = pruneResult <- value
+        with get () = pruneResult
+        and set (value) = pruneResult <- value

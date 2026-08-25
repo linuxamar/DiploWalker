@@ -26,9 +26,13 @@ type StatusCommand(output: IOutputPort, clients: IDiploClients) =
                 task {
                     try
                         let! v = containerClient.GetVersionAsync()
+
                         let info =
-                            if String.IsNullOrEmpty v.Os then v.Version
-                            else sprintf "%s (%s/%s)" v.Version v.Os v.Arch
+                            if String.IsNullOrEmpty v.Os then
+                                v.Version
+                            else
+                                sprintf "%s (%s/%s)" v.Version v.Os v.Arch
+
                         return (true, info)
                     with ex ->
                         return (false, ex.Message)
@@ -64,9 +68,7 @@ type StatusCommand(output: IOutputPort, clients: IDiploClients) =
 
             output.WriteLine("")
 
-            let allOk =
-                [ containerStatus; volumeStatus; networkStatus ]
-                |> List.forall fst
+            let allOk = [ containerStatus; volumeStatus; networkStatus ] |> List.forall fst
 
             if allOk then
                 output.WriteSuccess("Tous les services sont opérationnels.")

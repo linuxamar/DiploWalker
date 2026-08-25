@@ -22,8 +22,11 @@ module RegistryAuth =
 
     let private defaultStateFile () =
         let baseDir =
-            let programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)
+            let programData =
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)
+
             Path.Combine(programData, "Diplo")
+
         Path.Combine(baseDir, stateFileName)
 
     /// Chemin du fichier d'état (par défaut : %ProgramData%\Diplo\registry-auth.json).
@@ -47,7 +50,8 @@ module RegistryAuth =
         try
             if OperatingSystem.IsWindows() then
                 System.Text.Encoding.UTF8.GetString(
-                    ProtectedData.Unprotect(Convert.FromBase64String(encoded), null, DataProtectionScope.CurrentUser))
+                    ProtectedData.Unprotect(Convert.FromBase64String(encoded), null, DataProtectionScope.CurrentUser)
+                )
             else
                 System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded))
         with ex ->
@@ -58,14 +62,20 @@ module RegistryAuth =
     /// Retourne un état vide si le fichier est absent ou illisible.
     let load (path: string) : Map<string, RegistryEntry> =
         try
-            if not (File.Exists path) then Map.empty
+            if not (File.Exists path) then
+                Map.empty
             else
                 let json = File.ReadAllText path
-                if String.IsNullOrWhiteSpace(json) || json = "null" then Map.empty
+
+                if String.IsNullOrWhiteSpace(json) || json = "null" then
+                    Map.empty
                 else
                     let entries = JsonSerializer.Deserialize<RegistryEntry list>(json)
-                    if isNull (box entries) then Map.empty
-                    else entries |> Seq.map (fun e -> e.Registry, e) |> Map.ofSeq
+
+                    if isNull (box entries) then
+                        Map.empty
+                    else
+                        entries |> Seq.map (fun e -> e.Registry, e) |> Map.ofSeq
         with
         | :? JsonException as ex ->
             Log.Warning(ex, "Fichier d'authentification registre corrompu: {Path}", path)
@@ -76,18 +86,23 @@ module RegistryAuth =
 
     /// Enregistre les identifiants (écriture atomique : fichier temporaire puis remplacement).
     let save (path: string) (entries: seq<RegistryEntry>) =
-        let json = JsonSerializer.Serialize(entries |> Seq.toList, JsonSerializerOptions(WriteIndented = true))
+        let json =
+            JsonSerializer.Serialize(entries |> Seq.toList, JsonSerializerOptions(WriteIndented = true))
+
         AtomicFile.write path json
 
     /// Ajoute ou met à jour l'identifiant d'un registre (mot de passe chiffré).
     let add (path: string) (registry: string) (username: string) (password: string) =
         let current = load path
+
         let updated =
-            Map.add registry
+            Map.add
+                registry
                 { Registry = registry
                   Username = username
                   EncryptedPassword = protect password }
                 current
+
         save path (updated |> Map.toSeq |> Seq.map snd)
 
     /// Retire l'identifiant d'un registre.

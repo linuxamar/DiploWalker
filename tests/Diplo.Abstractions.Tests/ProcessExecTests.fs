@@ -9,12 +9,14 @@ module ProcessExecTests =
     open Diplo.Abstractions
 
     let private tempDir () =
-        let dir = Path.Combine(Path.GetTempPath(), "diplo-process-tests", Guid.NewGuid().ToString("N"))
+        let dir =
+            Path.Combine(Path.GetTempPath(), "diplo-process-tests", Guid.NewGuid().ToString("N"))
+
         Directory.CreateDirectory(dir) |> ignore
         dir
 
     let private cmd (args: string list) =
-        ProcessExec.runWithResult "cmd.exe" (["/c"] @ args) None None
+        ProcessExec.runWithResult "cmd.exe" ([ "/c" ] @ args) None None
 
     [<Fact>]
     let ``runWithResult capture la sortie standard`` () =
@@ -36,7 +38,8 @@ module ProcessExecTests =
 
     [<Fact>]
     let ``run retourne la sortie standard en cas de succes`` () =
-        (ProcessExec.run "cmd.exe" [ "/c"; "echo"; "ok" ] None None).Contains("ok") |> should equal true
+        (ProcessExec.run "cmd.exe" [ "/c"; "echo"; "ok" ] None None).Contains("ok")
+        |> should equal true
 
     [<Fact>]
     let ``run leve une exception si le processus echoue`` () =
@@ -46,21 +49,26 @@ module ProcessExecTests =
     [<Fact>]
     let ``runWithResult tue le processus en cas de depassement du delai`` () =
         let stopwatch = Diagnostics.Stopwatch.StartNew()
+
         (fun () ->
             ProcessExec.runWithResult "cmd.exe" [ "/c"; "ping"; "-n"; "5"; "127.0.0.1" ] (Some 500) None
             |> ignore)
         |> should throw typeof<TimeoutException>
+
         stopwatch.ElapsedMilliseconds |> should be (lessThan 10_000L)
 
     [<Fact>]
     let ``runWithResult transmet l'entree standard au processus`` () =
-        let code, stdout, _ = ProcessExec.runWithResult "cmd.exe" [ "/c"; "more" ] None (Some "hello-stdin")
+        let code, stdout, _ =
+            ProcessExec.runWithResult "cmd.exe" [ "/c"; "more" ] None (Some "hello-stdin")
+
         code |> should equal 0
         stdout.Contains("hello-stdin") |> should equal true
 
     [<Fact>]
     let ``atomicWrite ecrit le contenu et cree le repertoire parent`` () =
         let dir = tempDir ()
+
         try
             let path = Path.Combine(dir, "sub", "state.json")
             AtomicFile.write path "{\"a\":1}"
@@ -72,6 +80,7 @@ module ProcessExecTests =
     [<Fact>]
     let ``atomicWrite remplace le contenu existant`` () =
         let dir = tempDir ()
+
         try
             let path = Path.Combine(dir, "state.json")
             AtomicFile.write path "premier"
@@ -83,6 +92,7 @@ module ProcessExecTests =
     [<Fact>]
     let ``atomicWrite ne laisse aucun fichier temporaire`` () =
         let dir = tempDir ()
+
         try
             let path = Path.Combine(dir, "state.json")
             AtomicFile.write path "contenu"

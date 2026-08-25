@@ -15,10 +15,13 @@ module AuthTokenTests =
     module Tests =
 
         let withTempPath (f: unit -> unit) =
-            let dir = Path.Combine(Path.GetTempPath(), "diplo-auth-" + Guid.NewGuid().ToString("N"))
+            let dir =
+                Path.Combine(Path.GetTempPath(), "diplo-auth-" + Guid.NewGuid().ToString("N"))
+
             Directory.CreateDirectory(dir) |> ignore
             let previous = authTokenPath
             authTokenPath <- Path.Combine(dir, "auth-token.json")
+
             try
                 f ()
             finally
@@ -58,8 +61,7 @@ module AuthTokenTests =
 
         [<Fact>]
         let ``verifyToken sans fichier token retourne false`` () =
-            withTempPath (fun () ->
-                verifyToken (generateToken ()) |> should equal false)
+            withTempPath (fun () -> verifyToken (generateToken ()) |> should equal false)
 
         [<Fact>]
         let ``verifyToken avec token vide retourne false`` () =
@@ -72,7 +74,11 @@ module AuthTokenTests =
         let ``verifyToken echoue si le token est expire`` () =
             withTempPath (fun () ->
                 let token = generateToken ()
-                let expired = { Token = token; ExpiresAt = DateTime.UtcNow.AddHours(-1.0) }
+
+                let expired =
+                    { Token = token
+                      ExpiresAt = DateTime.UtcNow.AddHours(-1.0) }
+
                 File.WriteAllText(authTokenPath, JsonSerializer.Serialize(expired))
                 verifyToken token |> should equal false)
 
