@@ -149,7 +149,7 @@ module Parallels =
                     let l1Off = h.L1TableOffset + int64 bIdx * 4L
                     s.Position <- l1Off
                     let blockOffsetBytes = Array.zeroCreate<byte> 4
-                    let _ = s.Read(blockOffsetBytes, 0, 4)
+                    readFully s blockOffsetBytes 0 4
                     let blockOffset = int64 (readUInt32LE blockOffsetBytes 0) * 512L
                     let toRead = min remaining (h.BlockSize - int bOffInBlock)
 
@@ -170,7 +170,7 @@ module Parallels =
             let l1Off = h.L1TableOffset + int64 i * 4L
             s.Position <- l1Off
             let buf = Array.zeroCreate<byte> 4
-            let _ = s.Read(buf, 0, 4)
+            readFully s buf 0 4
             let blockOff = int64 (readUInt32LE buf 0) * 512L
 
             if blockOff > 0L then
@@ -200,7 +200,7 @@ module Parallels =
             let l1Off = h.L1TableOffset + int64 bIdx * 4L
             s.Position <- l1Off
             let blockOffsetBuf = Array.zeroCreate<byte> 4
-            let _ = s.Read(blockOffsetBuf, 0, 4)
+            readFully s blockOffsetBuf 0 4
             let blockOffset = int64 (readUInt32LE blockOffsetBuf 0) * 512L
             let toWrite = min remaining (h.BlockSize - int bOffInBlock)
 

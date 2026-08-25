@@ -29,7 +29,7 @@ module SecurityValidation =
 
     /// Caractères interdits dans les commandes exécutées dans les conteneurs.
     let private dangerousChars =
-        [| ';'; '|'; '&'; '`'; '$'; '\t'; '\n'; '\r'; '<'; '>'; '('; ')' |]
+        [| ';'; '|'; '&'; '`'; '$'; '\''; '\t'; '\n'; '\r'; '<'; '>'; '('; ')' |]
 
     /// Préfixes dangereux interdits dans les commandes (contournements shell Windows).
     let private dangerousPrefixes = [| "\\\\"; "//" |]

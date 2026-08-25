@@ -182,10 +182,11 @@ module FsImage =
         else
             match format with
             | DiskFormat.Raw ->
-                let fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None)
-                fs.SetLength(virtualSize)
-                fs.Flush()
-                new Raw.Disk(fs, Ownership.Dispose) :> VirtualDisk
+                do
+                    use fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None)
+                    fs.SetLength(virtualSize)
+                    fs.Flush()
+                new Raw.Disk(new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read), Ownership.Dispose) :> VirtualDisk
             | _ ->
                 let typeName, variant =
                     match format with

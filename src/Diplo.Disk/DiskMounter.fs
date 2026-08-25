@@ -39,6 +39,30 @@ module DiskMounter =
         Directory.CreateDirectory baseDir |> ignore
         baseDir
 
+    /// Supprime les dossiers de staging orphelins (GUID) plus anciens que
+    /// `maxAge`. Un staging est orphelin quand le service a crashé entre
+    /// l'extraction et l'appel au write-back.
+    let pruneStaleStaging (maxAge: TimeSpan) =
+        let root = stagingRoot ()
+
+        for dir in Directory.GetDirectories root do
+            let dirName = Path.GetFileName dir
+
+            let isGuid (s: string) =
+                s.Length = 32
+                && s
+                    |> Seq.forall (fun c -> c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F')
+
+            if isGuid dirName then
+                try
+                    let age = DateTime.UtcNow - Directory.GetCreationTimeUtc(dir)
+
+                    if age > maxAge then
+                        Directory.Delete(dir, true)
+                        Log.Warning("Staging orphelin supprimé : {Dir} (âge {Age})", dir, age)
+                with ex ->
+                    Log.Warning(ex, "Échec de la suppression du staging orphelin : {Dir}", dir)
+
     let private extractOrRaise (source: string) (staging: string) (readOnly: bool) =
         try
             FsImage.extract source staging readOnly |> ignore
@@ -131,6 +155,7 @@ module DiskMounter =
 
 /// Implémentation concrète d'IDiskMounter pour l'injection de dépendances.
 type DiskMounter() =
+    do DiskMounter.pruneStaleStaging (TimeSpan.FromHours 24.0)
     interface IDiskMounter with
         member _.Mount(source, destination, readOnly) =
             DiskMounter.mount source destination readOnly

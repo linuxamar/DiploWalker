@@ -176,7 +176,7 @@ module Qcow1 =
                     bOff <- bOff + toRead
                     vOff <- vOff + int64 toRead
 
-    let private findFreeCluster (_s: Stream) (h: Header) : int64 =
+    let private findFreeCluster (h: Header) : int64 =
         let endOfL1 = h.L1TableOffset + int64 h.L1Size * 8L
         let lastCluster = (endOfL1 + h.ClusterSize - 1L) / h.ClusterSize
         lastCluster
@@ -202,7 +202,7 @@ module Qcow1 =
             let toWrite = min remaining (int (h.ClusterSize - clusterOff))
 
             if hostCluster = 0L then
-                let freeClus = findFreeCluster s h
+                let freeClus = findFreeCluster h
                 let newDesc = (freeClus <<< (clusterBits - 8)) &&& (~~~dataMask)
                 writeUInt64At s l1EntryOff newDesc
                 let fileOffset = freeClus * h.ClusterSize
