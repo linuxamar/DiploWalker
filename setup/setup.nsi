@@ -2,7 +2,8 @@
 !include "WinVer.nsh"
 !include "LogicLib.nsh"
 
-SetCompressor /SOLID lzma
+; Compression désactivée
+SetCompress off
 
 ; ── Définitions par défaut (surchargeables via -D) ──────────────────────────
 !ifndef APP_VERSION
