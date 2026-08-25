@@ -226,3 +226,6 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
                 use orchestrator = new ComposeOrchestrator(outputPort)
                 do! orchestrator.Pull(this.ComposeFilePath)
             })
+
+    interface IDisposable with
+        member _.Dispose() = (composeClient :> IDisposable).Dispose()

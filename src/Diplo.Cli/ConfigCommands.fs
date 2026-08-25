@@ -71,6 +71,10 @@ type InitConfigCommand(output: IOutputPort) =
             if not (String.IsNullOrWhiteSpace(dir)) && not (Directory.Exists(dir)) then
                 Directory.CreateDirectory(dir) |> ignore
 
-            File.WriteAllText(filePath, content)
-            output.WriteSuccess(sprintf "Configuration écrite dans %s" filePath)
-            0
+            try
+                File.WriteAllText(filePath, content)
+                output.WriteSuccess(sprintf "Configuration écrite dans %s" filePath)
+                0
+            with ex ->
+                output.WriteError(sprintf "Erreur lors de l'écriture de %s : %s" filePath ex.Message)
+                1

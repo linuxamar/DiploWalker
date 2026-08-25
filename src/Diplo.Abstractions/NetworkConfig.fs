@@ -149,7 +149,10 @@ let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) =
         let baseIp = c.Split('/')
         let prefix = baseIp.[0].Split('.') |> Array.take 2 |> String.concat "."
         not (usedPrefixes |> Set.exists (fun ip -> ip.StartsWith(prefix))))
-    |> Option.defaultValue (candidates |> List.head)
+    |> Option.defaultWith (fun () ->
+        match candidates |> List.tryHead with
+        | Some h -> h
+        | None -> failwith "Aucun sous-réseau disponible")
 
 let deriveGateway (subnet: string) =
     let ipPart = subnet.Split('/') |> Array.head
@@ -166,7 +169,9 @@ let resolveSubnet (config: CniNatConfig) (usedPrefixes: Set<string>) =
     if String.IsNullOrEmpty(config.Subnet) && config.AutoDetect then
         findAvailableSubnet config.SubnetCandidates usedPrefixes
     elif String.IsNullOrEmpty(config.Subnet) then
-        config.SubnetCandidates |> List.head
+        match config.SubnetCandidates |> List.tryHead with
+        | Some h -> h
+        | None -> failwith "Aucun sous-réseau disponible"
     else
         config.Subnet
 

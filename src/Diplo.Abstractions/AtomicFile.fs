@@ -29,6 +29,13 @@ module AtomicFile =
         File.WriteAllText(tmp, content)
 
         try
-            File.Replace(tmp, path, null)
-        with :? FileNotFoundException ->
-            File.Move(tmp, path)
+            try
+                File.Replace(tmp, path, null)
+            with :? FileNotFoundException ->
+                File.Move(tmp, path)
+        with
+        | _ ->
+            try
+                File.Delete(tmp)
+            with _ -> ()
+            reraise()

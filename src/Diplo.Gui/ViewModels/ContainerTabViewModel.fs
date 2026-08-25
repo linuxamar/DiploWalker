@@ -55,6 +55,9 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
 
     let mutable selectedContainer: ContainerInfo = Unchecked.defaultof<ContainerInfo>
 
+    let getSelectedContainer () = Volatile.Read(&selectedContainer)
+    let setSelectedContainer v = Interlocked.Exchange(&selectedContainer, v) |> ignore
+
     let mutable logCts: CancellationTokenSource = null
 
     let cancelPreviousLogStream () =
@@ -123,13 +126,13 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
     member _.Images = images
 
     member _.SelectedContainer
-        with get () = selectedContainer
+        with get () = getSelectedContainer ()
         and set v =
-            selectedContainer <- v
+            setSelectedContainer v
             this.OnPropertyChanged()
             this.OnPropertyChanged(nameof this.HasSelection)
 
-    member _.HasSelection = not (isNull (box selectedContainer))
+    member _.HasSelection = not (isNull (box (getSelectedContainer ())))
 
     member _.ContainerIdInput
         with get () = containerIdInput
@@ -616,6 +619,7 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
 
     interface IDisposable with
         member _.Dispose() =
+            (containerClient :> IDisposable).Dispose()
             if logCts <> null then
                 logCts.Cancel()
                 logCts.Dispose()

@@ -281,3 +281,6 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                         let size = System.IO.FileInfo(result).Length
                         outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
             })
+
+    interface IDisposable with
+        member _.Dispose() = (volumeClient :> IDisposable).Dispose()

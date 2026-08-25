@@ -264,3 +264,6 @@ type NetworkTabViewModel(outputPort: IOutputPort) as this =
                 let! response = networkClient.PruneNetworksAsync()
                 outputPort.WriteSuccess(sprintf "Réseaux nettoyés - %s" response.Message)
             })
+
+    interface IDisposable with
+        member _.Dispose() = (networkClient :> IDisposable).Dispose()

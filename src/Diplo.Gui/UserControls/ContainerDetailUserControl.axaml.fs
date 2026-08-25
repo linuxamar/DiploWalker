@@ -13,5 +13,8 @@ type ContainerDetailUserControl() as this =
             typeof<ContainerDetailUserControl>.Assembly
                 .GetManifestResourceStream("Diplo.Gui.UserControls.ContainerDetailUserControl.axaml")
 
+        if isNull stream then
+            failwith "Ressource XAML introuvable : Diplo.Gui.UserControls.ContainerDetailUserControl.axaml"
+
         AvaloniaRuntimeXamlLoader.Load(stream, typeof<ContainerDetailUserControl>.Assembly, this)
         |> ignore

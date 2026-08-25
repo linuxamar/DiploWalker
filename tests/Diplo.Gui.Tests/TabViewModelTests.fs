@@ -55,7 +55,7 @@ let ``MockOutputPort.Clear remet tout à zéro`` () =
 [<Fact>]
 let ``ComposeTabViewModel expose les 6 commandes ICommand`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     vm.ComposeUpCommand |> should not' (be Null)
     vm.ComposeDownCommand |> should not' (be Null)
     vm.ComposePsCommand |> should not' (be Null)
@@ -66,7 +66,7 @@ let ``ComposeTabViewModel expose les 6 commandes ICommand`` () =
 [<Fact>]
 let ``ComposeTabViewModel etat initial`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     vm.ComposeFilePath |> should equal ""
     vm.ComposeServiceName |> should equal ""
     vm.ComposeServices.Count |> should equal 0
@@ -74,7 +74,7 @@ let ``ComposeTabViewModel etat initial`` () =
 [<Fact>]
 let ``ComposeTabViewModel proprietes declenchent PropertyChanged`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
     vm.ComposeFilePath <- "/test/docker-compose.yml"
@@ -174,7 +174,7 @@ let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
 [<Fact>]
 let ``VolumeTabViewModel expose les 10 commandes ICommand`` () =
     let port = MockOutputPort()
-    let vm = VolumeTabViewModel(port)
+    let vm = new VolumeTabViewModel(port)
     vm.ListVolumesCommand |> should not' (be Null)
     vm.InspectVolumeCommand |> should not' (be Null)
     vm.CreateVolumeCommand |> should not' (be Null)
@@ -189,7 +189,7 @@ let ``VolumeTabViewModel expose les 10 commandes ICommand`` () =
 [<Fact>]
 let ``VolumeTabViewModel etat initial image disque`` () =
     let port = MockOutputPort()
-    let vm = VolumeTabViewModel(port)
+    let vm = new VolumeTabViewModel(port)
     vm.ImageSourceDir |> should equal ""
     vm.ImageDestPath |> should equal ""
     vm.ImageFormat |> should equal "raw"
@@ -197,7 +197,7 @@ let ``VolumeTabViewModel etat initial image disque`` () =
 [<Fact>]
 let ``VolumeTabViewModel etat initial`` () =
     let port = MockOutputPort()
-    let vm = VolumeTabViewModel(port)
+    let vm = new VolumeTabViewModel(port)
     vm.VolumeIdInput |> should equal ""
     vm.VolumeNameInput |> should equal ""
     vm.Volumes.Count |> should equal 0
@@ -207,7 +207,7 @@ let ``VolumeTabViewModel etat initial`` () =
 [<Fact>]
 let ``NetworkTabViewModel expose les 8 commandes ICommand`` () =
     let port = MockOutputPort()
-    let vm = NetworkTabViewModel(port)
+    let vm = new NetworkTabViewModel(port)
     vm.ListNetworksCommand |> should not' (be Null)
     vm.InspectNetworkCommand |> should not' (be Null)
     vm.CreateNetworkCommand |> should not' (be Null)
@@ -220,7 +220,7 @@ let ``NetworkTabViewModel expose les 8 commandes ICommand`` () =
 [<Fact>]
 let ``NetworkTabViewModel etat initial`` () =
     let port = MockOutputPort()
-    let vm = NetworkTabViewModel(port)
+    let vm = new NetworkTabViewModel(port)
     vm.NetworkIdInput |> should equal ""
     vm.NetworkNameInput |> should equal ""
     vm.Networks.Count |> should equal 0
@@ -248,7 +248,7 @@ let private withConfigHome (action: string -> unit) =
 let ``SettingsTabViewModel expose les commandes ICommand`` () =
     withConfigHome (fun _ ->
         let port = MockOutputPort()
-        let vm = SettingsTabViewModel(port)
+        let vm = new SettingsTabViewModel(port)
         vm.SaveCommand |> should not' (be Null)
         vm.ReloadCommand |> should not' (be Null))
 
@@ -256,7 +256,7 @@ let ``SettingsTabViewModel expose les commandes ICommand`` () =
 let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
     withConfigHome (fun home ->
         let port = MockOutputPort()
-        let vm = SettingsTabViewModel(port)
+        let vm = new SettingsTabViewModel(port)
         vm.ConfigPath |> should equal (Path.Combine(home, "diplo.json"))
         vm.ContainerAddress |> should equal "localhost:5001"
         vm.VolumeAddress |> should equal "localhost:5002"
@@ -266,7 +266,7 @@ let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
 let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` () =
     withConfigHome (fun home ->
         let port = MockOutputPort()
-        let vm = SettingsTabViewModel(port)
+        let vm = new SettingsTabViewModel(port)
         vm.ContainerAddress <- "http://pipe:/diplo-container"
         vm.VolumeAddress <- "localhost:9002"
         vm.NetworkAddress <- "localhost:9003"
@@ -288,7 +288,7 @@ let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` ()
 let ``SettingsTabViewModel SaveCommand avec adresse vide signale une erreur`` () =
     withConfigHome (fun _ ->
         let port = MockOutputPort()
-        let vm = SettingsTabViewModel(port)
+        let vm = new SettingsTabViewModel(port)
         vm.ContainerAddress <- ""
         (vm.SaveCommand).Execute(null)
         vm.StatusMessage |> should haveSubstring "obligatoires")
@@ -297,7 +297,7 @@ let ``SettingsTabViewModel SaveCommand avec adresse vide signale une erreur`` ()
 let ``SettingsTabViewModel SaveCommand applique la configuration sans redemarrage`` () =
     withConfigHome (fun _ ->
         let port = MockOutputPort()
-        let vm = SettingsTabViewModel(port)
+        let vm = new SettingsTabViewModel(port)
         vm.ContainerAddress <- "http://pipe:/diplo-container"
         vm.VolumeAddress <- "localhost:9002"
         vm.NetworkAddress <- "localhost:9003"
@@ -314,7 +314,7 @@ let ``SettingsTabViewModel ReloadCommand relit la configuration depuis le disque
         let path = Path.Combine(home, "diplo.json")
         DiploConfig.save path "localhost:7001" "localhost:7002" "localhost:7003"
         let port = MockOutputPort()
-        let vm = SettingsTabViewModel(port)
+        let vm = new SettingsTabViewModel(port)
         vm.ContainerAddress |> should equal "http://localhost:7001"
         vm.VolumeAddress |> should equal "http://localhost:7002"
         vm.NetworkAddress |> should equal "http://localhost:7003"
@@ -480,7 +480,7 @@ let ``ComposeEditorViewModel proprietes declenchent PropertyChanged`` () =
 [<Fact>]
 let ``ComposeTabViewModel expose les commandes de l'editeur`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     vm.OpenComposeFileCommand |> should not' (be Null)
     vm.SaveComposeFileCommand |> should not' (be Null)
     vm.ValidateComposeFileCommand |> should not' (be Null)
@@ -489,19 +489,19 @@ let ``ComposeTabViewModel expose les commandes de l'editeur`` () =
 [<Fact>]
 let ``ComposeTabViewModel ComposeEditor n'est pas null`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     vm.ComposeEditor |> should not' (be Null)
 
 [<Fact>]
 let ``ComposeTabViewModel InspectImageRef etat initial`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     vm.InspectImageRef |> should equal ""
 
 [<Fact>]
 let ``ComposeTabViewModel InspectImageRef declenche PropertyChanged`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     let mutable changed = []
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
     vm.InspectImageRef <- "nginx:latest"
@@ -510,14 +510,14 @@ let ``ComposeTabViewModel InspectImageRef declenche PropertyChanged`` () =
 [<Fact>]
 let ``ComposeTabViewModel OnSelectedServiceChanged met a jour InspectImageRef`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     vm.OnSelectedServiceChanged("alpine:3.18")
     vm.InspectImageRef |> should equal "alpine:3.18"
 
 [<Fact>]
 let ``ComposeTabViewModel ValidateComposeFile sans fichier affiche avertissement`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     (vm.ValidateComposeFileCommand :> System.Windows.Input.ICommand).Execute(null)
     // Pas de fichier chargé, validate fonctionne sur le document vide
     vm.ComposeEditor.Errors.Count |> should be (greaterThan 0)
@@ -525,7 +525,7 @@ let ``ComposeTabViewModel ValidateComposeFile sans fichier affiche avertissement
 [<Fact>]
 let ``ComposeTabViewModel SaveComposeFile sans fichier ouvre le dialogue`` () =
     let port = MockOutputPort()
-    let vm = ComposeTabViewModel(port)
+    let vm = new ComposeTabViewModel(port)
     (vm.SaveComposeFileCommand :> System.Windows.Input.ICommand).Execute(null)
     // Sans storageProvider, écrit un avertissement
     port.Warnings
@@ -540,7 +540,7 @@ let ``ComposeTabViewModel ComposeFilePath charge l'editeur`` () =
         let path = IO.Path.Combine(dir, "docker-compose.yml")
         IO.File.WriteAllText(path, "services:\n  web:\n    image: nginx\n")
         let port = MockOutputPort()
-        let vm = ComposeTabViewModel(port)
+        let vm = new ComposeTabViewModel(port)
         vm.ComposeFilePath <- path
         vm.ComposeEditor.Document.Text.Contains("nginx") |> should equal true
     finally

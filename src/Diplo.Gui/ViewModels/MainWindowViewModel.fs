@@ -16,10 +16,10 @@ type MainWindowViewModel() as this =
     let maxLogLines = 500
 
     let containerTab = new ContainerTabViewModel(outputPort)
-    let volumeTab = VolumeTabViewModel(outputPort)
-    let networkTab = NetworkTabViewModel(outputPort)
-    let composeTab = ComposeTabViewModel(outputPort)
-    let settingsTab = SettingsTabViewModel(outputPort)
+    let volumeTab = new VolumeTabViewModel(outputPort)
+    let networkTab = new NetworkTabViewModel(outputPort)
+    let composeTab = new ComposeTabViewModel(outputPort)
+    let settingsTab = new SettingsTabViewModel(outputPort)
 
     let trimLogLines () =
         while outputPort.LogLines.Count > maxLogLines do
@@ -52,9 +52,12 @@ type MainWindowViewModel() as this =
     member _.QuitCommand: ICommand =
         RelayCommand(
             Action(fun () ->
-                match Application.Current.ApplicationLifetime with
-                | :? IClassicDesktopStyleApplicationLifetime as desktop -> desktop.Shutdown(0)
-                | _ -> ())
+                match Application.Current with
+                | null -> ()
+                | app ->
+                    match app.ApplicationLifetime with
+                    | :? IClassicDesktopStyleApplicationLifetime as desktop -> desktop.Shutdown(0)
+                    | _ -> ())
         )
 
     member _.AboutCommand: ICommand =
@@ -65,3 +68,10 @@ type MainWindowViewModel() as this =
                 (outputPort :> IOutputPort)
                     .WriteLine("Interface graphique Avalonia pour la gestion de conteneurs, volumes et réseaux."))
         )
+
+    interface IDisposable with
+        member _.Dispose() =
+            (containerTab :> IDisposable).Dispose()
+            (volumeTab :> IDisposable).Dispose()
+            (networkTab :> IDisposable).Dispose()
+            (composeTab :> IDisposable).Dispose()

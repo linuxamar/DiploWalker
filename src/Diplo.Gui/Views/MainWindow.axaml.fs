@@ -12,7 +12,7 @@ open Diplo.Gui.ViewModels
 type MainWindow() as this =
     inherit Window()
 
-    let viewModel = MainWindowViewModel()
+    let viewModel = new MainWindowViewModel()
 
     do
         this.DataContext <- viewModel
@@ -36,7 +36,7 @@ type MainWindow() as this =
         viewModel.ComposeTab.SetStorageProvider(this.StorageProvider)
         this.setUpComposeEditor ()
         let aboutItem = this.FindControl<MenuItem>("AboutMenuItem")
-        aboutItem.Command <- Diplo.Gui.ViewModels.RelayCommand(Action(fun () -> this.OnAbout(null, RoutedEventArgs())))
+        aboutItem.Command <- Diplo.Gui.ViewModels.RelayCommand(Action(fun () -> this.OnAbout(null, null)))
 
     member private this.setUpComposeEditor() =
         let host = this.FindControl<Panel>("ComposeEditorHost")
