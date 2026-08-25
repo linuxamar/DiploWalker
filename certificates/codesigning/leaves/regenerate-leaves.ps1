@@ -22,9 +22,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
+$repoRoot  = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
 $leavesDir = $PSScriptRoot
-$caDir = Resolve-Path (Join-Path $PSScriptRoot "..")
+$caDir     = Resolve-Path (Join-Path $PSScriptRoot "..")
 
 # Binaire OpenSSL : Git pour Windows par défaut, sinon le PATH.
 $openssl = "C:\Program Files\Git\usr\bin\openssl.exe"
@@ -118,8 +118,7 @@ foreach ($name in $names) {
     try {
         & $openssl req -new -config openssl.cnf -key $key -out $csr
         if ($LASTEXITCODE -ne 0) { throw "Échec de la CSR ($name)." }
-    }
-    finally {
+    } finally {
         Pop-Location
     }
 
@@ -128,8 +127,7 @@ foreach ($name in $names) {
         & $openssl ca -config openssl.cnf -extensions leaf_cert -batch -notext `
             -md sha384 -in $csr -out $crt -days 825
         if ($LASTEXITCODE -ne 0) { throw "Échec de la signature ($name)." }
-    }
-    finally {
+    } finally {
         Pop-Location
     }
 

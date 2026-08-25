@@ -1,4 +1,4 @@
-# ---------------------------------------------------------------------------
+﻿# ---------------------------------------------------------------------------
 #  build.ps1 – Compile Diplo-Setup.exe (NSIS)
 # ---------------------------------------------------------------------------
 #  Usage :
@@ -30,7 +30,7 @@ if (-not $makensis) {
 
 # Résoudre le répertoire racine du dépôt
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$setupDir = $PSScriptRoot
+$setupDir  = $PSScriptRoot
 
 # Déterminer le répertoire de publication
 if (-not $PublishRoot) {
@@ -52,12 +52,12 @@ Write-Host "  Platform : $Platform" -ForegroundColor Cyan
 Write-Host "  Publish  : $PublishRoot" -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════" -ForegroundColor Cyan
 
-$nsiFile = Join-Path $setupDir "setup.nsi"
-$outFile = Join-Path $repoRoot "Diplo-Setup-$Version-$Platform.exe"
+$nsiFile   = Join-Path $setupDir "setup.nsi"
+$outFile   = Join-Path $repoRoot "Diplo-Setup-$Version-$Platform.exe"
 
-$defineVersion = "-DAPP_VERSION=$Version"
-$definePlatform = "-DPLATFORM=$Platform"
-$definePublish = "-DPUBLISH_ROOT=$PublishRoot"
+$defineVersion   = "-DAPP_VERSION=$Version"
+$definePlatform  = "-DPLATFORM=$Platform"
+$definePublish   = "-DPUBLISH_ROOT=$PublishRoot"
 
 Push-Location $setupDir
 try {
@@ -66,8 +66,7 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "makensis a échoué (code $LASTEXITCODE)."
     }
-}
-finally {
+} finally {
     Pop-Location
 }
 
@@ -94,8 +93,7 @@ if ($Sign) {
     }
     if (-not $signtool) {
         Write-Warning "signtool.exe introuvable (installez le SDK Windows ou ajoutez-le au PATH) — signature ignorée."
-    }
-    else {
+    } else {
         Write-Host ""
         Write-Host "═══ Signature ═══" -ForegroundColor Cyan
         Write-Host "  signtool : $($signtool.Source)"
@@ -105,20 +103,17 @@ if ($Sign) {
         if ($SignThumbprint) {
             # Certificat du magasin désigné par son empreinte (SHA-1 ou SHA-256).
             $signArgs += "/sha1", $SignThumbprint
-        }
-        elseif ($SignCert) {
+        } elseif ($SignCert) {
             $signArgs += "/f", $SignCert
             if ($SignPassword) {
                 $signArgs += "/p", $SignPassword
             }
-        }
-        else {
+        } else {
             # Par défaut : la feuille de signature de code du projet Diplo.Installer.
             $defaultPfx = Join-Path $repoRoot "certificates\codesigning\leaves\Diplo.Installer\Diplo.Installer.pfx"
             if (Test-Path $defaultPfx) {
                 $signArgs += "/f", $defaultPfx
-            }
-            else {
+            } else {
                 $signArgs += "/a"
             }
         }
@@ -132,8 +127,7 @@ if ($Sign) {
 
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  ✓ Installateur signé." -ForegroundColor Green
-        }
-        else {
+        } else {
             Write-Warning "La signature a échoué (code $LASTEXITCODE)."
         }
     }

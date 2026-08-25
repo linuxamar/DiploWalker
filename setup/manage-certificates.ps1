@@ -22,7 +22,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$rootCn = "Diplo Root CA"
+$rootCn    = "Diplo Root CA"
 $targetCns = @("Authentification", "CodeSigning", "System")
 
 function Add-CertificateToStore {
@@ -31,13 +31,12 @@ function Add-CertificateToStore {
         [System.Security.Cryptography.X509Certificates.StoreName]$StoreName
     )
 
-    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($Path)
+    $cert  = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($Path)
     $store = New-Object System.Security.Cryptography.X509Certificates.X509Store($StoreName, "LocalMachine")
     try {
         $store.Open("ReadWrite")
         $store.Add($cert)
-    }
-    finally {
+    } finally {
         $store.Close()
         $cert.Dispose()
     }
@@ -60,11 +59,9 @@ function Remove-CertificatesFromStores {
             foreach ($cert in $toRemove) {
                 $store.Remove($cert)
             }
-        }
-        catch {
+        } catch {
             Write-Warning "Impossible de nettoyer le magasin $storeName : $_"
-        }
-        finally {
+        } finally {
             $store.Close()
         }
     }
@@ -72,13 +69,12 @@ function Remove-CertificatesFromStores {
 
 if ($Remove) {
     Remove-CertificatesFromStores
-}
-else {
+} else {
     $certificates = @(
-        @{ File = "root-ca.crt.pem"; Store = [System.Security.Cryptography.X509Certificates.StoreName]::Root }
+        @{ File = "root-ca.crt.pem";          Store = [System.Security.Cryptography.X509Certificates.StoreName]::Root }
         @{ File = "authentification.crt.pem"; Store = [System.Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority }
-        @{ File = "codesigning.crt.pem"; Store = [System.Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority }
-        @{ File = "system.crt.pem"; Store = [System.Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority }
+        @{ File = "codesigning.crt.pem";      Store = [System.Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority }
+        @{ File = "system.crt.pem";           Store = [System.Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority }
     )
     foreach ($cert in $certificates) {
         $path = Join-Path $PSScriptRoot $cert.File
