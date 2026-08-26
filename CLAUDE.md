@@ -51,11 +51,15 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 
 ## Stack
 
-- **.NET 10** (`dotnet 10.0.302` installé localement).
+- **.NET 10** (`dotnet 10.0.400` installé localement).
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
 - **GUI** : Avalonia 12.1.1 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 877 tests au total.
+- **Tests** : xUnit v4 + FsUnit.xUnit — 886 tests au total.
+
+### Ports gRPC (Debug / Release)
+
+Les ports des 3 services sont définis **une seule fois** dans `Diplo.Abstractions/DiploPorts.fs` : `#if DEBUG` → 5001/5002/5003, sinon → 6001/6002/6003. `ServerConfig.runGrpcHost` force l'environnement selon la configuration de build (Development en Debug, Production sinon) quand les variables d'environnement sont absentes ; `appsettings.json` porte les ports Release et `appsettings.Development.json` les ports Debug. Les clients (CLI, GUI) et l'installateur consomment les constantes — ne jamais coder un port en dur ailleurs.
 
 ### Contraintes F#
 
@@ -76,6 +80,12 @@ dotnet build Diplo.slnx                       # Build complète
 .\pipeline.ps1 -DoPublish                     # Publication self-contained
 .\pipeline.ps1 -Clean -Restore                # Nettoyage + restauration NuGet
 ```
+
+> **Attention** : `dotnet test --nologo` casse la découverte de tests avec le runner MTP (0 test exécuté, code de sortie 5). Ne pas utiliser `--nologo`.
+
+## Environnement opencode
+
+La configuration **globale** d'opencode (`~/.config/opencode/opencode.jsonc`) déclare deux serveurs LSP : TypeScript (tsserver via scoop) et PowerShell (**PowerShellEditorServices** installé sous `%LOCALAPPDATA%\opencode\tools\powershell-lsp\`, lancé en mode `-Stdio`). Particularité : PSES écrit son fichier de statut `PowerShellEditorServices.json` dans le répertoire courant du processus — le LSP démarre donc via `Set-Location %LOCALAPPDATA%\opencode` pour éviter de polluer les dépôts ; `/PowerShellEditorServices.json` figure aussi dans l'exclusion git globale (`core.excludesFile`). La config n'est pas rechargée à chaud : redémarrer opencode après modification.
 
 ## Conventions Git
 
