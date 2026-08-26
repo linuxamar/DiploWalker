@@ -27,6 +27,9 @@ let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
     let useTcp = config.GetValue<bool>("ServiceSettings:UseTcp")
     let usePipes = config.GetValue<bool>("ServiceSettings:UseNamedPipes")
 
+    if not useTcp && not usePipes then
+        failwith "Configuration invalide : ni ServiceSettings:UseTcp ni ServiceSettings:UseNamedPipes sont activés"
+
     if useTcp then
         Log.Information("Écoute TCP sur localhost:{Port}", grpcPort)
 
@@ -46,12 +49,16 @@ let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
     // (sur Windows, les règles Deny priment sur les règles Allow).
     opts.CurrentUserOnly <- false
     let pipeSecurity = PipeSecurity()
-    let currentUser = WindowsIdentity.GetCurrent()
 
-    let allowRule =
-        PipeAccessRule(currentUser.User, PipeAccessRights.FullControl, AccessControlType.Allow)
+    // WindowsIdentity détient un handle de token : à disposer.
+    do
+        use currentUser = WindowsIdentity.GetCurrent()
 
-    pipeSecurity.AddAccessRule(allowRule)
+        let allowRule =
+            PipeAccessRule(currentUser.User, PipeAccessRights.FullControl, AccessControlType.Allow)
+
+        pipeSecurity.AddAccessRule(allowRule)
+
     opts.PipeSecurity <- pipeSecurity
 
 let runGrpcHost

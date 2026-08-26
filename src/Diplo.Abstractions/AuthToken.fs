@@ -39,17 +39,30 @@ let saveToken (token: string) =
     let tmpPath = authTokenPath + "." + Guid.NewGuid().ToString("N") + ".tmp"
 
     try
-        File.WriteAllText(tmpPath, json)
+        // Créer le fichier VIDE d'abord, resserrer l'ACL, puis écrire le contenu :
+        // WriteAllText créerait le fichier avec les ACL héritées permissives de
+        // C:\ProgramData\Diplo (lecture BUILTIN\Users) — fenêtre d'exposition.
+        do
+            use fs =
+                new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None)
+
+            ()
+
         let fileInfo = new FileInfo(tmpPath)
         let acl = fileInfo.GetAccessControl()
         acl.SetAccessRuleProtection(true, false)
-        let currentUser = WindowsIdentity.GetCurrent()
 
-        let rule =
-            FileSystemAccessRule(currentUser.User, FileSystemRights.FullControl, AccessControlType.Allow)
+        // WindowsIdentity détient un handle de token : à disposer.
+        do
+            use currentUser = WindowsIdentity.GetCurrent()
 
-        acl.AddAccessRule(rule)
+            let rule =
+                FileSystemAccessRule(currentUser.User, FileSystemRights.FullControl, AccessControlType.Allow)
+
+            acl.AddAccessRule(rule)
+
         fileInfo.SetAccessControl(acl)
+        File.WriteAllText(tmpPath, json)
 
         try
             File.Replace(tmpPath, authTokenPath, null)
@@ -70,6 +83,7 @@ type private TokenCache() =
     let mutable cachedToken: string option = None
     let mutable lastWriteUtc: DateTime = DateTime.MinValue
     let mutable lastLoadUtc: DateTime = DateTime.MinValue
+    let mutable lastExpiredLogUtc: DateTime = DateTime.MinValue
     let cacheTtl = TimeSpan.FromSeconds(5.0)
     let lockObj = obj ()
 
@@ -86,7 +100,10 @@ type private TokenCache() =
                     || writeTimeUtc > lastWriteUtc
                 then
                     let json = File.ReadAllText(authTokenPath)
-                    let doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
+
+                    // JsonDocument loue des buffers du pool : à disposer.
+                    use doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
+
                     let root = doc.RootElement
                     let token = root.GetProperty("Token").GetString()
                     let mutable expiresElement = Unchecked.defaultof<JsonElement>
@@ -95,7 +112,12 @@ type private TokenCache() =
                         let expiresAt = expiresElement.GetDateTime()
 
                         if DateTime.UtcNow > expiresAt then
-                            Log.Warning("Token expiré le {ExpiresAt}", expiresAt)
+                            // Un seul avertissement par minute : sinon chaque requête
+                            // (après expiration du TTL) inonde les logs et le disque.
+                            if (now - lastExpiredLogUtc) > TimeSpan.FromMinutes(1.0) then
+                                Log.Warning("Token expiré le {ExpiresAt}", expiresAt)
+                                lastExpiredLogUtc <- now
+
                             cachedToken <- None
                         else
                             cachedToken <- Some token

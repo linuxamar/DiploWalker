@@ -40,6 +40,9 @@ module RegistryAuth =
     let stateFile () = !stateFileRef
 
     let private protect (password: string) =
+        if isNull password then
+            invalidArg (nameof password) "Le mot de passe ne peut pas être null"
+
         if OperatingSystem.IsWindows() then
             let bytes = System.Text.Encoding.UTF8.GetBytes(password)
             Convert.ToBase64String(ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser))
@@ -91,25 +94,32 @@ module RegistryAuth =
 
         AtomicFile.write path json
 
+    /// Verrou global : les handlers gRPC s'exécutent en parallèle et add/remove
+    /// font une lecture-modification-écriture — sans verrou, deux mutations
+    /// concurrentes s'écrasent mutuellement (perte silencieuse d'identifiants).
+    let private stateLock = obj ()
+
     /// Ajoute ou met à jour l'identifiant d'un registre (mot de passe chiffré).
     let add (path: string) (registry: string) (username: string) (password: string) =
-        let current = load path
+        lock stateLock (fun () ->
+            let current = load path
 
-        let updated =
-            Map.add
-                registry
-                { Registry = registry
-                  Username = username
-                  EncryptedPassword = protect password }
-                current
+            let updated =
+                Map.add
+                    registry
+                    { Registry = registry
+                      Username = username
+                      EncryptedPassword = protect password }
+                    current
 
-        save path (updated |> Map.toSeq |> Seq.map snd)
+            save path (updated |> Map.toSeq |> Seq.map snd))
 
     /// Retire l'identifiant d'un registre.
     let remove (path: string) (registry: string) =
-        let current = load path
-        let updated = Map.remove registry current
-        save path (updated |> Map.toSeq |> Seq.map snd)
+        lock stateLock (fun () ->
+            let current = load path
+            let updated = Map.remove registry current
+            save path (updated |> Map.toSeq |> Seq.map snd))
 
     /// Retourne l'identifiant d'un registre sous forme "user:password" pour ctr --user.
     let tryGetUserArg (path: string) (registry: string) =

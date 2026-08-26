@@ -3,9 +3,15 @@ namespace Diplo.Abstractions
 open System.Text.Json
 
 /// Helpers mutualisés pour l'extraction de propriétés depuis des JsonElement.
+/// CONTRAT SENTINELLE : tryGetString/tryGetInt64/tryGetDouble/tryGetBool
+/// retournent la valeur par défaut du type ("", 0L, 0.0, false) aussi bien
+/// pour une propriété absente que pour un mismatch de type — impossible de
+/// distinguer « absent » de « vide ». Pour différencier, utiliser les
+/// variantes Option (tryGetElement, tryGetStringValue).
 [<RequireQualifiedAccess>]
 module JsonHelpers =
 
+    /// Valeur de la propriété, ou "" si absente ou non-chaîne (sentinelle ambiguë).
     let tryGetString (el: JsonElement) (prop: string) =
         let mutable v = Unchecked.defaultof<JsonElement>
 

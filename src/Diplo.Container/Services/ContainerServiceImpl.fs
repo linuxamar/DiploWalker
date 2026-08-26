@@ -23,17 +23,60 @@ open Diplo.Container
 /// Aides au streaming gRPC basées sur System.Threading.Channels.
 module private ContainerStreaming =
 
-    /// Flux basé sur un canal : connecte un flux entrant gRPC (entrée standard
-    /// du processus) et les flux sortants (stdout/stderr) sans buffer
-    /// intermédiaire.
+    /// Flux basé sur un canal de SEGMENTS (byte[]) : connecte un flux entrant
+    /// gRPC et les flux sortants. Le découpage par segments évite le coût d'un
+    /// WriteAsync par octet, et la lecture rend les données dès qu'un segment
+    /// est disponible (une sortie interactive courte n'attend plus 8 Ko).
     type ChannelStream() =
         inherit Stream()
 
         let channel =
-            Channel.CreateUnbounded<byte>(UnboundedChannelOptions(SingleReader = false, SingleWriter = false))
+            Channel.CreateUnbounded<byte[]>(UnboundedChannelOptions(SingleReader = false, SingleWriter = false))
 
         let reader = channel.Reader
         let writer = channel.Writer
+
+        // Segment en cours de consommation (lecture partielle entre deux appels).
+        let mutable pending: (byte[] * int) option = None
+
+        /// Lit au plus `count` octets : consomme d'abord le segment partiel
+        /// restant, puis attend un nouveau segment ; retourne dès que `count`
+        /// octets sont réunis OU que tous les segments disponibles sont épuisés.
+        let readInto (buffer: byte[]) (offset: int) (count: int) : int =
+            let mutable total = 0
+            let mutable cont = true
+
+            while cont do
+                match pending with
+                | Some(chunk, pos) ->
+                    let available = chunk.Length - pos
+                    let take = min available (count - total)
+                    Array.blit chunk pos buffer (offset + total) take
+                    total <- total + take
+
+                    if pos + take >= chunk.Length then
+                        pending <- None
+                    else
+                        pending <- Some(chunk, pos + take)
+
+                    if total >= count then cont <- false
+                | None ->
+                    if total > 0 then
+                        // Des octets déjà lus : ne pas bloquer sur un nouveau
+                        // segment, livrer ce qui est disponible maintenant.
+                        cont <- false
+                    else
+                        let has = reader.WaitToReadAsync().AsTask().GetAwaiter().GetResult()
+
+                        if has then
+                            let mutable chunk: byte[] = null
+
+                            if reader.TryRead(&chunk) && not (isNull chunk) && chunk.Length > 0 then
+                                pending <- Some(chunk, 0)
+                        else
+                            cont <- false
+
+            total
 
         interface IDisposable with
             member _.Dispose() = writer.TryComplete() |> ignore
@@ -54,53 +97,54 @@ module private ContainerStreaming =
 
         override _.Seek(_, _) = raise (NotSupportedException())
 
-        override _.Read(buffer: byte[], offset: int, count: int) : int =
-            let mutable total = 0
-            let mutable cont = true
-
-            while cont && total < count do
-                let has = reader.WaitToReadAsync().AsTask().GetAwaiter().GetResult()
-
-                if has then
-                    let mutable b = 0uy
-
-                    if reader.TryRead(&b) then
-                        buffer[offset + total] <- b
-                        total <- total + 1
-                else
-                    cont <- false
-
-            total
+        override _.Read(buffer: byte[], offset: int, count: int) : int = readInto buffer offset count
 
         override _.Write(buffer: byte[], offset: int, count: int) =
-            for i in 0 .. count - 1 do
-                writer.WriteAsync(buffer[offset + i]).AsTask().GetAwaiter().GetResult()
-                |> ignore
+            if count > 0 then
+                let chunk = Array.sub buffer offset count
+                writer.WriteAsync(chunk).AsTask().GetAwaiter().GetResult() |> ignore
 
         override _.ReadAsync(buffer, offset, count, ct) =
             task {
                 let mutable total = 0
                 let mutable cont = true
 
-                while cont && total < count do
-                    let! has = reader.WaitToReadAsync(ct).AsTask()
+                while cont do
+                    match pending with
+                    | Some(chunk, pos) ->
+                        let available = chunk.Length - pos
+                        let take = min available (count - total)
+                        Array.blit chunk pos buffer (offset + total) take
+                        total <- total + take
 
-                    if has then
-                        let mutable b = 0uy
+                        if pos + take >= chunk.Length then
+                            pending <- None
+                        else
+                            pending <- Some(chunk, pos + take)
 
-                        if reader.TryRead(&b) then
-                            buffer[offset + total] <- b
-                            total <- total + 1
-                    else
-                        cont <- false
+                        if total >= count then cont <- false
+                    | None ->
+                        if total > 0 then
+                            cont <- false
+                        else
+                            let! has = reader.WaitToReadAsync(ct).AsTask()
+
+                            if has then
+                                let mutable chunk: byte[] = null
+
+                                if reader.TryRead(&chunk) && not (isNull chunk) && chunk.Length > 0 then
+                                    pending <- Some(chunk, 0)
+                            else
+                                cont <- false
 
                 return total
             }
 
         override _.WriteAsync(buffer, offset, count, ct) =
             task {
-                for i in 0 .. count - 1 do
-                    do! writer.WriteAsync(buffer[offset + i], ct).AsTask()
+                if count > 0 then
+                    let chunk = Array.sub buffer offset count
+                    do! writer.WriteAsync(chunk, ct).AsTask()
             }
 
     /// Convertit un lecteur de canal en IAsyncEnumerable (streaming gRPC).
@@ -349,7 +393,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
 
                 return
                     { CreateContainerResponse.Id = id
-                      Name = request.Name
+
+                      // Renvoyer le nom RÉSOLU : un nom auto-généré (vide dans
+                      // la requête) doit être connu du client.
+                      Name = name
                       State = ContainerState.Created
                       CreatedAt = DateTime.UtcNow.ToString("o") }
             }
@@ -1103,33 +1150,38 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                 SecurityValidation.validateContainerPath request.Path "Le chemin du fichier"
                 let command = [| "base64"; request.Path |]
                 SecurityValidation.validateCommand command
-                let output = client.ExecInContainer(DefaultNamespace, request.Id, command)
 
-                if output.StartsWith("Erreur d'exécution") then
-                    return
-                        { ReadFileResponse.Data = Array.empty
-                          Success = false
-                          Message = output }
-                else
-                    try
-                        let data = Convert.FromBase64String(output.Trim())
+                try
+                    // ExecInContainer propage désormais les erreurs : pas de
+                    // sentinelle textuelle, et une sortie vide est traitée comme
+                    // un échec (conteneur sans base64 → données vides trompeuses).
+                    let output = client.ExecInContainer(DefaultNamespace, request.Id, command)
+                    let trimmed = output.Trim()
+
+                    if String.IsNullOrEmpty trimmed then
+                        return
+                            { ReadFileResponse.Data = Array.empty
+                              Success = false
+                              Message = "Sortie vide (base64 indisponible dans le conteneur ?)" }
+                    else
+                        let data = Convert.FromBase64String(trimmed)
 
                         return
                             { ReadFileResponse.Data = data
                               Success = true
                               Message = "" }
-                    with ex ->
-                        Log.Warning(
-                            ex,
-                            "Impossible de décoder le fichier {Path} dans le conteneur {ContainerId}",
-                            request.Path,
-                            request.Id
-                        )
+                with ex ->
+                    Log.Warning(
+                        ex,
+                        "Impossible de lire le fichier {Path} dans le conteneur {ContainerId}",
+                        request.Path,
+                        request.Id
+                    )
 
-                        return
-                            { ReadFileResponse.Data = Array.empty
-                              Success = false
-                              Message = "Impossible de lire le fichier : " + ex.Message }
+                    return
+                        { ReadFileResponse.Data = Array.empty
+                          Success = false
+                          Message = "Impossible de lire le fichier : " + ex.Message }
             }
 
         member _.WriteFile(request, _context) =
@@ -1179,44 +1231,57 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                 ServiceGuards.requireNonEmpty request.ImageRef "La référence de l'image"
                 SecurityValidation.validateImage request.ImageRef
 
-                try
-                    let info = client.InspectContainer(DefaultNamespace, request.ContainerId)
-                    let sourceRef = tryGetString info "image"
-
-                    if String.IsNullOrEmpty sourceRef then
-                        return
-                            { CommitImageResponse.ImageRef = ""
-                              Success = false
-                              Message = "Aucune image source trouvée pour le conteneur" }
-                    else
-                        let tmp =
-                            Path.Combine(Path.GetTempPath(), "diplo-commit-" + Guid.NewGuid().ToString("N") + ".tar")
-
-                        try
-                            client.ExportImage(DefaultNamespace, sourceRef, tmp)
-                            client.ImportImage(DefaultNamespace, tmp) |> ignore
-                            client.TagImage(DefaultNamespace, sourceRef, request.ImageRef)
-
-                            return
-                                { CommitImageResponse.ImageRef = request.ImageRef
-                                  Success = true
-                                  Message = sprintf "Image '%s' créée depuis le conteneur" request.ImageRef }
-                        finally
-                            try
-                                File.Delete(tmp)
-                            with _ ->
-                                ()
-                with ex ->
-                    Log.Warning(
-                        ex,
-                        "Erreur lors du commit de l'image depuis le conteneur {ContainerId}",
-                        request.ContainerId
-                    )
-
+                // Le write-back des volumes n'a lieu qu'au Dispose (suppression
+                // du conteneur) : exporter l'image source maintenant produirait
+                // un commit mensonger sans les modifications du conteneur.
+                match mountedVolumes.TryGetValue(request.ContainerId) with
+                | true, volumes when not volumes.IsEmpty ->
                     return
                         { CommitImageResponse.ImageRef = ""
                           Success = false
-                          Message = "Erreur lors du commit : " + ex.Message }
+                          Message =
+                              "Commit impossible : des volumes sont montés et leurs modifications ne seront "
+                              + "réécrites dans l'image qu'à la suppression du conteneur. Supprimez le "
+                              + "conteneur puis recréez l'image depuis celle-ci." }
+                | _ ->
+                    try
+                        let info = client.InspectContainer(DefaultNamespace, request.ContainerId)
+                        let sourceRef = tryGetString info "image"
+
+                        if String.IsNullOrEmpty sourceRef then
+                            return
+                                { CommitImageResponse.ImageRef = ""
+                                  Success = false
+                                  Message = "Aucune image source trouvée pour le conteneur" }
+                        else
+                            let tmp =
+                                Path.Combine(Path.GetTempPath(), "diplo-commit-" + Guid.NewGuid().ToString("N") + ".tar")
+
+                            try
+                                client.ExportImage(DefaultNamespace, sourceRef, tmp)
+                                client.ImportImage(DefaultNamespace, tmp) |> ignore
+                                client.TagImage(DefaultNamespace, sourceRef, request.ImageRef)
+
+                                return
+                                    { CommitImageResponse.ImageRef = request.ImageRef
+                                      Success = true
+                                      Message = sprintf "Image '%s' créée depuis le conteneur" request.ImageRef }
+                            finally
+                                try
+                                    File.Delete(tmp)
+                                with _ ->
+                                    ()
+                    with ex ->
+                        Log.Warning(
+                            ex,
+                            "Erreur lors du commit de l'image depuis le conteneur {ContainerId}",
+                            request.ContainerId
+                        )
+
+                        return
+                            { CommitImageResponse.ImageRef = ""
+                              Success = false
+                              Message = "Erreur lors du commit : " + ex.Message }
             }
 
         // ─── Export / Import ────────────────────────────────────────────────
@@ -1322,6 +1387,11 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
             task {
                 ServiceGuards.requireNonEmpty request.Registry "L'adresse du registre"
                 ServiceGuards.requireNonEmpty request.Username "Le nom d'utilisateur"
+
+                // Sans garde, un Password null atteint UTF8.GetBytes dans
+                // RegistryAuth.protect et sort en Unknown au lieu d'InvalidArgument.
+                ServiceGuards.requireNonEmpty request.Password "Le mot de passe"
+
                 RegistryAuth.add (RegistryAuth.stateFile ()) request.Registry request.Username request.Password
 
                 return

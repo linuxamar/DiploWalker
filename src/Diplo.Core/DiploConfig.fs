@@ -151,4 +151,20 @@ module DiploConfig =
         if not (String.IsNullOrEmpty dir) && not (Directory.Exists dir) then
             Directory.CreateDirectory(dir) |> ignore
 
-        File.WriteAllText(path, root.ToJsonString(JsonSerializerOptions(WriteIndented = true)))
+        // Écriture atomique (temp + replace) : un crash pendant l'écriture ne
+        // doit pas laisser un diplo.json tronqué que la lecture avalerait.
+        let tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp"
+
+        try
+            File.WriteAllText(tmp, root.ToJsonString(JsonSerializerOptions(WriteIndented = true)))
+
+            try
+                File.Replace(tmp, path, null)
+            with :? FileNotFoundException ->
+                File.Move(tmp, path)
+        with
+        | _ ->
+            try
+                File.Delete(tmp)
+            with _ -> ()
+            reraise ()

@@ -39,6 +39,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
             ?memoryLimit: int64,
             ?cpuShares: int,
             ?mounts: (string * string * bool) list,
+            ?ports: (int * int * string) list,
             ?ct: CancellationToken
         ) =
         task {
@@ -90,6 +91,15 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
                         { Source = s
                           Destination = d
                           ReadOnly = ro }
+                    ))
+
+            ports
+            |> Option.iter (fun ps ->
+                for (hostPort, containerPort, protocol) in ps do
+                    request.Ports.Add(
+                        { HostPort = hostPort
+                          ContainerPort = containerPort
+                          Protocol = protocol }
                     ))
 
             let ct = defaultArg ct CancellationToken.None
@@ -193,6 +203,8 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
                 (this.GetLogsStream(id, ?follow = follow, ?tail = tail, ?since = since, ?ct = Some ct))
                     .GetAsyncEnumerator(ct)
 
+            let mutable failure: Exception option = None
+
             try
                 let mutable moving = true
 
@@ -203,10 +215,16 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
                         entries.Add(enumerator.Current)
                     else
                         moving <- false
-            finally
-                enumerator.DisposeAsync().AsTask() |> ignore
+            with ex ->
+                failure <- Some ex
 
-            return entries :> seq<ContainerLogEntry>
+            // La disposition est attendue dans les deux cas : un abandon
+            // fire-and-forget laisse l'appel gRPC streaming ouvert.
+            do! enumerator.DisposeAsync().AsTask()
+
+            match failure with
+            | Some ex -> return raise ex
+            | None -> return entries :> seq<ContainerLogEntry>
         }
 
     member _.Exec
@@ -215,6 +233,9 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
         task {
             if String.IsNullOrWhiteSpace(id) then
                 invalidArg (nameof id) ServiceGuards.ContainerIdRequired
+
+            if isNull command then
+                invalidArg (nameof command) "La commande ne peut pas être vide"
 
             let aOut = defaultArg attachStdout true
             let aErr = defaultArg attachStderr true
@@ -232,6 +253,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
             let outputs = ResizeArray()
             let enumerator = client.ExecInContainer(request, ct).GetAsyncEnumerator(ct)
+            let mutable failure: Exception option = None
 
             try
                 let mutable moving = true
@@ -243,10 +265,16 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
                         outputs.Add(enumerator.Current)
                     else
                         moving <- false
-            finally
-                enumerator.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
+            with ex ->
+                failure <- Some ex
 
-            return outputs :> seq<ExecOutput>
+            // Attendu hors thread bloquant : GetAwaiter().GetResult() figerait
+            // un thread du pool dans un contexte asynchrone.
+            do! enumerator.DisposeAsync().AsTask()
+
+            match failure with
+            | Some ex -> return raise ex
+            | None -> return outputs :> seq<ExecOutput>
         }
 
     member _.PullImageAsync(image: string, ?user: string, ?ct: CancellationToken) =

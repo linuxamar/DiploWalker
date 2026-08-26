@@ -61,44 +61,66 @@ module ComposeModels =
     let buildServiceLabels (projectName: string) (serviceName: string) =
         dict [ composeProjectLabel, projectName; composeServiceLabel, serviceName ]
 
-    let parsePorts (portStrings: string list) : PortMapping list =
-        portStrings
-        |> List.choose (fun s ->
-            let parts = s.Split('/', 2)
+    /// Analyse une entrée « ports ». Gère les formes conteneur, hôte:conteneur
+    /// et IP:hôte:conteneur. Retourne None pour une entrée inexploitable.
+    let private tryParsePortSpec (s: string) : PortMapping option =
+        let parts = s.Split('/', 2)
+        let protocol = if parts.Length > 1 then parts.[1] else "tcp"
+        let spec = parts.[0].Trim()
 
-            match parts.[0].Split(':', 2) with
-            | [| host; container |] ->
-                match Int32.TryParse host, Int32.TryParse container with
-                | (true, h), (true, c) ->
-                    Some
-                        { ContainerPort = c
-                          HostPort = Some h
-                          Protocol = if parts.Length > 1 then parts.[1] else "tcp" }
-                | _ -> None
-            | [| container |] ->
-                match Int32.TryParse container with
-                | (true, c) ->
-                    Some
-                        { ContainerPort = c
-                          HostPort = None
-                          Protocol = if parts.Length > 1 then parts.[1] else "tcp" }
-                | _ -> None
-            | _ -> None)
+        // Découper sur tous les ':' : gère "8080:80" et "127.0.0.1:8080:80".
+        match spec.Split(':') with
+        | [| container |] ->
+            match Int32.TryParse(container) with
+            | true, c when c > 0 && c <= 65535 ->
+                Some { ContainerPort = c; HostPort = None; Protocol = protocol }
+            | _ -> None
+        | [| host; container |] when not (host.Contains(".")) ->
+            match Int32.TryParse(host), Int32.TryParse(container) with
+            | (true, h), (true, c) when h > 0 && h <= 65535 && c > 0 && c <= 65535 ->
+                Some { ContainerPort = c; HostPort = Some h; Protocol = protocol }
+            | _ -> None
+        | [| _ip; host; container |] ->
+            match Int32.TryParse(host), Int32.TryParse(container) with
+            | (true, h), (true, c) when h > 0 && h <= 65535 && c > 0 && c <= 65535 ->
+                Some { ContainerPort = c; HostPort = Some h; Protocol = protocol }
+            | _ -> None
+        | _ -> None
+
+    /// Retourne (mappings valides, entrées rejetées). Le rejet doit être signalé
+    /// par l'appelant : une configuration réseau perdue silencieusement est un bug.
+    let parsePorts (portStrings: string list) : PortMapping list * string list =
+        portStrings
+        |> List.partition (fun s -> tryParsePortSpec s |> Option.isSome)
+        |> fun (valid, invalid) ->
+            (valid |> List.choose tryParsePortSpec, invalid)
 
     let parseVolumes (volumeStrings: string list) : VolumeMapping list =
         volumeStrings
         |> List.choose (fun s ->
             let readOnly = s.EndsWith(":ro")
             let path = if readOnly then s.Substring(0, s.Length - 3) else s
-            let parts = path.Split(':', 2)
 
-            match parts with
-            | [| source; target |] ->
-                Some
-                    { Source = source
-                      Target = target
-                      ReadOnly = readOnly }
-            | _ -> None)
+            // Chemin Windows avec lettre de lecteur ("C:\data:/app") : le second
+            // ':' est le séparateur source/cible, pas une coupure du chemin.
+            let drivePrefixLen =
+                if path.Length >= 2 && Char.IsAsciiLetter path.[0] && path.[1] = ':' then
+                    2
+                else
+                    0
+
+            let rest = path.Substring(drivePrefixLen)
+
+            match rest.IndexOf(':') with
+            | -1 -> None
+            | idx ->
+                let source = path.Substring(0, drivePrefixLen + idx).Trim()
+                let target = path.Substring(drivePrefixLen + idx + 1).Trim()
+
+                if String.IsNullOrWhiteSpace source || String.IsNullOrWhiteSpace target then
+                    None
+                else
+                    Some { Source = source; Target = target; ReadOnly = readOnly })
 
     let parseEnvironment (envStrings: string list) : EnvironmentVariable list =
         envStrings

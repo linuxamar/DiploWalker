@@ -215,16 +215,14 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                 with ex ->
                     Log.Warning(ex, "Erreur lors du parsing des informations du volume {VolumeId}", request.Id)
 
+                    // Une erreur interne ne doit pas ressembler à un volume vide :
+                    // le client distinguerait mal « absent » et « en panne ».
                     return
-                        { InspectVolumeResponse.Id = ""
-                          Name = ""
-                          Driver = StorageDriverType.Local
-                          Mountpoint = ""
-                          State = MountState.Unmounted
-                          Labels = System.Collections.Generic.Dictionary<string, string>()
-                          DriverOpts = System.Collections.Generic.Dictionary<string, string>()
-                          SizeBytes = 0L
-                          CreatedAt = "" }
+                        raise (
+                            RpcException(
+                                Status(StatusCode.Internal, "Erreur interne lors de l'inspection du volume")
+                            )
+                        )
             }
 
         member _.ListVolumes(request, _context) =
@@ -294,7 +292,11 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                             { MountVolumeResponse.State = MountState.Error
                               Mountpoint = ""
                               Message = "Volume introuvable ou erreur de montage" }
-                with ex ->
+                with
+                | :? RpcException as rpcEx ->
+                    Log.Warning(rpcEx, "Erreur lors du montage du volume {VolumeId}", request.Id)
+                    return raise rpcEx
+                | ex ->
                     Log.Warning(ex, "Erreur lors du montage du volume {VolumeId}", request.Id)
 
                     return
@@ -338,7 +340,11 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                         return
                             { UnmountVolumeResponse.State = MountState.Unmounted
                               Message = "Démonté" }
-                with ex ->
+                with
+                | :? RpcException as rpcEx ->
+                    Log.Warning(rpcEx, "Erreur lors du démontage du volume {VolumeId}", request.Id)
+                    return raise rpcEx
+                | ex ->
                     Log.Warning(ex, "Erreur lors du démontage du volume {VolumeId}", request.Id)
 
                     return

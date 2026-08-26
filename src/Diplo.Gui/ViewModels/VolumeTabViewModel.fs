@@ -115,48 +115,46 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
     member _.BrowseDestCommand = browseDestCmd
 
     member private this.BrowseSource() =
-        task {
-            if isNull storageProvider then
-                ()
-            else
-                let folders =
-                    storageProvider.OpenFolderPickerAsync(
-                        FolderPickerOpenOptions(Title = "Sélectionner le répertoire source", AllowMultiple = false)
-                    )
+        // Cmd.run : exceptions attendues et signalées — le fire-and-forget
+        // rendait l'échec du picker totalement muet.
+        Cmd.run outputPort (fun () ->
+            task {
+                if isNull storageProvider then
+                    outputPort.WriteWarning("Fournisseur de stockage non disponible")
+                else
+                    let! result =
+                        storageProvider.OpenFolderPickerAsync(
+                            FolderPickerOpenOptions(Title = "Sélectionner le répertoire source", AllowMultiple = false)
+                        )
 
-                let! result = folders
-
-                if result.Count > 0 then
-                    this.ImageSourceDir <- result.[0].Path.LocalPath
-        }
-        |> ignore
+                    if result.Count > 0 then
+                        this.ImageSourceDir <- result.[0].Path.LocalPath
+            })
 
     member private this.BrowseDest() =
-        task {
-            if isNull storageProvider then
-                ()
-            else
-                let files =
-                    storageProvider.OpenFilePickerAsync(
-                        FilePickerOpenOptions(
-                            Title = "Enregistrer l'image disque sous",
-                            AllowMultiple = false,
-                            FileTypeFilter =
-                                [ FilePickerFileType("VHD", Patterns = [| "*.vhd" |])
-                                  FilePickerFileType("VHDX", Patterns = [| "*.vhdx" |])
-                                  FilePickerFileType("VMDK", Patterns = [| "*.vmdk" |])
-                                  FilePickerFileType("VDI", Patterns = [| "*.vdi" |])
-                                  FilePickerFileType("Raw", Patterns = [| "*.img"; "*.raw" |])
-                                  FilePickerFileType("Tous", Patterns = [| "*.*" |]) ]
+        Cmd.run outputPort (fun () ->
+            task {
+                if isNull storageProvider then
+                    outputPort.WriteWarning("Fournisseur de stockage non disponible")
+                else
+                    let! result =
+                        storageProvider.OpenFilePickerAsync(
+                            FilePickerOpenOptions(
+                                Title = "Enregistrer l'image disque sous",
+                                AllowMultiple = false,
+                                FileTypeFilter =
+                                    [ FilePickerFileType("VHD", Patterns = [| "*.vhd" |])
+                                      FilePickerFileType("VHDX", Patterns = [| "*.vhdx" |])
+                                      FilePickerFileType("VMDK", Patterns = [| "*.vmdk" |])
+                                      FilePickerFileType("VDI", Patterns = [| "*.vdi" |])
+                                      FilePickerFileType("Raw", Patterns = [| "*.img"; "*.raw" |])
+                                      FilePickerFileType("Tous", Patterns = [| "*.*" |]) ]
+                            )
                         )
-                    )
 
-                let! result = files
-
-                if result.Count > 0 then
-                    this.ImageDestPath <- result.[0].Path.LocalPath
-        }
-        |> ignore
+                    if result.Count > 0 then
+                        this.ImageDestPath <- result.[0].Path.LocalPath
+            })
 
     member private this.ListVolumes() =
         Cmd.run outputPort (fun () ->
@@ -277,7 +275,11 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                                 (DiskFormat.toString format)
                         )
 
-                        let result = FsImage.create this.ImageSourceDir this.ImageDestPath format
+                        // Travail lourd (parcours récursif, écriture de Go) :
+                        // déporté hors du thread UI sinon l'interface gèle.
+                        let! result = System.Threading.Tasks.Task.Run(fun () ->
+                            FsImage.create this.ImageSourceDir this.ImageDestPath format)
+
                         let size = System.IO.FileInfo(result).Length
                         outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
             })

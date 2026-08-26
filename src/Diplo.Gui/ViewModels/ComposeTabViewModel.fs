@@ -104,11 +104,13 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
             })
 
     member private this.OpenComposeFile() =
-        Cmd.runSync outputPort (fun () ->
-            if isNull storageProvider then
-                outputPort.WriteWarning("Fournisseur de stockage non disponible")
-            else
-                task {
+        // Cmd.run : la tâche est attendue et ses exceptions journalisées — un
+        // fire-and-forget avalait silencieusement les erreurs du picker.
+        Cmd.run outputPort (fun () ->
+            task {
+                if isNull storageProvider then
+                    outputPort.WriteWarning("Fournisseur de stockage non disponible")
+                else
                     let! files =
                         storageProvider.OpenFilePickerAsync(
                             FilePickerOpenOptions(
@@ -122,19 +124,46 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
 
                     if files.Count > 0 then
                         let path = files.[0].Path.LocalPath
+                        // Le setter de ComposeFilePath recharge déjà le contenu.
                         this.ComposeFilePath <- path
-                        composeEditor.LoadFile(path)
-                        outputPort.WriteSuccess(sprintf "Fichier ouvert: %s" path)
-                }
-                |> ignore)
+                        outputPort.WriteSuccess(sprintf "Fichier ouvert : %s" path)
+            })
 
     member private this.SaveComposeFile() =
-        Cmd.runSync outputPort (fun () ->
-            if String.IsNullOrEmpty(composeEditor.FilePath) then
-                this.OpenComposeFile()
-            else
-                composeEditor.Save()
-                outputPort.WriteSuccess(sprintf "Fichier enregistré: %s" composeEditor.FilePath))
+        Cmd.run outputPort (fun () ->
+            task {
+                if not (String.IsNullOrEmpty(composeEditor.FilePath)) then
+                    composeEditor.Save()
+                    outputPort.WriteSuccess(sprintf "Fichier enregistré : %s" composeEditor.FilePath)
+                else
+                    // « Enregistrer sous » réel : écrire le buffer ACTUEL vers le
+                    // chemin choisi. Repasser par OpenComposeFile rechargerait le
+                    // contenu depuis le disque et détruirait les modifications.
+                    if isNull storageProvider then
+                        outputPort.WriteWarning("Fournisseur de stockage non disponible")
+                    else
+                        let! file =
+                            storageProvider.SaveFilePickerAsync(
+                                FilePickerSaveOptions(
+                                    Title = "Enregistrer le fichier Compose",
+                                    DefaultExtension = "yml",
+                                    FileTypeChoices =
+                                        [ FilePickerFileType("Fichiers Compose", Patterns = [| "*.yml"; "*.yaml" |]) ]
+                                )
+                            )
+
+                        if not (isNull file) then
+                            let path = file.Path.LocalPath
+
+                            if not (String.IsNullOrEmpty path) then
+                                composeEditor.SaveAs(path)
+                                // Champ brut : ne pas repasser par le setter qui
+                                // rechargerait le fichier depuis le disque.
+                                composeFilePath <- path
+                                this.OnPropertyChanged(nameof this.ComposeFilePath)
+
+                                outputPort.WriteSuccess(sprintf "Fichier enregistré : %s" path)
+            })
 
     member private this.ValidateComposeFile() =
         Cmd.runSync outputPort (fun () ->

@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Diagnostics
 open System.IO
+open System.Threading
 open System.Threading.Tasks
 open Grpc.Core
 open Diplo.Core.Clients
@@ -25,11 +26,6 @@ type ComposeOrchestrator(output: IOutputPort) =
         | :? YamlScalarNode as s -> Some s.Value
         | _ -> None
 
-    let sequenceValues (node: YamlNode) : string list =
-        match node with
-        | :? YamlSequenceNode as seq -> seq.Children |> Seq.map (fun c -> c.ToString()) |> Seq.toList
-        | _ -> []
-
     interface IDisposable with
         member _.Dispose() =
             (containerClient :> IDisposable).Dispose()
@@ -46,7 +42,25 @@ type ComposeOrchestrator(output: IOutputPort) =
         use stream = new StringReader(yaml)
         let doc = YamlStream()
         doc.Load(stream)
-        let root = doc.Documents.[0].RootNode :?> YamlMappingNode
+
+        // Document vide ou uniquement des commentaires : rejet explicite plutôt
+        // qu'un ArgumentOutOfRangeException brut.
+        if doc.Documents.Count = 0 then
+            raise (
+                RpcException(
+                    Status(StatusCode.InvalidArgument, sprintf "Le fichier compose '%s' est vide" filePath)
+                )
+            )
+
+        let root =
+            match doc.Documents.[0].RootNode with
+            | :? YamlMappingNode as m -> m
+            | _ ->
+                raise (
+                    RpcException(
+                        Status(StatusCode.InvalidArgument, "La racine du fichier compose doit être un mapping YAML")
+                    )
+                )
 
         let version =
             match tryGetChild root "version" |> Option.bind scalarValue with
@@ -65,7 +79,19 @@ type ComposeOrchestrator(output: IOutputPort) =
                 |> Seq.toList
                 |> List.map (fun kv ->
                     let name = kv.Key.ToString()
-                    let svc = kv.Value :?> YamlMappingNode
+
+                    let svc =
+                        match kv.Value with
+                        | :? YamlMappingNode as m -> m
+                        | _ ->
+                            raise (
+                                RpcException(
+                                    Status(
+                                        StatusCode.InvalidArgument,
+                                        sprintf "Le service '%s' doit être un mapping YAML" name
+                                    )
+                                )
+                            )
 
                     let buildCtx = tryGetChild svc "build" |> Option.bind scalarValue
 
@@ -116,7 +142,25 @@ type ComposeOrchestrator(output: IOutputPort) =
                     let ports =
                         match tryGetChild svc "ports" with
                         | Some(:? YamlSequenceNode as seq) ->
-                            seq.Children |> Seq.map (fun p -> p.ToString()) |> Seq.toList |> parsePorts
+                            let specs =
+                                seq.Children |> Seq.map (fun p -> p.ToString()) |> Seq.toList
+
+                            let parsed, rejected = parsePorts specs
+
+                            if not rejected.IsEmpty then
+                                raise (
+                                    RpcException(
+                                        Status(
+                                            StatusCode.InvalidArgument,
+                                            sprintf
+                                                "Le service '%s' contient des entrées 'ports' invalides : %s"
+                                                name
+                                                (String.Join(", ", rejected))
+                                        )
+                                    )
+                                )
+
+                            parsed
                         | _ -> []
 
                     let volumes =
@@ -169,57 +213,103 @@ type ComposeOrchestrator(output: IOutputPort) =
           ProjectName = projectName
           Services = services }
 
-    member this.Up(filePath: string) =
+    member this.Up(filePath: string, ?ct: CancellationToken) =
         task {
+            let ct = defaultArg ct CancellationToken.None
             let compose = this.ParseFile(filePath)
 
             output.WriteSuccess(
                 sprintf "Démarrage du projet '%s' (%d service(s))" compose.ProjectName compose.Services.Length
             )
 
+            let mutable created = 0
+            let mutable failures = 0
+
             for svc in compose.Services do
-                let containerName = buildContainerName compose.ProjectName svc.Name 0
+                try
+                    let containerName = buildContainerName compose.ProjectName svc.Name 0
 
-                let serviceLabels = buildServiceLabels compose.ProjectName svc.Name
-                let allLabels = ResizeArray<string * string>()
+                    // Labels Diplo en DERNIER : ils priment sur les labels
+                    // utilisateur et ne peuvent pas être détournés par le compose.
+                    let allLabels = ResizeArray<string * string>()
 
-                for kv in serviceLabels do
-                    allLabels.Add(kv.Key, kv.Value)
+                    for kv in svc.Labels do
+                        allLabels.Add(kv.Key, kv.Value)
 
-                for kv in svc.Labels do
-                    allLabels.Add(kv.Key, kv.Value)
+                    for kv in buildServiceLabels compose.ProjectName svc.Name do
+                        allLabels.Add(kv.Key, kv.Value)
 
-                let labels = dict allLabels
+                    let labels = dict allLabels
 
-                let env = svc.Environment |> List.map (fun e -> e.Key, e.Value) |> dict
+                    let env =
+                        svc.Environment |> List.map (fun e -> e.Key, e.Value) |> dict
 
-                let! response =
-                    containerClient.CreateAsync(
-                        name = containerName,
-                        image = svc.Image,
-                        ?env = (if env.Count > 0 then Some env else None),
-                        ?command = svc.Command,
-                        ?args = svc.Args,
-                        labels = labels,
-                        ?pidLimit = svc.PidLimit,
-                        ?memoryLimit = svc.MemoryLimit,
-                        ?cpuShares = svc.CpuShares
+                    // Transmettre les volumes ET les ports déclarés : les ignorer
+                    // produirait un déploiement non conforme sans aucun avertissement.
+                    let mounts =
+                        match svc.Volumes with
+                        | [] -> None
+                        | vols ->
+                            vols
+                            |> List.map (fun v -> v.Source, v.Target, v.ReadOnly)
+                            |> Some
+
+                    let portMappings =
+                        match svc.Ports with
+                        | [] -> None
+                        | ps ->
+                            ps
+                            |> List.map (fun p ->
+                                (defaultArg p.HostPort p.ContainerPort, p.ContainerPort, p.Protocol))
+                            |> Some
+
+                    let! response =
+                        containerClient.CreateAsync(
+                            name = containerName,
+                            image = svc.Image,
+                            ?env = (if env.Count > 0 then Some env else None),
+                            ?command = svc.Command,
+                            ?args = svc.Args,
+                            labels = labels,
+                            ?pidLimit = svc.PidLimit,
+                            ?memoryLimit = svc.MemoryLimit,
+                            ?cpuShares = svc.CpuShares,
+                            ?mounts = mounts,
+                            ?ports = portMappings,
+                            ct = ct
+                        )
+
+                    output.WriteSuccess(
+                        sprintf "  Conteneur %s créé (%s)" response.Name (response.State.ToString())
                     )
 
-                output.WriteSuccess(sprintf "  Conteneur %s créé (%s)" response.Name (response.State.ToString()))
-                let! _ = containerClient.StartAsync(response.Id)
-                output.WriteSuccess(sprintf "  Conteneur %s démarré" response.Name)
+                    let! _ = containerClient.StartAsync(response.Id, ct = ct)
 
-            output.WriteSuccess(sprintf "Projet '%s' démarré" compose.ProjectName)
+                    output.WriteSuccess(sprintf "  Conteneur %s démarré" response.Name)
+                    created <- created + 1
+                with ex ->
+                    // Tolérance aux échecs partiels : continuer les autres services
+                    // puis restituer un bilan honnête.
+                    failures <- failures + 1
+                    output.WriteError(sprintf "  Service '%s' en échec : %s" svc.Name ex.Message)
+
+            if failures > 0 then
+                output.WriteWarning(
+                    sprintf "Projet '%s' partiellement démarré (%d OK, %d échec(s))" compose.ProjectName created failures
+                )
+            else
+                output.WriteSuccess(sprintf "Projet '%s' démarré (%d conteneur(s))" compose.ProjectName created)
         }
 
-    member this.Down(filePath: string) =
+    member this.Down(filePath: string, ?ct: CancellationToken) =
         task {
+            let ct = defaultArg ct CancellationToken.None
             let compose = this.ParseFile(filePath)
             output.WriteSuccess(sprintf "Arrêt du projet '%s'" compose.ProjectName)
 
-            let! containers = containerClient.ListAsync(all = true)
+            let! containers = containerClient.ListAsync(all = true, ct = ct)
             let mutable stopped = 0
+            let mutable failures = 0
 
             for c in containers.Containers do
                 let hasProjectLabel =
@@ -227,18 +317,35 @@ type ComposeOrchestrator(output: IOutputPort) =
                     |> Seq.exists (fun kv -> kv.Key = composeProjectLabel && kv.Value = compose.ProjectName)
 
                 if hasProjectLabel then
-                    let! _ = containerClient.StopAsync(c.Id, 10)
-                    let! _ = containerClient.DeleteAsync(c.Id, true)
-                    stopped <- stopped + 1
-                    output.WriteSuccess(sprintf "  Conteneur %s arrêté et supprimé" c.Name)
+                    try
+                        let! _ = containerClient.StopAsync(c.Id, 10, ct = ct)
+                        let! _ = containerClient.DeleteAsync(c.Id, true, ct = ct)
+                        stopped <- stopped + 1
 
-            output.WriteSuccess(sprintf "Projet '%s' arrêté (%d conteneur(s))" compose.ProjectName stopped)
+                        output.WriteSuccess(sprintf "  Conteneur %s arrêté et supprimé" c.Name)
+                    with ex ->
+                        // Un échec sur un conteneur n'interrompt pas le nettoyage
+                        // des autres conteneurs du projet.
+                        failures <- failures + 1
+                        output.WriteError(sprintf "  Conteneur %s : échec de l'arrêt (%s)" c.Name ex.Message)
+
+            if failures > 0 then
+                output.WriteWarning(
+                    sprintf
+                        "Projet '%s' partiellement arrêté (%d OK, %d échec(s))"
+                        compose.ProjectName
+                        stopped
+                        failures
+                )
+            else
+                output.WriteSuccess(sprintf "Projet '%s' arrêté (%d conteneur(s))" compose.ProjectName stopped)
         }
 
-    member this.Ps(filePath: string) =
+    member this.Ps(filePath: string, ?ct: CancellationToken) =
         task {
+            let ct = defaultArg ct CancellationToken.None
             let compose = this.ParseFile(filePath)
-            let! containers = containerClient.ListAsync(all = true)
+            let! containers = containerClient.ListAsync(all = true, ct = ct)
 
             let projectContainers =
                 containers.Containers
@@ -264,10 +371,11 @@ type ComposeOrchestrator(output: IOutputPort) =
                 )
         }
 
-    member this.Logs(filePath: string, serviceName: string option) =
+    member this.Logs(filePath: string, serviceName: string option, ?ct: CancellationToken) =
         task {
+            let ct = defaultArg ct CancellationToken.None
             let compose = this.ParseFile(filePath)
-            let! containers = containerClient.ListAsync(all = true)
+            let! containers = containerClient.ListAsync(all = true, ct = ct)
 
             for c in containers.Containers do
                 let hasProjectLabel =
@@ -280,21 +388,35 @@ type ComposeOrchestrator(output: IOutputPort) =
                     | Some sn -> c.Labels |> Seq.exists (fun kv -> kv.Key = composeServiceLabel && kv.Value = sn)
 
                 if hasProjectLabel && matchesService then
-                    let! entries = containerClient.GetLogs(c.Id, follow = false, tail = 100)
+                    let! entries = containerClient.GetLogs(c.Id, follow = false, tail = 100, ct = ct)
                     output.WriteSuccess(sprintf "--- %s ---" c.Name)
 
                     for entry in entries do
                         output.WriteLine(sprintf "[%s] %s" entry.Timestamp entry.Log)
         }
 
-    member this.Pull(filePath: string) =
+    member this.Pull(filePath: string, ?ct: CancellationToken) =
         task {
+            let ct = defaultArg ct CancellationToken.None
             let compose = this.ParseFile(filePath)
-            let images = compose.Services |> List.map (fun s -> s.Image) |> List.distinct
+
+            // Les services en build n'ont pas d'image dans un registre : leur
+            // nom est synthétique et le pull échouerait avec une erreur obscure.
+            let images =
+                compose.Services
+                |> List.filter (fun s -> s.Build.IsNone)
+                |> List.map (fun s -> s.Image)
+                |> List.distinct
+
+            for svc in compose.Services do
+                if svc.Build.IsSome then
+                    output.WriteLine(
+                        sprintf "  %s : image locale (build), utilisez 'compose build'" svc.Name
+                    )
 
             for img in images do
                 output.WriteSuccess(sprintf "Téléchargement de %s..." img)
-                let! response = containerClient.PullImageAsync(img)
+                let! response = containerClient.PullImageAsync(img, ct = ct)
                 output.WriteSuccess(sprintf "  %s" response.Message)
         }
 

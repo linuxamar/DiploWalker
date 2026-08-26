@@ -99,8 +99,14 @@ module Parallels =
         if sectorSize = 0 then
             failwith "Sector size invalide"
 
-        if blockSize = 0 then
-            failwith "Block size invalide"
+        // Géométrie validée : heads/sectors à zéro provoqueraient une division
+        // par zéro au SetLength ; blockSize non borné permettrait des
+        // allocations géantes (ou négatives) sur image forgée.
+        if heads < 1 || sectors < 1 || cylinders < 0 then
+            failwith "Géométrie invalide (heads/sectors/cylinders)"
+
+        if blockSize < 512 || blockSize > 8 * 1024 * 1024 || blockSize % sectorSize <> 0 then
+            failwithf "Block size invalide : %d" blockSize
 
         { Magic = magic
           Version = version
@@ -228,9 +234,13 @@ module Parallels =
 /// Flux System.IO presentant une image Parallels comme un disque brut virtuel.
 type ParallelsStream(path: string, access: FileAccess) =
     inherit Stream()
-    let fs = new FileStream(path, FileMode.Open, access, FileShare.ReadWrite)
+
+    // FileShare.Read : un second accès en écriture doit échouer franchement.
+    let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
+
     let header = Parallels.readHeader fs
     let mutable position = 0L
+
     override _.CanRead = true
     override _.CanSeek = true
     override _.CanWrite = access = FileAccess.ReadWrite || access = FileAccess.Write
@@ -238,9 +248,17 @@ type ParallelsStream(path: string, access: FileAccess) =
 
     override _.Position
         with get () = position
-        and set v = position <- v
+
+        and set v =
+            if v < 0L then
+                raise (ArgumentOutOfRangeException(nameof position))
+
+            position <- v
 
     override _.Read(buf, offset, count) =
+        if position < 0L then
+            raise (ArgumentOutOfRangeException(nameof position))
+
         let vSize = Parallels.virtualSize header
         let read = min count (int (vSize - position))
 
@@ -252,6 +270,9 @@ type ParallelsStream(path: string, access: FileAccess) =
             read
 
     override _.Write(buf, offset, count) =
+        if position < 0L then
+            raise (ArgumentOutOfRangeException(nameof position))
+
         Parallels.writeBytesAt fs header position buf offset count
         position <- position + int64 count
 
@@ -263,11 +284,23 @@ type ParallelsStream(path: string, access: FileAccess) =
             | SeekOrigin.End -> Parallels.virtualSize header + offset
             | _ -> position
 
+        if position < 0L then
+            raise (ArgumentOutOfRangeException(nameof position))
+
         position
 
     override _.SetLength(value) =
-        let vSize = Parallels.virtualSize header
-        header.Cylinders <- int (value / int64 (header.Heads * header.Sectors * header.SectorSize))
+        // Arrondi par excès : la division entière seule effondrerait la taille
+        // virtuelle (voire à 0) pour un SetLength non aligné.
+        let sectorPerCyl = int64 header.Heads * int64 header.Sectors * int64 header.SectorSize
+
+        let cylinders =
+            if value <= 0L then
+                1L
+            else
+                (value + sectorPerCyl - 1L) / sectorPerCyl |> max 1L
+
+        header.Cylinders <- int cylinders
         Parallels.writeHeader fs header
 
     override _.Flush() = fs.Flush()

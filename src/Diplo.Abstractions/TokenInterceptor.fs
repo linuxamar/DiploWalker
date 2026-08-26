@@ -4,8 +4,9 @@ open Grpc.Core
 
 /// Crée des CallCredentials qui ajoutent l'en-tête Authorization à partir du token d'authentification.
 /// Utilisation avec Grpc.Net.Client.GrpcChannel :
-///   let channel = GrpcChannel.ForAddress("http://localhost:5001")
-///   let invoker = channel.Intercept(TokenInterceptor.createTokenCredentials())
+///   let creds = TokenInterceptor.createTokenCredentials ()
+///   let channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, creds)
+///   let channel = GrpcChannel.ForAddress("http://localhost:5001", GrpcChannelCredentials = channelCredentials)
 let createTokenCredentials () : CallCredentials =
     CallCredentials.FromInterceptor(fun _context metadata ->
         task {

@@ -86,6 +86,10 @@ module GrpcClientFactory =
         GrpcChannel.ForAddress(address, options)
 
     let private create (address: string) =
+        // INVARIANT DE SÉCURITÉ : validateGrpcAddress restreint l'hôte à
+        // localhost/pipe. Les callCredentials partent en clair sur un canal
+        // insecure (UnsafeUseInsecureChannelCallCredentials) — tout
+        // assouplissement de la validation exposerait le token sur le réseau.
         SecurityValidation.validateGrpcAddress address
         let uri = Uri(address)
 

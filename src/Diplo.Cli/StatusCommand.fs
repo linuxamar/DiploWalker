@@ -72,8 +72,10 @@ type StatusCommand(output: IOutputPort, clients: IDiploClients) =
 
             if allOk then
                 output.WriteSuccess("Tous les services sont opérationnels.")
+                return 0
             else
                 output.WriteWarning("Certains services ne sont pas disponibles.")
-
-            return 0
+                // Un status check qui répond 0 avec des services down est
+                // inutilisable pour la supervision scriptée.
+                return 1
         }

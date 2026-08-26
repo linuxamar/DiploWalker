@@ -59,12 +59,9 @@ module Qcow1 =
             done_ <- done_ + n
 
     let private hostOffsetMask (clusterBits: int) =
-        let shift = clusterBits - 8
-
-        if shift > 0 then
-            0x00FFFFFFFFFFFFFE00L >>> shift
-        else
-            0x00FFFFFFFFFFFFFE00L
+        ignore clusterBits
+        // Bits 9-55 de l'entrée L1 : offset HÔTE EN OCTETS du cluster (spec QCOW).
+        0x00FFFFFFFFFFFE00L
 
     let private clusterOffsetMask (clusterBits: int) = (1L <<< clusterBits) - 1L
 
@@ -93,7 +90,9 @@ module Qcow1 =
 
         let clusterBits = be32 buf 20
 
-        if clusterBits < 8 || clusterBits > 30 then
+        // Borné à 21 bits (2 Mo) : une image forgée avec cluster_bits élevé
+        // déclencherait des allocations d'un Go par cluster écrit.
+        if clusterBits < 9 || clusterBits > 21 then
             failwithf "Cluster bits invalide : %d" clusterBits
 
         let clusterSize = 1L <<< clusterBits
@@ -141,6 +140,9 @@ module Qcow1 =
         s.Write(buf, 0, 8)
 
     let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) =
+        if vOffset < 0L then
+            raise (ArgumentOutOfRangeException(nameof vOffset))
+
         let clusterBits = h.ClusterBits
         let offMask = hostOffsetMask clusterBits
         let dataMask = clusterOffsetMask clusterBits
@@ -162,26 +164,45 @@ module Qcow1 =
                 else
                     let l1EntryOff = h.L1TableOffset + int64 l1Index * 8L
                     let descriptor = readUInt64At s l1EntryOff
-                    let hostCluster = (descriptor &&& offMask) >>> (clusterBits - 8)
+
+                    // L'entrée L1 contient un OFFSET EN OCTETS : le décaler puis
+                    // re-multiplier par la taille de cluster faussait tout d'un
+                    // facteur 2^clusterBits+8 et rendait les images illisibles.
+                    let hostOffset = descriptor &&& offMask
                     let toRead = min remaining (int (h.ClusterSize - clusterOff))
 
-                    if hostCluster = 0L then
+                    if hostOffset = 0L then
                         Array.Clear(buf, bOff, toRead)
                     else
-                        let fileOffset = hostCluster * h.ClusterSize + clusterOff
-                        s.Position <- fileOffset
+                        s.Position <- hostOffset + clusterOff
                         readFully s buf bOff toRead
 
                     remaining <- remaining - toRead
                     bOff <- bOff + toRead
                     vOff <- vOff + int64 toRead
 
-    let private findFreeCluster (h: Header) : int64 =
+    /// Alloue un nouveau cluster hôte : balayer la table L1 pour trouver la plus
+    /// haute allocation RÉELLE. Un état partagé serait nécessaire sinon ; sans
+    /// lui, retourner systématiquement « le premier cluster libre » fait que
+    /// deux écritures écrasent mutuellement leurs données.
+    let private allocateCluster (s: Stream) (h: Header) : int64 =
         let endOfL1 = h.L1TableOffset + int64 h.L1Size * 8L
-        let lastCluster = (endOfL1 + h.ClusterSize - 1L) / h.ClusterSize
-        lastCluster
+
+        let floorOffset =
+            ((endOfL1 + h.ClusterSize - 1L) / h.ClusterSize) * h.ClusterSize
+
+        let mutable maxOffset = 0L
+
+        for i in 0 .. h.L1Size - 1 do
+            let d = readUInt64At s (h.L1TableOffset + int64 i * 8L)
+            maxOffset <- max maxOffset (d &&& hostOffsetMask h.ClusterBits)
+
+        max (maxOffset + h.ClusterSize) floorOffset
 
     let writeBytesAt (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) =
+        if vOffset < 0L then
+            raise (ArgumentOutOfRangeException(nameof vOffset))
+
         let clusterBits = h.ClusterBits
         let offMask = hostOffsetMask clusterBits
         let dataMask = clusterOffsetMask clusterBits
@@ -198,22 +219,22 @@ module Qcow1 =
 
             let l1EntryOff = h.L1TableOffset + int64 l1Index * 8L
             let descriptor = readUInt64At s l1EntryOff
-            let hostCluster = (descriptor &&& offMask) >>> (clusterBits - 8)
+            let hostOffset = descriptor &&& offMask
             let toWrite = min remaining (int (h.ClusterSize - clusterOff))
 
-            if hostCluster = 0L then
-                let freeClus = findFreeCluster h
-                let newDesc = (freeClus <<< (clusterBits - 8)) &&& (~~~dataMask)
-                writeUInt64At s l1EntryOff newDesc
-                let fileOffset = freeClus * h.ClusterSize
+            if hostOffset = 0L then
+                // Nouvelle entrée : offset hôte en octets, aligné sur le cluster
+                // (les 9 bits bas restent nuls — conforme au masque de la spec).
+                let newHostOffset = allocateCluster s h
+                writeUInt64At s l1EntryOff newHostOffset
+
                 let zeroBuf = Array.zeroCreate<byte> (int h.ClusterSize)
-                s.Position <- fileOffset
+                s.Position <- newHostOffset
                 s.Write(zeroBuf, 0, int h.ClusterSize)
-                s.Position <- fileOffset + clusterOff
+                s.Position <- newHostOffset + clusterOff
                 s.Write(data, dOff, toWrite)
             else
-                let fileOffset = hostCluster * h.ClusterSize + clusterOff
-                s.Position <- fileOffset
+                s.Position <- hostOffset + clusterOff
                 s.Write(data, dOff, toWrite)
 
             remaining <- remaining - toWrite
@@ -222,9 +243,14 @@ module Qcow1 =
 
 type Qcow1Stream(path: string, access: FileAccess) =
     inherit Stream()
-    let fs = new FileStream(path, FileMode.Open, access, FileShare.ReadWrite)
+
+    // FileShare.Read : un second accès en écriture doit échouer franchement
+    // plutôt que corrompre silencieusement les métadonnées.
+    let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
+
     let header = Qcow1.readHeader fs
     let mutable position = 0L
+
     override _.CanRead = true
     override _.CanSeek = true
     override _.CanWrite = access = FileAccess.ReadWrite || access = FileAccess.Write
@@ -232,9 +258,17 @@ type Qcow1Stream(path: string, access: FileAccess) =
 
     override _.Position
         with get () = position
-        and set v = position <- v
+
+        and set v =
+            if v < 0L then
+                raise (ArgumentOutOfRangeException(nameof position))
+
+            position <- v
 
     override _.Read(buf, offset, count) =
+        if position < 0L then
+            raise (ArgumentOutOfRangeException(nameof position))
+
         let count = min count (int (header.VirtualSize - position))
 
         if count <= 0 then
@@ -245,6 +279,9 @@ type Qcow1Stream(path: string, access: FileAccess) =
             count
 
     override _.Write(buf, offset, count) =
+        if position < 0L then
+            raise (ArgumentOutOfRangeException(nameof position))
+
         Qcow1.writeBytesAt fs header position buf offset count
         position <- position + int64 count
 

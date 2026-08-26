@@ -80,6 +80,31 @@ let serializeConfig (config: CniNatConfig) : string =
 let deserializeConfig (json: string) : CniNatConfig =
     JsonSerializer.Deserialize<CniNatConfig>(json, jsonOptions)
 
+// ─── Validation de format ────────────────────────────────────────────────
+
+/// Vérifie le format canonique A.B.C.D/masque d'un sous-réseau.
+let isValidCidr (cidr: string) =
+    if String.IsNullOrWhiteSpace cidr then
+        false
+    else
+        match cidr.Split('/') with
+        | [| ip; mask |] ->
+            let octets = ip.Split('.')
+
+            let maskOk =
+                match Int32.TryParse(mask) with
+                | true, m -> m >= 0 && m <= 32
+                | _ -> false
+
+            octets.Length = 4
+            && maskOk
+            && (octets
+                |> Array.forall (fun o ->
+                    match Int32.TryParse(o) with
+                    | true, v when v >= 0 && v <= 255 -> true
+                    | _ -> false))
+        | _ -> false
+
 // ─── Chargement depuis fichier ───────────────────────────────────────────
 
 let private getConfigPath () =
@@ -95,13 +120,44 @@ let loadConfig (configPath: string option) : CniNatConfig =
         try
             let json = File.ReadAllText(path)
             let loaded = deserializeConfig json
-            // Fusionner avec les défauts pour les champs manquants
-            { loaded with
-                SubnetCandidates =
-                    if loaded.SubnetCandidates |> List.isEmpty then
-                        defaultBridgeCandidates
-                    else
-                        loaded.SubnetCandidates }
+
+            let keepOrDefault value fallback =
+                if String.IsNullOrWhiteSpace value then fallback else value
+
+            // Fusionner TOUS les champs manquants avec les défauts, et valider
+            // le format des valeurs réseau : une config corrompue ne doit pas
+            // faire planter le service au démarrage.
+            { CniVersion = keepOrDefault loaded.CniVersion defaultConfig.CniVersion
+              NatName = keepOrDefault loaded.NatName defaultConfig.NatName
+              Subnet =
+                  if isValidCidr loaded.Subnet then
+                      loaded.Subnet
+                  elif not (String.IsNullOrWhiteSpace loaded.Subnet) then
+                      Log.Warning(
+                          "Sous-réseau invalide dans {Path} : '{Subnet}', détection automatique activée",
+                          path,
+                          loaded.Subnet
+                      )
+
+                      ""
+                  else
+                      ""
+              Gateway =
+                  if String.IsNullOrWhiteSpace loaded.Gateway || isValidCidr loaded.Gateway then
+                      loaded.Gateway
+                  else
+                      Log.Warning("Passerelle invalide dans {Path} : '{Gateway}', elle sera dérivée", path, loaded.Gateway)
+
+                      ""
+              MasterInterface = keepOrDefault loaded.MasterInterface defaultConfig.MasterInterface
+              AutoDetect = loaded.AutoDetect
+              SubnetCandidates =
+                  if loaded.SubnetCandidates |> List.isEmpty then
+                      defaultBridgeCandidates
+                  else
+                      loaded.SubnetCandidates
+              PortMappings = loaded.PortMappings
+              Dns = loaded.Dns }
         with ex ->
             Log.Warning(ex, "Erreur lors du chargement de {Path}: {Message}", path, ex.Message)
             defaultConfig
@@ -121,8 +177,11 @@ let saveConfig (configPath: string option) (config: CniNatConfig) =
         File.WriteAllText(tempPath, serializeConfig config)
         File.Move(tempPath, path, true)
     with ex ->
-        if File.Exists(tempPath) then
-            File.Delete(tempPath)
+        try
+            if File.Exists(tempPath) then
+                File.Delete(tempPath)
+        with _ ->
+            ()
 
         reraise ()
 
@@ -143,16 +202,36 @@ let getUsedPrefixes () =
             None)
     |> Set.ofArray
 
+/// Extrait les deux premiers octets d'une IP ou d'un CIDR sous forme de paire
+/// d'entiers. Comparer par segments (et non via StartsWith) évite les faux
+/// positifs du type « 172.200.x.x » considéré comme dans « 172.20.0.0/16 ».
+let private firstTwoOctets (addressOrCidr: string) =
+    if String.IsNullOrWhiteSpace addressOrCidr then
+        None
+    else
+        let ip = addressOrCidr.Split('/').[0]
+
+        match ip.Split('.') with
+        | [| a; b; _; _ |] ->
+            match Int32.TryParse(a), Int32.TryParse(b) with
+            | (true, x), (true, y) -> Some(struct (x, y))
+            | _ -> None
+        | _ -> None
+
 let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) =
+    let usedPairs =
+        usedPrefixes |> Seq.choose firstTwoOctets |> Set.ofSeq
+
     candidates
     |> List.tryFind (fun c ->
-        let baseIp = c.Split('/')
-        let prefix = baseIp.[0].Split('.') |> Array.take 2 |> String.concat "."
-        not (usedPrefixes |> Set.exists (fun ip -> ip.StartsWith(prefix))))
+        // Ignorer silencieusement tout candidat mal formé (config externe)
+        match firstTwoOctets c with
+        | Some pair when isValidCidr c -> not (usedPairs.Contains pair)
+        | _ -> false)
     |> Option.defaultWith (fun () ->
-        match candidates |> List.tryHead with
+        match candidates |> List.tryFind isValidCidr with
         | Some h -> h
-        | None -> failwith "Aucun sous-réseau disponible")
+        | None -> failwith "Aucun sous-réseau valide disponible")
 
 let deriveGateway (subnet: string) =
     let ipPart = subnet.Split('/') |> Array.head

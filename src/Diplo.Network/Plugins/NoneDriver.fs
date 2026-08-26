@@ -50,18 +50,31 @@ type NoneDriver() =
 
         member _.List() = networks.Values |> Seq.toList |> Ok
 
-        member _.Connect(_networkId, containerId, _endpointId, _ipv4Address, _options) =
-            let epId = Guid.NewGuid().ToString("N")
+        member _.Connect(networkId, containerId, _endpointId, _ipv4Address, _options) =
+            // Cohérence de contrat : vérifier l'existence du réseau comme les
+            // autres drivers (sinon un id bidon obtiendrait un endpoint).
+            match networks.TryGetValue(networkId) with
+            | false, _ -> Error(sprintf "Réseau None '%s' introuvable" networkId)
+            | true, info ->
+                let epId = Guid.NewGuid().ToString("N")
 
-            Ok
-                { EndpointId = epId
-                  ContainerId = containerId
-                  Ipv4Address = ""
-                  MacAddress = ""
-                  Message = sprintf "Container '%s' isolé (réseau None)" containerId }
+                Ok
+                    { EndpointId = epId
+                      ContainerId = containerId
+                      Ipv4Address = ""
+                      MacAddress = ""
+                      Message = sprintf "Container '%s' isolé (réseau None '%s')" containerId info.Name }
 
         member _.Disconnect(_networkId, _containerId, _endpointId, _force) = Ok()
 
+        /// Nettoyage réel : les réseaux None n'ont pas de ressource externe,
+        /// la suppression du registre est l'intégralité de l'opération.
         member _.Prune() =
-            let ids = networks.Keys |> Seq.toList
-            Ok ids
+            let removed = ResizeArray<string>()
+
+            for kvp in networks do
+                match networks.TryRemove(kvp.Key) with
+                | true, _ -> removed.Add(kvp.Key)
+                | false, _ -> ()
+
+            Ok(removed |> Seq.toList)

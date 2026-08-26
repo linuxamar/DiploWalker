@@ -74,7 +74,7 @@ type ContainerdClientTests() =
                 []
             )
 
-        result |> should equal "abc123"
+        result |> should equal "test-123"
 
         let cmd =
             runner.SecureCommands
@@ -663,14 +663,16 @@ type ContainerdClientTests() =
                 ()
 
     [<Fact>]
-    member _.``DeleteContainer avec force sur conteneur inexistant ne leve pas``() =
+    member _.``DeleteContainer avec force sur conteneur inexistant leve sur le delete``() =
         let runner = createRunner ()
         runner.SetFail("ctr a échoué")
 
         let client =
             ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
-        // ne doit pas lever malgré l'échec du kill et du delete
-        client.DeleteContainer("default", "absent-1", true)
+
+        // Le kill est best-effort, mais l'échec de la SUPPRESSION doit remonter :
+        // un succès mensonger libérerait prématurément les volumes montés.
+        Assert.Throws<System.Exception>(fun () -> client.DeleteContainer("default", "absent-1", true))
 
     [<Fact>]
     member _.``UpdateContainer avec limites demandees leve Unimplemented``() =

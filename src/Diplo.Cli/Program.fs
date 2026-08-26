@@ -104,5 +104,6 @@ let main argv =
         |> ignore)
     |> ignore
 
-    app.Run(argv) |> ignore
-    0
+    // Propager le code retour de Spectre : l'ignorer faisait toujours sortir
+    // le processus en 0, cassant toute chaîne scriptée (&&, CI, planificateur).
+    app.Run(argv)

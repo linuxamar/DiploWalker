@@ -313,31 +313,62 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
                         outputPort.WriteLine(sprintf "  %s = %s" kvp.Key kvp.Value)
             })
 
+    /// Résout l'identifiant cible des actions : champ de saisie s'il est
+    /// rempli, sinon le conteneur sélectionné dans la grille. Sans ce repli,
+    /// les boutons du panneau détail agissaient sur un id vide ou obsolète.
+    member private this.ResolveTargetId() : string =
+        if not (String.IsNullOrWhiteSpace(this.ContainerIdInput)) then
+            this.ContainerIdInput
+        else
+            let sel = getSelectedContainer ()
+
+            if isNull (box sel) then
+                ""
+
+            elif String.IsNullOrWhiteSpace(sel.Id) then
+                ""
+            else
+                sel.Id
+
     member private this.StartContainer() =
         Cmd.run outputPort (fun () ->
             task {
-                let! response = containerClient.StartAsync(id = this.ContainerIdInput)
-                outputPort.WriteSuccess(sprintf "Conteneur %s démarré - %s" this.ContainerIdInput response.Message)
+                let target = this.ResolveTargetId()
+
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                else
+                    let! response = containerClient.StartAsync(id = target)
+                    outputPort.WriteSuccess(sprintf "Conteneur %s démarré - %s" target response.Message)
             })
 
     member private this.StopContainer() =
         Cmd.run outputPort (fun () ->
             task {
-                let! response =
-                    containerClient.StopAsync(id = this.ContainerIdInput, timeoutSeconds = this.ContainerTimeout)
+                let target = this.ResolveTargetId()
 
-                outputPort.WriteSuccess(sprintf "Conteneur %s arrêté - %s" this.ContainerIdInput response.Message)
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                else
+                    let! response = containerClient.StopAsync(id = target, timeoutSeconds = this.ContainerTimeout)
+
+                    outputPort.WriteSuccess(sprintf "Conteneur %s arrêté - %s" target response.Message)
             })
 
     member private this.DeleteContainer() =
         Cmd.run outputPort (fun () ->
             task {
-                let! response = containerClient.DeleteAsync(id = this.ContainerIdInput, force = this.ContainerForce)
+                let target = this.ResolveTargetId()
 
-                if response.Success then
-                    outputPort.WriteSuccess(sprintf "Conteneur %s supprimé" this.ContainerIdInput)
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
                 else
-                    outputPort.WriteWarning(response.Message)
+                    let! response = containerClient.DeleteAsync(id = target, force = this.ContainerForce)
+
+                    if response.Success then
+                        outputPort.WriteSuccess(sprintf "Conteneur %s supprimé" target)
+                    else
+                        outputPort.WriteWarning(response.Message)
             })
 
     member private this.PullImage() =
@@ -369,31 +400,48 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
     member private this.RenameContainer() =
         Cmd.run outputPort (fun () ->
             task {
-                let! response =
-                    containerClient.RenameContainerAsync(id = this.ContainerIdInput, newName = this.ContainerNewName)
+                let target = this.ResolveTargetId()
 
-                outputPort.WriteSuccess(
-                    sprintf "Conteneur %s renommé en %s" this.ContainerIdInput this.ContainerNewName
-                )
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                else
+                    let! response =
+                        containerClient.RenameContainerAsync(id = target, newName = this.ContainerNewName)
+
+                    outputPort.WriteSuccess(sprintf "Conteneur %s renommé en %s" target this.ContainerNewName)
             })
 
     member private this.TopContainer() =
         Cmd.run outputPort (fun () ->
             task {
-                let! response = containerClient.TopContainerAsync(id = this.ContainerIdInput)
-                outputPort.WriteLine(sprintf "Processus du conteneur %s:" this.ContainerIdInput)
+                let target = this.ResolveTargetId()
 
-                for proc in response.Processes do
-                    outputPort.WriteLine(sprintf "  PID: %d  CMD: %s" proc.Pid proc.Command)
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                else
+                    let! response = containerClient.TopContainerAsync(id = target)
+                    outputPort.WriteLine(sprintf "Processus du conteneur %s:" target)
+
+                    for proc in response.Processes do
+                        outputPort.WriteLine(sprintf "  PID: %d  CMD: %s" proc.Pid proc.Command)
             })
 
     member private this.GetContainerStats() =
         Cmd.run outputPort (fun () ->
             task {
-                let! response = containerClient.GetContainerStatsAsync(id = this.ContainerIdInput)
-                outputPort.WriteLine(sprintf "Métriques du conteneur %s:" this.ContainerIdInput)
-                outputPort.WriteLine(sprintf "  CPU: %.2f  Mémoire: %d" response.CpuUsage response.MemoryUsage)
-                outputPort.WriteLine(sprintf "  Réseau RX: %d  TX: %d" response.NetworkRx response.NetworkTx)
+                let target = this.ResolveTargetId()
+
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                else
+                    let! response = containerClient.GetContainerStatsAsync(id = target)
+                    outputPort.WriteLine(sprintf "Métriques du conteneur %s:" target)
+
+                    outputPort.WriteLine(
+                        sprintf "  CPU: %.2f  Mémoire: %d" response.CpuUsage response.MemoryUsage
+                    )
+
+                    outputPort.WriteLine(sprintf "  Réseau RX: %d  TX: %d" response.NetworkRx response.NetworkTx)
             })
 
     member private this.ListImages() =
@@ -524,16 +572,26 @@ type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> 
 
                         try
                             let mutable moving = true
+                            let mutable cancelled = false
 
                             while moving do
-                                let! hasNext = enumerator.MoveNextAsync().AsTask()
+                                try
+                                    let! hasNext = enumerator.MoveNextAsync().AsTask()
 
-                                if hasNext then
-                                    outputPort.WriteLine(
-                                        sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log
-                                    )
-                                else
+                                    if hasNext then
+                                        outputPort.WriteLine(
+                                            sprintf "[%s] %s" enumerator.Current.Timestamp enumerator.Current.Log
+                                        )
+                                    else
+                                        moving <- false
+                                with :? OperationCanceledException ->
+                                    // Arrêt volontaire du suivi (bouton ⏹) :
+                                    // ce n'est PAS une erreur à afficher.
+                                    cancelled <- true
                                     moving <- false
+
+                            if not cancelled then
+                                outputPort.WriteSuccess("Suivi des journaux terminé")
                         finally
                             enumerator.DisposeAsync().AsTask() |> ignore
                     finally

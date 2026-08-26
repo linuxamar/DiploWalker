@@ -34,6 +34,21 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
     let validateNs (namespaceName: string) =
         SecurityValidation.validateId namespaceName "Le namespace"
 
+    /// Sépare un REF containerd en (repository, tag). Un ref avec digest
+    /// (@sha256:...) est considéré sans tag. Le tag est le segment après le
+    /// dernier ':' SITUÉ APRÈS le dernier '/' (sinon c'est le port du registre).
+    let splitRef (refName: string) =
+        let at = refName.IndexOf('@')
+        let nameOnly = if at >= 0 then refName.Substring(0, at) else refName
+
+        let lastSlash = nameOnly.LastIndexOf('/')
+        let lastColon = nameOnly.LastIndexOf(':')
+
+        if lastColon > lastSlash then
+            (nameOnly.Substring(0, lastColon), nameOnly.Substring(lastColon + 1))
+        else
+            (nameOnly, "")
+
     interface IContainerdClient with
         member _.CreateContainer
             (namespaceName, id, image, labels, env, command, args, memoryLimit, cpuShares, pidLimit, mounts)
@@ -55,13 +70,25 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             for (src, dst, readOnly) in mounts do
                 SecurityValidation.validateVolumePath src "La source du volume"
 
-                if String.IsNullOrEmpty(dst) then
-                    invalidArg "dst" "La destination du montage ne peut pas être vide"
+                // La spec --mount est une liste séparée par des virgules : un
+                // champ contenant une virgule ou un espace permettrait d'injecter
+                // des options arbitraires (ex. annuler le « ro » imposé).
+                let validateMountSegment (value: string) (label: string) =
+                    if String.IsNullOrEmpty value then
+                        invalidArg "mounts" (sprintf "%s du montage ne peut pas être vide" label)
 
-                if dst.Contains("..") then
-                    invalidArg
-                        "dst"
-                        (sprintf "La destination du montage contient une traversée de répertoire interdite: '%s'" dst)
+                    if value.Contains("..") then
+                        invalidArg
+                            "mounts"
+                            (sprintf "%s du montage contient une traversée de répertoire interdite" label)
+
+                    if
+                        value.IndexOfAny([| ','; ' '; '\t'; '\r'; '\n' |])
+                        >= 0
+                    then
+                        invalidArg "mounts" (sprintf "%s du montage contient un caractère interdit" label)
+
+                validateMountSegment dst "La destination"
 
                 ctrArgs.Add("--mount")
                 let options = if readOnly then "rbind,ro" else "rbind"
@@ -95,8 +122,10 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 ctrArgs.Add(a)
 
             let output = runCtr (ctrArgs |> Seq.toList)
-            let trimmed = output.Trim()
-            if String.IsNullOrEmpty(trimmed) then id else trimmed
+            // L'id est généré côté service et passé à ctr : la sortie peut
+            // contenir des avertissements supplémentaires, on ne l'utilise pas.
+            ignore output
+            id
 
         member _.StartContainer(namespaceName, id, detach) =
             validateNsId namespaceName id
@@ -120,6 +149,14 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             psi.RedirectStandardError <- true
             psi.UseShellExecute <- false
             psi.CreateNoWindow <- true
+
+            // Rotation simple : un journal > 50 Mo bascule en <id>.log.1 pour
+            // éviter la saturation disque d'un conteneur bavard.
+            if File.Exists(logFile) && (FileInfo(logFile)).Length > 50L * 1024L * 1024L then
+                let old = logFile + ".1"
+                File.Delete(old)
+                File.Move(logFile, old)
+
             let proc = Process.Start(psi)
 
             if isNull proc then
@@ -152,16 +189,29 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
                 proc.OutputDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> append e.Data))
                 proc.ErrorDataReceived.AddHandler(DataReceivedEventHandler(fun _ e -> append e.Data))
+
+                // Les lectures asynchrones doivent être armées AVANT
+                // EnableRaisingEvents : si le process sort très vite, Exited peut
+                // fire avant BeginOutputReadLine et provoquer une
+                // ObjectDisposedException (échec rapporté à tort).
+                proc.BeginOutputReadLine()
+                proc.BeginErrorReadLine()
                 proc.EnableRaisingEvents <- true
 
                 proc.Exited.AddHandler(
                     EventHandler(fun _ _ ->
+                        // WaitForExit() sans délai garantit que les callbacks
+                        // DataReceived déjà en file ont été traités : sinon les
+                        // dernières lignes sont perdues par closeWriter.
+                        try
+                            proc.WaitForExit()
+                        with _ ->
+                            ()
+
                         closeWriter ()
                         proc.Dispose())
                 )
 
-                proc.BeginOutputReadLine()
-                proc.BeginErrorReadLine()
                 Log.Information("Conteneur {ContainerId} démarré, logs capturés dans {LogFile}", id, logFile)
             with ex ->
                 // Nettoyage du processus en cas d'échec de configuration
@@ -181,13 +231,50 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         member _.StopContainer(namespaceName, id, timeoutSeconds) : Task =
             validateNsId namespaceName id
 
-            runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGTERM"; id ])
-            |> ignore
-
             task {
-                if timeoutSeconds > 0 then
-                    let capped = min timeoutSeconds 300
-                    do! Task.Delay(capped * 1000)
+                runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGTERM"; id ])
+                |> ignore
+
+                // SIGTERM n'est qu'une demande : attendre l'arrêt RÉEL en
+                // interrogeant `tasks list`, puis escalader vers SIGKILL sinon.
+                let capped = if timeoutSeconds > 0 then min timeoutSeconds 300 else 10
+                let deadline = DateTime.UtcNow.AddSeconds(float capped)
+
+                let isRunning () =
+                    try
+                        let output = runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+
+                        output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+                        |> Array.exists (fun line ->
+                            let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
+
+                            parts.Length >= 3
+                            && parts[0].Equals(id, StringComparison.OrdinalIgnoreCase)
+                            && parts[2].Equals("RUNNING", StringComparison.OrdinalIgnoreCase))
+                    with _ ->
+                        true // vérification impossible : rester prudent, l'escalade est bornée
+
+                while DateTime.UtcNow < deadline && isRunning () do
+                    do! Task.Delay(500)
+
+                if isRunning () then
+                    Log.Warning(
+                        "Le conteneur {ContainerId} tourne encore après {Timeout}s : envoi de SIGKILL",
+                        id,
+                        capped
+                    )
+
+                    try
+                        runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGKILL"; id ])
+                        |> ignore
+                    with ex ->
+                        Log.Warning(ex, "SIGKILL a échoué pour le conteneur {ContainerId}", id)
+
+                    try
+                        runCtr (nsArgs namespaceName [ "task"; "delete"; "--force"; id ])
+                        |> ignore
+                    with ex ->
+                        Log.Warning(ex, "Suppression forcée de la tâche a échoué pour {ContainerId}", id)
             }
             :> Task
 
@@ -195,6 +282,9 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             validateNsId namespaceName id
 
             if force then
+                // Le kill est best-effort ; en revanche l'échec de la suppression
+                // doit remonter : un succès mensonger ferait libérer les volumes
+                // montés alors que le conteneur existe peut-être toujours.
                 try
                     runCtr (nsArgs namespaceName [ "task"; "kill"; "--signal"; "SIGKILL"; id ])
                     |> ignore
@@ -202,9 +292,12 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     Log.Warning(ex, "Erreur lors de l'arrêt forcé du conteneur {ContainerId}", id)
 
                 try
-                    runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
+                    runCtr (nsArgs namespaceName [ "task"; "delete"; "--force"; id ])
+                    |> ignore
                 with ex ->
-                    Log.Warning(ex, "Erreur lors de la suppression du conteneur {ContainerId}", id)
+                    Log.Debug(ex, "Tâche déjà absente pour le conteneur {ContainerId}", id)
+
+                runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
             else
                 runCtr (nsArgs namespaceName [ "container"; "delete"; id ]) |> ignore
 
@@ -245,10 +338,10 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 let status = currentStatus ()
 
                 match status.ToUpperInvariant() with
+                // PAUSED n'est PAS un état terminal : attendre la reprise.
                 | "STOPPED"
                 | "DELETED"
-                | "UNKNOWN"
-                | "PAUSED" -> 0
+                | "UNKNOWN" -> 0
                 | _ ->
                     match deadline with
                     | Some d when DateTime.UtcNow >= d -> -1
@@ -317,8 +410,6 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
         member _.GetContainerLogsStream(namespaceName, id, tail, since, ct) =
             validateNsId namespaceName id
-            let channel = System.Threading.Channels.Channel.CreateUnbounded<string>()
-            let writer = channel.Writer
 
             let isContainerRunning () =
                 try
@@ -335,15 +426,20 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     Log.Warning(ex, "Erreur lors du suivi des logs du conteneur {ContainerId}", id)
                     false
 
-            let producer (cancel: CancellationToken) =
+            // Canal et producteur créés PAR ÉNUMÉRATION : plusieurs
+            // GetAsyncEnumerator sur le même IAsyncEnumerable ne doivent pas
+            // partager un canal ni dupliquer les lignes.
+            let producer (writer: System.Threading.Channels.ChannelWriter<string>) (cancel: CancellationToken) =
                 async {
                     try
-                        let snapshot = ContainerLogs.read id tail since
+                        // Watermark capturé AVANT la lecture : aucun octet écrit
+                        // pendant la lecture n'est ni sauté ni dupliqué ensuite.
+                        let snapshot, initialOffset = ContainerLogs.readUpTo id tail since
 
                         for l in snapshot do
                             writer.TryWrite(l) |> ignore
 
-                        let mutable lastOffset = ContainerLogs.fileLength id
+                        let mutable lastOffset = initialOffset
                         let mutable running = true
 
                         while running && not cancel.IsCancellationRequested do
@@ -373,7 +469,8 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             { new IAsyncEnumerable<string> with
                 member _.GetAsyncEnumerator(ct2) =
                     let cts = CancellationTokenSource.CreateLinkedTokenSource(ct, ct2)
-                    producer cts.Token |> Async.StartAsTask |> ignore
+                    let channel = System.Threading.Channels.Channel.CreateUnbounded<string>()
+                    producer channel.Writer cts.Token |> Async.StartAsTask |> ignore
                     let mutable current = ""
 
                     { new IAsyncEnumerator<string> with
@@ -395,7 +492,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                             ValueTask<bool>(task)
 
                         member _.DisposeAsync() =
-                            writer.TryComplete() |> ignore
+                            channel.Writer.TryComplete() |> ignore
                             ValueTask() } }
 
         member _.ExecInContainer(namespaceName, id, command) =
@@ -412,12 +509,9 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                   yield id ]
                 @ (command |> Array.toList)
 
-            try
-                let output = runCtr args
-                output
-            with ex ->
-                Log.Error(ex, "Erreur lors de l'exécution dans le conteneur {ContainerId}", id)
-                "Erreur d'exécution dans le conteneur"
+            // L'échec est propagé : une sentinelle textuelle retournée comme
+            // sortie normale rend l'erreur indistinguable d'un résultat valide.
+            runCtr args
 
         member _.StartExec(namespaceName, id, command, stdin, stdout, stderr) =
             validateNsId namespaceName id
@@ -444,7 +538,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 psi.RedirectStandardError <- true
                 psi.UseShellExecute <- false
                 psi.CreateNoWindow <- true
-                use proc = Process.Start(psi)
+                let proc = Process.Start(psi)
 
                 let pumpIn =
                     Task.Run(fun () ->
@@ -456,11 +550,30 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 let exited = proc.WaitForExit(600_000)
 
                 if not exited then
+                    // Sans Kill, les pumps ne se terminent jamais (pipes ouverts)
+                    // : attente infinie et processus ctr orphelin.
                     Log.Warning("Timeout (600s) lors de l'exécution en flux dans le conteneur {ContainerId}", id)
 
-                Task.WaitAll(pumpOut, pumpErr)
-                pumpIn.Wait()
-                proc.ExitCode
+                    try
+                        proc.Kill(true)
+                    with ex ->
+                        Log.Warning(ex, "Impossible de tuer le processus ctr exec pour {ContainerId}", id)
+
+                    try
+                        Task.WaitAll([| pumpOut; pumpErr; pumpIn |], 5_000) |> ignore
+                    with _ ->
+                        ()
+
+                    try
+                        proc.Dispose()
+                    with _ ->
+                        ()
+
+                    -1
+                else
+                    Task.WaitAll(pumpOut, pumpErr)
+                    pumpIn.Wait()
+                    proc.ExitCode
             with ex ->
                 Log.Error(ex, "Erreur lors de l'exécution en flux dans le conteneur {ContainerId}", id)
                 -1
@@ -484,18 +597,19 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 | Some line ->
                     let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
 
-                    let pid =
-                        if parts.Length >= 2 && parts[1] <> "-" then
-                            parts[1]
-                        else
-                            "0"
+                    // Pid émis en NOMBRE : les consommateurs lisent avec
+                    // tryGetInt64 qui exige ValueKind = Number.
+                    let mutable pidValue = 0L
+
+                    if parts.Length >= 2 then
+                        Int64.TryParse(parts.[1], &pidValue) |> ignore
 
                     let status = if parts.Length >= 3 then parts[2] else "unknown"
 
                     let json =
                         System.Text.Json.JsonSerializer.Serialize(
                             {| status = status
-                               pid = pid
+                               pid = pidValue
                                exited_at = "" |}
                         )
 
@@ -619,9 +733,17 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 |> Array.map (fun line ->
                     let parts = line.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
                     let id = if parts.Length >= 2 then parts[0] else line
+                    let repository, tag = splitRef id
 
+                    // tag est indispensable : PruneImages s'appuie dessus pour
+                    // ne supprimer que les images non taguées (dangling).
                     let json =
-                        System.Text.Json.JsonSerializer.Serialize({| id = id; repository = id; ref = id |})
+                        System.Text.Json.JsonSerializer.Serialize(
+                            {| id = id
+                               repository = repository
+                               ref = id
+                               tag = tag |}
+                        )
 
                     parseJson json)
                 |> Array.toList

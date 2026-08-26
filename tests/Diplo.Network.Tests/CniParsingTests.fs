@@ -41,7 +41,7 @@ module CniParsingTests =
         ipv4 |> should equal "10.22.0.2/24"
 
     [<Fact>]
-    let ``parseCniResult extrait le gateway DNS`` () =
+    let ``parseCniResult extrait le gateway depuis ips`` () =
         let _, _, gw = parseCniResult validCniJson
         gw |> should equal "10.22.0.1"
 
@@ -112,4 +112,20 @@ module CniParsingTests =
         let ifname, ipv4, gw = parseCniResult json
         ifname |> should equal "eth0"
         ipv4 |> should equal "10.0.0.2/24"
-        gw |> should equal "8.8.8.8"
+
+        // SPEC CNI : dns.nameservers n'est PAS un repli de passerelle — un DNS
+        // public ne doit jamais être retourné comme passerelle du réseau.
+        gw |> should equal ""
+
+    [<Fact>]
+    let ``parseCniResult lit la passerelle de la premiere interface uniquement`` () =
+        let json =
+            """{
+                "interfaces": [
+                    {"name": "eth0", "ips": [{"address": "10.0.0.2/24", "gateway": "10.0.0.1"}]},
+                    {"name": "eth1", "ips": [{"address": "192.168.1.2/24", "gateway": "192.168.1.1"}]}
+                ]
+            }"""
+
+        let _, _, gw = parseCniResult json
+        gw |> should equal "10.0.0.1"

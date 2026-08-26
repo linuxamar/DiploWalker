@@ -23,9 +23,12 @@ type CloudAwsDriver(dataRoot: string) =
             )
 
     let mountEfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
+        // Chiffrement en transit (recommandation AWS pour EFS) : l'option tls
+        // du helper de montage EFS tunnelise via stunnel. Sans elle, les
+        // données traversent le réseau en clair.
         ProcessExec.runUnit
             "mount"
-            [ "-o"; "nfsvers=4.1"; remotePath; targetPath ]
+            [ "-o"; "nfsvers=4.1,tls"; remotePath; targetPath ]
             (Some ProcessExec.MountTimeoutMs)
             None
 

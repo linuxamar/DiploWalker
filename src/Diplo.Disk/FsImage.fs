@@ -19,8 +19,47 @@ module FsImage =
     let private toRealRel (fsPath: string) =
         fsPath.TrimStart('\\', '/').Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar)
 
+    /// Convertit un chemin INTERNE au système de fichiers image en chemin hôte,
+    /// confiné à `realRoot` : les noms internes viennent de données non fiables
+    /// (une image peut contenir « .. » ou des noms enracinés type « C:\x »).
+    /// Sans ce contrôle, le service (LocalSystem) écrit n'importe où sur l'hôte.
     let private realFrom (realRoot: string) (fsPath: string) =
-        Path.Combine(realRoot, toRealRel fsPath)
+        let rel = toRealRel fsPath
+
+        let rooted =
+            try
+                Path.IsPathRooted(rel)
+            with _ ->
+                true
+
+        let hasTraversal =
+            rel.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
+            |> Array.exists (fun seg -> seg = "..")
+
+        if rooted || hasTraversal then
+            invalidArg "fsPath" (sprintf "Chemin interne d'image invalide : '%s'" fsPath)
+
+        let combined =
+            try
+                Path.GetFullPath(Path.Combine(realRoot, rel))
+            with _ ->
+                invalidArg "fsPath" (sprintf "Chemin interne d'image invalide : '%s'" fsPath)
+
+        let rootFull = Path.GetFullPath(realRoot)
+
+        let rootWithSep =
+            realRoot.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
+
+        // Le chemin doit rester dans le staging ; la RACINE elle-même est
+        // autorisée (l'extraction démarre par « \ »).
+        let inside =
+            combined.Equals(rootFull, StringComparison.OrdinalIgnoreCase)
+            || combined.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase)
+
+        if not inside then
+            invalidArg "fsPath" (sprintf "Le chemin interne sort du répertoire de staging : '%s'" fsPath)
+
+        combined
 
     /// Enregistre une seule fois les fournisseurs DiscUtils (conteneurs et
     /// systèmes de fichiers) pour la détection automatique des formats.
@@ -252,10 +291,14 @@ module FsImage =
             copyDirIntoFs fs "\\" sourceDir
             destPath
         with ex ->
-            try
-                if File.Exists destPath then
-                    File.Delete destPath
-            with _ ->
-                ()
+            // Ne supprimer l'image que si NOUS l'avons créée : un échec de
+            // formatage sur une image EXISTANTE (ouverte par openOrCreateDisk)
+            // ne doit jamais la détruire.
+            if fileCreated then
+                try
+                    if File.Exists destPath then
+                        File.Delete destPath
+                with _ ->
+                    ()
 
             reraise ()

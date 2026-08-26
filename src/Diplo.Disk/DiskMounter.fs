@@ -41,9 +41,33 @@ module DiskMounter =
 
     /// Supprime les dossiers de staging orphelins (GUID) plus anciens que
     /// `maxAge`. Un staging est orphelin quand le service a crashé entre
-    /// l'extraction et l'appel au write-back.
+    /// l'extraction et l'appel au write-back. Les stagings référencés par
+    /// l'état persisté (mounted-state.json, en attente de rehydration après un
+    /// arrêt long) sont préservés : les supprimer détruirait des modifications
+    /// de conteneur sans aucun write-back.
     let pruneStaleStaging (maxAge: TimeSpan) =
         let root = stagingRoot ()
+
+        let referencedHostPaths =
+            try
+                let statePath = MountState.stateFile ()
+
+                if File.Exists statePath then
+                    MountState.load statePath
+                    |> Map.toSeq
+                    |> Seq.collect snd
+                    |> Seq.map (fun m -> m.HostPath)
+                    |> Set.ofSeq
+                else
+                    Set.empty
+            with ex ->
+                Log.Warning(
+                    ex,
+                    "Impossible de lire l'état persisté avant le prune : aucun staging ne sera supprimé"
+                )
+
+                // Fail-safe : en cas d'erreur de lecture, ne rien supprimer.
+                Directory.GetDirectories root |> Set.ofArray
 
         for dir in Directory.GetDirectories root do
             let dirName = Path.GetFileName dir
@@ -53,7 +77,7 @@ module DiskMounter =
                 && s
                     |> Seq.forall (fun c -> c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F')
 
-            if isGuid dirName then
+            if isGuid dirName && not (referencedHostPaths.Contains dir) then
                 try
                     let age = DateTime.UtcNow - Directory.GetCreationTimeUtc(dir)
 
@@ -127,7 +151,15 @@ module DiskMounter =
             if Directory.Exists source then
                 fun () -> ()
             elif not (Directory.Exists hostPath) then
-                fun () -> ()
+                // Le staging a disparu (prune, nettoyage manuel...) : le
+                // write-back est impossible, le signaler bruyamment plutôt que
+                // de transformer la libération en no-op silencieux.
+                fun () ->
+                    Log.Error(
+                        "Write-back impossible : le staging {HostPath} de la source {Source} n'existe plus — modifications perdues",
+                        hostPath,
+                        source
+                    )
             else
                 fun () ->
                     if not readOnly then

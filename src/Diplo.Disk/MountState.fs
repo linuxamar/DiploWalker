@@ -19,58 +19,80 @@ module MountState =
 
     type ContainerState = { Id: string; Mounts: MountEntry list }
 
+    // Même racine que DiskMounter.stagingRoot() : calculée localement pour
+    // éviter une dépendance croisée entre les deux modules.
     let stateFile () =
-        Path.Combine(DiskMounter.stagingRoot (), "mounted-state.json")
+        let baseDir =
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "Diplo",
+                "volumes"
+            )
+
+        Path.Combine(baseDir, "mounted-state.json")
+
+    /// Verrou global : les handlers gRPC appellent persistMounts en parallèle ;
+    /// sans sérialisation, deux sauvegardes concurrentes s'écrasent et des
+    /// entrées de montage sont perdues (write-backs jamais exécutés après crash).
+    let private stateLock = obj ()
 
     /// Charge l'état persisté (Map identifiant conteneur -> volumes).
     /// Retourne un état vide si le fichier est absent ou illisible.
     let load (path: string) : Map<string, MountEntry list> =
-        try
-            if not (File.Exists path) then
-                Map.empty
-            else
-                let json = File.ReadAllText path
-
-                if String.IsNullOrWhiteSpace(json) || json = "null" then
-                    Log.Warning("Fichier d'état de montage vide ou null : {Path}", path)
+        lock stateLock (fun () ->
+            try
+                if not (File.Exists path) then
                     Map.empty
                 else
-                    let entries = JsonSerializer.Deserialize<ContainerState list>(json)
+                    let json = File.ReadAllText path
 
-                    if isNull (box entries) then
-                        Log.Warning("Fichier d'état de montage contient null : {Path}", path)
+                    if String.IsNullOrWhiteSpace(json) || json = "null" then
+                        Log.Warning("Fichier d'état de montage vide ou null : {Path}", path)
                         Map.empty
                     else
-                        entries |> Seq.map (fun e -> e.Id, e.Mounts) |> Map.ofSeq
-        with
-        | :? JsonException as ex ->
-            Log.Warning(ex, "Fichier d'état de montage corrompu : {Path}", path)
-            Map.empty
-        | ex ->
-            Log.Warning(ex, "Erreur lecture état de montage : {Path}", path)
-            Map.empty
+                        let entries = JsonSerializer.Deserialize<ContainerState list>(json)
+
+                        if isNull (box entries) then
+                            Log.Warning("Fichier d'état de montage contient null : {Path}", path)
+                            Map.empty
+                        else
+                            entries |> Seq.map (fun e -> e.Id, e.Mounts) |> Map.ofSeq
+            with
+            | :? JsonException as ex ->
+                Log.Warning(ex, "Fichier d'état de montage corrompu : {Path}", path)
+                Map.empty
+            | ex ->
+                Log.Warning(ex, "Erreur lecture état de montage : {Path}", path)
+                Map.empty)
 
     /// Enregistre l'état des volumes montés (écriture atomique : fichier
-    /// temporaire du même répertoire puis remplacement).
+    /// temporaire du même répertoire puis remplacement ; le temporaire est
+    /// supprimé même en cas d'échec).
     let save (path: string) (mounted: seq<string * MountEntry list>) =
-        let entries =
-            mounted
-            |> Seq.map (fun (id, mounts) -> { Id = id; Mounts = mounts })
-            |> Seq.toList
+        lock stateLock (fun () ->
+            let entries =
+                mounted
+                |> Seq.map (fun (id, mounts) -> { Id = id; Mounts = mounts })
+                |> Seq.toList
 
-        let json =
-            JsonSerializer.Serialize(entries, JsonSerializerOptions(WriteIndented = true))
+            let json = JsonSerializer.Serialize(entries, JsonSerializerOptions(WriteIndented = true))
+            let dir = Path.GetDirectoryName(path)
 
-        let dir = Path.GetDirectoryName(path)
+            if not (String.IsNullOrEmpty dir) then
+                Directory.CreateDirectory dir |> ignore
 
-        if not (String.IsNullOrEmpty dir) then
-            Directory.CreateDirectory dir |> ignore
+            let name = Path.GetFileName(path)
+            let tmp = Path.Combine(dir, name + "." + Guid.NewGuid().ToString("N") + ".tmp")
 
-        let name = Path.GetFileName(path)
-        let tmp = Path.Combine(dir, name + "." + Guid.NewGuid().ToString("N") + ".tmp")
-        File.WriteAllText(tmp, json)
-
-        try
-            File.Replace(tmp, path, null)
-        with :? FileNotFoundException ->
-            File.Move(tmp, path)
+            try
+                try
+                    File.WriteAllText(tmp, json)
+                    File.Replace(tmp, path, null)
+                with :? FileNotFoundException ->
+                    File.Move(tmp, path)
+            with
+            | _ ->
+                try
+                    File.Delete(tmp)
+                with _ -> ()
+                reraise ())

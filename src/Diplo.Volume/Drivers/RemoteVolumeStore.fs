@@ -20,7 +20,21 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
     let generateId () = Guid.NewGuid().ToString("N")
 
     /// Clés sensibles à supprimer avant persistance (credentials en clair interdit).
-    let sensitiveKeys = set [ "password"; "secret"; "token"; "apikey"; "api_key" ]
+    /// Couvre les variantes Azure/AWS/GCP : clé de stockage, clé de compte, SAS,
+    /// chaîne de connexion — sans elles, la clé finit en clair dans meta.json.
+    let sensitiveKeys =
+        set
+            [ "password"
+              "secret"
+              "token"
+              "apikey"
+              "api_key"
+              "storagekey"
+              "accountkey"
+              "account_key"
+              "sas"
+              "connectionstring"
+              "connection_string" ]
 
     member _.CreateVolume
         (name: string, remotePath: string, labels: Map<string, string>, driverOpts: Map<string, string>)
@@ -29,16 +43,20 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
         let dir = Path.Combine(volumesDir, id)
         Directory.CreateDirectory(dir) |> ignore
 
-        let safeOpts =
-            driverOpts
-            |> Map.filter (fun k _ -> not (sensitiveKeys.Contains(k.ToLowerInvariant())))
+        let sanitize (m: Map<string, string>) =
+            m |> Map.filter (fun k _ -> not (sensitiveKeys.Contains(k.ToLowerInvariant())))
+
+        let safeOpts = sanitize driverOpts
+        // Les labels subissent le même filtre : y glisser un « password »
+        // contournerait sinon l'intention du filtre des driverOpts.
+        let safeLabels = sanitize labels
 
         let meta =
             {| id = id
                name = name
                driver = driverName
                remotePath = remotePath
-               labels = labels
+               labels = safeLabels
                driverOpts = safeOpts
                createdAt = DateTime.UtcNow |}
 
