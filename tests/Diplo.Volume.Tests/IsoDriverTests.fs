@@ -709,7 +709,9 @@ module IsoDriverTests =
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
 
-            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/HELLO.TXT")
+            let result = IsoImage.readFile isoFile "/HELLO.TXT"
+            let bytes = result |> Result.defaultWith failwith
+            Encoding.UTF8.GetString(bytes)
             |> should equal "Bonjour ISO!\n"
         finally
             cleanupDir tempRoot
@@ -722,7 +724,9 @@ module IsoDriverTests =
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfDvd ())
 
-            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/HELLO.TXT")
+            let result = IsoImage.readFile isoFile "/HELLO.TXT"
+            let bytes = result |> Result.defaultWith failwith
+            Encoding.UTF8.GetString(bytes)
             |> should equal "Bonjour DVD!\n"
         finally
             cleanupDir tempRoot
@@ -735,20 +739,24 @@ module IsoDriverTests =
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildUdfMultiBlock ())
 
-            Encoding.UTF8.GetString(IsoImage.readFile isoFile "/DOSSIER/SOUS.TXT")
+            let result = IsoImage.readFile isoFile "/DOSSIER/SOUS.TXT"
+            let bytes = result |> Result.defaultWith failwith
+            Encoding.UTF8.GetString(bytes)
             |> should equal "Bonjour SOUS\n"
         finally
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``IsoImage.readFile leve une exception si le fichier est absent`` () =
+    let ``IsoImage.readFile retourne Error si le fichier est absent`` () =
         let tempRoot = createTempDir ()
 
         try
             let isoFile = Path.Combine(tempRoot, "test.iso")
             File.WriteAllBytes(isoFile, buildIso ())
 
-            (fun () -> IsoImage.readFile isoFile "/INEXISTANT.TXT" |> ignore)
-            |> should throw typeof<System.Exception>
+            let result = IsoImage.readFile isoFile "/INEXISTANT.TXT"
+            match result with
+            | Error _ -> ()
+            | Ok _ -> failwith "Attendait Error mais a recu Ok"
         finally
             cleanupDir tempRoot

@@ -84,7 +84,7 @@ module HawkyntFsTests =
         run (fun root img ->
             TestImage.createFat img [ "test.txt", "contenu Hawkynt" ]
             let staging = Path.Combine(root, "staging")
-            let n = FsImage.extract img staging false
+            let n = FsImage.extract img staging false |> Result.defaultWith failwith
             n |> should equal 1
 
             File.ReadAllText(Path.Combine(staging, "test.txt"))
@@ -95,12 +95,12 @@ module HawkyntFsTests =
         run (fun root img ->
             TestImage.createFat img [ "orig.txt", "v1" ]
             let staging = Path.Combine(root, "staging")
-            FsImage.extract img staging false |> ignore
+            FsImage.extract img staging false |> Result.defaultWith failwith |> ignore
             File.WriteAllText(Path.Combine(staging, "orig.txt"), "v2")
             File.WriteAllText(Path.Combine(staging, "ajout.txt"), "ajout")
-            FsImage.writeBack img staging
+            FsImage.writeBack img staging |> Result.defaultWith failwith
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "orig.txt")) |> should equal "v2"
             File.ReadAllText(Path.Combine(re, "ajout.txt")) |> should equal "ajout")
 
@@ -109,13 +109,13 @@ module HawkyntFsTests =
         run (fun root img ->
             TestImage.createFat img [ "a.txt", "alpha"; @"d\b.txt", "beta" ]
             let staging = Path.Combine(root, "staging")
-            let n1 = FsImage.extract img staging false
+            let n1 = FsImage.extract img staging false |> Result.defaultWith failwith
             n1 |> should equal 2
             File.Delete(Path.Combine(staging, "a.txt"))
             File.WriteAllText(Path.Combine(staging, "d", "b.txt"), "gamma")
-            FsImage.writeBack img staging
+            FsImage.writeBack img staging |> Result.defaultWith failwith
             let re = Path.Combine(root, "re")
-            let n2 = FsImage.extract img re false
+            let n2 = FsImage.extract img re false |> Result.defaultWith failwith
             n2 |> should equal 1
             File.Exists(Path.Combine(re, "a.txt")) |> should equal false
             File.ReadAllText(Path.Combine(re, "d", "b.txt")) |> should equal "gamma")

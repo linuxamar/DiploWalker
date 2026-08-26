@@ -37,7 +37,7 @@ module DiskMounterTests =
             File.WriteAllText(Path.Combine(vol.HostPath, "hello.txt"), "v2")
             vol.Dispose()
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2")
 
     [<Fact>]
@@ -49,7 +49,7 @@ module DiskMounterTests =
             File.WriteAllText(Path.Combine(vol.HostPath, "hello.txt"), "v3")
             vol.Dispose()
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v1")
 
     [<Fact>]
@@ -97,7 +97,7 @@ module DiskMounterTests =
             File.WriteAllText(Path.Combine(restored.HostPath, "hello.txt"), "v2")
             restored.Dispose()
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2")
 
     [<Fact>]

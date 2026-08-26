@@ -218,7 +218,7 @@ let private firstTwoOctets (addressOrCidr: string) =
             | _ -> None
         | _ -> None
 
-let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) =
+let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) : Result<string, string> =
     let usedPairs =
         usedPrefixes |> Seq.choose firstTwoOctets |> Set.ofSeq
 
@@ -228,10 +228,12 @@ let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) =
         match firstTwoOctets c with
         | Some pair when isValidCidr c -> not (usedPairs.Contains pair)
         | _ -> false)
-    |> Option.defaultWith (fun () ->
-        match candidates |> List.tryFind isValidCidr with
-        | Some h -> h
-        | None -> failwith "Aucun sous-réseau valide disponible")
+    |> function
+        | Some subnet -> Ok subnet
+        | None ->
+            match candidates |> List.tryFind isValidCidr with
+            | Some h -> Ok h
+            | None -> Error "Aucun sous-réseau valide disponible"
 
 let deriveGateway (subnet: string) =
     let ipPart = subnet.Split('/') |> Array.head
@@ -244,15 +246,15 @@ let deriveGateway (subnet: string) =
 
 // ─── Résolution de la configuration finale ───────────────────────────────
 
-let resolveSubnet (config: CniNatConfig) (usedPrefixes: Set<string>) =
+let resolveSubnet (config: CniNatConfig) (usedPrefixes: Set<string>) : Result<string, string> =
     if String.IsNullOrEmpty(config.Subnet) && config.AutoDetect then
         findAvailableSubnet config.SubnetCandidates usedPrefixes
     elif String.IsNullOrEmpty(config.Subnet) then
         match config.SubnetCandidates |> List.tryHead with
-        | Some h -> h
-        | None -> failwith "Aucun sous-réseau disponible"
+        | Some h -> Ok h
+        | None -> Error "Aucun sous-réseau disponible"
     else
-        config.Subnet
+        Ok config.Subnet
 
 let resolveGateway (config: CniNatConfig) (resolvedSubnet: string) =
     if String.IsNullOrEmpty(config.Gateway) then
@@ -260,12 +262,13 @@ let resolveGateway (config: CniNatConfig) (resolvedSubnet: string) =
     else
         config.Gateway
 
-let resolveAll (configPath: string option) =
+let resolveAll (configPath: string option) : Result<CniNatConfig * string * string, string> =
     let config = loadConfig configPath
     let usedPrefixes = getUsedPrefixes ()
-    let subnet = resolveSubnet config usedPrefixes
-    let gateway = resolveGateway config subnet
-    (config, subnet, gateway)
+    resolveSubnet config usedPrefixes
+    |> Result.map (fun subnet ->
+        let gateway = resolveGateway config subnet
+        (config, subnet, gateway))
 
 // ─── Génération du conflist CNI ─────────────────────────────────────────
 

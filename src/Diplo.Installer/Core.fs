@@ -3,6 +3,7 @@ module Diplo.Installer.Core
 open System
 open System.IO
 open System.IO.Compression
+open System.Runtime.ExceptionServices
 open System.Net.Http
 open System.Runtime.InteropServices
 open System.Security.Cryptography
@@ -243,7 +244,7 @@ let installContainerd () =
         with ex ->
             printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(archivePath)
-            raise ex
+            ExceptionDispatchInfo.Capture(ex).Throw()
 
         printfn "  [*] Extraction..."
         do! extractTarGz archivePath containerdDir
@@ -280,7 +281,7 @@ let downloadCniPlugins () =
         with ex ->
             printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(winCniTemp)
-            raise ex
+            ExceptionDispatchInfo.Capture(ex).Throw()
 
         extractZip winCniTemp cniBinDir
         File.Delete(winCniTemp)
@@ -304,7 +305,7 @@ let downloadCniPlugins () =
         with ex ->
             printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(cniTemp)
-            raise ex
+            ExceptionDispatchInfo.Capture(ex).Throw()
 
         do! extractTarGz cniTemp cniBinDir
 
@@ -515,7 +516,7 @@ let createCniConfig () =
     let configPath = Path.Combine(cniConfDir, "0-containerd-nat.conf")
 
     if not (File.Exists(configPath)) then
-        let (_, subnet, gateway) = Diplo.Abstractions.NetworkConfig.resolveAll None
+        let (_, subnet, gateway) = Diplo.Abstractions.NetworkConfig.resolveAll None |> Result.defaultWith failwith
 
         let config =
             Diplo.Abstractions.NetworkConfig.generateCniConflistJson

@@ -2,6 +2,7 @@ namespace Diplo.Abstractions
 
 open System
 open System.IO
+open Serilog
 
 /// Écriture de fichiers avec remplacement atomique : le contenu est d'abord
 /// écrit dans un fichier temporaire du même répertoire, puis remplacé d'un bloc,
@@ -38,5 +39,5 @@ module AtomicFile =
         | _ ->
             try
                 File.Delete(tmp)
-            with _ -> ()
+            with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
             reraise()

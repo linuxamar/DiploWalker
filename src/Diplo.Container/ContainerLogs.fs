@@ -73,7 +73,7 @@ module ContainerLogs =
     /// lire d'abord la longueur puis le contenu garantit qu'aucun octet n'est ni
     /// sauté (écriture entre lecture et mesure) ni dupliqué au redémarrage.
     /// La fenêtre est bornée à 1 Go pour limiter la mémoire sur journaux géants.
-    let readUpTo (id: string) (tail: int) (since: string) : string array * int64 =
+    let readUpToCore (id: string) (tail: int) (since: string) : string array * int64 =
         let file = fileFor id
 
         if not (File.Exists file) then
@@ -125,12 +125,16 @@ module ContainerLogs =
 
                 lines, watermark
 
+    let readUpTo (id: string) (tail: int) (since: string) : Result<string array * int64, string> =
+        try Ok(readUpToCore id tail since)
+        with ex -> Error ex.Message
+
     /// Lit les lignes complètes ajoutées au journal depuis l'octet `fromOffset`.
     ///
     /// Retourne (lignes, nouvel offset). Une ligne partielle (non terminée par
     /// un saut de ligne) n'est pas retournée et l'offset n'avance pas, afin de
     /// la relire lors d'un prochain appel une fois le délimiteur écrit.
-    let readIncremental (id: string) (fromOffset: int64) : string array * int64 =
+    let readIncrementalCore (id: string) (fromOffset: int64) : string array * int64 =
         let file = fileFor id
 
         if not (File.Exists file) then
@@ -177,3 +181,7 @@ module ContainerLogs =
                         |> Array.map (fun l -> l.TrimEnd('\r'))
 
                     lines, consumed
+
+    let readIncremental (id: string) (fromOffset: int64) : Result<string array * int64, string> =
+        try Ok(readIncrementalCore id fromOffset)
+        with ex -> Error ex.Message

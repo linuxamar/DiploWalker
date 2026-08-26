@@ -65,7 +65,7 @@ module Qcow1 =
 
     let private clusterOffsetMask (clusterBits: int) = (1L <<< clusterBits) - 1L
 
-    let readHeader (s: Stream) : Header =
+    let private readHeaderCore (s: Stream) : Header =
         let buf = Array.zeroCreate<byte> 72
         s.Position <- 0L
         readFully s buf 0 72
@@ -113,6 +113,9 @@ module Qcow1 =
           L1TableOffset = l1TableOffset
           CryptMethod = cryptMethod }
 
+    let readHeader (s: Stream) : Result<Header, string> =
+        try Ok(readHeaderCore s) with ex -> Error ex.Message
+
     let writeHeader (s: Stream) (h: Header) =
         let buf = Array.zeroCreate<byte> 72
         buf.[0] <- byte 'Q'
@@ -139,7 +142,7 @@ module Qcow1 =
         s.Position <- offset
         s.Write(buf, 0, 8)
 
-    let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) =
+    let private readBytesAtCore (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) =
         if vOffset < 0L then
             raise (ArgumentOutOfRangeException(nameof vOffset))
 
@@ -181,6 +184,12 @@ module Qcow1 =
                     bOff <- bOff + toRead
                     vOff <- vOff + int64 toRead
 
+    let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) : Result<unit, string> =
+        try
+            readBytesAtCore s h vOffset count buf bufOff
+            Ok()
+        with ex -> Error ex.Message
+
     /// Alloue un nouveau cluster hôte : balayer la table L1 pour trouver la plus
     /// haute allocation RÉELLE. Un état partagé serait nécessaire sinon ; sans
     /// lui, retourner systématiquement « le premier cluster libre » fait que
@@ -199,7 +208,7 @@ module Qcow1 =
 
         max (maxOffset + h.ClusterSize) floorOffset
 
-    let writeBytesAt (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) =
+    let private writeBytesAtCore (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) =
         if vOffset < 0L then
             raise (ArgumentOutOfRangeException(nameof vOffset))
 
@@ -241,6 +250,12 @@ module Qcow1 =
             dOff <- dOff + toWrite
             vOff <- vOff + int64 toWrite
 
+    let writeBytesAt (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) : Result<unit, string> =
+        try
+            writeBytesAtCore s h vOffset data dataOff count
+            Ok()
+        with ex -> Error ex.Message
+
 type Qcow1Stream(path: string, access: FileAccess) =
     inherit Stream()
 
@@ -248,7 +263,7 @@ type Qcow1Stream(path: string, access: FileAccess) =
     // plutôt que corrompre silencieusement les métadonnées.
     let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
 
-    let header = Qcow1.readHeader fs
+    let header = Qcow1.readHeader fs |> Result.defaultWith failwith
     let mutable position = 0L
 
     override _.CanRead = true
@@ -274,7 +289,7 @@ type Qcow1Stream(path: string, access: FileAccess) =
         if count <= 0 then
             0
         else
-            Qcow1.readBytesAt fs header position count buf offset
+            Qcow1.readBytesAt fs header position count buf offset |> Result.defaultWith failwith
             position <- position + int64 count
             count
 
@@ -282,7 +297,7 @@ type Qcow1Stream(path: string, access: FileAccess) =
         if position < 0L then
             raise (ArgumentOutOfRangeException(nameof position))
 
-        Qcow1.writeBytesAt fs header position buf offset count
+        Qcow1.writeBytesAt fs header position buf offset count |> Result.defaultWith failwith
         position <- position + int64 count
 
     override _.Seek(offset, origin) =

@@ -55,7 +55,7 @@ type CreateImageCommand(output: IOutputPort) =
                             sprintf "Création de l'image '%s' au format %s…" settings.Dest (DiskFormat.toString format)
                         )
 
-                        let result = FsImage.create settings.Source settings.Dest format
+                        let result = FsImage.create settings.Source settings.Dest format |> Result.defaultWith failwith
                         let size = IO.FileInfo(result).Length
                         output.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
                         return 0

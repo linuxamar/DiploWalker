@@ -2,6 +2,7 @@ namespace Diplo.Network.Plugins
 
 open System
 open System.Collections.Concurrent
+open System.Runtime.ExceptionServices
 open Serilog
 open Diplo.Abstractions
 open Diplo.Abstractions.NetworkConfig
@@ -74,7 +75,7 @@ type PodDriver(hns: IHnsProvider) =
     let getAvailableSubnet () =
         let usedPrefixes = getUsedPrefixes ()
         let config = loadConfig None
-        findAvailableSubnet config.SubnetCandidates usedPrefixes
+        findAvailableSubnet config.SubnetCandidates usedPrefixes |> Result.defaultWith failwith
 
     let getDefaultGateway (subnet: string) = deriveGateway subnet
 
@@ -121,14 +122,14 @@ type PodDriver(hns: IHnsProvider) =
                     hns.CreateNetwork(name, actualSubnet)
                 with ex ->
                     Log.Error(ex, "Création du réseau HNS {Name} échouée", name)
-                    reraise ()
+                    ExceptionDispatchInfo.Capture(ex).Throw()
 
                 try
                     hns.CreateNat(sprintf "%sNat" name, actualSubnet)
                 with natEx ->
                     Log.Error(natEx, "Création du NAT {Name} échouée : rollback du réseau HNS", sprintf "%sNat" name)
                     hns.RemoveNetwork(name)
-                    raise natEx
+                    ExceptionDispatchInfo.Capture(natEx).Throw()
 
                 let id = Guid.NewGuid().ToString("N")
 

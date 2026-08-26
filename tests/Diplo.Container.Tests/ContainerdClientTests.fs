@@ -403,21 +403,21 @@ type ContainerdClientTests() =
             ContainerLogs.setLogsDir dir
             let file = ContainerLogs.fileFor "c-1"
             File.WriteAllText(file, "l1" + Environment.NewLine + "l2" + Environment.NewLine)
-            let lines, offset = ContainerLogs.readIncremental "c-1" 0L
+            let lines, offset = ContainerLogs.readIncremental "c-1" 0L |> Result.defaultWith failwith
             lines |> should equal [| "l1"; "l2" |]
             offset |> should equal (FileInfo(file).Length)
-            let lines2, offset2 = ContainerLogs.readIncremental "c-1" offset
+            let lines2, offset2 = ContainerLogs.readIncremental "c-1" offset |> Result.defaultWith failwith
             lines2 |> should equal [||]
             offset2 |> should equal offset
             File.AppendAllText(file, "l3" + Environment.NewLine)
-            let lines3, offset3 = ContainerLogs.readIncremental "c-1" offset
+            let lines3, offset3 = ContainerLogs.readIncremental "c-1" offset |> Result.defaultWith failwith
             lines3 |> should equal [| "l3" |]
             File.AppendAllText(file, "l4")
-            let lines4, offset4 = ContainerLogs.readIncremental "c-1" offset3
+            let lines4, offset4 = ContainerLogs.readIncremental "c-1" offset3 |> Result.defaultWith failwith
             lines4 |> should equal [||]
             offset4 |> should equal offset3
             File.AppendAllText(file, Environment.NewLine + "l5" + Environment.NewLine)
-            let lines5, _ = ContainerLogs.readIncremental "c-1" offset3
+            let lines5, _ = ContainerLogs.readIncremental "c-1" offset3 |> Result.defaultWith failwith
             lines5 |> should equal [| "l4"; "l5" |]
         finally
             try

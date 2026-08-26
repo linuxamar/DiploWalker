@@ -3,6 +3,7 @@ namespace Diplo.Core.Clients
 open System
 open System.Collections.Generic
 open System.Runtime.CompilerServices
+open System.Runtime.ExceptionServices
 open System.Threading
 open System.Threading.Tasks
 open Diplo.Abstractions
@@ -223,7 +224,9 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
             do! enumerator.DisposeAsync().AsTask()
 
             match failure with
-            | Some ex -> return raise ex
+            | Some ex ->
+                ExceptionDispatchInfo.Capture(ex).Throw()
+                return Unchecked.defaultof<seq<ContainerLogEntry>>
             | None -> return entries :> seq<ContainerLogEntry>
         }
 
@@ -273,7 +276,9 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
             do! enumerator.DisposeAsync().AsTask()
 
             match failure with
-            | Some ex -> return raise ex
+            | Some ex ->
+                ExceptionDispatchInfo.Capture(ex).Throw()
+                return Unchecked.defaultof<seq<ExecOutput>>
             | None -> return outputs :> seq<ExecOutput>
         }
 

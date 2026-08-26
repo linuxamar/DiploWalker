@@ -466,7 +466,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     try
                         // Watermark capturé AVANT la lecture : aucun octet écrit
                         // pendant la lecture n'est ni sauté ni dupliqué ensuite.
-                        let snapshot, initialOffset = ContainerLogs.readUpTo id tail since
+                        let snapshot, initialOffset = ContainerLogs.readUpTo id tail since |> Result.defaultWith failwith
 
                         for l in snapshot do
                             writer.TryWrite(l) |> ignore
@@ -475,7 +475,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                         let mutable running = true
 
                         while running && not cancel.IsCancellationRequested do
-                            let lines, offset = ContainerLogs.readIncremental id lastOffset
+                            let lines, offset = ContainerLogs.readIncremental id lastOffset |> Result.defaultWith failwith
                             lastOffset <- offset
 
                             for l in lines do
@@ -486,7 +486,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                             else
                                 // courte grâce au writer pour vider les derniers octets
                                 do! Async.Sleep 150
-                                let fin, _ = ContainerLogs.readIncremental id lastOffset
+                                let fin, _ = ContainerLogs.readIncremental id lastOffset |> Result.defaultWith failwith
 
                                 for l in fin do
                                     writer.TryWrite(l) |> ignore

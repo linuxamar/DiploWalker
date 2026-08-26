@@ -73,7 +73,7 @@ module Parallels =
 
     let private blockOffsetInSector (h: Header) (vOffset: int64) = vOffset % int64 h.BlockSize
 
-    let readHeader (s: Stream) : Header =
+    let private readHeaderCore (s: Stream) : Header =
         let buf = Array.zeroCreate<byte> 1024
         s.Position <- 0L
         readFully s buf 0 1024
@@ -119,6 +119,9 @@ module Parallels =
           L1Size = l1Size
           L1TableOffset = l1TableOffset }
 
+    let readHeader (s: Stream) : Result<Header, string> =
+        try Ok(readHeaderCore s) with ex -> Error ex.Message
+
     let writeHeader (s: Stream) (h: Header) =
         let buf = Array.zeroCreate<byte> 1024
         putUInt32LE buf 0 h.Magic
@@ -134,7 +137,7 @@ module Parallels =
         s.Position <- 0L
         s.Write(buf, 0, 1024)
 
-    let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) =
+    let private readBytesAtCore (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) =
         let vSize = virtualSize h
         let mutable remaining = count
         let mutable vOff = vOffset
@@ -169,6 +172,12 @@ module Parallels =
                     bOff <- bOff + toRead
                     vOff <- vOff + int64 toRead
 
+    let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) : Result<unit, string> =
+        try
+            readBytesAtCore s h vOffset count buf bufOff
+            Ok()
+        with ex -> Error ex.Message
+
     let private findFreeBlock (s: Stream) (h: Header) : int =
         let mutable maxEnd = h.L1TableOffset + int64 h.L1Size * 4L
 
@@ -187,7 +196,7 @@ module Parallels =
 
         int ((maxEnd + 511L) / 512L)
 
-    let writeBytesAt (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) =
+    let private writeBytesAtCore (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) =
         let vSize = virtualSize h
         let mutable remaining = count
         let mutable vOff = vOffset
@@ -231,6 +240,12 @@ module Parallels =
             dOff <- dOff + toWrite
             vOff <- vOff + int64 toWrite
 
+    let writeBytesAt (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) : Result<unit, string> =
+        try
+            writeBytesAtCore s h vOffset data dataOff count
+            Ok()
+        with ex -> Error ex.Message
+
 /// Flux System.IO presentant une image Parallels comme un disque brut virtuel.
 type ParallelsStream(path: string, access: FileAccess) =
     inherit Stream()
@@ -238,7 +253,7 @@ type ParallelsStream(path: string, access: FileAccess) =
     // FileShare.Read : un second accès en écriture doit échouer franchement.
     let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
 
-    let header = Parallels.readHeader fs
+    let header = Parallels.readHeader fs |> Result.defaultWith failwith
     let mutable position = 0L
 
     override _.CanRead = true
@@ -265,7 +280,7 @@ type ParallelsStream(path: string, access: FileAccess) =
         if read <= 0 then
             0
         else
-            Parallels.readBytesAt fs header position read buf offset
+            Parallels.readBytesAt fs header position read buf offset |> Result.defaultWith failwith
             position <- position + int64 read
             read
 
@@ -273,7 +288,7 @@ type ParallelsStream(path: string, access: FileAccess) =
         if position < 0L then
             raise (ArgumentOutOfRangeException(nameof position))
 
-        Parallels.writeBytesAt fs header position buf offset count
+        Parallels.writeBytesAt fs header position buf offset count |> Result.defaultWith failwith
         position <- position + int64 count
 
     override _.Seek(offset, origin) =

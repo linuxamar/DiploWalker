@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.IO
 open DiscUtils
 open DiscUtils.Streams
+open Serilog
 
 /// Couche d'accès au système de fichiers contenu dans une image disque.
 ///
@@ -122,7 +123,7 @@ module FsImage =
     /// Retourne le nombre de fichiers extraits.
     /// Essaie les adaptateurs spécialisés (Hawkynt Btrfs/XFS/HFS+, VDI, DMG)
     /// avant de fallback sur DiscUtils générique.
-    let extract (sourcePath: string) (targetDir: string) (readOnly: bool) : int =
+    let extractCore (sourcePath: string) (targetDir: string) (readOnly: bool) : int =
         match HawkyntFs.tryExtract sourcePath targetDir with
         | Some count -> count
         | None ->
@@ -137,6 +138,10 @@ module FsImage =
                     let counter = ref 0
                     copyDirectory fs "\\" targetDir counter
                     !counter
+
+    let extract (sourcePath: string) (targetDir: string) (readOnly: bool) : Result<int, string> =
+        try Ok(extractCore sourcePath targetDir readOnly)
+        with ex -> Error ex.Message
 
     let rec private copyIntoFs (fs: DiscFileSystem) (fsDir: string) (realDir: string) =
         for file in Directory.GetFiles realDir do
@@ -167,7 +172,7 @@ module FsImage =
     /// Réécrit le contenu de `sourceDir` dans le système de fichiers de
     /// l'image : retour arrière des modifications effectuées par le conteneur.
     /// Essaie les adaptateurs spécialisés avant fallback DiscUtils générique.
-    let writeBack (sourcePath: string) (sourceDir: string) =
+    let writeBackCore (sourcePath: string) (sourceDir: string) =
         if HawkyntFs.tryWriteBack sourcePath sourceDir then
             ()
         elif VdiFs.tryWriteBack sourcePath sourceDir then
@@ -179,6 +184,10 @@ module FsImage =
             use fs = openFileSystem disk
             copyIntoFs fs "\\" sourceDir
             deleteFsEntries fs "\\" sourceDir
+
+    let writeBack (sourcePath: string) (sourceDir: string) : Result<unit, string> =
+        try writeBackCore sourcePath sourceDir; Ok()
+        with ex -> Error ex.Message
 
     // ── Création d'image disque ─────────────────────────────────────
 
@@ -250,7 +259,7 @@ module FsImage =
     /// Formats supportés en écriture : VHD, VHDX, VMDK, VDI, Raw.
     /// Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés
     /// en création (pas de factory publique dans DiscUtils).
-    let create (sourceDir: string) (destPath: string) (format: DiskFormat.Format) : string =
+    let createCore (sourceDir: string) (destPath: string) (format: DiskFormat.Format) : string =
         if not (Directory.Exists sourceDir) then
             invalidArg "sourceDir" (sprintf "Le répertoire source n'existe pas : '%s'" sourceDir)
 
@@ -298,7 +307,10 @@ module FsImage =
                 try
                     if File.Exists destPath then
                         File.Delete destPath
-                with _ ->
-                    ()
+                with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {DestPath}", destPath)
 
             reraise ()
+
+    let create (sourceDir: string) (destPath: string) (format: DiskFormat.Format) : Result<string, string> =
+        try Ok(createCore sourceDir destPath format)
+        with ex -> Error ex.Message

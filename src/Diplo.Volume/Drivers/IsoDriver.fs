@@ -736,7 +736,7 @@ module IsoImage =
 
     /// Extrait le contenu de l'image dans le répertoire cible. Retourne le
     /// nombre de fichiers extraits.
-    let extract (isoPath: string) (targetPath: string) : int =
+    let extractCore (isoPath: string) (targetPath: string) : int =
         use stream = IsoSource.openFile isoPath
         let src = IsoSource.fromStream stream
         Directory.CreateDirectory(targetPath) |> ignore
@@ -746,8 +746,12 @@ module IsoImage =
         else
             Iso9660.extract src isoPath targetPath
 
+    let extract (isoPath: string) (targetPath: string) : Result<int, string> =
+        try Ok(extractCore isoPath targetPath)
+        with ex -> Error ex.Message
+
     /// Lit le contenu d'un fichier de l'image par son chemin (ISO9660 ou UDF).
-    let readFile (isoPath: string) (pathInImage: string) : byte[] =
+    let readFileCore (isoPath: string) (pathInImage: string) : byte[] =
         use stream = IsoSource.openFile isoPath
         let src = IsoSource.fromStream stream
 
@@ -755,6 +759,10 @@ module IsoImage =
             Udf.readFileByPath src isoPath pathInImage
         else
             Iso9660.readFileByPath src isoPath pathInImage
+
+    let readFile (isoPath: string) (pathInImage: string) : Result<byte[], string> =
+        try Ok(readFileCore isoPath pathInImage)
+        with ex -> Error ex.Message
 
 /// Pilote de volume permettant de monter un fichier ISO9660 ou UDF (DVD) en
 /// extrayant son contenu (lecture seule) dans le répertoire cible.
@@ -827,7 +835,7 @@ type IsoDriver(dataRoot: string) =
                         RpcException(Status(StatusCode.NotFound, sprintf "Le fichier ISO '%s' est introuvable" isoPath))
                     )
 
-                IsoImage.extract isoPath targetPath |> ignore
+                IsoImage.extract isoPath targetPath |> Result.defaultWith failwith |> ignore
                 (true, targetPath)
 
         member _.UnmountVolume(id, targetPath) =

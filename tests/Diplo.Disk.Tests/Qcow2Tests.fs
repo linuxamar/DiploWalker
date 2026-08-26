@@ -178,7 +178,7 @@ module Qcow2Tests =
         run (fun root img ->
             TestImage.createQcow2 img [ "hello.txt", "Bonjour"; @"dossier\sub.txt", "sous" ]
             let staging = Path.Combine(root, "staging")
-            let n = FsImage.extract img staging false
+            let n = FsImage.extract img staging false |> Result.defaultWith failwith
             n |> should equal 2
             File.ReadAllText(Path.Combine(staging, "hello.txt")) |> should equal "Bonjour"
 
@@ -190,12 +190,12 @@ module Qcow2Tests =
         run (fun root img ->
             TestImage.createQcow2 img [ "hello.txt", "v1" ]
             let staging = Path.Combine(root, "staging")
-            FsImage.extract img staging false |> ignore
+            FsImage.extract img staging false |> Result.defaultWith failwith |> ignore
             File.WriteAllText(Path.Combine(staging, "hello.txt"), "v2")
             File.WriteAllText(Path.Combine(staging, "nouveau.txt"), "nouveau")
-            FsImage.writeBack img staging
+            FsImage.writeBack img staging |> Result.defaultWith failwith
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2"
             File.ReadAllText(Path.Combine(re, "nouveau.txt")) |> should equal "nouveau")
 
@@ -204,11 +204,11 @@ module Qcow2Tests =
         run (fun root img ->
             TestImage.createQcow2 img [ "a.txt", "a"; "b.txt", "b" ]
             let staging = Path.Combine(root, "staging")
-            FsImage.extract img staging false |> ignore
+            FsImage.extract img staging false |> Result.defaultWith failwith |> ignore
             File.Delete(Path.Combine(staging, "a.txt"))
-            FsImage.writeBack img staging
+            FsImage.writeBack img staging |> Result.defaultWith failwith
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.Exists(Path.Combine(re, "a.txt")) |> should equal false
             File.Exists(Path.Combine(re, "b.txt")) |> should equal true)
 
@@ -221,7 +221,7 @@ module Qcow2Tests =
             File.WriteAllText(Path.Combine(vol.HostPath, "hello.txt"), "v2")
             vol.Dispose()
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2")
 
     [<Fact>]
@@ -232,7 +232,7 @@ module Qcow2Tests =
             File.WriteAllText(Path.Combine(vol.HostPath, "hello.txt"), "v3")
             vol.Dispose()
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v1")
 
     [<Fact>]
@@ -241,7 +241,7 @@ module Qcow2Tests =
             TestImage.createQcow2 img []
             patchHeader img makeV3
             use fs = new FileStream(img, FileMode.Open, FileAccess.Read)
-            let h = Qcow2.readHeader fs
+            let h = Qcow2.readHeader fs |> Result.defaultWith failwith
             h.Version |> should equal 3
             h.RefcountOrder |> should equal 4)
 
@@ -251,12 +251,12 @@ module Qcow2Tests =
             TestImage.createQcow2 img [ "hello.txt", "v1" ]
             patchHeader img makeV3
             let staging = Path.Combine(root, "staging")
-            FsImage.extract img staging false |> ignore
+            FsImage.extract img staging false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(staging, "hello.txt")) |> should equal "v1"
             File.WriteAllText(Path.Combine(staging, "hello.txt"), "v2")
-            FsImage.writeBack img staging
+            FsImage.writeBack img staging |> Result.defaultWith failwith
             let re = Path.Combine(root, "re")
-            FsImage.extract img re false |> ignore
+            FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2")
 
     // ── refus et limites ────────────────────────────────────────────────────
@@ -339,7 +339,7 @@ module Qcow2Tests =
                 use fs =
                     new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
 
-                let h = Qcow2.resize fs (72L * 1024L * 1024L)
+                let h = Qcow2.resize fs (72L * 1024L * 1024L) |> Result.defaultWith failwith
                 h.VirtualSize |> should equal (72L * 1024L * 1024L)
 
             use s = new Qcow2Stream(img, FileAccess.ReadWrite)
@@ -370,7 +370,7 @@ module Qcow2Tests =
                 use fs =
                     new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
 
-                let h = Qcow2.resize fs (1152L * 1024L * 1024L)
+                let h = Qcow2.resize fs (1152L * 1024L * 1024L) |> Result.defaultWith failwith
                 h.VirtualSize |> should equal (1152L * 1024L * 1024L)
                 h.L1Size |> should equal 576
 
@@ -404,7 +404,7 @@ module Qcow2Tests =
                 use fs =
                     new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
 
-                let h = Qcow2.resize fs (32L * 1024L * 1024L)
+                let h = Qcow2.resize fs (32L * 1024L * 1024L) |> Result.defaultWith failwith
                 h.VirtualSize |> should equal (32L * 1024L * 1024L)
                 h.L1Size |> should equal 16
 
@@ -422,7 +422,7 @@ module Qcow2Tests =
                 use fs =
                     new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
 
-                Qcow2.resize fs (64L * 1024L * 1024L) |> ignore
+                Qcow2.resize fs (64L * 1024L * 1024L) |> Result.defaultWith failwith |> ignore
 
             use s2 = new Qcow2Stream(img, FileAccess.Read)
             s2.Position <- 50L * 1024L * 1024L

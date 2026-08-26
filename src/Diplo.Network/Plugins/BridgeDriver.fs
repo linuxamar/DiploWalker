@@ -25,7 +25,7 @@ type BridgeNetworkDriver() =
     let getAvailableSubnet () =
         let config = loadConfig None
         let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
-        findAvailableSubnet config.SubnetCandidates existing
+        findAvailableSubnet config.SubnetCandidates existing |> Result.defaultWith failwith
 
     let getDefaultGateway (subnet: string) = deriveGateway subnet
 

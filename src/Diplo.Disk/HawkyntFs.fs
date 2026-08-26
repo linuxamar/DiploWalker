@@ -192,7 +192,7 @@ module HawkyntFs =
         | _ ->
             try
                 File.Delete(tmpPath)
-            with _ -> ()
+            with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmpPath)
             reraise ()
 
     // ── Réécriture Btrfs ──────────────────────────────────────────────

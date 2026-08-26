@@ -21,7 +21,7 @@ type CustomCniDriver() =
     member _.GetAvailableSubnet() =
         let config = loadConfig None
         let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
-        findAvailableSubnet config.SubnetCandidates existing
+        findAvailableSubnet config.SubnetCandidates existing |> Result.defaultWith failwith
 
     interface INetworkDriver with
         member _.DriverType = NetworkDriver.CustomCni
@@ -43,7 +43,7 @@ type CustomCniDriver() =
                     if String.IsNullOrEmpty(subnet) then
                         let config = loadConfig None
                         let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
-                        findAvailableSubnet config.SubnetCandidates existing
+                        findAvailableSubnet config.SubnetCandidates existing |> Result.defaultWith failwith
                     else
                         subnet
 
