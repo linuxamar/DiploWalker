@@ -14,10 +14,14 @@ type NetworkDriver =
     | [<ProtoEnum>] ``None`` = 2
     | [<ProtoEnum>] Pod = 3
 
+// Convention protobuf : 0 = valeur neutre/inconnue. Un champ State absent à
+// la désérialisation vaut désormais Unknown (et non un état « actif »
+// trompeur). Rupture wire assumée : client et serveur sont versionnés ensemble.
 [<ProtoContract>]
 type EndpointState =
-    | [<ProtoEnum>] Active = 0
-    | [<ProtoEnum>] Inactive = 1
+    | [<ProtoEnum>] Unknown = 0
+    | [<ProtoEnum>] Active = 1
+    | [<ProtoEnum>] Inactive = 2
 
 // ═══════════════════════════════════════════════
 // CreateNetwork

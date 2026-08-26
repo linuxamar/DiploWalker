@@ -553,6 +553,7 @@ type ContainerdClientTests() =
 
         result |> should equal "resolved"
 
+        // Identifiant EXPLICITE : repli historique sur argv (choix de l'utilisateur).
         let (_, args) =
             runner.SecureCommands
             |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
@@ -598,7 +599,7 @@ type ContainerdClientTests() =
                 ()
 
     [<Fact>]
-    member _.``PullImage utilise --user quand un identifiant est enregistre``() =
+    member _.``PullImage avec identifiant enregistre passe par le helper sans secret dans argv``() =
         let runner = createRunner ()
         runner.OnCommand("image pull", "resolved")
 
@@ -623,8 +624,11 @@ type ContainerdClientTests() =
                 |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
 
             let joined = args |> String.concat " "
-            joined |> shouldContain "--user"
-            joined |> shouldContain "user:secret"
+
+            // Identifiants STOCKÉS : hosts-dir + helper, aucun secret en argv.
+            joined |> shouldNotContain "--user"
+            joined |> shouldNotContain "user:secret"
+            joined |> shouldContain "--hosts-dir"
         finally
             try
                 System.IO.File.Delete stateFile
@@ -632,7 +636,7 @@ type ContainerdClientTests() =
                 ()
 
     [<Fact>]
-    member _.``PullImage de Docker Hub consulte le registre docker.io``() =
+    member _.``PullImage de Docker Hub prepare un hosts-dir pour docker.io``() =
         let runner = createRunner ()
         runner.OnCommand("image pull", "resolved")
 
@@ -649,16 +653,61 @@ type ContainerdClientTests() =
             let client =
                 ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
+            // Instantané AVANT le pull : l'assertion doit être relative, pas
+            // dépendre des résidus d'exécutions précédentes.
+            let before =
+                System.IO.Directory.GetDirectories(System.IO.Path.GetTempPath(), "diplo-hosts-*")
+
             client.PullImage("library/nginx:latest", None) |> ignore
 
             let (_, args) =
                 runner.SecureCommands
                 |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
 
-            (args |> String.concat " ") |> shouldContain "hubuser:hubpass"
+            let joined = args |> String.concat " "
+            joined |> shouldContain "--hosts-dir"
+            joined |> shouldNotContain "hubuser:hubpass"
+
+            // Le répertoire temporaire est nettoyé après le pull : aucun
+            // nouveau hosts-dir ne subsiste.
+            let after =
+                System.IO.Directory.GetDirectories(System.IO.Path.GetTempPath(), "diplo-hosts-*")
+
+            (after.Length - before.Length) |> should equal 0
         finally
             try
                 System.IO.File.Delete stateFile
+            with _ ->
+                ()
+
+    [<Theory>]
+    [<InlineData("docker.io", "https://registry-1.docker.io")>]
+    [<InlineData("myregistry.azurecr.io", "https://myregistry.azurecr.io")>]
+    [<InlineData("https://reg.ex.io/v2", "https://reg.ex.io")>]
+    member _.``normalizeRegistryHost mappe les hotes canoniques``(input: string, expected: string) =
+        RegistryAuth.normalizeRegistryHost input |> should equal expected
+
+    [<Fact>]
+    member _.``prepareHostsDir genere un hosts.toml delegant au helper``() =
+        let dir =
+            RegistryAuth.prepareHostsDir "myregistry.azurecr.io"
+            |> Option.defaultValue ""
+
+        try
+            dir |> should not' (be Null)
+            dir |> should not' (equal "")
+
+            let toml =
+                System.IO.File.ReadAllText(
+                    System.IO.Path.Combine(dir, "myregistry.azurecr.io", "hosts.toml")
+                )
+
+            toml |> shouldContain "[host.\"https://myregistry.azurecr.io\"]"
+            toml |> shouldContain "auth = '"
+            toml |> shouldNotContain "secret"
+        finally
+            try
+                System.IO.Directory.Delete(dir, true)
             with _ ->
                 ()
 

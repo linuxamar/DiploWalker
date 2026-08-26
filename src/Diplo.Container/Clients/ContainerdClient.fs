@@ -1,4 +1,4 @@
-namespace Diplo.Container.Clients
+﻿namespace Diplo.Container.Clients
 
 open System
 open System.Collections.Generic
@@ -48,6 +48,33 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             (nameOnly.Substring(0, lastColon), nameOnly.Substring(lastColon + 1))
         else
             (nameOnly, "")
+
+    // ── Cache mutualisé des requêtes ctr coûteuses ──────────────────────
+    //
+    // Chaque flux (suivi de logs, watch d'événements, stats) interrogeait
+    // `ctr tasks list` à sa propre cadence : quelques clients suffisaient à
+    // générer des centaines de processus/minute. Un TTL court mutualise un
+    // seul spawn entre tous les consommateurs d'une même fenêtre.
+    let sharedCache =
+        System.Collections.Concurrent.ConcurrentDictionary<string, DateTime * string>()
+
+    let cachedRun (ttlMs: int) (key: string) (fetch: unit -> string) : string =
+        match sharedCache.TryGetValue(key) with
+        | true, (expiresAt, value) when DateTime.UtcNow < expiresAt -> value
+        | _ ->
+            let value = fetch ()
+            sharedCache[key] <- (DateTime.UtcNow.AddMilliseconds(float ttlMs), value)
+            value
+
+    let tasksListTtlMs = max 250 logPollIntervalMs
+
+    let cachedTasksList (namespaceName: string) =
+        cachedRun tasksListTtlMs ("tasks:" + namespaceName) (fun () ->
+            runCtr (nsArgs namespaceName [ "tasks"; "list" ]))
+
+    /// Métriques avec TTL court : les flux de stats concurrents du même
+    /// conteneur partagent un seul spawn ctr au lieu d'un par flux.
+    let metricsTtlMs = 750
 
     interface IContainerdClient with
         member _.CreateContainer
@@ -242,7 +269,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
                 let isRunning () =
                     try
-                        let output = runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+                        let output = cachedTasksList namespaceName
 
                         output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                         |> Array.exists (fun line ->
@@ -320,7 +347,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
             let currentStatus () =
                 try
-                    let output = runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+                    let output = cachedTasksList namespaceName
 
                     output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                     |> Array.tryFind (fun line ->
@@ -382,7 +409,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 ids
             else
                 let running =
-                    runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+                    cachedTasksList namespaceName
                     |> fun output ->
                         output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                         |> Array.choose (fun line ->
@@ -413,7 +440,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
             let isContainerRunning () =
                 try
-                    runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+                    cachedTasksList namespaceName
                     |> fun output ->
                         output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
                         |> Array.exists (fun line ->
@@ -582,7 +609,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             validateNsId namespaceName id
 
             try
-                let output = runCtr (nsArgs namespaceName [ "tasks"; "list" ])
+                let output = cachedTasksList namespaceName
 
                 let row =
                     output.Split('\n', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
@@ -624,7 +651,14 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             SecurityValidation.validateImage image
 
             let registry =
-                let firstSegment = image.Split('/').[0]
+                // Premier segment SANS tag/port : « nginx:latest » est un tag,
+                // pas un hôte de registre.
+                let firstSegmentRaw = image.Split('/').[0]
+
+                let lastColon = firstSegmentRaw.LastIndexOf(':')
+
+                let firstSegment =
+                    if lastColon >= 0 then firstSegmentRaw.Substring(0, lastColon) else firstSegmentRaw
 
                 if
                     firstSegment.Contains('.')
@@ -635,18 +669,27 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 else
                     "docker.io"
 
-            let userArg =
-                match userArg with
-                | Some u -> Some u
-                | None -> RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) registry
-
-            let args =
-                match userArg with
-                | Some userArg -> [ "image"; "pull"; "--user"; userArg; image ]
-                | None -> [ "image"; "pull"; image ]
-
-            let output = runCtr args
-            output.Trim()
+            match userArg with
+            | Some explicit ->
+                // Identifiant EXPLICITE (option CLI --user) : repli historique
+                // sur argv, seul cas restant — l'utilisateur a choisi la voie
+                // directe et éphémère.
+                runCtr [ "image"; "pull"; "--user"; explicit; image ] |> fun o -> o.Trim()
+            | None ->
+                // Identifiants STOCKÉS : passer par le helper de credentials —
+                // plus aucun secret dans argv.
+                match RegistryAuth.prepareHostsDir registry with
+                | Some hostsDir ->
+                    try
+                        runCtr [ "image"; "pull"; "--hosts-dir"; hostsDir; image ]
+                        |> fun o -> o.Trim()
+                    finally
+                        try
+                            Directory.Delete(hostsDir, true)
+                        with ex ->
+                            Log.Debug(ex, "Nettoyage du hosts-dir temporaire impossible")
+                | None ->
+                    runCtr [ "image"; "pull"; image ] |> fun o -> o.Trim()
 
         member _.Version() =
             try
@@ -707,7 +750,10 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             validateNsId namespaceName id
 
             try
-                let output = runCtr (nsArgs namespaceName [ "task"; "metrics"; id ])
+                let output =
+                    cachedRun metricsTtlMs (sprintf "metrics:%s:%s" namespaceName id) (fun () ->
+                        runCtr (nsArgs namespaceName [ "task"; "metrics"; id ]))
+
                 parseJson output
             with ex ->
                 Log.Error(ex, "Erreur lors de la récupération des métriques du conteneur {ContainerId}", id)
