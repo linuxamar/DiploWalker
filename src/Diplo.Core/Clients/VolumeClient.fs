@@ -23,7 +23,7 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) as this =
     new() =
         match DiploConfig.volumeAddress () with
         | Some address -> new VolumeClient(DiploChannel.forAddress address, true)
-        | None -> new VolumeClient(5002)
+        | None -> new VolumeClient(DiploPorts.Volume)
 
     member _.CreateAsync
         (

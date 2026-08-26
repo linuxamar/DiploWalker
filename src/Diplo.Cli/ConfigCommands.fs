@@ -5,6 +5,7 @@ open System.IO
 open System.Threading
 open Spectre.Console.Cli
 open Diplo.Core.Output
+open Diplo.Abstractions
 
 type InitConfigSettings() =
     inherit CommandSettings()
@@ -18,20 +19,25 @@ type InitConfigSettings() =
 type InitConfigCommand(output: IOutputPort) =
     inherit Command<InitConfigSettings>()
 
+    // Défauts alignés sur DiploPorts (Debug 5001-5003, Release 6001-6003).
     let defaultConfig =
-        """{
+        sprintf
+            """{
   "container": {
-    "address": "localhost:5001",
+    "address": "localhost:%d",
     "namespace": "default"
   },
   "volume": {
-    "address": "localhost:5002"
+    "address": "localhost:%d"
   },
   "network": {
-    "address": "localhost:5003"
+    "address": "localhost:%d"
   },
   "logLevel": "Information"
 }"""
+            DiploPorts.Container
+            DiploPorts.Volume
+            DiploPorts.Network
 
     let pipeConfig =
         """{

@@ -4,6 +4,7 @@ open System
 open System.Windows.Input
 open Diplo.Core
 open Diplo.Core.Output
+open Diplo.Abstractions
 
 /// Onglet « Paramètres » : lecture et édition de la configuration client `diplo.json`
 /// (adresses des services conteneurs, volumes et réseaux).
@@ -89,9 +90,12 @@ type SettingsTabViewModel(outputPort: IOutputPort) as this =
 
     member private this.Reload() =
         let c, v, n = DiploConfig.load this.ConfigPath
-        containerAddress <- defaultArg c "localhost:5001"
-        volumeAddress <- defaultArg v "localhost:5002"
-        networkAddress <- defaultArg n "localhost:5003"
+
+        // Défauts alignés sur la configuration de build (DiploPorts) :
+        // Debug 5001-5003, Release 6001-6003.
+        containerAddress <- defaultArg c (sprintf "localhost:%d" DiploPorts.Container)
+        volumeAddress <- defaultArg v (sprintf "localhost:%d" DiploPorts.Volume)
+        networkAddress <- defaultArg n (sprintf "localhost:%d" DiploPorts.Network)
         this.OnPropertyChanged(nameof this.ContainerAddress)
         this.OnPropertyChanged(nameof this.VolumeAddress)
         this.OnPropertyChanged(nameof this.NetworkAddress)

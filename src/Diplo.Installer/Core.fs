@@ -24,9 +24,9 @@ let containerdRootDir = Path.Combine(containerdDir, "root")
 let containerdStateDir = Path.Combine(containerdDir, "state")
 
 let services =
-    [| "Diplo.Container", "Diplo.Container Service", 5001
-       "Diplo.Volume", "Diplo.Volume Service", 5002
-       "Diplo.Network", "Diplo.Network Service", 5003 |]
+    [| "Diplo.Container", "Diplo.Container Service", DiploPorts.Container
+       "Diplo.Volume", "Diplo.Volume Service", DiploPorts.Volume
+       "Diplo.Network", "Diplo.Network Service", DiploPorts.Network |]
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────
 

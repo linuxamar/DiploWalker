@@ -6,7 +6,8 @@ open Grpc.Core
 /// Utilisation avec Grpc.Net.Client.GrpcChannel :
 ///   let creds = TokenInterceptor.createTokenCredentials ()
 ///   let channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, creds)
-///   let channel = GrpcChannel.ForAddress("http://localhost:5001", GrpcChannelCredentials = channelCredentials)
+///   let port = if DEBUG then 5001 else 6001 (cf. DiploPorts.Container)
+///   let channel = GrpcChannel.ForAddress(sprintf "http://localhost:%d" port, GrpcChannelCredentials = channelCredentials)
 let createTokenCredentials () : CallCredentials =
     CallCredentials.FromInterceptor(fun _context metadata ->
         task {

@@ -88,6 +88,20 @@ let runGrpcHost
         Log.Information("Démarrage du service {ServiceName}", serviceName)
         let builder = WebApplication.CreateBuilder(args)
 
+        // Environnement par défaut aligné sur la configuration de build :
+        // sans lui, `dotnet run` démarre en Production et chargerait
+        // appsettings.json (ports Release) même en Debug — incohérent avec
+        // les clients compilés en Debug (5001-5003).
+#if DEBUG
+        if isNull (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"))
+           && isNull (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")) then
+            builder.Environment.EnvironmentName <- "Development"
+#else
+        if isNull (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"))
+           && isNull (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")) then
+            builder.Environment.EnvironmentName <- "Production"
+#endif
+
         builder.Services.AddWindowsService(fun opts -> opts.ServiceName <- serviceName)
         |> ignore
 

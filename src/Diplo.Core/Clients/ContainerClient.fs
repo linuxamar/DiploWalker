@@ -25,7 +25,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
     new() =
         match DiploConfig.containerAddress () with
         | Some address -> new ContainerClient(DiploChannel.forAddress address, true)
-        | None -> new ContainerClient(5001)
+        | None -> new ContainerClient(DiploPorts.Container)
 
     member _.CreateAsync
         (
