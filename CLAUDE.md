@@ -55,7 +55,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
 - **GUI** : Avalonia 12.1.1 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 886 tests au total.
+- **Tests** : xUnit v4 + FsUnit.xUnit — 953 tests au total.
 
 ### Ports gRPC (Debug / Release)
 

@@ -171,6 +171,12 @@ try {
   exit 1
 } catch { exit 1 }"""
 
+    /// Texte du script PowerShell du helper. Exposé en lecture pour les tests :
+    /// ceux-ci en instancient une copie avec le chemin du fichier d'état
+    /// redirigé vers un répertoire temporaire, sans toucher au vrai
+    /// %ProgramData%\Diplo\registry-auth.json.
+    let helperScriptText () : string = helperScript
+
     /// Écrit (idempotent) le shim .cmd + le script PowerShell du helper et
     /// retourne le chemin du shim à référencer depuis hosts.toml.
     let ensureHelper () : string =

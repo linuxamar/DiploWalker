@@ -743,3 +743,181 @@ type ContainerdClientTests() =
             ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
         client.UpdateContainer("default", "c-1", 0L, 0, 0)
+
+    // ── Segments --mount : injections interdites ────────────────
+    //
+    // La spec --mount est une liste séparée par virgules : une destination
+    // OU une source contenant «, », un espace ou « .. » permettrait
+    // d'injecter des options arbitraires (ex. annuler le « ro » imposé).
+
+    [<Fact>]
+    member _.``CreateContainer refuse une destination contenant une virgule``() =
+        let runner = createRunner ()
+
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        let src = Path.Combine(Path.GetTempPath(), "diplo-data")
+
+        let inj dst =
+            fun () ->
+                client.CreateContainer(
+                    "default",
+                    "inj",
+                    "nginx:latest",
+                    Map.empty,
+                    Map.empty,
+                    Array.empty,
+                    Array.empty,
+                    0L,
+                    0L,
+                    0u,
+                    [ (src, dst, true) ]
+                )
+                |> ignore
+
+        Assert.Throws<ArgumentException>(inj "C:\\app,options=rbind")
+
+    [<Fact>]
+    member _.``CreateContainer refuse une destination contenant un espace``() =
+        let runner = createRunner ()
+
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        let src = Path.Combine(Path.GetTempPath(), "diplo-data")
+
+        let inj dst =
+            fun () ->
+                client.CreateContainer(
+                    "default",
+                    "inj",
+                    "nginx:latest",
+                    Map.empty,
+                    Map.empty,
+                    Array.empty,
+                    Array.empty,
+                    0L,
+                    0L,
+                    0u,
+                    [ (src, dst, true) ]
+                )
+                |> ignore
+
+        Assert.Throws<ArgumentException>(inj "C:\\app data")
+
+    [<Fact>]
+    member _.``CreateContainer refuse une destination avec traversée ..``() =
+        let runner = createRunner ()
+
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        let src = Path.Combine(Path.GetTempPath(), "diplo-data")
+
+        let inj dst =
+            fun () ->
+                client.CreateContainer(
+                    "default",
+                    "inj",
+                    "nginx:latest",
+                    Map.empty,
+                    Map.empty,
+                    Array.empty,
+                    Array.empty,
+                    0L,
+                    0L,
+                    0u,
+                    [ (src, dst, true) ]
+                )
+                |> ignore
+
+        Assert.Throws<ArgumentException>(inj "C:\\..\\escape")
+
+    [<Fact>]
+    member _.``CreateContainer refuse une destination vide``() =
+        let runner = createRunner ()
+
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        let src = Path.Combine(Path.GetTempPath(), "diplo-data")
+
+        let inj dst =
+            fun () ->
+                client.CreateContainer(
+                    "default",
+                    "inj",
+                    "nginx:latest",
+                    Map.empty,
+                    Map.empty,
+                    Array.empty,
+                    Array.empty,
+                    0L,
+                    0L,
+                    0u,
+                    [ (src, dst, true) ]
+                )
+                |> ignore
+
+        Assert.Throws<ArgumentException>(inj "")
+
+    [<Fact>]
+    member _.``CreateContainer refuse une source contenant une virgule``() =
+        let runner = createRunner ()
+        runner.OnCommand("container create", "abc")
+
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        // Chemin sous %TEMP% (répertoire autorisé) mais contenant une virgule :
+        // validateVolumePath le laisse passer, le contrôle de segment doit le rejeter.
+        let src = Path.Combine(Path.GetTempPath(), "diplo,data")
+
+        let inj s =
+            fun () ->
+                client.CreateContainer(
+                    "default",
+                    "inj",
+                    "nginx:latest",
+                    Map.empty,
+                    Map.empty,
+                    Array.empty,
+                    Array.empty,
+                    0L,
+                    0L,
+                    0u,
+                    [ (s, "C:\\app", true) ]
+                )
+                |> ignore
+
+        Assert.Throws<ArgumentException>(inj src)
+
+    [<Fact>]
+    member _.``CreateContainer refuse une source contenant un espace``() =
+        let runner = createRunner ()
+        runner.OnCommand("container create", "abc")
+
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        let src = Path.Combine(Path.GetTempPath(), "diplo data")
+
+        let inj s =
+            fun () ->
+                client.CreateContainer(
+                    "default",
+                    "inj",
+                    "nginx:latest",
+                    Map.empty,
+                    Map.empty,
+                    Array.empty,
+                    Array.empty,
+                    0L,
+                    0L,
+                    0u,
+                    [ (s, "C:\\app", true) ]
+                )
+                |> ignore
+
+        Assert.Throws<ArgumentException>(inj src)

@@ -117,6 +117,11 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
                 validateMountSegment dst "La destination"
 
+                // La source subit les mêmes contrôles de segment --mount :
+                // une virgule ou un espace y injecterait des options
+                // arbitraires au même titre que dans la destination.
+                validateMountSegment src "La source"
+
                 ctrArgs.Add("--mount")
                 let options = if readOnly then "rbind,ro" else "rbind"
                 ctrArgs.Add(sprintf "type=bind,src=%s,dst=%s,options=%s" src dst options)
