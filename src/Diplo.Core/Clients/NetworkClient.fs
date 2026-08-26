@@ -23,7 +23,7 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
     new() =
         match DiploConfig.networkAddress () with
         | Some address -> new NetworkClient(DiploChannel.forAddress address, true)
-        | None -> new NetworkClient(5003)
+        | None -> new NetworkClient(DiploPorts.Network)
 
     member _.CreateAsync
         (

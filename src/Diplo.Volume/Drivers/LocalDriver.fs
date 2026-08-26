@@ -152,6 +152,38 @@ type LocalVolumeDriver(dataRoot: string) =
                 else
                     None)
             |> Array.toList
+            // Appliquer au minimum les filtres name et label : ignorer la
+            // requête du client renverrait des volumes hors périmètre.
+            |> List.filter (fun elem ->
+                filters
+                |> Map.forall (fun key expected ->
+                    match key.ToLowerInvariant() with
+                    | "name" ->
+                        (JsonHelpers.tryGetString elem "name")
+                            .IndexOf(expected, StringComparison.OrdinalIgnoreCase)
+                        >= 0
+                    | "label" ->
+                        match expected.Split('=', 2) with
+                        | [| k |] ->
+                            (JsonHelpers.tryGetElement elem "labels")
+                            |> Option.map (fun labels ->
+                                let mutable e = Unchecked.defaultof<System.Text.Json.JsonElement>
+
+                                labels.TryGetProperty(k, &e))
+                            |> Option.defaultValue false
+                        | [| k; v |] ->
+                            (JsonHelpers.tryGetElement elem "labels")
+                            |> Option.bind (fun labels ->
+                                let mutable e = Unchecked.defaultof<System.Text.Json.JsonElement>
+
+                                if labels.TryGetProperty(k, &e) then
+                                    Some(e.GetString())
+                                else
+                                    None)
+                            |> Option.map (fun actual -> actual = v)
+                            |> Option.defaultValue false
+                        | _ -> true
+                    | _ -> true))
 
     member _.MountVolume(id: string, targetPath: string, options: string) =
         SecurityValidation.validateId id "L'identifiant du volume"
@@ -204,6 +236,42 @@ type LocalVolumeDriver(dataRoot: string) =
 
         lock lockObj (fun () ->
             if Directory.Exists(mountDir) then
+                let src = resolveDataPath id
+
+                // Resynchroniser les modifications du montage vers le volume :
+                // supprimer le répertoire sans réécriture détruirait TOUT ce
+                // que le conteneur a écrit entre Mount et Unmount.
+                if Directory.Exists(src) then
+                    let rec syncBack (source: string) (target: string) =
+                        Directory.CreateDirectory(target) |> ignore
+
+                        for file in Directory.GetFiles(source) do
+                            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), true)
+
+                        for subdir in Directory.GetDirectories(source) do
+                            syncBack subdir (Path.Combine(target, Path.GetFileName(subdir)))
+
+                    try
+                        syncBack mountDir src
+                    with ex ->
+                        // Synchronisation échouée : conserver le montage pour ne
+                        // pas perdre les données, et signaler l'échec.
+                        Log.Error(
+                            ex,
+                            "Synchronisation retour impossible de {MountDir} vers {DataPath} — contenu conservé",
+                            mountDir,
+                            src
+                        )
+
+                        raise (
+                            RpcException(
+                                Status(
+                                    StatusCode.Internal,
+                                    sprintf "Démontage de '%s' annulé : synchronisation retour échouée" id
+                                )
+                            )
+                        )
+
                 Directory.Delete(mountDir, true))
 
         (true, "Démonté")
@@ -237,8 +305,17 @@ type LocalVolumeDriver(dataRoot: string) =
 
                             for subdir in Directory.GetDirectories(current) do
                                 let subFull = Path.GetFullPath(subdir)
-                                // Détecter les boucles de symlinks
-                                if subFull.StartsWith(dirFull, StringComparison.OrdinalIgnoreCase) then
+
+                                // Détecter les boucles de symlinks — comparer avec
+                                // le séparateur final, sinon un répertoire frère
+                                // (vol-abc vs vol-abcd) serait inclus à tort.
+                                let dirFullWithSep =
+                                    if dirFull.EndsWith(Path.DirectorySeparatorChar) then
+                                        dirFull
+                                    else
+                                        dirFull + string Path.DirectorySeparatorChar
+
+                                if subFull.StartsWith(dirFullWithSep, StringComparison.OrdinalIgnoreCase) then
                                     queue.Enqueue(subFull)
                         with _ ->
                             ()

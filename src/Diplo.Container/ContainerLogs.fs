@@ -68,6 +68,63 @@ module ContainerLogs =
         else
             (FileInfo(file)).Length
 
+    /// Lit les lignes du journal jusqu'à une marque (watermark) capturée AVANT
+    /// la lecture, et retourne (lignes, octets consommés). Utilisé par le suivi :
+    /// lire d'abord la longueur puis le contenu garantit qu'aucun octet n'est ni
+    /// sauté (écriture entre lecture et mesure) ni dupliqué au redémarrage.
+    /// La fenêtre est bornée à 1 Go pour limiter la mémoire sur journaux géants.
+    let readUpTo (id: string) (tail: int) (since: string) : string array * int64 =
+        let file = fileFor id
+
+        if not (File.Exists file) then
+            [||], 0L
+        else
+            use fs =
+                new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
+
+            let watermark = fs.Length
+
+            if watermark = 0L then
+                [||], 0L
+            else
+                let maxWindow = 1_000_000_000L
+                let startOffset = max 0L (watermark - maxWindow)
+                let count = int (watermark - startOffset)
+                let buffer = Array.zeroCreate<byte> count
+                fs.Position <- startOffset
+                let mutable total = 0
+
+                while total < count do
+                    let r = fs.Read(buffer, total, count - total)
+
+                    if r <= 0 then
+                        failwith "Lecture tronquée du journal"
+
+                    total <- total + r
+
+                let text = System.Text.Encoding.UTF8.GetString(buffer, 0, count)
+
+                let lines =
+                    if String.IsNullOrEmpty text then
+                        [||]
+                    else
+                        text.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                        |> Array.map (fun l -> l.TrimEnd('\r'))
+
+                let lines =
+                    if String.IsNullOrEmpty since then
+                        lines
+                    else
+                        lines |> Array.skipWhile (fun l -> String.CompareOrdinal(l, since) < 0)
+
+                let lines =
+                    if tail > 0 && lines.Length > tail then
+                        lines.[lines.Length - tail ..]
+                    else
+                        lines
+
+                lines, watermark
+
     /// Lit les lignes complètes ajoutées au journal depuis l'octet `fromOffset`.
     ///
     /// Retourne (lignes, nouvel offset). Une ligne partielle (non terminée par
@@ -83,6 +140,9 @@ module ContainerLogs =
                 new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
 
             let length = fs.Length
+            // Fichier tronqué ou recréé : repartir du début, sinon l'offset
+            // resterait bloqué pour toujours et le suivi ne livrerait plus rien.
+            let fromOffset = min fromOffset length
 
             if length <= fromOffset then
                 [||], fromOffset

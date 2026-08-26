@@ -47,9 +47,10 @@ module DiskFormat =
         if fs.Length < 4L then
             Raw
         else
-            let head = Array.zeroCreate<byte> 16
+            // 72 octets : assez pour la signature VDI située à l'offset 0x44.
+            let head = Array.zeroCreate<byte> 80
             fs.Position <- 0L
-            let headRead = fs.Read(head, 0, 16)
+            let headRead = fs.Read(head, 0, 80)
 
             if headRead < 4 then
                 Raw
@@ -68,33 +69,42 @@ module DiskFormat =
                 elif isVmdk then
                     Vmdk
                 else
+                    // VDI réel (VirtualBox) : signature 7F 10 DA BE à l'offset 0x44.
                     let isVdi =
-                        fs.Length >= 72L
-                        && startsWith head 0 [| 0x7Euy; 0x10uy; 0x10uy; 0x10uy; 0x4Duy; 0x61uy; 0x63uy; 0x20uy |]
+                        headRead >= 68
+                        && startsWith head 64 [| 0x7Fuy; 0x10uy; 0xDAuy; 0xBEuy |]
 
-                    let isDmg =
-                        fs.Length >= 4L && startsWith head 0 [| 0x78uy; 0x6Buy; 0x6Fuy; 0x6Cuy |]
-
+                    // Parallels maison : aligné sur Parallels.readHeader
+                    // (readUInt32LE == 0x30617261 → octets « ara0 »).
                     let isParallels =
-                        fs.Length >= 8L
-                        && startsWith head 0 [| 0x70uy; 0x61uy; 0x72uy; 0x61uy; 0x0Duy; 0x0Auy; 0x1Auy; 0x0Auy |]
+                        startsWith head 0 [| 0x61uy; 0x72uy; 0x61uy; 0x30uy |]
 
                     if isVdi then
                         Vdi
-                    elif isDmg then
-                        Dmg
                     elif isParallels then
                         Parallels
                     else
-                        let foot = Array.zeroCreate<byte> 512
+                        // DMG (UDIF) : le magic « koly » est dans le TRAILER de
+                        // 512 octets en fin de fichier, pas en tête.
+                        let isDmg =
+                            fs.Length >= 512L
+                            && (let foot = Array.zeroCreate<byte> 512
+                                fs.Position <- fs.Length - 512L
+                                fs.Read(foot, 0, 512) |> ignore
+                                startsWith foot 0 (Encoding.ASCII.GetBytes "koly"))
 
-                        if fs.Length < 512L then
-                            Raw
+                        if isDmg then
+                            Dmg
                         else
-                            fs.Position <- fs.Length - 512L
-                            fs.Read(foot, 0, 512) |> ignore
-                            let isVhd = startsWith foot 0 (Encoding.ASCII.GetBytes "conectix")
-                            if isVhd then Vhd else Raw
+                            let foot = Array.zeroCreate<byte> 512
+
+                            if fs.Length < 512L then
+                                Raw
+                            else
+                                fs.Position <- fs.Length - 512L
+                                fs.Read(foot, 0, 512) |> ignore
+                                let isVhd = startsWith foot 0 (Encoding.ASCII.GetBytes "conectix")
+                                if isVhd then Vhd else Raw
 
     /// Indique si le format est une image disque prise en charge par le
     /// moteur de montage (c'est-à-dire un fichier, pas un répertoire).

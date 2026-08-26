@@ -27,10 +27,15 @@ type CloudAzureDriver(dataRoot: string) =
         args.Add(targetPath)
         args.Add(sharePath)
 
-        match driverOpts |> Map.tryFind "storageAccount", driverOpts |> Map.tryFind "storageKey" with
-        | Some account, Some key ->
+        let hasKey = driverOpts |> Map.containsKey "storageKey"
+
+        match driverOpts |> Map.tryFind "storageAccount", hasKey with
+        | Some account, true ->
             args.Add("/user:AZURE\\" + account)
-            args.Add(key)
+            // « * » fait lire le mot de passe sur l'entrée standard : la clé du
+            // compte de stockage ne doit JAMAIS figurer dans argv, où elle est
+            // visible par tout processus local (WMI Win32_Process, audits).
+            args.Add("*")
         | _ ->
             raise (
                 RpcException(
@@ -46,7 +51,10 @@ type CloudAzureDriver(dataRoot: string) =
 
     let mountAzure (sharePath: string) (targetPath: string) (opts: Map<string, string>) =
         let args = buildNetUseArgs sharePath targetPath opts
-        ProcessExec.runUnit "net" ("use" :: args) (Some ProcessExec.MountTimeoutMs) None
+
+        // La clé transite par l'entrée standard, pas par la ligne de commande.
+        let secret = opts |> Map.tryFind "storageKey"
+        ProcessExec.runUnit "net" ("use" :: args) (Some ProcessExec.MountTimeoutMs) secret
 
     let unmountAzure (targetPath: string) =
         ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some ProcessExec.MountTimeoutMs) None

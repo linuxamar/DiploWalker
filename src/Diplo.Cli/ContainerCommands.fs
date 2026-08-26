@@ -317,8 +317,31 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
 
-                let env =
+                // Signaler les entrées malformées : « --env FOO » sans '=' est
+                // sinon ignoré en silence et la variable n'atteint jamais le
+                // conteneur.
+                let envPairs, envRejected =
                     settings.Env
+                    |> Array.partition (fun e -> e.Contains('='))
+
+                let labelsPairs, labelsRejected =
+                    settings.Labels
+                    |> Array.partition (fun l -> l.Contains('='))
+
+                if not (Array.isEmpty envRejected) then
+                    output.WriteWarning(
+                        sprintf "Entrées --env ignorées (format attendu CLE=valeur) : %s" (String.Join(", ", envRejected))
+                    )
+
+                if not (Array.isEmpty labelsRejected) then
+                    output.WriteWarning(
+                        sprintf
+                            "Entrées --label ignorées (format attendu cle=valeur) : %s"
+                            (String.Join(", ", labelsRejected))
+                    )
+
+                let env =
+                    envPairs
                     |> Array.choose (fun e ->
                         match e.Split('=', 2) with
                         | [| k; v |] -> Some(k, v)
@@ -326,7 +349,7 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
                     |> dict
 
                 let labels =
-                    settings.Labels
+                    labelsPairs
                     |> Array.choose (fun l ->
                         match l.Split('=', 2) with
                         | [| k; v |] -> Some(k, v)
@@ -417,6 +440,7 @@ type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
                             )
 
                         let enumerator = stream.GetAsyncEnumerator(followCt)
+                        let mutable failure: System.Exception option = None
 
                         try
                             let mutable moving = true
@@ -430,8 +454,16 @@ type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
                                     )
                                 else
                                     moving <- false
-                        finally
-                            enumerator.DisposeAsync().AsTask() |> ignore
+                        with ex ->
+                            failure <- Some ex
+
+                        // Disposition attendue : l'abandon fire-and-forget laissait
+                        // le canal gRPC se fermer pendant le dispose du flux.
+                        do! enumerator.DisposeAsync().AsTask()
+
+                        match failure with
+                        | Some ex -> raise ex
+                        | None -> ()
                     else
                         let! entries = client.GetLogs(settings.Id, tail = settings.Tail, since = since, ct = ct)
 

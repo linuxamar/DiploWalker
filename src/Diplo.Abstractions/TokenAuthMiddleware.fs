@@ -94,10 +94,21 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
                                 context.Response.StatusCode <- 401
                                 context.Response.WriteAsync("Token invalide")
                         else
+                            // Ne jamais journaliser la valeur brute de l'en-tête
+                            // (elle peut contenir un secret) : schéma seul + longueur.
+                            let schemeEnd = header.IndexOf(' ')
+
+                            let scheme =
+                                if schemeEnd > 0 && schemeEnd <= 32 then
+                                    header.Substring(0, schemeEnd)
+                                else
+                                    "<sans espace>"
+
                             logger.LogWarning(
-                                "Format Authorization invalide depuis {ClientIp}: {Header}",
+                                "Format Authorization invalide depuis {ClientIp} (schéma: {Scheme}, longueur: {Length})",
                                 clientIp,
-                                header
+                                scheme,
+                                header.Length
                             )
 
                             context.Response.StatusCode <- 401

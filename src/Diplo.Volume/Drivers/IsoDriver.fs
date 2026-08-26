@@ -1,4 +1,4 @@
-namespace Diplo.Volume.Drivers
+﻿namespace Diplo.Volume.Drivers
 
 open System
 open System.IO
@@ -100,22 +100,35 @@ module Iso9660 =
           name: string }
 
     let private parseDirRecord (data: byte[]) (offset: int) =
-        let length = int data.[offset]
-
-        if length = 0 then
+        if offset >= data.Length then
             None
         else
-            let extent = readUInt32LE data (offset + 2)
-            let dataLength = readUInt32LE data (offset + 10)
-            let flags = data.[offset + 25]
-            let nameLen = int data.[offset + 32]
-            let rawName = ascii data (offset + 33) nameLen
+            let length = int data.[offset]
 
-            Some
-                { extent = extent
-                  dataLength = dataLength
-                  isDirectory = (flags &&& 0x02uy) <> 0uy
-                  name = rawName }
+            if length = 0 then
+                None
+            else
+                // Enregistrement tronqué (fin de répertoire) : borner la lecture
+                // du nom au lieu de lever IndexOutOfRange sur une image
+                // malformée.
+                if length < 33 || offset + length > data.Length then
+                    Some
+                        { extent = 0
+                          dataLength = 0
+                          isDirectory = false
+                          name = "\x01" } // sentinelle ignorée par l'appelant
+                else
+                    let extent = readUInt32LE data (offset + 2)
+                    let dataLength = readUInt32LE data (offset + 10)
+                    let flags = data.[offset + 25]
+                    let rawNameLen = min (int data.[offset + 32]) (length - 33) |> max 0
+                    let rawName = ascii data (offset + 33) rawNameLen
+
+                    Some
+                        { extent = extent
+                          dataLength = dataLength
+                          isDirectory = (flags &&& 0x02uy) <> 0uy
+                          name = rawName }
 
     let private readDirectoryRecords (src: IsoSource.T) (extent: int) (length: int) =
         let start = int64 extent * int64 blockSize
@@ -123,6 +136,10 @@ module Iso9660 =
 
         if count <= 0 then
             []
+        elif count > int64 Int32.MaxValue then
+            // Au-delà de 2 Go, `int` bouclerait sur un négatif et produirait un
+            // résultat vide SILENCIEUX : échouer explicitement.
+            failwithf "Répertoire ISO trop volumineux pour l'extraction en mémoire (%d octets)" count
         else
             let data = src.ReadBytes start (int count)
             let records = ResizeArray<DirRecord>()
@@ -153,6 +170,10 @@ module Iso9660 =
 
         if count <= 0 then
             Array.empty
+        elif count > int64 Int32.MaxValue then
+            // Fichier ≥ 2 Go : le cast int bouclerait en négatif et retournerait
+            // un fichier vide sans erreur — échouer explicitement.
+            failwithf "Fichier ISO trop volumineux pour l'extraction en mémoire (%d octets)" count
         else
             src.ReadBytes start (int count)
 
@@ -436,8 +457,13 @@ module Udf =
     /// Assemble les données pointées par un ICB (fichier ou répertoire) en
     /// parcourant ses descripteurs d'allocation (short_ad, long_ad ou
     /// extended_ad) ou en lisant le contenu inline (AD_IN_ICB).
-    let private readIcbData (src: IsoSource.T) (icbOffset: int) (partitionStart: int) (logicalBlockSize: int) =
-        let desc = src.ReadBytes (int64 icbOffset) 176
+    /// Limite de sécurité : accumulation maximale acceptée pour le contenu
+    /// d'un ICB (des descripteurs d'allocation forgés peuvent gonfler la
+    /// mémoire à plusieurs Go avant toute autre vérification).
+    let private maxIcbContentBytes = 4L * 1024L * 1024L * 1024L
+
+    let private readIcbData (src: IsoSource.T) (icbOffset: int64) (partitionStart: int) (logicalBlockSize: int) =
+        let desc = src.ReadBytes icbOffset 176
 
         if desc.Length < 176 then
             failwith "Image UDF invalide (ICB fichier incomplet)"
@@ -450,18 +476,22 @@ module Udf =
         let flags = readUInt16LE desc 34
         let allocationType = flags &&& 7
         let informationLength = int64 (readUInt64LE desc 56)
-        let extendedAttrLength = readUInt32LE desc 168
-        let allocLength = readUInt32LE desc 172
-        let allocStart = icbOffset + 176 + extendedAttrLength
+        // Masque uint32 : une valeur ≥ 2^31 deviendrait négative en int et
+        // décalerait allocStart EN ARRIÈRE.
+        let extendedAttrLength = int64 (readUInt32LE desc 168)
+        let allocLength = int64 (readUInt32LE desc 172)
+        let allocStart = icbOffset + 176L + extendedAttrLength
         let allocEnd = allocStart + allocLength
         let content = ResizeArray<byte>()
+        let mutable accumulated = 0L
 
         if allocationType = 3 then
             // AD_IN_ICB : les données sont stockées dans l'ICB lui-même.
             let inlineLen = int (min informationLength (int64 allocLength))
 
             if inlineLen > 0 then
-                content.AddRange(src.ReadBytes (int64 allocStart) inlineLen)
+                content.AddRange(src.ReadBytes allocStart inlineLen)
+                accumulated <- int64 inlineLen
         else
             let step =
                 if allocationType = 0 then 8
@@ -469,10 +499,10 @@ module Udf =
                 else 20
 
             let locOffset = if allocationType = 2 then 12 else 4
-            let mutable pos = int64 allocStart
+            let mutable pos = allocStart
 
             let mutable running =
-                pos + int64 step <= int64 allocEnd && pos + int64 step <= src.Length
+                pos + int64 step <= allocEnd && pos + int64 step <= src.Length
 
             while running do
                 let ad = src.ReadBytes pos step
@@ -487,10 +517,19 @@ module Udf =
                     let available = min (int64 length) (max 0L (src.Length - start))
 
                     if available > 0 then
-                        content.AddRange(src.ReadBytes start (int available))
+                        // Plafonner l'accumulation AVANT d'allouer : sinon des
+                        // AD redondants/OOM-forgés gonflent `content` sans borne.
+                        let remainingBudget = min (informationLength - accumulated) maxIcbContentBytes
+
+                        if remainingBudget <= 0L then
+                            running <- false
+                        else
+                            let toRead = min available remainingBudget |> int
+                            content.AddRange(src.ReadBytes start toRead)
+                            accumulated <- accumulated + int64 toRead
 
                     pos <- pos + int64 step
-                    running <- pos + int64 step <= int64 allocEnd && pos + int64 step <= src.Length
+                    running <- pos + int64 step <= allocEnd && pos + int64 step <= src.Length
 
         let data = content.ToArray()
 
@@ -519,7 +558,7 @@ module Udf =
         if icbTag <> 0x0105 && icbTag <> 0x0201 then
             failwithf "Image UDF invalide (ICB manquant, tag 0x%04x)" icbTag
 
-        let dirData = readIcbData src (int icbOffset) partitionStart logicalBlockSize
+        let dirData = readIcbData src icbOffset partitionStart logicalBlockSize
         let entries = ResizeArray<string * int * bool>()
         let mutable pos = 0
         let mutable running = pos + 38 <= dirData.Length
@@ -533,40 +572,45 @@ module Udf =
                 let characteristics = dirData.[pos + 18]
                 let nameLen = int dirData.[pos + 19]
                 let childIcbLocation = readUInt32LE dirData (pos + 24)
-                let implUseLen = readUInt16LE dirData (pos + 36)
+                let implUseLen = int (readUInt16LE dirData (pos + 36))
                 // Le nom de fichier est un d-string (ECMA-167 1/7.2.12) :
                 // un octet de type (8 = ASCII, 16 = UTF-16BE) suivi du nom.
                 let nameOffset = pos + 38 + implUseLen
 
-                let rawName =
-                    if nameLen <= 1 then
-                        ""
-                    else
-                        let dType = dirData.[nameOffset]
-
-                        if dType = 8uy then
-                            ascii dirData (nameOffset + 1) (nameLen - 1)
-                        elif dType = 16uy then
-                            let chars = ResizeArray<char>()
-                            let mutable i = nameOffset + 1
-
-                            while i + 1 <= nameOffset + nameLen - 1 do
-                                chars.Add(char ((int dirData.[i] <<< 8) ||| int dirData.[i + 1]))
-                                i <- i + 2
-
-                            System.String(chars.ToArray())
-                        else
+                // FID malformé : sortir proprement au lieu de lire hors bornes
+                // et interrompre toute l'extraction.
+                if nameOffset + nameLen > dirData.Length then
+                    running <- false
+                else
+                    let rawName =
+                        if nameLen <= 1 then
                             ""
+                        else
+                            let dType = dirData.[nameOffset]
 
-                let isParent = (characteristics &&& 0x08uy) <> 0uy
+                            if dType = 8uy then
+                                ascii dirData (nameOffset + 1) (nameLen - 1)
+                            elif dType = 16uy then
+                                let chars = ResizeArray<char>()
+                                let mutable i = nameOffset + 1
 
-                if not isParent && rawName <> "\x00" && rawName <> "\x01" && nameLen > 0 then
-                    let isDir = (characteristics &&& 0x02uy) <> 0uy
-                    entries.Add(rawName, childIcbLocation, isDir)
-                // Descripteur suivant, aligné sur 4 octets.
-                let total = 38 + implUseLen + nameLen
-                pos <- pos + total + ((4 - (total % 4)) % 4)
-                running <- pos + 38 <= dirData.Length
+                                while i + 1 <= nameOffset + nameLen - 1 do
+                                    chars.Add(char ((int dirData.[i] <<< 8) ||| int dirData.[i + 1]))
+                                    i <- i + 2
+
+                                System.String(chars.ToArray())
+                            else
+                                ""
+
+                    let isParent = (characteristics &&& 0x08uy) <> 0uy
+
+                    if not isParent && rawName <> "\x00" && rawName <> "\x01" && nameLen > 0 then
+                        let isDir = (characteristics &&& 0x02uy) <> 0uy
+                        entries.Add(rawName, childIcbLocation, isDir)
+                    // Descripteur suivant, aligné sur 4 octets.
+                    let total = 38 + implUseLen + nameLen
+                    pos <- pos + total + ((4 - (total % 4)) % 4)
+                    running <- pos + 38 <= dirData.Length
 
         List.ofSeq entries
 
@@ -631,7 +675,7 @@ module Udf =
                             let fileIcb =
                                 (int64 partitionStart + int64 childIcbLocation) * int64 logicalBlockSize
 
-                            let fileData = readIcbData src (int fileIcb) partitionStart logicalBlockSize
+                            let fileData = readIcbData src fileIcb partitionStart logicalBlockSize
                             let filePath = pathFromRelative targetPath sub
                             Directory.CreateDirectory(Path.GetDirectoryName(filePath)) |> ignore
                             File.WriteAllBytes(filePath, fileData)
@@ -678,7 +722,7 @@ module Udf =
                     failwithf "'%s' est un répertoire dans l'image '%s'" pathInImage isoPath
 
                 let fileIcb = (int64 partitionStart + int64 childIcb) * int64 logicalBlockSize
-                readIcbData src (int fileIcb) partitionStart logicalBlockSize
+                readIcbData src fileIcb partitionStart logicalBlockSize
             | Some(_, childIcb, isDir) ->
                 if not isDir then
                     failwithf "'%s' n'est pas un répertoire dans l'image '%s'" pathInImage isoPath

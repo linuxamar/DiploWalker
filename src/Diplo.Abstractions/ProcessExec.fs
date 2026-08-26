@@ -107,8 +107,13 @@ module ProcessExec =
         let bytes = System.Text.Encoding.Unicode.GetBytes(script)
         Convert.ToBase64String(bytes)
 
-    /// Exécute un script PowerShell encodé avec les paramètres nomméss.
+    /// Exécute un script PowerShell encodé avec les paramètres nommés.
+    /// Les VALEURS sont injectées dans le script lui-même en Base64 UTF-8 :
+    /// `-EncodedCommand` n'offre aucun canal de liaison pour un bloc param(),
+    /// et stdin n'est pas consommé par le script — l'injection Base64 garantit
+    /// le binding réel des variables $pN sans risque d'injection.
     /// Partagé par runPowerShell et runPowerShellScript.
+    /// Attention : API bloquante — ne jamais appeler depuis le thread UI.
     let private runEncodedScript
         (scriptBody: string)
         (parameters: (string * string) list)
@@ -117,19 +122,28 @@ module ProcessExec =
         let timeout = timeoutMsOr timeoutMs
 
         let script =
-            let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
-            sprintf "{ param(%s) %s }" (paramNames |> String.concat ", ") scriptBody
+            let assignments =
+                parameters
+                |> List.mapi (fun i (_, value) ->
+                    let b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes value)
+
+                    sprintf "$p%d = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))" i b64)
+                |> String.concat "; "
+
+            if String.IsNullOrEmpty assignments then
+                scriptBody
+            else
+                sprintf "%s; %s" assignments scriptBody
 
         let encoded = encodeScript script
 
         let args =
-            [ yield "-NoProfile"
-              yield "-NonInteractive"
-              yield "-EncodedCommand"
-              yield encoded ]
+            [ "-NoProfile"
+              "-NonInteractive"
+              "-EncodedCommand"
+              encoded ]
 
-        let input = parameters |> List.map snd |> String.concat "\n" |> Some
-        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) input
+        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) None
 
         if code <> 0 then
             let detail =

@@ -22,8 +22,30 @@ type NfsDriver(dataRoot: string) =
                 )
             )
 
-    let mountNfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
-        ProcessExec.runUnit "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some ProcessExec.MountTimeoutMs) None
+    /// Options de montage utilisateur acceptées (allow-list) : ro, vers,
+    /// hard/soft, timeo. Les autres sont ignorées volontairement.
+    let allowedMountOptions = set [ "ro"; "vers"; "hard"; "soft"; "timeo" ]
+
+    let buildMountOptions (opts: Map<string, string>) =
+        let userOpts =
+            opts
+            |> Map.toSeq
+            |> Seq.choose (fun (k, v) ->
+                if allowedMountOptions.Contains(k.ToLowerInvariant()) then
+                    if v = "" || v = "true" then
+                        Some(k.ToLowerInvariant())
+                    else
+                        Some(sprintf "%s=%s" k v)
+                else
+                    None)
+            |> Seq.toList
+
+        let all = "nolock" :: userOpts
+        String.Join(",", all)
+
+    let mountNfs (remotePath: string) (targetPath: string) (opts: Map<string, string>) =
+        let options = buildMountOptions opts
+        ProcessExec.runUnit "mount" [ "-o"; options; remotePath; targetPath ] (Some ProcessExec.MountTimeoutMs) None
 
     interface IVolumeDriver with
         member _.CreateVolume(name, driverOpts, labels) =

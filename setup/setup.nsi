@@ -2,7 +2,8 @@
 !include "WinVer.nsh"
 !include "LogicLib.nsh"
 
-SetCompressor /SOLID lzma
+; Compression désactivée
+SetCompress off
 
 ; ── Définitions par défaut (surchargeables via -D) ──────────────────────────
 !ifndef APP_VERSION
@@ -66,8 +67,22 @@ BrandingText "Diplo"
 Function ${UN}AddToPath
   Exch $R0
   Push $R1
+  Push $R2
 
   ReadRegStr $R1 HKLM "${REG_KEY_ENV}" "Path"
+
+  ; Détection de doublon : ne pas réajouter l'entrée à chaque réinstallation.
+  StrCpy $R2 ";$R1;"
+  Push $R2
+  Push ";$R0;"
+  Call ${UN}StrStr
+  Pop $R2
+
+  ${If} $R2 != ""
+    DetailPrint "Déjà présent dans PATH : $R0"
+    Goto a_done
+  ${EndIf}
+
   ${If} $R1 == ""
     StrCpy $R1 "$R0"
   ${Else}
@@ -77,6 +92,8 @@ Function ${UN}AddToPath
   SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment"
   DetailPrint "PATH += $R0"
 
+a_done:
+  Pop $R2
   Pop $R1
   Pop $R0
 FunctionEnd
@@ -122,7 +139,8 @@ s_done:
   Pop $R0
 FunctionEnd
 !macroend
-; StrStr (installateur) n'est plus appelée — on ne génère que la variante désinstallateur
+; StrStr nécessaire côté installateur (doublon PATH) ET désinstallateur
+!insertmacro StrStrFunc ""
 !insertmacro StrStrFunc "un."
 
 !macro RemoveFromPathFunc UN
@@ -131,33 +149,72 @@ Function ${UN}RemoveFromPath
   Push $R1
   Push $R2
   Push $R3
+  Push $R4
+  Push $R5
+  Push $R6
+  Push $R7
+  Push $R8
 
   ReadRegStr $R1 HKLM "${REG_KEY_ENV}" "Path"
   ${If} $R1 == ""
     Goto r_done
   ${EndIf}
 
+  ; S = «;$PATH;» (paddée), aiguille = «;$R0;»
   StrCpy $R2 ";$R1;"
   StrCpy $R3 ";$R0;"
 
   Push $R2
   Push $R3
   Call ${UN}StrStr
-  Pop $R1
+  Pop $R1   ; $R1 = suffixe de S à partir de l'occurrence (U)
+
   ${If} $R1 == ""
     DetailPrint "Introuvable dans PATH : $R0"
     Goto r_done
   ${EndIf}
 
-  StrCpy $R2 $R1 "" 0
-  StrLen $R3 $R3
-  StrCpy $R2 $R2 "" $R3
+  ; offset = Len(S) - Len(U) : position de l'entrée dans la chaîne paddée.
+  StrLen $R4 $R2
+  StrLen $R5 $R1
+  IntOp $R4 $R4 - $R5
+
+  ; TÊTE : caractères [1, offset) de S — sans le ';' initial de padding.
+  ; L'ANCIENNE implémentation réécrivait UNIQUEMENT le suffixe : toute la
+  ; portion du PATH située AVANT l'entrée était effacée du registre.
+  IntOp $R6 $R4 - 1
+  ${If} $R6 < 0
+    StrCpy $R6 0
+  ${EndIf}
+  StrCpy $R6 $R2 $R6 1      ; tête
+
+  ; QUEUE : U sans l'aiguille («;$R0;») ni le ';' final de padding.
+  StrLen $R7 $R3            ; Len(aiguille)
+  IntOp $R8 $R5 - $R7
+  IntOp $R8 $R8 - 1
+  ${If} $R8 < 0
+    StrCpy $R8 0
+  ${EndIf}
+  StrCpy $R5 $R1 $R8 $R7    ; queue
+
+  ${If} $R6 == ""
+    StrCpy $R2 $R5
+  ${ElseIf} $R5 == ""
+    StrCpy $R2 $R6
+  ${Else}
+    StrCpy $R2 "$R6;$R5"
+  ${EndIf}
 
   WriteRegExpandStr HKLM "${REG_KEY_ENV}" "Path" "$R2"
   SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment"
   DetailPrint "PATH -= $R0"
 
 r_done:
+  Pop $R8
+  Pop $R7
+  Pop $R6
+  Pop $R5
+  Pop $R4
   Pop $R3
   Pop $R2
   Pop $R1
@@ -244,6 +301,17 @@ Section "Uninstall"
 
   Delete "$DESKTOP\Diplo GUI.lnk"
   RMDir  /r "$SMPROGRAMS\${APP_NAME}"
+
+  ; Arrêt + suppression des services Windows AVANT l'effacement des binaires :
+  ; sinon des services orphelins pointent vers des fichiers supprimés
+  ; (erreurs SCM au boot). Diplo.Installer retire aussi le token.
+  nsExec::ExecToStack '"$INSTDIR\Diplo.Installer\Diplo.Installer.exe" uninstall'
+  Pop $0
+
+  ${If} $0 != 0
+    DetailPrint "Avertissement : désinstallation des services impossible (code $0)."
+    DetailPrint "Exécutez manuellement : Diplo.Installer.exe uninstall (console administrateur)"
+  ${EndIf}
 
   ; Retrait des certificats PKI des magasins machine avant la suppression des dossiers.
   nsExec::ExecToStack '"${POWERSHELL_EXE}" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1" -Remove'

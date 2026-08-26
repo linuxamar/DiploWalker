@@ -8,6 +8,7 @@ open System.Threading.Tasks
 open System.Windows.Input
 open Xunit
 open FsUnit.Xunit
+open Diplo.Abstractions
 open Diplo.Core
 open Diplo.Core.Output
 open Diplo.Grpc.Container
@@ -258,9 +259,11 @@ let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
         let port = MockOutputPort()
         let vm = new SettingsTabViewModel(port)
         vm.ConfigPath |> should equal (Path.Combine(home, "diplo.json"))
-        vm.ContainerAddress |> should equal "localhost:5001"
-        vm.VolumeAddress |> should equal "localhost:5002"
-        vm.NetworkAddress |> should equal "localhost:5003")
+
+        // Défauts alignés sur DiploPorts : Debug 5001-5003, Release 6001-6003.
+        vm.ContainerAddress |> should equal (sprintf "localhost:%d" DiploPorts.Container)
+        vm.VolumeAddress |> should equal (sprintf "localhost:%d" DiploPorts.Volume)
+        vm.NetworkAddress |> should equal (sprintf "localhost:%d" DiploPorts.Network))
 
 [<Fact>]
 let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` () =

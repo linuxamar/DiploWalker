@@ -20,7 +20,13 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
         | true, driver -> Some driver
         | false, _ -> None
 
-    let defaultDriver () = drivers.[NetworkDriver.Bridge]
+    let defaultDriver () =
+        match drivers.TryGetValue(NetworkDriver.Bridge) with
+        | true, d -> d
+        | false, _ ->
+            raise (
+                RpcException(Status(StatusCode.Internal, "Driver Bridge non enregistré dans le registre"))
+            )
 
     interface INetworkService with
 
@@ -35,17 +41,43 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                 SecurityValidation.validateName name "Le nom du réseau"
                 SecurityValidation.validateCidr request.Subnet "Le sous-réseau"
                 SecurityValidation.validateIp request.Gateway "La passerelle"
-                SecurityValidation.validateIp request.IpRange "La plage IP"
+
+                // IpRange est une PLAGE CIDR (« 10.0.0.0/24 »), pas une IP simple :
+                // validateIp rejetait toute valeur légitime.
+                SecurityValidation.validateCidr request.IpRange "La plage IP"
+
+                // Valeur d'enum hors plage (protobuf transporte un int32) :
+                // rejeter plutôt que retomber silencieusement sur Bridge.
+                if not (System.Enum.IsDefined(typeof<NetworkDriver>, request.Driver)) then
+                    raise (
+                        RpcException(
+                            Status(
+                                StatusCode.InvalidArgument,
+                                sprintf "Valeur de driver inconnue : %d" (int request.Driver)
+                            )
+                        )
+                    )
+
                 let labels = request.Labels |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
 
                 for kv in labels do
                     SecurityValidation.validateLabel kv.Key kv.Value
 
+                let options = request.Options |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
+
                 let driverType = request.Driver
                 let driver = getDriver driverType |> Option.defaultValue (defaultDriver ())
 
+                // Le chemin de plugin CNI fourni est injecté comme option
+                // standard consommée par CustomCniDriver.
+                let options =
+                    if String.IsNullOrEmpty(request.CniPluginPath) then
+                        options
+                    else
+                        options.Add("plugin_path", request.CniPluginPath)
+
                 let result =
-                    driver.Create(name, request.Subnet, request.Gateway, request.IpRange, Map.empty, labels)
+                    driver.Create(name, request.Subnet, request.Gateway, request.IpRange, options, labels)
 
                 let info =
                     match result with
@@ -99,34 +131,26 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     drivers
                     |> Seq.tryPick (fun kvp ->
                         match kvp.Value.Inspect(request.Id) with
-                        | Ok info ->
-                            let ep =
-                                { Diplo.Grpc.Network.EndpointInfo.EndpointId = info.Id
-                                  ContainerId = ""
-                                  Ipv4Address = info.Gateway
-                                  MacAddress = ""
-                                  State = EndpointState.Active }
-
-                            let response =
-                                { InspectNetworkResponse.Id = info.Id
-                                  Name = info.Name
-                                  Driver = info.Driver
-                                  Subnet = info.Subnet
-                                  Gateway = info.Gateway
-                                  IpRange = ""
-                                  Options = Dictionary<string, string>()
-                                  Labels = Dictionary<string, string>()
-                                  Endpoints = List<Diplo.Grpc.Network.EndpointInfo>()
-                                  CreatedAt = "" }
-
-                            response.Endpoints.Add(ep)
-                            Some response
+                        | Ok info -> Some info
                         | Error _ -> None)
 
                 if result.IsNone then
                     raise (RpcException(Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.Id)))
 
-                return result.Value
+                let info = result.Value
+
+                // Données honnêtes : CreatedAt réel, endpoints non fabriqués.
+                return
+                    { InspectNetworkResponse.Id = info.Id
+                      Name = info.Name
+                      Driver = info.Driver
+                      Subnet = info.Subnet
+                      Gateway = info.Gateway
+                      IpRange = ""
+                      Options = Dictionary<string, string>()
+                      Labels = Dictionary<string, string>()
+                      Endpoints = List<Diplo.Grpc.Network.EndpointInfo>()
+                      CreatedAt = info.CreatedAt }
             }
 
         member _.ListNetworks(request, _context) =
@@ -147,7 +171,14 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                                   CreatedAt = netInfo.CreatedAt }
 
                             response.Networks.Add(ni)
-                    | Error _ -> ()
+                    | Error msg ->
+                        // Un driver en échec ne doit pas passer inaperçu : le
+                        // client croirait voir l'inventaire complet.
+                        Log.Warning(
+                            "Liste des réseaux du driver {Driver} indisponible : {Error}",
+                            kvp.Key,
+                            msg
+                        )
 
                 return response
             }
@@ -162,15 +193,26 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
                 SecurityValidation.validateIp request.Ipv4Address "L'adresse IPv4"
 
-                let driverType =
+                let foundDriverType =
                     drivers
                     |> Seq.tryPick (fun kvp ->
                         match kvp.Value.Inspect(request.NetworkId) with
                         | Ok info when info.Driver = kvp.Key -> Some kvp.Key
                         | _ -> None)
-                    |> Option.defaultValue NetworkDriver.Bridge
 
-                let driver = getDriver driverType |> Option.defaultValue (defaultDriver ())
+                let driver =
+                    match foundDriverType with
+                    | Some dt -> getDriver dt |> Option.defaultValue (defaultDriver ())
+                    | None ->
+                        // NotFound explicite : masquer l'absence derrière une
+                        // réponse « succès » au message textuel casse le contrat.
+                        raise (
+                            RpcException(
+                                Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.NetworkId)
+                            )
+                        )
+
+                let connectOptions = request.Options |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq
 
                 let ipv4Opt =
                     if String.IsNullOrEmpty(request.Ipv4Address) then
@@ -179,7 +221,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                         Some request.Ipv4Address
 
                 match
-                    driver.Connect(request.NetworkId, request.ContainerId, request.EndpointId, ipv4Opt, Map.empty)
+                    driver.Connect(request.NetworkId, request.ContainerId, request.EndpointId, ipv4Opt, connectOptions)
                 with
                 | Ok epInfo ->
                     return
@@ -254,6 +296,9 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                             request.Command
 
                     SecurityValidation.validateCniCommand command
+                    // Propager la forme NORMALISÉE : la spec CNI est sensible à
+                    // la casse, « add » ou « ADD » avec espaces serait rejeté.
+                    let normalizedCommand = command.Trim().ToUpperInvariant()
 
                     try
                         let configJson =
@@ -275,7 +320,11 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                                 "{}"
 
                         let args =
-                            [ command; "--container-id"; request.ContainerId; "--netns"; request.NetnsPath ]
+                            [ normalizedCommand
+                              "--container-id"
+                              request.ContainerId
+                              "--netns"
+                              request.NetnsPath ]
 
                         let code, stdout, stderr =
                             ProcessExec.runWithResult resolvedPluginPath args (Some 60_000) (Some configJson)

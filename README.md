@@ -1,4 +1,4 @@
-# Diplo
+﻿# Diplo
 
 Système distribué de microservices gRPC pour la gestion de conteneurs Windows.
 
@@ -8,10 +8,13 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 | Service             | Port | Description                                                                                                |
 | ------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
-| **Diplo.Container** | 5001 | Cycle de vie des conteneurs via containerd — création, démarrage, arrêt, suppression et montage de volumes |
-| **Diplo.Volume**    | 5002 | Gestion des volumes persistants                                                                            |
-| **Diplo.Network**   | 5003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge)                                                 |
+| **Diplo.Container** | 5001 / 6001 | Cycle de vie des conteneurs via containerd — création, démarrage, arrêt, suppression et montage de volumes |
+| **Diplo.Volume**    | 5002 / 6002 | Gestion des volumes persistants                                                                            |
+| **Diplo.Network**   | 5003 / 6003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge)                                                 |
+
 | **Diplo.Installer** | —    | Installation et configuration de l'ensemble du système                                                     |
+
+> **Ports Debug / Release** : en configuration **Debug**, les services écoutent sur 5001-5003 ; en **Release** (+ installation via l'installateur), sur **6001-6003**. Les deux plages permettent une exécution simultanée. Les named pipes (`diplo-container`, `diplo-volume`, `diplo-network`) sont identiques dans les deux configurations.
 
 ### Clients
 
@@ -80,9 +83,9 @@ Le choix de l'image de base Windows est crucial pour le fonctionnement de Diplo 
 
 ### Installation automatique
 
-```powershell
+``powershell
 Diplo.Installer.exe install
-```
+``
 
 L'installateur effectue automatiquement :
 
@@ -118,10 +121,10 @@ Le dépôt fournit le script officiel Microsoft
 d'installer et de configurer containerd et nerdctl de manière autonome, sans
 l'installateur Diplo :
 
-```powershell
+``powershell
 # Élevé (PowerShell administrateur)
 .\setup\install-containerd-runtime.ps1
-```
+``
 
 Le script, exécuté en tant qu'administrateur :
 
@@ -144,19 +147,19 @@ Paramètres notables : `-ExternalNetAdapter` (réseau DHCP), `-ContainerBaseImag
 
 ### Commandes
 
-```powershell
+``powershell
 Diplo.Installer.exe install      # Installation complète
 Diplo.Installer.exe uninstall    # Suppression des services
 Diplo.Installer.exe status       # État des services
-```
+``
 
 ### Démarrage des services
 
-```powershell
+``powershell
 sc.exe start "Diplo.Container"
 sc.exe start "Diplo.Volume"
 sc.exe start "Diplo.Network"
-```
+``
 
 ### Configuration du client (diplo.json)
 
@@ -165,15 +168,15 @@ Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `
 1. `%DIPLO_CONFIG_HOME%\diplo.json` si la variable d'environnement est définie (recommandé pour la GUI et les installations : chemin stable, indépendant du répertoire courant) ;
 2. `diplo.json` dans le répertoire courant.
 
-S'il est absent ou mal formé, les clients retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003`).
+S'il est absent ou mal formé, les clients retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003` en Debug, `localhost:6001`/`6002`/`6003` en Release).
 
-```powershell
+``powershell
 diplo config init                       # génère diplo.json avec le transport TCP par défaut
 diplo config init --transport pipe      # génère diplo.json avec des adresses par named pipes
 diplo config init --path C:\etc\diplo.json --transport pipe
-```
+``
 
-```json
+``json
 {
     "container": {
         "address": "http://pipe:/diplo-container",
@@ -183,7 +186,7 @@ diplo config init --path C:\etc\diplo.json --transport pipe
     "network": { "address": "http://pipe:/diplo-network" },
     "logLevel": "Information"
 }
-```
+``
 
 - `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
 - `pipe` : adresses `http://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplo-container`, `diplo-volume`, `diplo-network`).
@@ -194,9 +197,9 @@ diplo config init --path C:\etc\diplo.json --transport pipe
 
 ### Build
 
-```powershell
+``powershell
 .\pipeline.ps1
-```
+``
 
 Options disponibles :
 
@@ -211,7 +214,7 @@ Options disponibles :
 
 ### Structure du projet
 
-```
+``
 Diplo/
 ├── src/
 │   ├── Diplo.Abstractions/     # Interfaces, validation, sécurité, modules mutualisés
@@ -252,7 +255,7 @@ Diplo/
 │   └── Diplo.Volume.Tests/
 ├── pipeline.ps1                # Pipeline de build et déploiement
 └── README.md
-```
+``
 
 ## Aperçu technique
 
@@ -296,10 +299,10 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 
 ### CLI
 
-```powershell
+``powershell
 diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees"
 diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees,ro"
-```
+``
 
 - `src` : répertoire de l'hôte ou chemin vers une image disque
 - `dst` : destination dans le conteneur
@@ -309,9 +312,9 @@ Les sources sont restreintes aux répertoires autorisés par la validation de s�
 
 ### Création d'images disque
 
-```powershell
+``powershell
 diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw]
-```
+``
 
 | Format   | Extension                      | Moteur    | Note                           |
 | -------- | ------------------------------ | --------- | ------------------------------ |
@@ -372,13 +375,13 @@ Les identifiants des registres privés sont stockés côté serveur, chiffrés a
 
 ### CLI
 
-```powershell
+``powershell
 diplo container login myregistry.azurecr.io --username user          # le mot de passe est demandé en mode masqué
 diplo container login myregistry.azurecr.io --username user --password secret
 diplo container logout myregistry.azurecr.io
 diplo container pull myregistry.azurecr.io/team/app:latest           # utilise l'identifiant enregistré
 diplo container pull myregistry.azurecr.io/team/app:latest --user inline:secret   # identifiant explicite (prime sur l'enregistré)
-```
+``
 
 ### GUI
 
@@ -386,7 +389,7 @@ L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de pas
 
 ## Référence CLI
 
-```powershell
+``powershell
 # Statut
 diplo status check
 
@@ -448,7 +451,7 @@ diplo config init [--path <chemin>] [--transport tcp|pipe]
 
 # Version
 diplo version
-```
+``
 
 ### Modules mutualisés
 

@@ -22,7 +22,7 @@ module ComposeModelsTests =
 
     [<Fact>]
     let ``parsePorts handles host:container`` () =
-        let ports = parsePorts [ "8080:80/tcp" ]
+        let ports = parsePorts [ "8080:80/tcp" ] |> fst
         ports |> should haveLength 1
         ports.[0].HostPort |> should equal (Some 8080)
         ports.[0].ContainerPort |> should equal 80
@@ -30,10 +30,29 @@ module ComposeModelsTests =
 
     [<Fact>]
     let ``parsePorts handles container-only`` () =
-        let ports = parsePorts [ "3000" ]
+        let ports = parsePorts [ "3000" ] |> fst
         ports |> should haveLength 1
         ports.[0].HostPort |> should equal None
         ports.[0].ContainerPort |> should equal 3000
+
+    [<Fact>]
+    let ``parsePorts handles ip:host:container`` () =
+        let ports = parsePorts [ "127.0.0.1:8080:80" ] |> fst
+        ports |> should haveLength 1
+        ports.[0].HostPort |> should equal (Some 8080)
+        ports.[0].ContainerPort |> should equal 80
+
+    [<Fact>]
+    let ``parsePorts signale les entrees invalides`` () =
+        let _, rejected = parsePorts [ "8000-8005:80"; "abc:80"; "9090" ]
+        rejected |> should haveLength 2
+
+    [<Fact>]
+    let ``parseVolumes handles windows drive letter`` () =
+        let vols = parseVolumes [ @"C:\data:/app/data" ]
+        vols |> should haveLength 1
+        vols.[0].Source |> should equal @"C:\data"
+        vols.[0].Target |> should equal "/app/data"
 
     [<Fact>]
     let ``parseVolumes handles source:target`` () =
@@ -44,8 +63,8 @@ module ComposeModelsTests =
         vols.[0].ReadOnly |> should equal false
 
     [<Fact>]
-    let ``parseVolumes handles read-only`` () =
-        let vols = parseVolumes [ "/config:/etc/config:ro" ]
+    let ``parseVolumes handles named volume with windows path`` () =
+        let vols = parseVolumes [ @"C:\config:/etc/config:ro" ]
         vols |> should haveLength 1
         vols.[0].ReadOnly |> should equal true
 

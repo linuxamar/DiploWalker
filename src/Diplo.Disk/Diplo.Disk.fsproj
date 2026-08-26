@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -13,8 +13,8 @@
     <Compile Include="ParallelsFs.fs" />
     <Compile Include="HawkyntFs.fs" />
     <Compile Include="FsImage.fs" />
-    <Compile Include="DiskMounter.fs" />
     <Compile Include="MountState.fs" />
+    <Compile Include="DiskMounter.fs" />
   </ItemGroup>
 
   <ItemGroup>

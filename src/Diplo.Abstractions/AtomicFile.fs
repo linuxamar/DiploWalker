@@ -26,10 +26,11 @@ module AtomicFile =
             else
                 Path.Combine(dir, name + "." + Guid.NewGuid().ToString("N") + ".tmp")
 
-        File.WriteAllText(tmp, content)
-
         try
             try
+                // WriteAllText inclus dans la zone protégée : un disque plein ne
+                // doit pas laisser de .tmp orphelin dans le répertoire cible.
+                File.WriteAllText(tmp, content)
                 File.Replace(tmp, path, null)
             with :? FileNotFoundException ->
                 File.Move(tmp, path)

@@ -11,9 +11,12 @@ let installAll () =
     task {
         if not (isWindows ()) then
             printfn "[ERREUR] L'installation ne fonctionne que sous Windows."
+            return 1
         elif not (isAdministrator ()) then
             printfn "[ERREUR] L'installation nécessite les droits administrateur."
-            printfn "  Exécutez: Diplo.Installer.exe install --elevated"
+            printfn "  Relancez la console en tant qu'administrateur, puis réexécutez :"
+            printfn "    Diplo.Installer.exe install"
+            return 1
         else
             let osVersion = getWindowsServerVersion ()
             let osYear = getWindowsServerYear ()
@@ -33,35 +36,50 @@ let installAll () =
             do! downloadCniPlugins ()
             createConfigFiles ()
 
+            let mutable failures = 0
+
             for service in services do
-                do! installWindowsService service
+                let! ok = installWindowsService service
+
+                if not ok then
+                    failures <- failures + 1
 
             printfn ""
             printfn "=== Installation terminée ==="
-            printfn "  Système: Windows Server %s (build %d)" osYear Environment.OSVersion.Version.Build
-            printfn "  Répertoire: %s" installDir
-            printfn "  Services: %d installés" services.Length
-            printfn "  Containerd: %s (isolation process)" downloadContainerdVersion
-            printfn "  Sandbox image: %s" (getSandboxImage ())
-            printfn "  Plugins CNI: Microsoft v%s + Standards v%s" winCniVersion cniPluginsVersion
-            printfn "  Logs: %s" logDir
-            printfn "  Config: %s" configDir
-            printfn ""
-            printfn "  Pour démarrer les services:"
 
-            for (name, _, _) in services do
-                printfn "    sc.exe start \"%s\"" name
+            if failures > 0 then
+                printfn "  [!] %d service(s) NON installé(s) — installation partielle" failures
+                return 1
+            else
+                printfn "  Système: Windows Server %s (build %d)" osYear Environment.OSVersion.Version.Build
+                printfn "  Répertoire: %s" installDir
+                printfn "  Services: %d installés" services.Length
+                printfn "  Containerd: %s (isolation process)" downloadContainerdVersion
+                printfn "  Sandbox image: %s" (getSandboxImage ())
+                printfn "  Plugins CNI: Microsoft v%s + Standards v%s" winCniVersion cniPluginsVersion
+                printfn "  Logs: %s" logDir
+                printfn "  Config: %s" configDir
+                printfn ""
+                printfn "  Pour démarrer les services:"
+
+                for (name, _, _) in services do
+                    printfn "    sc.exe start \"%s\"" name
+
+                return 0
     }
 
 let uninstallAll () =
     task {
         if not (isWindows ()) then
             printfn "[ERREUR] La désinstallation ne fonctionne que sous Windows."
+            return 1
         elif not (isAdministrator ()) then
             printfn "[ERREUR] La désinstallation nécessite les droits administrateur."
+            return 1
         else
             for (serviceName, _, _) in services do
-                do! removeWindowsService serviceName
+                let! _ok = removeWindowsService serviceName
+                ()
 
             let tokenPath = Diplo.Abstractions.AuthToken.authTokenPath
 
@@ -90,6 +108,7 @@ let uninstallAll () =
             printfn "=== Désinstallation des services terminée ==="
             printfn "  Les fichiers dans %s n'ont pas été supprimés." installDir
             printfn "  Supprimez manuellement si nécessaire."
+            return 0
     }
 
 let statusAll () =
@@ -113,11 +132,11 @@ let main argv =
     else
         match argv with
         | [| "install" |] ->
+            // Propager le code retour : un déploiement partiellement raté ne
+            // doit pas être indistinguable d'un succès pour l'outillage.
             installAll () |> Async.AwaitTask |> Async.RunSynchronously
-            0
         | [| "uninstall" |] ->
             uninstallAll () |> Async.AwaitTask |> Async.RunSynchronously
-            0
         | [| "status" |] ->
             statusAll ()
             0

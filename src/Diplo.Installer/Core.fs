@@ -24,9 +24,9 @@ let containerdRootDir = Path.Combine(containerdDir, "root")
 let containerdStateDir = Path.Combine(containerdDir, "state")
 
 let services =
-    [| "Diplo.Container", "Diplo.Container Service", 5001
-       "Diplo.Volume", "Diplo.Volume Service", 5002
-       "Diplo.Network", "Diplo.Network Service", 5003 |]
+    [| "Diplo.Container", "Diplo.Container Service", DiploPorts.Container
+       "Diplo.Volume", "Diplo.Volume Service", DiploPorts.Volume
+       "Diplo.Network", "Diplo.Network Service", DiploPorts.Network |]
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────
 
@@ -327,11 +327,19 @@ let installWindowsService (serviceName: string, displayName: string, port: int) 
         if not (File.Exists(exePath)) then
             printfn "  [!] EXE non trouvé: %s" exePath
             printfn "  [!] Assurez-vous que le build a copié l'exécutable dans %s" (Path.GetDirectoryName(exePath))
+
+            // Un service absent n'est pas un succès : l'appelant doit pouvoir
+            // distinguer une installation partielle d'une réussite.
+            return false
         else
+            // Guillemets INTERNES obligatoires : sans eux, SCM tente de lancer
+            // « C:\Program » pour un chemin contenant des espaces.
+            let quotedExe = sprintf "\"%s\"" exePath
+
             let scArgs =
                 [ "create"
                   serviceName
-                  sprintf "binPath= %s" exePath
+                  sprintf "binPath= %s" quotedExe
                   "start= auto"
                   sprintf "DisplayName= %s" displayName ]
 
@@ -339,24 +347,46 @@ let installWindowsService (serviceName: string, displayName: string, port: int) 
 
             if exitCode = 0 then
                 printfn "  [✓] Service %s créé" serviceName
+                return true
             else
                 printfn "  [✗] Échec de la création du service %s (code %d)" serviceName exitCode
+                return false
     }
 
 let removeWindowsService (serviceName: string) =
     task {
         printfn "=== Suppression du service %s ===" serviceName
-        let exitCode = runCommandWithArgs "sc.exe" [ "stop"; serviceName ]
 
-        if exitCode = 0 then
-            printfn "  [+] Service %s arrêté" serviceName
+        let stopResult = runCommandWithArgs "sc.exe" [ "stop"; serviceName ]
+
+        if stopResult = 0 then
+            printfn "  [+] Arrêt du service %s demandé" serviceName
+
+            // Attendre l'état STOPPED : un `sc delete` immédiat échoue en 1072
+            // tant que le service est RUNNING/STOP_PENDING.
+            try
+                use svc =
+                    new System.ServiceProcess.ServiceController(serviceName)
+
+                let mutable waited = System.TimeSpan.Zero
+
+                while svc.Status <> System.ServiceProcess.ServiceControllerStatus.Stopped
+                      && waited < System.TimeSpan.FromSeconds(30.0) do
+                    do! System.Threading.Tasks.Task.Delay(500)
+                    svc.Refresh()
+                    waited <- waited + System.TimeSpan.FromMilliseconds(500.0)
+            with ex ->
+                printfn "  [!] Attente de l'arrêt du service impossible : %s" ex.Message
 
         let exitCode = runCommandWithArgs "sc.exe" [ "delete"; serviceName ]
 
         if exitCode = 0 then
             printfn "  [✓] Service %s supprimé" serviceName
+            return true
         else
             printfn "  [!] Code retour %d (service peut-être déjà supprimé)" exitCode
+
+            return (exitCode = 1072 || exitCode = 1060) // déjà supprimé / inexistant : OK
     }
 
 // ─── Configuration containerd ─────────────────────────────────────────────
@@ -545,6 +575,33 @@ let createConfigFiles () =
     if not (File.Exists(tokenPath)) then
         let token = Diplo.Abstractions.AuthToken.generateToken ()
         Diplo.Abstractions.AuthToken.saveToken token
+
+        // saveToken n'accorde FullControl qu'à l'utilisateur COURANT (l'admin
+        // qui lance l'installeur) : or les services tournent en LocalSystem.
+        // Sans cette ouverture, les lectures du token échouent en AccessDenied
+        // juste après l'installation.
+        try
+            let fileInfo = FileInfo(tokenPath)
+            let acl = fileInfo.GetAccessControl()
+
+            let grantRead (account: string) =
+                try
+                    acl.AddAccessRule(
+                        System.Security.AccessControl.FileSystemAccessRule(
+                            account,
+                            System.Security.AccessControl.FileSystemRights.Read,
+                            System.Security.AccessControl.AccessControlType.Allow
+                        )
+                    )
+                with ex ->
+                    printfn "  [!] Octroi de lecture à '%s' impossible : %s" account ex.Message
+
+            grantRead "SYSTEM"
+            grantRead "Administrators"
+            fileInfo.SetAccessControl(acl)
+        with ex ->
+            printfn "  [!] Ajustement ACL du token impossible : %s" ex.Message
+
         printfn "  [+] auth-token.json (token gRPC généré)"
     else
         printfn "  [=] auth-token.json existe déjà, ignoré"

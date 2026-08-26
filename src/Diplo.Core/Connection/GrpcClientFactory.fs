@@ -16,14 +16,16 @@ open Diplo.Abstractions
 [<RequireQualifiedAccess>]
 module GrpcClientFactory =
 
+    // Ports par défaut selon la configuration de build (Debug 5001-5003,
+    // Release 6001-6003) — source unique : DiploPorts.
     [<Literal>]
-    let private DefaultContainerPort = 5001
+    let private DefaultContainerPort = DiploPorts.Container
 
     [<Literal>]
-    let private DefaultVolumePort = 5002
+    let private DefaultVolumePort = DiploPorts.Volume
 
     [<Literal>]
-    let private DefaultNetworkPort = 5003
+    let private DefaultNetworkPort = DiploPorts.Network
 
     let private isPipeAddress (uri: Uri) =
         String.Equals(uri.Host, "pipe", StringComparison.OrdinalIgnoreCase)
@@ -86,6 +88,10 @@ module GrpcClientFactory =
         GrpcChannel.ForAddress(address, options)
 
     let private create (address: string) =
+        // INVARIANT DE SÉCURITÉ : validateGrpcAddress restreint l'hôte à
+        // localhost/pipe. Les callCredentials partent en clair sur un canal
+        // insecure (UnsafeUseInsecureChannelCallCredentials) — tout
+        // assouplissement de la validation exposerait le token sur le réseau.
         SecurityValidation.validateGrpcAddress address
         let uri = Uri(address)
 

@@ -27,6 +27,9 @@ let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
     let useTcp = config.GetValue<bool>("ServiceSettings:UseTcp")
     let usePipes = config.GetValue<bool>("ServiceSettings:UseNamedPipes")
 
+    if not useTcp && not usePipes then
+        failwith "Configuration invalide : ni ServiceSettings:UseTcp ni ServiceSettings:UseNamedPipes sont activés"
+
     if useTcp then
         Log.Information("Écoute TCP sur localhost:{Port}", grpcPort)
 
@@ -46,12 +49,16 @@ let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
     // (sur Windows, les règles Deny priment sur les règles Allow).
     opts.CurrentUserOnly <- false
     let pipeSecurity = PipeSecurity()
-    let currentUser = WindowsIdentity.GetCurrent()
 
-    let allowRule =
-        PipeAccessRule(currentUser.User, PipeAccessRights.FullControl, AccessControlType.Allow)
+    // WindowsIdentity détient un handle de token : à disposer.
+    do
+        use currentUser = WindowsIdentity.GetCurrent()
 
-    pipeSecurity.AddAccessRule(allowRule)
+        let allowRule =
+            PipeAccessRule(currentUser.User, PipeAccessRights.FullControl, AccessControlType.Allow)
+
+        pipeSecurity.AddAccessRule(allowRule)
+
     opts.PipeSecurity <- pipeSecurity
 
 let runGrpcHost
@@ -80,6 +87,20 @@ let runGrpcHost
     try
         Log.Information("Démarrage du service {ServiceName}", serviceName)
         let builder = WebApplication.CreateBuilder(args)
+
+        // Environnement par défaut aligné sur la configuration de build :
+        // sans lui, `dotnet run` démarre en Production et chargerait
+        // appsettings.json (ports Release) même en Debug — incohérent avec
+        // les clients compilés en Debug (5001-5003).
+#if DEBUG
+        if isNull (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"))
+           && isNull (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")) then
+            builder.Environment.EnvironmentName <- "Development"
+#else
+        if isNull (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"))
+           && isNull (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")) then
+            builder.Environment.EnvironmentName <- "Production"
+#endif
 
         builder.Services.AddWindowsService(fun opts -> opts.ServiceName <- serviceName)
         |> ignore

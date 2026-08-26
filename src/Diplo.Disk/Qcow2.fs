@@ -143,6 +143,12 @@ module Qcow2 =
         let refcountTableOffset = be64 buf 48
         let refcountTableClusters = be32 buf 56
         let refcountOrder = if version = 3 then be32 buf 96 else 4
+
+        // 1 <<< 36 masquerait le décalage à 36∧31=4 et « accepterait » une
+        // largeur fantôme : refuser explicitement toute valeur autre que 4.
+        if refcountOrder <> 4 then
+            failwithf "refcount_order %d non pris en charge (seul 4, soit 16 bits, l'est)" refcountOrder
+
         let refcountBits = 1 <<< refcountOrder
 
         if refcountBits <> 16 then
@@ -339,7 +345,12 @@ module Qcow2 =
 
             let desc = readUInt64At s (l2Offset + int64 l2Index * 8L)
 
-            if desc = 0L || desc &&& zeroReadFlag <> 0L || desc &&& compressedFlag <> 0L then
+            if desc &&& compressedFlag <> 0L then
+                // Réécriture d'un cluster compressé : l'ancien cluster compressé
+                // n'est pas libérable proprement ici (encodage hôte variable) ;
+                // allouer sans libération fuirait de l'espace à chaque écriture.
+                failwith "Écriture dans un cluster compressé non prise en charge"
+            elif desc = 0L || desc &&& zeroReadFlag <> 0L then
                 let newCluster = findFreeCluster s h
                 let zero = Array.zeroCreate<byte> h.ClusterSize
                 s.Position <- newCluster * int64 h.ClusterSize

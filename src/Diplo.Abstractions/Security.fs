@@ -1,4 +1,4 @@
-namespace Diplo.Abstractions
+﻿namespace Diplo.Abstractions
 
 open System
 open System.IO
@@ -10,6 +10,20 @@ module SecurityValidation =
 
     /// Longueur maximale pour les identifiants et noms.
     let private maxLength = 128
+
+    /// Tronque et neutralise une valeur utilisateur avant de l'interpoler dans
+    /// un message d'erreur : pas de CR/LF (falsification de logs) ni de valeur
+    /// géante dans les réponses gRPC ou les journaux.
+    let private sanitizeForMessage (value: string) =
+        if isNull value then
+            ""
+        else
+            let cleaned = value.Replace('\r', ' ').Replace('\n', ' ')
+
+            if cleaned.Length <= 64 then
+                cleaned
+            else
+                cleaned.Substring(0, 64) + "…"
 
     /// Regex pour les identifiants (IDs de conteneur, réseau, volume) — hex, tirets, underscores.
     let private idPattern =
@@ -70,7 +84,7 @@ module SecurityValidation =
         if not (idPattern.IsMatch(value)) then
             raise (
                 RpcException(
-                    Status(StatusCode.InvalidArgument, sprintf "%s contient des caractères interdits: '%s'" label value)
+                    Status(StatusCode.InvalidArgument, sprintf "%s contient des caractères interdits: '%s'" label (sanitizeForMessage value))
                 )
             )
 
@@ -89,7 +103,7 @@ module SecurityValidation =
         if not (namePattern.IsMatch(value)) then
             raise (
                 RpcException(
-                    Status(StatusCode.InvalidArgument, sprintf "%s contient des caractères interdits: '%s'" label value)
+                    Status(StatusCode.InvalidArgument, sprintf "%s contient des caractères interdits: '%s'" label (sanitizeForMessage value))
                 )
             )
 
@@ -106,19 +120,20 @@ module SecurityValidation =
                 RpcException(
                     Status(
                         StatusCode.InvalidArgument,
-                        sprintf "Le nom de l'image contient des caractères interdits: '%s'" value
+                        sprintf "Le nom de l'image contient des caractères interdits: '%s'" (sanitizeForMessage value)
                     )
                 )
             )
 
     /// Valide qu'un octet IP est dans la plage 0-255.
+    /// NumberStyles.None rejette les formes non canoniques (« +1 », « 1 »).
     let private validateOctet (value: string) (label: string) =
-        match Int32.TryParse(value) with
+        match Int32.TryParse(value, Globalization.NumberStyles.None, Globalization.CultureInfo.InvariantCulture) with
         | true, n when n >= 0 && n <= 255 -> ()
         | _ ->
             raise (
                 RpcException(
-                    Status(StatusCode.InvalidArgument, sprintf "%s contient un octet invalide: '%s'" label value)
+                    Status(StatusCode.InvalidArgument, sprintf "%s contient un octet invalide: '%s'" label (sanitizeForMessage value))
                 )
             )
 
@@ -189,12 +204,18 @@ module SecurityValidation =
 
     /// Vérifie qu'une clé et une valeur de label sont valides.
     let validateLabel (key: string) (value: string) =
+        if String.IsNullOrWhiteSpace(key) then
+            raise (RpcException(Status(StatusCode.InvalidArgument, "La clé du label ne peut pas être vide")))
+
+        if String.IsNullOrWhiteSpace(value) then
+            raise (RpcException(Status(StatusCode.InvalidArgument, "La valeur du label ne peut pas être vide")))
+
         if not (labelPattern.IsMatch(key)) then
             raise (
                 RpcException(
                     Status(
                         StatusCode.InvalidArgument,
-                        sprintf "La clé du label contient des caractères interdits: '%s'" key
+                        sprintf "La clé du label contient des caractères interdits: '%s'" (sanitizeForMessage key)
                     )
                 )
             )
@@ -204,7 +225,7 @@ module SecurityValidation =
                 RpcException(
                     Status(
                         StatusCode.InvalidArgument,
-                        sprintf "La valeur du label contient des caractères interdits: '%s'" value
+                        sprintf "La valeur du label contient des caractères interdits: '%s'" (sanitizeForMessage value)
                     )
                 )
             )
@@ -229,32 +250,40 @@ module SecurityValidation =
                 RpcException(
                     Status(
                         StatusCode.InvalidArgument,
-                        sprintf "L'identifiant du conteneur contient des caractères interdits: '%s'" value
+                        sprintf "L'identifiant du conteneur contient des caractères interdits: '%s'" (sanitizeForMessage value)
                     )
                 )
             )
 
     /// Vérifie qu'un chemin de plugin CNI est dans les répertoires autorisés.
-    /// Résout les symlinks et retourne le chemin résolu pour éliminer la fenêtre TOCTOU.
+    /// Résout la chaîne complète de symlinks/junctions (ResolveLinkTarget) avant
+    /// la comparaison de préfixe : FullName seul ne suit pas les reparse points.
     let validateCniPluginPath (pluginPath: string) : string =
         if String.IsNullOrWhiteSpace(pluginPath) then
             raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin du plugin CNI ne peut pas être vide")))
 
-        let resolvedPath =
+        let resolveFinal (path: string) =
             try
-                let fi = new FileInfo(pluginPath)
+                let fi = new FileInfo(path)
 
                 if fi.Exists then
-                    fi.FullName
+                    // Suit toute la chaîne de liens jusqu'à la cible finale
+                    let target = fi.ResolveLinkTarget(true)
+
+                    if not (isNull target) then target.FullName else fi.FullName
                 else
-                    let di = new DirectoryInfo(pluginPath)
+                    let di = new DirectoryInfo(path)
 
                     if di.Exists then
-                        di.FullName
+                        let target = di.ResolveLinkTarget(true)
+
+                        if not (isNull target) then target.FullName else di.FullName
                     else
-                        Path.GetFullPath(pluginPath)
+                        Path.GetFullPath(path)
             with _ ->
-                Path.GetFullPath(pluginPath)
+                Path.GetFullPath(path)
+
+        let resolvedPath = resolveFinal pluginPath
 
         let isAllowed =
             allowedCniPluginDirs
@@ -316,65 +345,72 @@ module SecurityValidation =
                 )
             )
 
-        if command.Length > 0 && not (String.IsNullOrWhiteSpace(command.[0])) then
-            if command.[0].Contains("/") || command.[0].Contains("\\") then
+        // Tout élément vide ou blanc est rejeté : sinon il échapperait à toutes
+        // les vérifications ci-dessous et permettrait de décaler l'exécutable.
+        if Array.exists (fun a -> String.IsNullOrWhiteSpace(a)) command then
+            raise (
+                RpcException(
+                    Status(StatusCode.InvalidArgument, "La commande ne peut pas contenir d'argument vide")
+                )
+            )
+
+        if command.[0].Contains("/") || command.[0].Contains("\\") then
+            raise (
+                RpcException(
+                    Status(
+                        StatusCode.InvalidArgument,
+                        sprintf "L'exécutable ne doit pas contenir de chemin: '%s'" (sanitizeForMessage command.[0])
+                    )
+                )
+            )
+
+        for arg in command do
+            if arg.Length > 1024 then
                 raise (
                     RpcException(
-                        Status(
-                            StatusCode.InvalidArgument,
-                            sprintf "L'exécutable ne doit pas contenir de chemin: '%s'" command.[0]
-                        )
+                        Status(StatusCode.InvalidArgument, "Un argument de commande dépasse 1024 caractères")
                     )
                 )
 
-        for arg in command do
-            if String.IsNullOrWhiteSpace(arg) |> not then
-                if arg.Length > 1024 then
+            let upperArg = arg.ToUpperInvariant()
+
+            for pattern in dangerousEnvPatterns do
+                if upperArg.Contains(pattern) then
                     raise (
                         RpcException(
-                            Status(StatusCode.InvalidArgument, "Un argument de commande dépasse 1024 caractères")
+                            Status(
+                                StatusCode.InvalidArgument,
+                                sprintf
+                                    "L'argument de commande contient une variable d'environnement interdite: '%s'"
+                                    pattern
+                            )
                         )
                     )
 
-                let upperArg = arg.ToUpperInvariant()
-
-                for pattern in dangerousEnvPatterns do
-                    if upperArg.Contains(pattern) then
-                        raise (
-                            RpcException(
-                                Status(
-                                    StatusCode.InvalidArgument,
-                                    sprintf
-                                        "L'argument de commande contient une variable d'environnement interdite: '%s'"
-                                        pattern
-                                )
+            for prefix in dangerousPrefixes do
+                if arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
+                    raise (
+                        RpcException(
+                            Status(
+                                StatusCode.InvalidArgument,
+                                sprintf "L'argument de commande contient un préfixe interdit: '%s'" (sanitizeForMessage arg)
                             )
                         )
+                    )
 
-                for prefix in dangerousPrefixes do
-                    if arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
-                        raise (
-                            RpcException(
-                                Status(
-                                    StatusCode.InvalidArgument,
-                                    sprintf "L'argument de commande contient un préfixe interdit: '%s'" arg
-                                )
+            for c in arg do
+                if Array.exists (fun dc -> dc = c) dangerousChars then
+                    raise (
+                        RpcException(
+                            Status(
+                                StatusCode.InvalidArgument,
+                                sprintf
+                                    "L'argument de commande contient un caractère interdit: '%c' dans '%s'"
+                                    c
+                                    (sanitizeForMessage arg)
                             )
                         )
-
-                for c in arg do
-                    if Array.exists (fun dc -> dc = c) dangerousChars then
-                        raise (
-                            RpcException(
-                                Status(
-                                    StatusCode.InvalidArgument,
-                                    sprintf
-                                        "L'argument de commande contient un caractère interdit: '%c' dans '%s'"
-                                        c
-                                        arg
-                                )
-                            )
-                        )
+                    )
 
     /// Vérifie qu'un chemin de fichier cible dans un conteneur est sûr.
     /// S'utilise quand le chemin est intégré dans une commande interne (ex. redirection
@@ -405,7 +441,7 @@ module SecurityValidation =
                     RpcException(
                         Status(
                             StatusCode.InvalidArgument,
-                            sprintf "%s contient un caractère interdit: '%c' dans '%s'" label c path
+                            sprintf "%s contient un caractère interdit: '%c' dans '%s'" label c (sanitizeForMessage path)
                         )
                     )
                 )
@@ -536,6 +572,9 @@ module SecurityValidation =
     let private allowedYamlExtensions = set [ ".yaml"; ".yml" ]
 
     /// Valide le chemin d'un fichier de configuration (anti-traversée + extension + caractères nuls).
+    /// Les chemins UNC sont rejetés : leur lecture déclenche une négociation
+    /// NTLM vers un serveur contrôlable par l'entrée (fuite d'identifiants).
+    /// Seuls les chemins locaux absolus sont acceptés.
     let validateFilePath (path: string) (label: string) =
         if String.IsNullOrWhiteSpace(path) then
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s ne peut pas être vide" label)))
@@ -545,13 +584,33 @@ module SecurityValidation =
                 RpcException(
                     Status(
                         StatusCode.InvalidArgument,
-                        sprintf "%s contient une traversée de répertoire interdite: '%s'" label path
+                        sprintf "%s contient une traversée de répertoire interdite: '%s'" label (sanitizeForMessage path)
                     )
                 )
             )
 
         if path.Contains("\0") then
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul" label)))
+
+        if path.StartsWith(@"\\", StringComparison.Ordinal) || path.StartsWith("//", StringComparison.Ordinal) then
+            raise (
+                RpcException(
+                    Status(
+                        StatusCode.InvalidArgument,
+                        sprintf "%s ne peut pas être un chemin réseau (UNC): '%s'" label (sanitizeForMessage path)
+                    )
+                )
+            )
+
+        if not (Path.IsPathRooted(path)) then
+            raise (
+                RpcException(
+                    Status(
+                        StatusCode.InvalidArgument,
+                        sprintf "%s doit être un chemin absolu: '%s'" label (sanitizeForMessage path)
+                    )
+                )
+            )
 
         let ext = Path.GetExtension(path)
 
@@ -599,7 +658,7 @@ module SecurityValidation =
         if path.Contains("\0") then
             raise (
                 RpcException(
-                    Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul: '%s'" label path)
+                    Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul: '%s'" label (sanitizeForMessage path))
                 )
             )
 
@@ -655,7 +714,7 @@ module SecurityValidation =
                     RpcException(
                         Status(
                             StatusCode.InvalidArgument,
-                            sprintf "%s contient un caractère interdit: '%c' dans '%s'" label c path
+                            sprintf "%s contient un caractère interdit: '%c' dans '%s'" label c (sanitizeForMessage path)
                         )
                     )
                 )

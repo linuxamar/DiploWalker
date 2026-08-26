@@ -93,19 +93,23 @@ module DiskFormatTests =
         let p = tempFile ()
 
         try
+            // Signature réelle VirtualBox : 7F 10 DA BE (LE) à l'offset 0x40.
             let header = Array.zeroCreate<byte> 72
-            [| 0x7Euy; 0x10uy; 0x10uy; 0x10uy; 0x4Duy; 0x61uy; 0x63uy; 0x20uy |].CopyTo(header, 0)
+            [| 0x7Fuy; 0x10uy; 0xDAuy; 0xBEuy |].CopyTo(header, 0x40)
             writeBytes p header
             DiskFormat.detect p |> should equal DiskFormat.Vdi
         finally
             File.Delete p
 
     [<Fact>]
-    let ``detect reconnait une image dmg`` () =
+    let ``detect reconnait une image dmg par son trailer koly`` () =
         let p = tempFile ()
 
         try
-            writeBytes p [| 0x78uy; 0x6Buy; 0x6Fuy; 0x6Cuy |]
+            // Magic UDIF « koly » dans le TRAILER de 512 octets.
+            let foot = Array.zeroCreate<byte> 512
+            Encoding.ASCII.GetBytes("koly").CopyTo(foot, 0)
+            writeBytes p foot
             DiskFormat.detect p |> should equal DiskFormat.Dmg
         finally
             File.Delete p
@@ -115,7 +119,8 @@ module DiskFormatTests =
         let p = tempFile ()
 
         try
-            let header = [| 0x70uy; 0x61uy; 0x72uy; 0x61uy; 0x0Duy; 0x0Auy; 0x1Auy; 0x0Auy |]
+            // Magic aligné sur Parallels.readHeader (LE 0x30617261 → « ara0 »).
+            let header = [| 0x61uy; 0x72uy; 0x61uy; 0x30uy |]
             writeBytes p header
             DiskFormat.detect p |> should equal DiskFormat.Parallels
         finally

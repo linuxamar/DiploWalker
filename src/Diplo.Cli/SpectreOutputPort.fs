@@ -27,6 +27,10 @@ type SpectreOutputPort() =
 
             for item in items do
                 let cells = selector item
-                table.AddRow(cells) |> ignore
+
+                // Échapper les cellules : une donnée serveur contenant '[' ou ']'
+                // lèverait sinon une MarkupSyntaxException.
+                table.AddRow(cells |> Array.map Markup.Escape)
+                |> ignore
 
             AnsiConsole.Write(table)

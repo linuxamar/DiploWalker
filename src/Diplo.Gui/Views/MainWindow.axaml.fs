@@ -25,8 +25,12 @@ type MainWindow() as this =
             with ex ->
                 Serilog.Log.Debug(ex, "Chargement de l'assembly {Dll} ignoré", Path.GetFileName(dll))
 
-        use stream = assembly.GetManifestResourceStream("Diplo.Gui.Views.MainWindow.axaml")
-        AvaloniaRuntimeXamlLoader.Load(stream, assembly, this) |> ignore
+        let mainStream = assembly.GetManifestResourceStream("Diplo.Gui.Views.MainWindow.axaml")
+
+        if isNull mainStream then
+            failwith "Ressource XAML introuvable : Diplo.Gui.Views.MainWindow.axaml"
+
+        AvaloniaRuntimeXamlLoader.Load(mainStream, assembly, this) |> ignore
         use iconStream = assembly.GetManifestResourceStream("Diplo.Gui.Diplo.ico")
 
         if not (isNull iconStream) then
@@ -36,7 +40,15 @@ type MainWindow() as this =
         viewModel.ComposeTab.SetStorageProvider(this.StorageProvider)
         this.setUpComposeEditor ()
         let aboutItem = this.FindControl<MenuItem>("AboutMenuItem")
-        aboutItem.Command <- Diplo.Gui.ViewModels.RelayCommand(Action(fun () -> this.OnAbout(null, null)))
+
+        if not (isNull aboutItem) then
+            aboutItem.Command <- Diplo.Gui.ViewModels.RelayCommand(Action(fun () -> this.OnAbout(null, null)))
+        else
+            failwith "Contrôle introuvable dans le XAML : AboutMenuItem"
+
+        // Disposer le ViewModel (clients gRPC, CTS de suivi...) à la fermeture :
+        // sinon les flux « suivre » continuent et les canaux restent ouverts.
+        this.Closed.Add(fun _ -> (viewModel :> IDisposable).Dispose())
 
     member private this.setUpComposeEditor() =
         let host = this.FindControl<Panel>("ComposeEditorHost")
