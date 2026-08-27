@@ -441,3 +441,144 @@ module SecurityValidationTests =
     let ``validateImage trop long lève une exception`` () =
         let longImage = String('a', 513)
         (fun () -> validateImage longImage) |> should throw typeof<Exception>
+
+    // ── validateFilePath (fichiers de configuration compose) ────────
+
+    [<Fact>]
+    let ``validateFilePath accepte un chemin absolu yaml`` () =
+        validateFilePath @"C:\stack\docker-compose.yaml" "Le fichier"
+
+    [<Fact>]
+    let ``validateFilePath accepte l'extension yml`` () =
+        validateFilePath @"C:\stack\compose.yml" "Le fichier"
+
+    [<Fact>]
+    let ``validateFilePath rejette un chemin relatif`` () =
+        (fun () -> validateFilePath "compose.yaml" "Le fichier") |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateFilePath rejette une traversée ..`` () =
+        (fun () -> validateFilePath @"C:\stack\..\secret.yaml" "Le fichier")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateFilePath rejette un chemin UNC`` () =
+        (fun () -> validateFilePath @"\\srv\share\compose.yaml" "Le fichier")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateFilePath rejette un chemin réseau en slashes`` () =
+        (fun () -> validateFilePath "//srv/share/compose.yml" "Le fichier")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateFilePath rejette une extension non yaml`` () =
+        (fun () -> validateFilePath @"C:\stack\config.json" "Le fichier")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateFilePath rejette un caractère nul`` () =
+        (fun () -> validateFilePath "C:\\stack\\a\u0000.yaml" "Le fichier")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateFilePath rejette un chemin vide`` () =
+        (fun () -> validateFilePath "" "Le fichier") |> should throw typeof<RpcException>
+
+    // ── validateContainerPath (chemins dans les commandes internes) ─
+
+    [<Fact>]
+    let ``validateContainerPath accepte un chemin POSIX simple`` () =
+        validateContainerPath "/app/data.txt" "La destination"
+
+    [<Fact>]
+    let ``validateContainerPath accepte un chemin Windows simple`` () =
+        validateContainerPath @"C:\data\out.log" "La destination"
+
+    [<Fact>]
+    let ``validateContainerPath rejette une traversée ..`` () =
+        (fun () -> validateContainerPath "/app/../etc/passwd" "La destination")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateContainerPath rejette un point-virgule`` () =
+        (fun () -> validateContainerPath "/app/a;rm" "La destination") |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateContainerPath rejette une redirection >`` () =
+        (fun () -> validateContainerPath "/app/x>y" "La destination") |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateContainerPath rejette un caractère nul`` () =
+        (fun () -> validateContainerPath "/app/a\u0000b" "La destination")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateContainerPath rejette un chemin trop long`` () =
+        let long = String('a', 1025)
+        (fun () -> validateContainerPath long "La destination") |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateContainerPath rejette un chemin vide`` () =
+        (fun () -> validateContainerPath "" "La destination") |> should throw typeof<RpcException>
+
+    // ── validateNetnsPath (namespaces réseau pour plugins CNI) ──────
+
+    [<Fact>]
+    let ``validateNetnsPath accepte un chemin /proc standard`` () =
+        validateNetnsPath "/proc/1234/ns/net" "Le netns"
+
+    [<Fact>]
+    let ``validateNetnsPath rejette une traversée ..`` () =
+        (fun () -> validateNetnsPath "/proc/../etc" "Le netns") |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateNetnsPath rejette une substitution de commande $`` () =
+        (fun () -> validateNetnsPath "/proc/$(id)/ns/net" "Le netns") |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateNetnsPath rejette un backtick`` () =
+        (fun () -> validateNetnsPath "/proc/`id`/ns/net" "Le netns") |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateNetnsPath rejette un chemin vide`` () =
+        (fun () -> validateNetnsPath "" "Le netns") |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``validateNetnsPath rejette un chemin trop long`` () =
+        let long = String('p', 1025)
+        (fun () -> validateNetnsPath long "Le netns") |> should throw typeof<RpcException>
+
+    // ── addAllowedVolumeDir (liste blanche dynamique des volumes) ───
+    //
+    // La liste est globale et additive : on utilise des répertoires temporaires
+    // uniques par exécution, jamais retirés (effet résiduel inoffensif).
+
+    [<Fact>]
+    let ``addAllowedVolumeDir autorise un nouveau répertoire de base`` () =
+        let unique = "diplo-voldir-" + Guid.NewGuid().ToString("N")
+        let candidate = IO.Path.Combine(IO.Path.GetPathRoot(IO.Path.GetTempPath()), unique)
+        let other =
+            IO.Path.Combine(IO.Path.GetPathRoot(IO.Path.GetTempPath()), "diplo-other-" + Guid.NewGuid().ToString("N"))
+
+        try
+            // Avant ajout : rejeté (hors des bases par défaut).
+            (fun () -> validateVolumePath (IO.Path.Combine(candidate, "sub")) "Le chemin")
+            |> should throw typeof<RpcException>
+
+            addAllowedVolumeDir candidate
+
+            // Après ajout : accepté, y compris en sous-répertoire.
+            validateVolumePath (IO.Path.Combine(candidate, "sub")) "Le chemin"
+            validateVolumePath (IO.Path.Combine(candidate, "sub", "deeper")) "Le chemin"
+
+            // Un autre répertoire reste rejeté.
+            (fun () -> validateVolumePath (IO.Path.Combine(other, "x")) "Le chemin")
+            |> should throw typeof<RpcException>
+        finally
+            try
+                IO.Directory.Delete(candidate, true)
+            with _ -> ()
+            try
+                IO.Directory.Delete(other, true)
+            with _ -> ()

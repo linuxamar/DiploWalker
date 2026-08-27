@@ -278,7 +278,8 @@ type VolumeTabViewModel(outputPort: IOutputPort) as this =
                         // Travail lourd (parcours récursif, écriture de Go) :
                         // déporté hors du thread UI sinon l'interface gèle.
                         let! result = System.Threading.Tasks.Task.Run(fun () ->
-                            FsImage.create this.ImageSourceDir this.ImageDestPath format)
+                            FsImage.create this.ImageSourceDir this.ImageDestPath format
+                            |> Result.defaultWith failwith)
 
                         let size = System.IO.FileInfo(result).Length
                         outputPort.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))

@@ -128,42 +128,38 @@ module NetworkConfigTests =
     let ``findAvailableSubnet retourne le premier candidat non utilise`` () =
         let candidates = [ "172.18.0.0/16"; "172.19.0.0/16"; "172.20.0.0/16" ]
         let used = Set.empty
-        let result = findAvailableSubnet candidates used
-        result |> should equal "172.18.0.0/16"
+        findAvailableSubnet candidates used |> Result.defaultWith failwith |> should equal "172.18.0.0/16"
 
     [<Fact>]
     let ``findAvailableSubnet saute les prefixes utilises`` () =
         let candidates = [ "172.18.0.0/16"; "172.19.0.0/16"; "172.20.0.0/16" ]
         let used = Set.ofList [ "172.18.1.5" ]
-        let result = findAvailableSubnet candidates used
-        result |> should equal "172.19.0.0/16"
+        findAvailableSubnet candidates used |> Result.defaultWith failwith |> should equal "172.19.0.0/16"
 
     [<Fact>]
     let ``findAvailableSubnet saute tous les prefixes utilises et prend le premier`` () =
         let candidates = [ "172.18.0.0/16"; "172.19.0.0/16" ]
         let used = Set.ofList [ "172.18.1.5"; "172.19.2.1" ]
-        let result = findAvailableSubnet candidates used
-        result |> should equal "172.18.0.0/16"
+        findAvailableSubnet candidates used |> Result.defaultWith failwith |> should equal "172.18.0.0/16"
 
     [<Fact>]
     let ``findAvailableSubnet avec une seule candidate retourne cette candidate`` () =
         let candidates = [ "10.244.0.0/16" ]
-        let result = findAvailableSubnet candidates Set.empty
-        result |> should equal "10.244.0.0/16"
+        findAvailableSubnet candidates Set.empty |> Result.defaultWith failwith |> should equal "10.244.0.0/16"
 
     // ─── deriveGateway ───────────────────────────────────────────────────
 
     [<Fact>]
     let ``deriveGateway retourne .1 comme passerelle`` () =
-        deriveGateway "172.20.0.0/16" |> should equal "172.20.0.1"
+        deriveGateway "172.20.0.0/16" |> Result.defaultWith failwith |> should equal "172.20.0.1"
 
     [<Fact>]
     let ``deriveGateway fonctionne avec un sous-reseau /24`` () =
-        deriveGateway "10.0.0.0/24" |> should equal "10.0.0.1"
+        deriveGateway "10.0.0.0/24" |> Result.defaultWith failwith |> should equal "10.0.0.1"
 
     [<Fact>]
     let ``deriveGateway fonctionne avec 10.x`` () =
-        deriveGateway "10.100.0.0/16" |> should equal "10.100.0.1"
+        deriveGateway "10.100.0.0/16" |> Result.defaultWith failwith |> should equal "10.100.0.1"
 
     // ─── resolveSubnet ──────────────────────────────────────────────────
 
@@ -174,8 +170,7 @@ module NetworkConfigTests =
                 Subnet = "192.168.1.0/24"
                 AutoDetect = true }
 
-        let result = resolveSubnet config Set.empty
-        result |> should equal "192.168.1.0/24"
+        resolveSubnet config Set.empty |> Result.defaultWith failwith |> should equal "192.168.1.0/24"
 
     [<Fact>]
     let ``resolveSubnet auto-detecte si subnet vide et AutoDetect true`` () =
@@ -184,8 +179,7 @@ module NetworkConfigTests =
                 Subnet = ""
                 AutoDetect = true }
 
-        let result = resolveSubnet config Set.empty
-        result |> should not' (equal "")
+        resolveSubnet config Set.empty |> Result.defaultWith failwith |> should not' (equal "")
 
     [<Fact>]
     let ``resolveSubnet prend le premier candidat si subnet vide et AutoDetect false`` () =
@@ -194,8 +188,7 @@ module NetworkConfigTests =
                 Subnet = ""
                 AutoDetect = false }
 
-        let result = resolveSubnet config Set.empty
-        result |> should equal (defaultBridgeCandidates |> List.head)
+        resolveSubnet config Set.empty |> Result.defaultWith failwith |> should equal (defaultBridgeCandidates |> List.head)
 
     // ─── resolveGateway ─────────────────────────────────────────────────
 
@@ -205,13 +198,13 @@ module NetworkConfigTests =
             { defaultConfig with
                 Gateway = "10.0.0.254" }
 
-        let result = resolveGateway config "10.0.0.0/16"
+        let result = resolveGateway config "10.0.0.0/16" |> Result.defaultWith failwith
         result |> should equal "10.0.0.254"
 
     [<Fact>]
     let ``resolveGateway derive la passerelle si vide`` () =
         let config = { defaultConfig with Gateway = "" }
-        let result = resolveGateway config "172.20.0.0/16"
+        let result = resolveGateway config "172.20.0.0/16" |> Result.defaultWith failwith
         result |> should equal "172.20.0.1"
 
     // ─── generateCniConflistJson ────────────────────────────────────────
@@ -287,7 +280,7 @@ module NetworkConfigTests =
                 Gateway = "192.168.100.1" }
 
         saveConfig (Some tempPath) customConfig
-        let (config, subnet, gateway) = resolveAll (Some tempPath)
+        let (config, subnet, gateway) = resolveAll (Some tempPath) |> Result.defaultWith failwith
         config.CniVersion |> should equal "0.4.0"
         config.NatName |> should equal "custom-nat"
         subnet |> should equal "192.168.100.0/24"
@@ -304,7 +297,7 @@ module NetworkConfigTests =
         let tempPath =
             Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "nonexistent.json")
 
-        let (config, subnet, gateway) = resolveAll (Some tempPath)
+        let (config, subnet, gateway) = resolveAll (Some tempPath) |> Result.defaultWith failwith
         config.CniVersion |> should equal "1.0.0"
         subnet |> should not' (equal "")
         gateway |> should not' (equal "")

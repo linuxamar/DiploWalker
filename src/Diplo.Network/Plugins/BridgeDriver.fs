@@ -2,6 +2,7 @@ namespace Diplo.Network.Plugins
 
 open System
 open System.Collections.Concurrent
+open System.Runtime.ExceptionServices
 open Serilog
 open Diplo.Abstractions
 open Diplo.Abstractions.NetworkConfig
@@ -25,7 +26,7 @@ type BridgeNetworkDriver() =
     let getAvailableSubnet () =
         let config = loadConfig None
         let existing = networks.Values |> Seq.map (fun n -> n.Subnet) |> Set.ofSeq
-        findAvailableSubnet config.SubnetCandidates existing
+        findAvailableSubnet config.SubnetCandidates existing |> Result.defaultWith failwith
 
     let getDefaultGateway (subnet: string) = deriveGateway subnet
 
@@ -62,7 +63,7 @@ type BridgeNetworkDriver() =
 
                         let actualGateway =
                             if String.IsNullOrEmpty(gateway) then
-                                getDefaultGateway actualSubnet
+                                getDefaultGateway actualSubnet |> Result.defaultWith failwith
                             else
                                 gateway
                         // Idempotence : vérifier si le switch existe déjà avant de le créer
@@ -156,7 +157,8 @@ type BridgeNetworkDriver() =
                                 with rbEx ->
                                     Log.Warning(rbEx, "Rollback du VMSwitch {Name} impossible", name)
 
-                            raise ex
+                            ExceptionDispatchInfo.Capture(ex).Throw()
+                            Unchecked.defaultof<_>
                 with ex ->
                     Log.Error(ex, "Erreur lors de la création du bridge {Name}", name)
                     Error "Erreur lors de la création du bridge")

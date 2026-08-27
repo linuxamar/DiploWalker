@@ -180,8 +180,8 @@ let saveConfig (configPath: string option) (config: CniNatConfig) =
         try
             if File.Exists(tempPath) then
                 File.Delete(tempPath)
-        with _ ->
-            ()
+        with cleanupEx ->
+            Log.Warning(cleanupEx, "Échec de la suppression du fichier temporaire {Tmp}", tempPath)
 
         reraise ()
 
@@ -218,7 +218,7 @@ let private firstTwoOctets (addressOrCidr: string) =
             | _ -> None
         | _ -> None
 
-let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) =
+let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) : Result<string, string> =
     let usedPairs =
         usedPrefixes |> Seq.choose firstTwoOctets |> Set.ofSeq
 
@@ -228,44 +228,47 @@ let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) =
         match firstTwoOctets c with
         | Some pair when isValidCidr c -> not (usedPairs.Contains pair)
         | _ -> false)
-    |> Option.defaultWith (fun () ->
-        match candidates |> List.tryFind isValidCidr with
-        | Some h -> h
-        | None -> failwith "Aucun sous-réseau valide disponible")
+    |> function
+        | Some subnet -> Ok subnet
+        | None ->
+            match candidates |> List.tryFind isValidCidr with
+            | Some h -> Ok h
+            | None -> Error "Aucun sous-réseau valide disponible"
 
-let deriveGateway (subnet: string) =
+let deriveGateway (subnet: string) : Result<string, string> =
     let ipPart = subnet.Split('/') |> Array.head
     let parts = ipPart.Split('.')
 
     if parts.Length < 3 then
-        failwithf "Sous-réseau invalide pour dériver la passerelle: '%s'" subnet
-
-    sprintf "%s.%s.%s.1" parts.[0] parts.[1] parts.[2]
+        Error(sprintf "Sous-réseau invalide pour dériver la passerelle: '%s'" subnet)
+    else
+        Ok(sprintf "%s.%s.%s.1" parts.[0] parts.[1] parts.[2])
 
 // ─── Résolution de la configuration finale ───────────────────────────────
 
-let resolveSubnet (config: CniNatConfig) (usedPrefixes: Set<string>) =
+let resolveSubnet (config: CniNatConfig) (usedPrefixes: Set<string>) : Result<string, string> =
     if String.IsNullOrEmpty(config.Subnet) && config.AutoDetect then
         findAvailableSubnet config.SubnetCandidates usedPrefixes
     elif String.IsNullOrEmpty(config.Subnet) then
         match config.SubnetCandidates |> List.tryHead with
-        | Some h -> h
-        | None -> failwith "Aucun sous-réseau disponible"
+        | Some h -> Ok h
+        | None -> Error "Aucun sous-réseau disponible"
     else
-        config.Subnet
+        Ok config.Subnet
 
-let resolveGateway (config: CniNatConfig) (resolvedSubnet: string) =
+let resolveGateway (config: CniNatConfig) (resolvedSubnet: string) : Result<string, string> =
     if String.IsNullOrEmpty(config.Gateway) then
         deriveGateway resolvedSubnet
     else
-        config.Gateway
+        Ok config.Gateway
 
-let resolveAll (configPath: string option) =
+let resolveAll (configPath: string option) : Result<CniNatConfig * string * string, string> =
     let config = loadConfig configPath
     let usedPrefixes = getUsedPrefixes ()
-    let subnet = resolveSubnet config usedPrefixes
-    let gateway = resolveGateway config subnet
-    (config, subnet, gateway)
+    resolveSubnet config usedPrefixes
+    |> Result.bind (fun subnet ->
+        resolveGateway config subnet
+        |> Result.map (fun gateway -> (config, subnet, gateway)))
 
 // ─── Génération du conflist CNI ─────────────────────────────────────────
 

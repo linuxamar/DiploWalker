@@ -94,5 +94,5 @@ module MountState =
             | _ ->
                 try
                     File.Delete(tmp)
-                with _ -> ()
+                with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
                 reraise ())

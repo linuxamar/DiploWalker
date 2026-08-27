@@ -89,7 +89,7 @@ module DiskMounter =
 
     let private extractOrRaise (source: string) (staging: string) (readOnly: bool) =
         try
-            FsImage.extract source staging readOnly |> ignore
+            FsImage.extract source staging readOnly |> Result.defaultWith failwith |> ignore
         with ex ->
             try
                 Directory.Delete(staging, true)
@@ -118,7 +118,7 @@ module DiskMounter =
                 let dispose () =
                     if not readOnly then
                         try
-                            FsImage.writeBack source staging
+                            FsImage.writeBack source staging |> Result.defaultWith failwith
                             // Suppression du staging uniquement après writeBack réussi
                             Directory.Delete(staging, true)
                         with ex ->
@@ -164,7 +164,7 @@ module DiskMounter =
                 fun () ->
                     if not readOnly then
                         try
-                            FsImage.writeBack source hostPath
+                            FsImage.writeBack source hostPath |> Result.defaultWith failwith
                             Directory.Delete(hostPath, true)
                         with ex ->
                             Log.Error(

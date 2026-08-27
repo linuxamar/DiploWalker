@@ -28,7 +28,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit (877 tests)
+- **Tests** : xUnit v4 (953 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -224,7 +224,8 @@ Diplo/
 │   │   ├── ServiceGuards.fs    # Guards de validation d'entrée
 │   │   ├── CachedConfig.fs     # Cache générique avec invalidation
 │   │   ├── Security.fs         # Validation d'entrée, anti-injection
-│   │   └── ServerConfig.fs     # Configuration Kestrel / named pipes
+│   │   ├── ServerConfig.fs     # Configuration Kestrel / named pipes
+│   │   └── DiploPorts.fs       # Ports gRPC partagés (#if DEBUG 5001-5003 / Release 6001-6003)
 │   ├── Diplo.Container/        # Service gRPC de gestion des conteneurs
 │   ├── Diplo.Volume/           # Service gRPC de gestion des volumes
 │   ├── Diplo.Network/          # Service gRPC de gestion des réseaux
@@ -371,7 +372,7 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
 
 ## Authentification aux registres
 
-Les identifiants des registres privés sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) dans `%ProgramData%\Diplo\registry-auth.json`. Ils sont automatiquement fournis à containerd lors du `pull` d'une image du registre correspondant (registres nommés ou `docker.io` pour Docker Hub).
+Les identifiants des registres privés sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) dans `%ProgramData%\Diplo\registry-auth.json`. Ils ne transitent **jamais** par la ligne de commande de `ctr` : lors d'un `pull`, le service génère un **helper d'identification** conforme au protocole `docker-credential` (`%ProgramData%\Diplo\cred-helper\`) qui retourne les identifiants via stdin, et un répertoire hosts temporaire pointant vers ce helper (nettoyé en fin d'opération). Les identifiants sont automatiquement fournis à containerd pour l'image tirée (registres nommés ou `docker.io` redirigé vers `registry-1.docker.io`).
 
 ### CLI
 

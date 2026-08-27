@@ -102,7 +102,7 @@ module Qcow2 =
     // ── en-tête ────────────────────────────────────────────────────────────
 
     /// Analyse l'en-tête qcow2 (versions 2 et 3).
-    let readHeader (stream: Stream) : Header =
+    let private readHeaderCore (stream: Stream) : Header =
         let buf = Array.zeroCreate<byte> 128
         stream.Position <- 0L
         readFully stream buf
@@ -170,6 +170,10 @@ module Qcow2 =
           RefcountTableClusters = refcountTableClusters
           RefcountBits = refcountBits
           RefcountOrder = refcountOrder }
+
+    /// Analyse l'en-tête qcow2, version Result.
+    let readHeader (stream: Stream) : Result<Header, string> =
+        try Ok(readHeaderCore stream) with ex -> Error ex.Message
 
     let clusterSize (h: Header) = h.ClusterSize
     let virtualSize (h: Header) = h.VirtualSize
@@ -250,7 +254,7 @@ module Qcow2 =
 
     /// Lit `count` octets à l'offset virtuel `virtualOffset`.
     /// Les clusters non alloués et les clusters « zéros » sont lus comme des zéros.
-    let readBytesAt (s: Stream) (h: Header) (virtualOffset: int64) (count: int) : byte[] =
+    let private readBytesAtCore (s: Stream) (h: Header) (virtualOffset: int64) (count: int) : byte[] =
         if virtualOffset < 0L || virtualOffset + int64 count > h.VirtualSize then
             failwithf
                 "Lecture hors de l'image qcow2 (offset %d, %d octets, taille %d)"
@@ -297,6 +301,10 @@ module Qcow2 =
 
         out
 
+    /// Lit `count` octets à l'offset virtuel `virtualOffset`, version Result.
+    let readBytesAt (s: Stream) (h: Header) (virtualOffset: int64) (count: int) : Result<byte[], string> =
+        try Ok(readBytesAtCore s h virtualOffset count) with ex -> Error ex.Message
+
     // ── écriture ───────────────────────────────────────────────────────────
 
     /// Écrit `data` à l'offset virtuel `virtualOffset`.
@@ -306,7 +314,7 @@ module Qcow2 =
     /// jour de la table L2 (et de L1 si une table L2 doit être créée) puis
     /// incrément du refcount. Les écritures partielles de cluster suivent un
     /// modèle lecture-modification-écriture.
-    let writeBytesAt (s: Stream) (h: Header) (virtualOffset: int64) (data: byte[]) =
+    let private writeBytesAtCore (s: Stream) (h: Header) (virtualOffset: int64) (data: byte[]) =
         if virtualOffset < 0L || virtualOffset + int64 data.Length > h.VirtualSize then
             failwithf
                 "Écriture hors de l'image qcow2 (offset %d, %d octets, taille %d)"
@@ -362,7 +370,7 @@ module Qcow2 =
                 s.Write(data, dataPos, toWrite)
             else
                 let host = desc &&& hostOffsetMask
-                let whole = readBytesAt s h clusterStart h.ClusterSize
+                let whole = readBytesAtCore s h clusterStart h.ClusterSize
                 Array.Copy(data, dataPos, whole, inCluster, toWrite)
                 s.Position <- host
                 s.Write(whole, 0, h.ClusterSize)
@@ -372,6 +380,10 @@ module Qcow2 =
             remaining <- remaining - toWrite
 
         s.Flush()
+
+    /// Écrit `data` à l'offset virtuel `virtualOffset`, version Result.
+    let writeBytesAt (s: Stream) (h: Header) (virtualOffset: int64) (data: byte[]) : Result<unit, string> =
+        try Ok(writeBytesAtCore s h virtualOffset data) with ex -> Error ex.Message
 
     // ── redimensionnement ──────────────────────────────────────────────────
 
@@ -481,11 +493,11 @@ module Qcow2 =
     /// tronque le fichier à la dernière position utile. La table L1 est
     /// relocalisée (bloc contigu) lorsque sa taille change de nombre de
     /// clusters. Retourne l'en-tête relu après modification.
-    let resize (s: Stream) (newVirtualSize: int64) : Header =
+    let private resizeCore (s: Stream) (newVirtualSize: int64) : Header =
         if newVirtualSize <= 0L then
             invalidArg (nameof newVirtualSize) "La nouvelle taille virtuelle doit être positive"
 
-        let h = readHeader s
+        let h = readHeaderCore s
 
         if newVirtualSize = h.VirtualSize then
             h
@@ -552,7 +564,11 @@ module Qcow2 =
                 s.SetLength(endOffset)
                 s.Flush()
 
-            readHeader s
+            readHeaderCore s
+
+    /// Redimensionne l'image qcow2, version Result.
+    let resize (s: Stream) (newVirtualSize: int64) : Result<Header, string> =
+        try Ok(resizeCore s newVirtualSize) with ex -> Error ex.Message
 
 /// Flux d'accès aléatoire (lecture/écriture) sur une image qcow2, exploité
 /// par DiscUtils pour accéder au système de fichiers contenu dans l'image.
@@ -560,7 +576,7 @@ type Qcow2Stream(path: string, access: FileAccess) =
     inherit Stream()
 
     let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
-    let mutable header = Qcow2.readHeader fs
+    let mutable header = Qcow2.readHeader fs |> Result.defaultWith failwith
     let mutable position = 0L
     let mutable released = false
 
@@ -581,7 +597,7 @@ type Qcow2Stream(path: string, access: FileAccess) =
         if count <= 0 then
             0
         else
-            let data = Qcow2.readBytesAt fs header position count
+            let data = Qcow2.readBytesAt fs header position count |> Result.defaultWith failwith
             Array.Copy(data, 0, buffer, offset, count)
             position <- position + int64 count
             count
@@ -590,7 +606,7 @@ type Qcow2Stream(path: string, access: FileAccess) =
         if count > 0 then
             let data = Array.zeroCreate<byte> count
             Array.Copy(buffer, offset, data, 0, count)
-            Qcow2.writeBytesAt fs header position data
+            Qcow2.writeBytesAt fs header position data |> Result.defaultWith failwith
             position <- position + int64 count
 
     override _.Flush() = fs.Flush()
@@ -606,7 +622,7 @@ type Qcow2Stream(path: string, access: FileAccess) =
 
     override _.SetLength(value: int64) =
         if value <> header.VirtualSize then
-            header <- Qcow2.resize fs value
+            header <- Qcow2.resize fs value |> Result.defaultWith failwith
 
     override _.Dispose(disposing) =
         if not released then

@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Text.Json
 open System.Text.Json.Nodes
+open Serilog
 
 /// Lecture/écriture du fichier de configuration client `diplo.json` (adresses des services).
 /// Format généré par `container config init` :
@@ -166,5 +167,5 @@ module DiploConfig =
         | _ ->
             try
                 File.Delete(tmp)
-            with _ -> ()
+            with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
             reraise ()

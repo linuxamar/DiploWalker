@@ -49,112 +49,114 @@ module TokenAuthMiddlewareTests =
         ctx.Request.Headers.Append("Authorization", StringValues("Bearer " + token))
         |> ignore
 
-    let withTempToken (token: string) (f: unit -> unit) =
-        let path = authTokenPath
-        let existed = File.Exists(path)
-        let backup = if existed then Some(File.ReadAllText(path)) else None
+    // Redirige le chemin global du fichier de token vers un répertoire
+    // temporaire utilisateur : évite l'UnauuthorizedAccessException sur
+    // C:\ProgramData\Diplo (réservé aux administrateurs) en CI non élever.
+    let withTempPath (f: unit -> unit) =
+        let dir =
+            Path.Combine(Path.GetTempPath(), "diplo-auth-http-" + Guid.NewGuid().ToString("N"))
+
+        Directory.CreateDirectory(dir) |> ignore
+        let previous = authTokenPath
+        authTokenPath <- Path.Combine(dir, "auth-token.json")
 
         try
-            saveToken token
             f ()
         finally
-            match backup with
-            | Some content -> File.WriteAllText(path, content)
-            | None ->
-                if File.Exists(path) then
-                    File.Delete(path)
+            authTokenPath <- previous
+            Directory.Delete(dir, true)
+
+    let withTempToken (token: string) (f: unit -> unit) =
+        withTempPath (fun () ->
+            saveToken token
+            f ())
 
     [<Fact>]
     let ``middleware sans fichier token retourne 401 (fail-closed)`` () =
-        let next = NextHandler()
-        let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
-        let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
-        let path = authTokenPath
-        let existed = File.Exists(path)
-        let backup = if existed then Some(File.ReadAllText(path)) else None
-
-        try
-            if File.Exists(path) then
-                File.Delete(path)
+        withTempPath (fun () ->
+            let next = NextHandler()
+            let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
+            let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
 
             let ctx = createHttpContext ()
             mw.Invoke(ctx).Wait()
             next.Called |> should equal false
-            ctx.Response.StatusCode |> should equal 401
-        finally
-            match backup with
-            | Some c -> File.WriteAllText(path, c)
-            | None -> ()
+            ctx.Response.StatusCode |> should equal 401)
 
     [<Fact>]
     let ``middleware avec token correct laisse passer la requete`` () =
-        let token = generateToken ()
-        let next = NextHandler()
-        let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
-        let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
+        withTempPath (fun () ->
+            let token = generateToken ()
+            let next = NextHandler()
+            let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
+            let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
 
-        withTempToken token (fun () ->
-            let ctx = createHttpContext ()
-            addAuthHeader ctx token
-            mw.Invoke(ctx).Wait()
-            next.Called |> should equal true
-            ctx.Response.StatusCode |> should equal 200)
+            withTempToken token (fun () ->
+                let ctx = createHttpContext ()
+                addAuthHeader ctx token
+                mw.Invoke(ctx).Wait()
+                next.Called |> should equal true
+                ctx.Response.StatusCode |> should equal 200))
 
     [<Fact>]
     let ``middleware sans header Authorization retourne 401`` () =
-        let token = generateToken ()
-        let next = NextHandler()
-        let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
-        let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
+        withTempPath (fun () ->
+            let token = generateToken ()
+            let next = NextHandler()
+            let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
+            let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
 
-        withTempToken token (fun () ->
-            let ctx = createHttpContext ()
-            mw.Invoke(ctx).Wait()
-            next.Called |> should equal false
-            ctx.Response.StatusCode |> should equal 401)
+            withTempToken token (fun () ->
+                let ctx = createHttpContext ()
+                mw.Invoke(ctx).Wait()
+                next.Called |> should equal false
+                ctx.Response.StatusCode |> should equal 401))
 
     [<Fact>]
     let ``middleware avec mauvais token retourne 401`` () =
-        let token = generateToken ()
-        let badToken = generateToken ()
-        let next = NextHandler()
-        let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
-        let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
+        withTempPath (fun () ->
+            let token = generateToken ()
+            let badToken = generateToken ()
+            let next = NextHandler()
+            let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
+            let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
 
-        withTempToken token (fun () ->
-            let ctx = createHttpContext ()
-            addAuthHeader ctx badToken
-            mw.Invoke(ctx).Wait()
-            next.Called |> should equal false
-            ctx.Response.StatusCode |> should equal 401)
+            withTempToken token (fun () ->
+                let ctx = createHttpContext ()
+                addAuthHeader ctx badToken
+                mw.Invoke(ctx).Wait()
+                next.Called |> should equal false
+                ctx.Response.StatusCode |> should equal 401))
 
     [<Fact>]
     let ``middleware avec format Authorization invalide retourne 401`` () =
-        let token = generateToken ()
-        let next = NextHandler()
-        let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
-        let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
+        withTempPath (fun () ->
+            let token = generateToken ()
+            let next = NextHandler()
+            let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
+            let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
 
-        withTempToken token (fun () ->
-            let ctx = createHttpContext ()
+            withTempToken token (fun () ->
+                let ctx = createHttpContext ()
 
-            ctx.Request.Headers.Append("Authorization", StringValues("Basic " + token))
-            |> ignore
+                ctx.Request.Headers.Append("Authorization", StringValues("Basic " + token))
+                |> ignore
 
-            mw.Invoke(ctx).Wait()
-            next.Called |> should equal false
-            ctx.Response.StatusCode |> should equal 401)
+                mw.Invoke(ctx).Wait()
+                next.Called |> should equal false
+                ctx.Response.StatusCode |> should equal 401))
 
     [<Fact>]
     let ``middleware avec header vide retourne 401`` () =
-        let token = generateToken ()
-        let next = NextHandler()
-        let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
-        let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
+        withTempPath (fun () ->
+            let token = generateToken ()
+            let next = NextHandler()
+            let logger = NoopLogger<TokenAuthMiddleware>() :> ILogger<TokenAuthMiddleware>
+            let mw = TokenAuthMiddleware(RequestDelegate(next.Invoke), logger)
 
-        withTempToken token (fun () ->
-            let ctx = createHttpContext ()
-            ctx.Request.Headers.Append("Authorization", StringValues("")) |> ignore
-            mw.Invoke(ctx).Wait()
-            next.Called |> should equal false
-            ctx.Response.StatusCode |> should equal 401)
+            withTempToken token (fun () ->
+                let ctx = createHttpContext ()
+                ctx.Request.Headers.Append("Authorization", StringValues("")) |> ignore
+                mw.Invoke(ctx).Wait()
+                next.Called |> should equal false
+                ctx.Response.StatusCode |> should equal 401))

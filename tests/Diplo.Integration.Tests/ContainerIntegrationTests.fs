@@ -556,7 +556,7 @@ module ContainerIntegrationTests =
                 let delResult = client.DeleteContainer(delReq, CancellationToken.None).Result
                 delResult.Success |> should equal true
                 let re = Path.Combine(root, "re")
-                Diplo.Disk.FsImage.extract imagePath re false |> ignore
+                Diplo.Disk.FsImage.extract imagePath re false |> Result.defaultWith failwith |> ignore
                 File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2"
             finally
                 TestHelpers.cleanupDir root)

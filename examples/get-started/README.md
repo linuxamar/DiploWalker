@@ -266,7 +266,7 @@ diplo status check
 Get-ChildItem \\.\pipe\ | Where-Object { $_.Name -like "diplo*" }
 
 # Tester la connexion TCP (si UseTcp=true dans appsettings.json)
-Test-NetConnection -ComputerName localhost -Port 5001  # ou 6001 en Release (Debug) / 6001 (Release)
+Test-NetConnection -ComputerName localhost -Port 5001  # 5001 en Debug, 6001 en Release
 ``
 
 #### « L'adresse gRPC n'est pas autorisée »
@@ -280,7 +280,7 @@ Get-Content "$env:ProgramFiles\Diplo\Diplo.Container\appsettings.json"
 
 # Les adresses autorisées sont :
 #   http://localhost:5001 (Debug) | http://localhost:6001 (Release)
-#   http://127.0.0.1:5001
+#   http://127.0.0.1:5001 (Debug) | http://127.0.0.1:6001 (Release)
 #   http://pipe:/diplo-container
 ``
 

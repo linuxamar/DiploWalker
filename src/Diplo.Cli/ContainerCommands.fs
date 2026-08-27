@@ -2,6 +2,7 @@ namespace Diplo.Cli.Container
 
 open System
 open System.Collections.Generic
+open System.Runtime.ExceptionServices
 open System.Threading
 open System.Threading.Tasks
 open Diplo.Abstractions
@@ -462,7 +463,7 @@ type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
                         do! enumerator.DisposeAsync().AsTask()
 
                         match failure with
-                        | Some ex -> raise ex
+                        | Some ex -> ExceptionDispatchInfo.Capture(ex).Throw()
                         | None -> ()
                     else
                         let! entries = client.GetLogs(settings.Id, tail = settings.Tail, since = since, ct = ct)

@@ -432,7 +432,7 @@ module SecurityValidation =
                 )
             )
 
-        if path.Contains("\0") then
+        if path.Contains("\u0000") then
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul" label)))
 
         for c in path do
@@ -535,7 +535,7 @@ module SecurityValidation =
                     String.IsNullOrWhiteSpace(name)
                     || name.Contains("\\")
                     || name.Contains("..")
-                    || name.Contains("\0")
+                    || name.Contains("\u0000")
                 then
                     raise (
                         RpcException(
@@ -589,7 +589,7 @@ module SecurityValidation =
                 )
             )
 
-        if path.Contains("\0") then
+        if path.Contains("\u0000") then
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul" label)))
 
         if path.StartsWith(@"\\", StringComparison.Ordinal) || path.StartsWith("//", StringComparison.Ordinal) then
@@ -655,7 +655,7 @@ module SecurityValidation =
                 )
             )
 
-        if path.Contains("\0") then
+        if path.Contains("\u0000") then
             raise (
                 RpcException(
                     Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul: '%s'" label (sanitizeForMessage path))
@@ -705,7 +705,7 @@ module SecurityValidation =
                 )
             )
 
-        if path.Contains("\0") then
+        if path.Contains("\u0000") then
             raise (RpcException(Status(StatusCode.InvalidArgument, sprintf "%s contient un caractère nul" label)))
 
         for c in path do

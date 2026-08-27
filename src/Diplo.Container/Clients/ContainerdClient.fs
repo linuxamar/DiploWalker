@@ -117,6 +117,11 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
                 validateMountSegment dst "La destination"
 
+                // La source subit les mêmes contrôles de segment --mount :
+                // une virgule ou un espace y injecterait des options
+                // arbitraires au même titre que dans la destination.
+                validateMountSegment src "La source"
+
                 ctrArgs.Add("--mount")
                 let options = if readOnly then "rbind,ro" else "rbind"
                 ctrArgs.Add(sprintf "type=bind,src=%s,dst=%s,options=%s" src dst options)
@@ -461,7 +466,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     try
                         // Watermark capturé AVANT la lecture : aucun octet écrit
                         // pendant la lecture n'est ni sauté ni dupliqué ensuite.
-                        let snapshot, initialOffset = ContainerLogs.readUpTo id tail since
+                        let snapshot, initialOffset = ContainerLogs.readUpTo id tail since |> Result.defaultWith failwith
 
                         for l in snapshot do
                             writer.TryWrite(l) |> ignore
@@ -470,7 +475,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                         let mutable running = true
 
                         while running && not cancel.IsCancellationRequested do
-                            let lines, offset = ContainerLogs.readIncremental id lastOffset
+                            let lines, offset = ContainerLogs.readIncremental id lastOffset |> Result.defaultWith failwith
                             lastOffset <- offset
 
                             for l in lines do
@@ -481,7 +486,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                             else
                                 // courte grâce au writer pour vider les derniers octets
                                 do! Async.Sleep 150
-                                let fin, _ = ContainerLogs.readIncremental id lastOffset
+                                let fin, _ = ContainerLogs.readIncremental id lastOffset |> Result.defaultWith failwith
 
                                 for l in fin do
                                     writer.TryWrite(l) |> ignore
