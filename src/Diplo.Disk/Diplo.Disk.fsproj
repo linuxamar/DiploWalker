@@ -6,8 +6,11 @@
 
   <ItemGroup>
     <Compile Include="DiskFormat.fs" />
+    <Compile Include="BinaryIo.fs" />
+    <Compile Include="RawImageStream.fs" />
     <Compile Include="Qcow2.fs" />
     <Compile Include="Qcow1Fs.fs" />
+    <Compile Include="DiscFsHelper.fs" />
     <Compile Include="VdiFs.fs" />
     <Compile Include="DmgFs.fs" />
     <Compile Include="ParallelsFs.fs" />

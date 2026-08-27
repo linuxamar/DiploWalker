@@ -7,6 +7,7 @@ open System.IO
 /// Format simple : en-tete + table L1 + blocs de donnees.
 /// Lecture/ecriture in-place, blocs non alloues lus comme zeros.
 module Parallels =
+    open BinaryIo
 
     [<CLIMutable>]
     type Header =
@@ -23,49 +24,6 @@ module Parallels =
 
     let private MAGIC = 0x30617261 // "ara\0" in little-endian (reversed: "para")
 
-    let private readUInt32LE (d: byte[]) o =
-        int d.[o]
-        ||| (int d.[o + 1] <<< 8)
-        ||| (int d.[o + 2] <<< 16)
-        ||| (int d.[o + 3] <<< 24)
-
-    let private readUInt64LE (d: byte[]) (o: int) =
-        int64 d.[o]
-        ||| (int64 d.[o + 1] <<< 8)
-        ||| (int64 d.[o + 2] <<< 16)
-        ||| (int64 d.[o + 3] <<< 24)
-        ||| (int64 d.[o + 4] <<< 32)
-        ||| (int64 d.[o + 5] <<< 40)
-        ||| (int64 d.[o + 6] <<< 48)
-        ||| (int64 d.[o + 7] <<< 56)
-
-    let private putUInt32LE (d: byte[]) (o: int) (v: int) =
-        d.[o] <- byte v
-        d.[o + 1] <- byte (v >>> 8)
-        d.[o + 2] <- byte (v >>> 16)
-        d.[o + 3] <- byte (v >>> 24)
-
-    let private putUInt64LE (d: byte[]) (o: int) (v: int64) =
-        d.[o] <- byte v
-        d.[o + 1] <- byte (v >>> 8)
-        d.[o + 2] <- byte (v >>> 16)
-        d.[o + 3] <- byte (v >>> 24)
-        d.[o + 4] <- byte (v >>> 32)
-        d.[o + 5] <- byte (v >>> 40)
-        d.[o + 6] <- byte (v >>> 48)
-        d.[o + 7] <- byte (v >>> 56)
-
-    let private readFully (s: Stream) (buf: byte[]) (off: int) (len: int) =
-        let mutable done_ = 0
-
-        while done_ < len do
-            let n = s.Read(buf, off + done_, len - done_)
-
-            if n = 0 then
-                failwith "Fin prematuree du flux Parallels"
-
-            done_ <- done_ + n
-
     let virtualSize (h: Header) =
         int64 h.Cylinders * int64 h.Heads * int64 h.Sectors * int64 h.SectorSize
 
@@ -77,24 +35,24 @@ module Parallels =
         let buf = Array.zeroCreate<byte> 1024
         s.Position <- 0L
         readFully s buf 0 1024
-        let magic = readUInt32LE buf 0
+        let magic = le32 buf 0
 
         if magic <> MAGIC then
             failwith "Magic Parallels invalide"
 
-        let version = readUInt32LE buf 4
-        let flags = readUInt32LE buf 8
+        let version = le32 buf 4
+        let flags = le32 buf 8
         let _ = flags
-        let heads = readUInt32LE buf 16
-        let cylinders = readUInt32LE buf 20
-        let sectors = readUInt32LE buf 24
-        let sectorSize = readUInt32LE buf 28
-        let blockMagic = readUInt32LE buf 32
+        let heads = le32 buf 16
+        let cylinders = le32 buf 20
+        let sectors = le32 buf 24
+        let sectorSize = le32 buf 28
+        let blockMagic = le32 buf 32
         let _ = blockMagic
-        let blockSize = readUInt32LE buf 36
-        let blocksCount = readUInt32LE buf 40
-        let l1Size = readUInt32LE buf 44
-        let l1TableOffset = readUInt64LE buf 56
+        let blockSize = le32 buf 36
+        let blocksCount = le32 buf 40
+        let l1Size = le32 buf 44
+        let l1TableOffset = le64 buf 56
 
         if sectorSize = 0 then
             failwith "Sector size invalide"
@@ -120,20 +78,20 @@ module Parallels =
           L1TableOffset = l1TableOffset }
 
     let readHeader (s: Stream) : Result<Header, string> =
-        try Ok(readHeaderCore s) with ex -> Error ex.Message
+        protect (fun () -> readHeaderCore s)
 
     let writeHeader (s: Stream) (h: Header) =
         let buf = Array.zeroCreate<byte> 1024
-        putUInt32LE buf 0 h.Magic
-        putUInt32LE buf 4 h.Version
-        putUInt32LE buf 16 h.Heads
-        putUInt32LE buf 20 h.Cylinders
-        putUInt32LE buf 24 h.Sectors
-        putUInt32LE buf 28 h.SectorSize
-        putUInt32LE buf 36 h.BlockSize
-        putUInt32LE buf 40 h.BlocksCount
-        putUInt32LE buf 44 h.L1Size
-        putUInt64LE buf 56 h.L1TableOffset
+        putLe32 h.Magic buf 0
+        putLe32 h.Version buf 4
+        putLe32 h.Heads buf 16
+        putLe32 h.Cylinders buf 20
+        putLe32 h.Sectors buf 24
+        putLe32 h.SectorSize buf 28
+        putLe32 h.BlockSize buf 36
+        putLe32 h.BlocksCount buf 40
+        putLe32 h.L1Size buf 44
+        putLe64 h.L1TableOffset buf 56
         s.Position <- 0L
         s.Write(buf, 0, 1024)
 
@@ -159,7 +117,7 @@ module Parallels =
                     s.Position <- l1Off
                     let blockOffsetBytes = Array.zeroCreate<byte> 4
                     readFully s blockOffsetBytes 0 4
-                    let blockOffset = int64 (readUInt32LE blockOffsetBytes 0) * 512L
+                    let blockOffset = int64 (le32 blockOffsetBytes 0) * 512L
                     let toRead = min remaining (h.BlockSize - int bOffInBlock)
 
                     if blockOffset = 0L then
@@ -173,10 +131,7 @@ module Parallels =
                     vOff <- vOff + int64 toRead
 
     let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) : Result<unit, string> =
-        try
-            readBytesAtCore s h vOffset count buf bufOff
-            Ok()
-        with ex -> Error ex.Message
+        protect (fun () -> readBytesAtCore s h vOffset count buf bufOff)
 
     let private findFreeBlock (s: Stream) (h: Header) : int =
         let mutable maxEnd = h.L1TableOffset + int64 h.L1Size * 4L
@@ -186,7 +141,7 @@ module Parallels =
             s.Position <- l1Off
             let buf = Array.zeroCreate<byte> 4
             readFully s buf 0 4
-            let blockOff = int64 (readUInt32LE buf 0) * 512L
+            let blockOff = int64 (le32 buf 0) * 512L
 
             if blockOff > 0L then
                 let blockEnd = blockOff + int64 h.BlockSize
@@ -216,7 +171,7 @@ module Parallels =
             s.Position <- l1Off
             let blockOffsetBuf = Array.zeroCreate<byte> 4
             readFully s blockOffsetBuf 0 4
-            let blockOffset = int64 (readUInt32LE blockOffsetBuf 0) * 512L
+            let blockOffset = int64 (le32 blockOffsetBuf 0) * 512L
             let toWrite = min remaining (h.BlockSize - int bOffInBlock)
 
             if blockOffset = 0L then
@@ -224,7 +179,7 @@ module Parallels =
                 let newOffset = freeBlock
                 s.Position <- l1Off
                 let newBuf = Array.zeroCreate<byte> 4
-                putUInt32LE newBuf 0 newOffset
+                putLe32 newOffset newBuf 0
                 s.Write(newBuf, 0, 4)
                 let fileOffset = int64 newOffset * 512L
                 let zeroBuf = Array.zeroCreate<byte> h.BlockSize
@@ -241,24 +196,16 @@ module Parallels =
             vOff <- vOff + int64 toWrite
 
     let writeBytesAt (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) : Result<unit, string> =
-        try
-            writeBytesAtCore s h vOffset data dataOff count
-            Ok()
-        with ex -> Error ex.Message
+        protect (fun () -> writeBytesAtCore s h vOffset data dataOff count)
 
 /// Flux System.IO presentant une image Parallels comme un disque brut virtuel.
 type ParallelsStream(path: string, access: FileAccess) =
-    inherit Stream()
+    inherit RawImageStream(path, access)
 
-    // FileShare.Read : un second accès en écriture doit échouer franchement.
-    let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
-
+    let fs = base.UnderlyingStream
     let header = Parallels.readHeader fs |> Result.defaultWith failwith
     let mutable position = 0L
 
-    override _.CanRead = true
-    override _.CanSeek = true
-    override _.CanWrite = access = FileAccess.ReadWrite || access = FileAccess.Write
     override _.Length = Parallels.virtualSize header
 
     override _.Position
@@ -317,9 +264,3 @@ type ParallelsStream(path: string, access: FileAccess) =
 
         header.Cylinders <- int cylinders
         Parallels.writeHeader fs header
-
-    override _.Flush() = fs.Flush()
-
-    override _.Dispose(disposing) =
-        if disposing then
-            fs.Dispose()

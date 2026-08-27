@@ -6,10 +6,9 @@ open Diplo.Abstractions
 open Diplo.Abstractions.Interfaces
 
 type CloudAwsDriver(dataRoot: string) =
+    inherit RemoteVolumeDriver(dataRoot, "aws")
 
-    let store = RemoteVolumeStore(dataRoot, "aws")
-
-    let buildEfsPath (driverOpts: Map<string, string>) =
+    override _.RemotePath driverOpts =
         match driverOpts |> Map.tryFind "fsId", driverOpts |> Map.tryFind "region" with
         | Some fsId, Some region -> sprintf "%s.efs.%s.amazonaws.com:/" fsId region
         | _ ->
@@ -22,7 +21,7 @@ type CloudAwsDriver(dataRoot: string) =
                 )
             )
 
-    let mountEfs (remotePath: string) (targetPath: string) (_opts: Map<string, string>) =
+    override _.Mount remotePath targetPath _opts =
         // Chiffrement en transit (recommandation AWS pour EFS) : l'option tls
         // du helper de montage EFS tunnelise via stunnel. Sans elle, les
         // données traversent le réseau en clair.
@@ -31,22 +30,3 @@ type CloudAwsDriver(dataRoot: string) =
             [ "-o"; "nfsvers=4.1,tls"; remotePath; targetPath ]
             (Some ProcessExec.MountTimeoutMs)
             None
-
-    interface IVolumeDriver with
-        member _.CreateVolume(name, driverOpts, labels) =
-            let remotePath = buildEfsPath driverOpts
-            store.CreateVolume(name, remotePath, labels, driverOpts)
-
-        member _.RemoveVolume(id, _force) = store.RemoveVolume(id)
-        member _.InspectVolume(id) = store.InspectVolume(id)
-        member _.ListVolumes(_filters) = store.ListVolumes()
-        member _.GetVolumeSize(_id) = 0L
-
-        member _.MountVolume(id, targetPath, options) =
-            RemoteDriverHelpers.mountVolume store id targetPath options mountEfs
-
-        member _.UnmountVolume(id, targetPath) =
-            RemoteDriverHelpers.unmountVolume id targetPath RemoteDriverHelpers.unmountNfsLike
-
-        member _.PruneVolumes() =
-            RemoteDriverHelpers.pruneCloudVolumes store

@@ -58,6 +58,19 @@ type LocalVolumeDriver(dataRoot: string) =
         else
             dataPath id
 
+    /// Copie récursivement le contenu de `source` vers `target`, en créant les
+    /// sous-répertoires et en écrasant les fichiers existants. Utilisé à la fois
+    /// pour matérialiser un volume lors du montage et pour resynchroniser le
+    /// montage vers le volume au démontage.
+    let rec copyDirectoryTree (source: string) (target: string) =
+        Directory.CreateDirectory(target) |> ignore
+
+        for file in Directory.GetFiles(source) do
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), true)
+
+        for subdir in Directory.GetDirectories(source) do
+            copyDirectoryTree subdir (Path.Combine(target, Path.GetFileName(subdir)))
+
     member _.CreateVolume(name: string, driverOpts: Map<string, string>, labels: Map<string, string>) =
         let id = generateId ()
         let dir = Path.Combine(volumesDir, id)
@@ -202,18 +215,7 @@ type LocalVolumeDriver(dataRoot: string) =
                 Directory.CreateDirectory(mountDir) |> ignore
 
                 if Directory.Exists(src) then
-                    let rec copyDir (source: string) (target: string) =
-                        Directory.CreateDirectory(target) |> ignore
-
-                        for file in Directory.GetFiles(source) do
-                            let destFile = Path.Combine(target, Path.GetFileName(file))
-                            File.Copy(file, destFile, true)
-
-                        for subdir in Directory.GetDirectories(source) do
-                            let destSub = Path.Combine(target, Path.GetFileName(subdir))
-                            copyDir subdir destSub
-
-                    copyDir src mountDir
+                    copyDirectoryTree src mountDir
 
                 (true, mountDir)
             with ex ->
@@ -242,17 +244,8 @@ type LocalVolumeDriver(dataRoot: string) =
                 // supprimer le répertoire sans réécriture détruirait TOUT ce
                 // que le conteneur a écrit entre Mount et Unmount.
                 if Directory.Exists(src) then
-                    let rec syncBack (source: string) (target: string) =
-                        Directory.CreateDirectory(target) |> ignore
-
-                        for file in Directory.GetFiles(source) do
-                            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), true)
-
-                        for subdir in Directory.GetDirectories(source) do
-                            syncBack subdir (Path.Combine(target, Path.GetFileName(subdir)))
-
                     try
-                        syncBack mountDir src
+                        copyDirectoryTree mountDir src
                     with ex ->
                         // Synchronisation échouée : conserver le montage pour ne
                         // pas perdre les données, et signaler l'échec.

@@ -4,6 +4,7 @@ open System
 open System.IO
 
 module Qcow1 =
+    open BinaryIo
 
     [<CLIMutable>]
     type Header =
@@ -14,49 +15,6 @@ module Qcow1 =
           mutable L1Size: int
           mutable L1TableOffset: int64
           mutable CryptMethod: int }
-
-    let private be32 (d: byte[]) o =
-        (int d.[o] <<< 24)
-        ||| (int d.[o + 1] <<< 16)
-        ||| (int d.[o + 2] <<< 8)
-        ||| int d.[o + 3]
-
-    let private be64 (d: byte[]) (o: int) =
-        (int64 d.[o] <<< 56)
-        ||| (int64 d.[o + 1] <<< 48)
-        ||| (int64 d.[o + 2] <<< 40)
-        ||| (int64 d.[o + 3] <<< 32)
-        ||| (int64 d.[o + 4] <<< 24)
-        ||| (int64 d.[o + 5] <<< 16)
-        ||| (int64 d.[o + 6] <<< 8)
-        ||| int64 d.[o + 7]
-
-    let private putBe64 (d: byte[]) (o: int) (v: int64) =
-        d.[o] <- byte (v >>> 56)
-        d.[o + 1] <- byte (v >>> 48)
-        d.[o + 2] <- byte (v >>> 40)
-        d.[o + 3] <- byte (v >>> 32)
-        d.[o + 4] <- byte (v >>> 24)
-        d.[o + 5] <- byte (v >>> 16)
-        d.[o + 6] <- byte (v >>> 8)
-        d.[o + 7] <- byte v
-
-    let private putBe32 (d: byte[]) (o: int) (v: int) =
-        d.[o] <- byte (v >>> 24)
-        d.[o + 1] <- byte (v >>> 16)
-        d.[o + 2] <- byte (v >>> 8)
-        d.[o + 3] <- byte v
-
-    let private readFully (s: Stream) (buf: byte[]) (off: int) (len: int) =
-        let mutable done_ = 0
-
-        while done_ < len do
-            let n = s.Read(buf, off + done_, len - done_)
-
-            if n = 0 then
-                failwith "Fin prematuree du flux"
-
-            done_ <- done_ + n
 
     let private hostOffsetMask (clusterBits: int) =
         ignore clusterBits
@@ -114,7 +72,7 @@ module Qcow1 =
           CryptMethod = cryptMethod }
 
     let readHeader (s: Stream) : Result<Header, string> =
-        try Ok(readHeaderCore s) with ex -> Error ex.Message
+        protect (fun () -> readHeaderCore s)
 
     let writeHeader (s: Stream) (h: Header) =
         let buf = Array.zeroCreate<byte> 72
@@ -122,11 +80,11 @@ module Qcow1 =
         buf.[1] <- byte 'F'
         buf.[2] <- byte 'I'
         buf.[3] <- 0xFEuy
-        putBe32 buf 4 h.Version
-        putBe32 buf 20 h.ClusterBits
-        putBe64 buf 28 h.VirtualSize
-        putBe64 buf 40 h.L1TableOffset
-        putBe32 buf 48 h.L1Size
+        putBe32 h.Version buf 4
+        putBe32 h.ClusterBits buf 20
+        putBe64 h.VirtualSize buf 28
+        putBe64 h.L1TableOffset buf 40
+        putBe32 h.L1Size buf 48
         s.Position <- 0L
         s.Write(buf, 0, 72)
 
@@ -138,7 +96,7 @@ module Qcow1 =
 
     let private writeUInt64At (s: Stream) (offset: int64) (v: int64) =
         let buf = Array.zeroCreate<byte> 8
-        putBe64 buf 0 v
+        putBe64 v buf 0
         s.Position <- offset
         s.Write(buf, 0, 8)
 
@@ -185,10 +143,7 @@ module Qcow1 =
                     vOff <- vOff + int64 toRead
 
     let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) : Result<unit, string> =
-        try
-            readBytesAtCore s h vOffset count buf bufOff
-            Ok()
-        with ex -> Error ex.Message
+        protect (fun () -> readBytesAtCore s h vOffset count buf bufOff)
 
     /// Alloue un nouveau cluster hôte : balayer la table L1 pour trouver la plus
     /// haute allocation RÉELLE. Un état partagé serait nécessaire sinon ; sans
@@ -251,24 +206,15 @@ module Qcow1 =
             vOff <- vOff + int64 toWrite
 
     let writeBytesAt (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) : Result<unit, string> =
-        try
-            writeBytesAtCore s h vOffset data dataOff count
-            Ok()
-        with ex -> Error ex.Message
+        protect (fun () -> writeBytesAtCore s h vOffset data dataOff count)
 
 type Qcow1Stream(path: string, access: FileAccess) =
-    inherit Stream()
+    inherit RawImageStream(path, access)
 
-    // FileShare.Read : un second accès en écriture doit échouer franchement
-    // plutôt que corrompre silencieusement les métadonnées.
-    let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
-
+    let fs = base.UnderlyingStream
     let header = Qcow1.readHeader fs |> Result.defaultWith failwith
     let mutable position = 0L
 
-    override _.CanRead = true
-    override _.CanSeek = true
-    override _.CanWrite = access = FileAccess.ReadWrite || access = FileAccess.Write
     override _.Length = header.VirtualSize
 
     override _.Position
@@ -313,9 +259,3 @@ type Qcow1Stream(path: string, access: FileAccess) =
     override _.SetLength(value) =
         header.VirtualSize <- value
         Qcow1.writeHeader fs header
-
-    override _.Flush() = fs.Flush()
-
-    override _.Dispose(disposing) =
-        if disposing then
-            fs.Dispose()

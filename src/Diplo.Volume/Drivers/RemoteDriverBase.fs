@@ -85,21 +85,40 @@ module RemoteDriverHelpers =
                     )
                 )
 
-    /// Prune cloud partagé : itère sur le store et supprime tous les volumes.
-    let pruneCloudVolumes (store: RemoteVolumeStore) =
-        let vols = store.ListVolumes()
+/// Base commune aux drivers de volume distants. Mutualise le store, la
+/// création d'un volume (construction du chemin distant), le montage/démontage
+/// et la suppression de masse — le reste (chemin, monteur) reste spécifique.
+[<AbstractClass>]
+type RemoteVolumeDriver(dataRoot: string, driverName: string) as this =
 
-        if not (vols.IsEmpty) then
-            let removed = ResizeArray<string>()
+    let store = RemoteVolumeStore(dataRoot, driverName)
 
-            for vol in vols do
-                let mutable v = Unchecked.defaultof<JsonElement>
-                let id = if vol.TryGetProperty("id", &v) then v.GetString() else null
+    /// Construit le chemin distant (partage / export / maquette) à partir des
+    /// options du driver. Lève RpcException InvalidArgument si un champ manque.
+    abstract RemotePath: Map<string, string> -> string
 
-                if not (String.IsNullOrEmpty(id)) then
-                    if store.RemoveVolume(id) then
-                        removed.Add(id)
+    /// Monte la ressource distante `remotePath` sur `targetPath`.
+    abstract Mount: string -> string -> Map<string, string> -> unit
 
-            removed |> Seq.toList
-        else
-            []
+    /// Démonte la ressource montée sur `targetPath`. Défaut : démontage de
+    /// type NFS (umount → fallback mount -u) ; Azure/SMB surchargent.
+    abstract Unmount: string -> unit
+    default this.Unmount targetPath = RemoteDriverHelpers.unmountNfsLike targetPath
+
+    interface IVolumeDriver with
+        member _.CreateVolume(name, driverOpts, labels) =
+            let remotePath = this.RemotePath driverOpts
+            store.CreateVolume(name, remotePath, labels, driverOpts)
+
+        member _.RemoveVolume(id, _force) = store.RemoveVolume(id)
+        member _.InspectVolume(id) = store.InspectVolume(id)
+        member _.ListVolumes(_filters) = store.ListVolumes()
+        member _.GetVolumeSize(_id) = 0L
+
+        member _.MountVolume(id, targetPath, options) =
+            RemoteDriverHelpers.mountVolume store id targetPath options this.Mount
+
+        member _.UnmountVolume(id, targetPath) =
+            RemoteDriverHelpers.unmountVolume id targetPath this.Unmount
+
+        member _.PruneVolumes() = store.PruneAll()
