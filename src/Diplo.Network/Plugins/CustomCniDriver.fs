@@ -49,7 +49,7 @@ type CustomCniDriver() =
 
                 let actualGateway =
                     if String.IsNullOrEmpty(gateway) then
-                        deriveGateway actualSubnet
+                        deriveGateway actualSubnet |> Result.defaultWith failwith
                     else
                         gateway
 

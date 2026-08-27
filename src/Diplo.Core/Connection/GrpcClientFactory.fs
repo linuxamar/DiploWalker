@@ -7,6 +7,7 @@ open System.Net.Http
 open System.Net.Sockets
 open System.Threading
 open System.Threading.Tasks
+open System.Runtime.ExceptionServices
 open Grpc.Core
 open Grpc.Net.Client
 open Grpc.Net.Client.Configuration
@@ -71,7 +72,8 @@ module GrpcClientFactory =
                             return pipe :> Stream
                         with ex ->
                             pipe.Dispose()
-                            return raise ex
+                            ExceptionDispatchInfo.Capture(ex).Throw()
+                            return Unchecked.defaultof<Stream>
                     }
 
                 ValueTask<Stream>(t))

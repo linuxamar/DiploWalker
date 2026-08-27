@@ -180,8 +180,8 @@ let saveConfig (configPath: string option) (config: CniNatConfig) =
         try
             if File.Exists(tempPath) then
                 File.Delete(tempPath)
-        with _ ->
-            ()
+        with cleanupEx ->
+            Log.Warning(cleanupEx, "Échec de la suppression du fichier temporaire {Tmp}", tempPath)
 
         reraise ()
 
@@ -235,14 +235,14 @@ let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) : 
             | Some h -> Ok h
             | None -> Error "Aucun sous-réseau valide disponible"
 
-let deriveGateway (subnet: string) =
+let deriveGateway (subnet: string) : Result<string, string> =
     let ipPart = subnet.Split('/') |> Array.head
     let parts = ipPart.Split('.')
 
     if parts.Length < 3 then
-        failwithf "Sous-réseau invalide pour dériver la passerelle: '%s'" subnet
-
-    sprintf "%s.%s.%s.1" parts.[0] parts.[1] parts.[2]
+        Error(sprintf "Sous-réseau invalide pour dériver la passerelle: '%s'" subnet)
+    else
+        Ok(sprintf "%s.%s.%s.1" parts.[0] parts.[1] parts.[2])
 
 // ─── Résolution de la configuration finale ───────────────────────────────
 
@@ -256,19 +256,19 @@ let resolveSubnet (config: CniNatConfig) (usedPrefixes: Set<string>) : Result<st
     else
         Ok config.Subnet
 
-let resolveGateway (config: CniNatConfig) (resolvedSubnet: string) =
+let resolveGateway (config: CniNatConfig) (resolvedSubnet: string) : Result<string, string> =
     if String.IsNullOrEmpty(config.Gateway) then
         deriveGateway resolvedSubnet
     else
-        config.Gateway
+        Ok config.Gateway
 
 let resolveAll (configPath: string option) : Result<CniNatConfig * string * string, string> =
     let config = loadConfig configPath
     let usedPrefixes = getUsedPrefixes ()
     resolveSubnet config usedPrefixes
-    |> Result.map (fun subnet ->
-        let gateway = resolveGateway config subnet
-        (config, subnet, gateway))
+    |> Result.bind (fun subnet ->
+        resolveGateway config subnet
+        |> Result.map (fun gateway -> (config, subnet, gateway)))
 
 // ─── Génération du conflist CNI ─────────────────────────────────────────
 

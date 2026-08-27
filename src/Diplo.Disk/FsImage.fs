@@ -307,7 +307,7 @@ module FsImage =
                 try
                     if File.Exists destPath then
                         File.Delete destPath
-                with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {DestPath}", destPath)
+                with cleanupEx -> Log.Warning(cleanupEx, "Échec de la suppression du fichier temporaire {DestPath}", destPath)
 
             reraise ()
 

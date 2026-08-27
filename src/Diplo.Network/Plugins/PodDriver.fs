@@ -112,7 +112,7 @@ type PodDriver(hns: IHnsProvider) =
 
                 let actualGateway =
                     if String.IsNullOrEmpty(gateway) then
-                        getDefaultGateway actualSubnet
+                        getDefaultGateway actualSubnet |> Result.defaultWith failwith
                     else
                         gateway
 

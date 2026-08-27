@@ -151,15 +151,15 @@ module NetworkConfigTests =
 
     [<Fact>]
     let ``deriveGateway retourne .1 comme passerelle`` () =
-        deriveGateway "172.20.0.0/16" |> should equal "172.20.0.1"
+        deriveGateway "172.20.0.0/16" |> Result.defaultWith failwith |> should equal "172.20.0.1"
 
     [<Fact>]
     let ``deriveGateway fonctionne avec un sous-reseau /24`` () =
-        deriveGateway "10.0.0.0/24" |> should equal "10.0.0.1"
+        deriveGateway "10.0.0.0/24" |> Result.defaultWith failwith |> should equal "10.0.0.1"
 
     [<Fact>]
     let ``deriveGateway fonctionne avec 10.x`` () =
-        deriveGateway "10.100.0.0/16" |> should equal "10.100.0.1"
+        deriveGateway "10.100.0.0/16" |> Result.defaultWith failwith |> should equal "10.100.0.1"
 
     // ─── resolveSubnet ──────────────────────────────────────────────────
 
@@ -198,13 +198,13 @@ module NetworkConfigTests =
             { defaultConfig with
                 Gateway = "10.0.0.254" }
 
-        let result = resolveGateway config "10.0.0.0/16"
+        let result = resolveGateway config "10.0.0.0/16" |> Result.defaultWith failwith
         result |> should equal "10.0.0.254"
 
     [<Fact>]
     let ``resolveGateway derive la passerelle si vide`` () =
         let config = { defaultConfig with Gateway = "" }
-        let result = resolveGateway config "172.20.0.0/16"
+        let result = resolveGateway config "172.20.0.0/16" |> Result.defaultWith failwith
         result |> should equal "172.20.0.1"
 
     // ─── generateCniConflistJson ────────────────────────────────────────
