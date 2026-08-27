@@ -15,6 +15,7 @@ open System.IO
 /// fichier de données externe. Les clusters compressés sont refusés à la
 /// lecture (message explicite).
 module Qcow2 =
+    open BinaryIo
 
     type Header =
         { Version: int
@@ -49,63 +50,13 @@ module Qcow2 =
     /// Bit 62 d'un descripteur L2 : cluster compressé.
     let private compressedFlag = 0x4000000000000000L
 
-    // ── lecture binaire big-endian ─────────────────────────────────────────
-
-    let private readFully (s: Stream) (buffer: byte[]) =
-        let mutable total = 0
-
-        while total < buffer.Length do
-            let r = s.Read(buffer, total, buffer.Length - total)
-
-            if r <= 0 then
-                failwith "Fichier qcow2 tronqué (lecture incomplète)"
-
-            total <- total + r
-
-    let private be16 (d: byte[]) (o: int) = (int d.[o] <<< 8) ||| int d.[o + 1]
-
-    let private be32 (d: byte[]) (o: int) =
-        (int64 d.[o] <<< 24)
-        ||| (int64 d.[o + 1] <<< 16)
-        ||| (int64 d.[o + 2] <<< 8)
-        ||| int64 d.[o + 3]
-        |> int32
-
-    let private be64 (d: byte[]) (o: int) =
-        let mutable v = 0L
-
-        for i in 0..7 do
-            v <- (v <<< 8) ||| int64 d.[o + i]
-
-        v
-
-    let private putBe16 (v: int) (d: byte[]) (o: int) =
-        d.[o] <- byte (v >>> 8)
-        d.[o + 1] <- byte v
-
-    let private putBe32 (v: int) (d: byte[]) (o: int) =
-        d.[o] <- byte (v >>> 24)
-        d.[o + 1] <- byte (v >>> 16)
-        d.[o + 2] <- byte (v >>> 8)
-        d.[o + 3] <- byte v
-
-    let private putBe64 (v: int64) (d: byte[]) (o: int) =
-        d.[o] <- byte (v >>> 56)
-        d.[o + 1] <- byte (v >>> 48)
-        d.[o + 2] <- byte (v >>> 40)
-        d.[o + 3] <- byte (v >>> 32)
-        d.[o + 4] <- byte (v >>> 24)
-        d.[o + 5] <- byte (v >>> 16)
-        d.[o + 6] <- byte (v >>> 8)
-        d.[o + 7] <- byte v
-
     // ── en-tête ────────────────────────────────────────────────────────────
 
     /// Analyse l'en-tête qcow2 (versions 2 et 3).
     let private readHeaderCore (stream: Stream) : Header =
         let buf = Array.zeroCreate<byte> 128
         stream.Position <- 0L
-        readFully stream buf
+        BinaryIo.readFully stream buf 0 buf.Length
 
         if
             not (
@@ -173,7 +124,7 @@ module Qcow2 =
 
     /// Analyse l'en-tête qcow2, version Result.
     let readHeader (stream: Stream) : Result<Header, string> =
-        try Ok(readHeaderCore stream) with ex -> Error ex.Message
+        protect (fun () -> readHeaderCore stream)
 
     let clusterSize (h: Header) = h.ClusterSize
     let virtualSize (h: Header) = h.VirtualSize
@@ -182,15 +133,7 @@ module Qcow2 =
 
     let private readAt (s: Stream) (offset: int64) (buffer: byte[]) (bufferOffset: int) (count: int) =
         s.Position <- offset
-        let mutable total = 0
-
-        while total < count do
-            let r = s.Read(buffer, bufferOffset + total, count - total)
-
-            if r <= 0 then
-                failwith "Lecture au-delà de la fin du fichier qcow2"
-
-            total <- total + r
+        readFully s buffer bufferOffset count
 
     let private readUInt64At (s: Stream) (offset: int64) : int64 =
         let b = Array.zeroCreate<byte> 8
@@ -303,7 +246,7 @@ module Qcow2 =
 
     /// Lit `count` octets à l'offset virtuel `virtualOffset`, version Result.
     let readBytesAt (s: Stream) (h: Header) (virtualOffset: int64) (count: int) : Result<byte[], string> =
-        try Ok(readBytesAtCore s h virtualOffset count) with ex -> Error ex.Message
+        protect (fun () -> readBytesAtCore s h virtualOffset count)
 
     // ── écriture ───────────────────────────────────────────────────────────
 
@@ -383,7 +326,7 @@ module Qcow2 =
 
     /// Écrit `data` à l'offset virtuel `virtualOffset`, version Result.
     let writeBytesAt (s: Stream) (h: Header) (virtualOffset: int64) (data: byte[]) : Result<unit, string> =
-        try Ok(writeBytesAtCore s h virtualOffset data) with ex -> Error ex.Message
+        protect (fun () -> writeBytesAtCore s h virtualOffset data)
 
     // ── redimensionnement ──────────────────────────────────────────────────
 
@@ -568,23 +511,19 @@ module Qcow2 =
 
     /// Redimensionne l'image qcow2, version Result.
     let resize (s: Stream) (newVirtualSize: int64) : Result<Header, string> =
-        try Ok(resizeCore s newVirtualSize) with ex -> Error ex.Message
+        protect (fun () -> resizeCore s newVirtualSize)
 
 /// Flux d'accès aléatoire (lecture/écriture) sur une image qcow2, exploité
 /// par DiscUtils pour accéder au système de fichiers contenu dans l'image.
 type Qcow2Stream(path: string, access: FileAccess) =
-    inherit Stream()
+    inherit RawImageStream(path, access)
 
-    let fs = new FileStream(path, FileMode.Open, access, FileShare.Read)
+    let fs = base.UnderlyingStream
     let mutable header = Qcow2.readHeader fs |> Result.defaultWith failwith
     let mutable position = 0L
-    let mutable released = false
 
     member _.Header = header
 
-    override _.CanRead = true
-    override _.CanSeek = true
-    override _.CanWrite = access <> FileAccess.Read
     override _.Length = header.VirtualSize
 
     override _.Position
@@ -609,8 +548,6 @@ type Qcow2Stream(path: string, access: FileAccess) =
             Qcow2.writeBytesAt fs header position data |> Result.defaultWith failwith
             position <- position + int64 count
 
-    override _.Flush() = fs.Flush()
-
     override _.Seek(offset, origin) =
         position <-
             match origin with
@@ -623,15 +560,3 @@ type Qcow2Stream(path: string, access: FileAccess) =
     override _.SetLength(value: int64) =
         if value <> header.VirtualSize then
             header <- Qcow2.resize fs value |> Result.defaultWith failwith
-
-    override _.Dispose(disposing) =
-        if not released then
-            released <- true
-
-            if disposing then
-                try
-                    fs.Flush()
-                finally
-                    fs.Dispose()
-
-        base.Dispose(disposing)

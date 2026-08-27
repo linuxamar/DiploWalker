@@ -16,51 +16,7 @@ open Serilog
 /// (ntfs, fat, ext, btrfs, …) est détecté automatiquement après enregistrement
 /// des fournisseurs via `SetupHelper.SetupComplete()`.
 module FsImage =
-
-    let private toRealRel (fsPath: string) =
-        fsPath.TrimStart('\\', '/').Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar)
-
-    /// Convertit un chemin INTERNE au système de fichiers image en chemin hôte,
-    /// confiné à `realRoot` : les noms internes viennent de données non fiables
-    /// (une image peut contenir « .. » ou des noms enracinés type « C:\x »).
-    /// Sans ce contrôle, le service (LocalSystem) écrit n'importe où sur l'hôte.
-    let private realFrom (realRoot: string) (fsPath: string) =
-        let rel = toRealRel fsPath
-
-        let rooted =
-            try
-                Path.IsPathRooted(rel)
-            with _ ->
-                true
-
-        let hasTraversal =
-            rel.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
-            |> Array.exists (fun seg -> seg = "..")
-
-        if rooted || hasTraversal then
-            invalidArg "fsPath" (sprintf "Chemin interne d'image invalide : '%s'" fsPath)
-
-        let combined =
-            try
-                Path.GetFullPath(Path.Combine(realRoot, rel))
-            with _ ->
-                invalidArg "fsPath" (sprintf "Chemin interne d'image invalide : '%s'" fsPath)
-
-        let rootFull = Path.GetFullPath(realRoot)
-
-        let rootWithSep =
-            realRoot.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
-
-        // Le chemin doit rester dans le staging ; la RACINE elle-même est
-        // autorisée (l'extraction démarre par « \ »).
-        let inside =
-            combined.Equals(rootFull, StringComparison.OrdinalIgnoreCase)
-            || combined.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase)
-
-        if not inside then
-            invalidArg "fsPath" (sprintf "Le chemin interne sort du répertoire de staging : '%s'" fsPath)
-
-        combined
+    open DiscFsHelper
 
     /// Enregistre une seule fois les fournisseurs DiscUtils (conteneurs et
     /// systèmes de fichiers) pour la détection automatique des formats.
@@ -86,38 +42,11 @@ module FsImage =
             :> VirtualDisk
         | _ -> VirtualDisk.OpenDisk(sourcePath, access)
 
-    /// Retrouve le système de fichiers de l'image : volumes logiques puis
-    /// physiques, détectés automatiquement parmi les fournisseurs enregistrés.
+    /// Retrouve le système de fichiers de l'image via l'adaptateur partagé.
     let private openFileSystem (disk: VirtualDisk) : DiscFileSystem =
-        let vm = new VolumeManager(disk)
-
-        let candidates =
-            Seq.append
-                (vm.GetLogicalVolumes() |> Seq.cast<VolumeInfo>)
-                (vm.GetPhysicalVolumes() |> Seq.cast<VolumeInfo>)
-            |> Seq.toArray
-
-        candidates
-        |> Array.tryFind (fun v -> FileSystemManager.DetectFileSystems(v).Count > 0)
-        |> function
-            | Some volume ->
-                let fsi = FileSystemManager.DetectFileSystems(volume).[0]
-                fsi.Open(volume)
-            | None -> failwith "Aucun système de fichiers détecté dans l'image disque"
-
-    let rec private copyDirectory (fs: DiscFileSystem) (fsDir: string) (realRoot: string) (counter: int ref) =
-        Directory.CreateDirectory(realFrom realRoot fsDir) |> ignore
-
-        for file in fs.GetFiles fsDir |> Seq.toArray do
-            let target = realFrom realRoot file
-            Directory.CreateDirectory(Path.GetDirectoryName target) |> ignore
-            use src = fs.OpenFile(file, FileMode.Open, FileAccess.Read)
-            use dst = File.Create target
-            src.CopyTo dst
-            counter := !counter + 1
-
-        for sub in fs.GetDirectories fsDir |> Seq.toArray do
-            copyDirectory fs sub realRoot counter
+        match DiscFsHelper.openFileSystem disk with
+        | Some fs -> fs
+        | None -> failwith "Aucun système de fichiers détecté dans l'image disque"
 
     /// Extrait le contenu du système de fichiers de l'image dans `targetDir`.
     /// Retourne le nombre de fichiers extraits.
@@ -136,38 +65,11 @@ module FsImage =
                     use disk = openDisk sourcePath readOnly
                     use fs = openFileSystem disk
                     let counter = ref 0
-                    copyDirectory fs "\\" targetDir counter
+                    DiscFsHelper.copyDirectory (realFrom targetDir) fs "\\" counter
                     !counter
 
     let extract (sourcePath: string) (targetDir: string) (readOnly: bool) : Result<int, string> =
-        try Ok(extractCore sourcePath targetDir readOnly)
-        with ex -> Error ex.Message
-
-    let rec private copyIntoFs (fs: DiscFileSystem) (fsDir: string) (realDir: string) =
-        for file in Directory.GetFiles realDir do
-            let fsPath = fsDir.TrimEnd('\\') + "\\" + Path.GetFileName file
-            use src = File.OpenRead file
-            use dst = fs.OpenFile(fsPath, FileMode.Create, FileAccess.Write)
-            src.CopyTo dst
-
-        for dir in Directory.GetDirectories realDir do
-            let fsPath = fsDir.TrimEnd('\\') + "\\" + Path.GetFileName dir
-
-            if not (fs.DirectoryExists fsPath) then
-                fs.CreateDirectory fsPath
-
-            copyIntoFs fs fsPath dir
-
-    let rec private deleteFsEntries (fs: DiscFileSystem) (fsDir: string) (realRoot: string) =
-        for file in fs.GetFiles fsDir |> Seq.toArray do
-            if not (File.Exists(realFrom realRoot file)) then
-                fs.DeleteFile file
-
-        for sub in fs.GetDirectories fsDir |> Seq.toArray do
-            deleteFsEntries fs sub realRoot
-
-            if not (Directory.Exists(realFrom realRoot sub)) then
-                fs.DeleteDirectory(sub, false)
+        BinaryIo.protect (fun () -> extractCore sourcePath targetDir readOnly)
 
     /// Réécrit le contenu de `sourceDir` dans le système de fichiers de
     /// l'image : retour arrière des modifications effectuées par le conteneur.
@@ -182,12 +84,11 @@ module FsImage =
         else
             use disk = openDisk sourcePath false
             use fs = openFileSystem disk
-            copyIntoFs fs "\\" sourceDir
-            deleteFsEntries fs "\\" sourceDir
+            DiscFsHelper.copyIntoFs fs "\\" sourceDir
+            DiscFsHelper.deleteFsEntries (realFrom sourceDir) fs "\\"
 
     let writeBack (sourcePath: string) (sourceDir: string) : Result<unit, string> =
-        try writeBackCore sourcePath sourceDir; Ok()
-        with ex -> Error ex.Message
+        BinaryIo.protect (fun () -> writeBackCore sourcePath sourceDir)
 
     // ── Création d'image disque ─────────────────────────────────────
 
@@ -201,23 +102,6 @@ module FsImage =
             size <- size + calcDirSize sub
 
         size
-
-    /// Copie le contenu de `realDir` dans le système de fichiers DiscUtils
-    /// à la racine `fsDir`.
-    let rec private copyDirIntoFs (fs: DiscFileSystem) (fsDir: string) (realDir: string) =
-        for file in Directory.GetFiles realDir do
-            let fsPath = fsDir.TrimEnd('\\') + "\\" + Path.GetFileName file
-            use src = File.OpenRead file
-            use dst = fs.OpenFile(fsPath, FileMode.Create, FileAccess.Write)
-            src.CopyTo dst
-
-        for dir in Directory.GetDirectories realDir do
-            let fsPath = fsDir.TrimEnd('\\') + "\\" + Path.GetFileName dir
-
-            if not (fs.DirectoryExists fsPath) then
-                fs.CreateDirectory fsPath
-
-            copyDirIntoFs fs fsPath dir
 
     /// Ouvre ou crée un disque virtuel dans le format donné.
     /// Si le fichier existe déjà, il est ouvert ; sinon, un nouveau disque
@@ -297,7 +181,7 @@ module FsImage =
             let pv = physicalVolumes.Head
             Ntfs.NtfsFileSystem.Format(pv, "Diplo", Ntfs.NtfsFormatOptions()) |> ignore
             use fs = openFileSystem disk
-            copyDirIntoFs fs "\\" sourceDir
+            DiscFsHelper.copyIntoFs fs "\\" sourceDir
             destPath
         with ex ->
             // Ne supprimer l'image que si NOUS l'avons créée : un échec de
