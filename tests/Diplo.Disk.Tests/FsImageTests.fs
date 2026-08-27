@@ -295,5 +295,9 @@ module FsImageTests =
                 File.CreateSymbolicLink(linkPath, Path.Combine(src, "cible.txt")) |> ignore
                 FsImage.create src dest DiskFormat.Vhd |> Result.defaultWith failwith |> ignore
                 File.Exists(dest) |> should equal true
-            with :? PlatformNotSupportedException ->
-                ())
+            with
+            // Le privilège SeCreateSymbolicLink n'est pas disponible sur
+            // tous les environnements (CI non élévée, mode développeur
+            // désactivé) : le test ne peut pas s'exécuter, on le saute.
+            | :? PlatformNotSupportedException -> Assert.Skip("Symbolic links non supportés sur cette plateforme.")
+            | :? IOException -> Assert.Skip("Privilège de création de liens symboliques indisponible."))
