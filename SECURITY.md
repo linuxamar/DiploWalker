@@ -59,6 +59,10 @@ Toutes les entrées utilisateur sont validées avant traitement :
 
 `SecurityValidation.containsShellInjection` bloque les caractères dangereux : `;`, `|`, `&&`, `$(`, `` ` ``, `$(`, `>`, `<`. Ceci empêche toute injection de commandes shell à travers les paramètres utilisateur.
 
+### Confinement des chemins d'images disque
+
+Lors de l'extraction/la réécriture d'une image disque (VDI, DMG, QCOW…), les chemins relatifs provenant de l'image sont résolus via `DiscFsHelper.realFrom` **confiné** au dossier racine monté : toute tentative de sortie (`..`, chemins absolus, séparateurs) est rejetée. Ce correctif anti-traversal empêche une image malveillante d'écrire en dehors de sa propre arborescence (VdiFs et DmgFs passent désormais par cette vérification).
+
 ## Limites de conteneurs
 
 Les ressources des conteneurs (mémoire, CPU, PID) sont transmises à containerd via un spec OCI généré dynamiquement. Les limites sont appliquées au niveau du kernel Windows :

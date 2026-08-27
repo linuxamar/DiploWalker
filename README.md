@@ -234,6 +234,10 @@ Diplo/
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
 │   ├── Diplo.Disk/             # Montage et création d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels)
+│   │   ├── BinaryIo.fs         # Lecture/écriture binaire + helper `protect`
+│   │   ├── DiscFsHelper.fs     # Fonctions DiscUtils partagées + `realFrom` (anti-traversal)
+│   │   ├── RawImageStream.fs   # Classe de base Stream des pilotes maison (Qcow1/Qcow2/Parallels)
+│   │   ├── Qcow1Fs.fs / Qcow2.fs / ParallelsFs.fs / VdiFs.fs / DmgFs.fs / FsImage.fs
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
 │   ├── Diplo.Gui/              # Interface graphique Avalonia
 │   │   ├── Views/MainWindow.axaml(.fs)
@@ -467,12 +471,16 @@ diplo version
 | `GrpcClientFactory`          | Core         | Construction canaux gRPC TCP/pipe avec retry                         |
 | `TestHelpers`                | TestHelpers  | Helpers temp dir pour les tests                                      |
 | `HawkyntFs`                  | Disk         | Adaptateur Hawkynt pour Btrfs/XFS/HFS+ R/W                           |
+| `BinaryIo`                   | Disk         | Lecture/écriture binaire + helper `protect`                          |
+| `RawImageStream`             | Disk         | Classe de base `Stream` des pilotes maison (Qcow1/Qcow2/Parallels)   |
+| `DiscFsHelper`               | Disk         | Fonctions DiscUtils partagées + `realFrom` (anti-traversal)          |
 | `VdiFs`                      | Disk         | Adaptateur DiscUtils.Vdi pour VDI R/W                                |
 | `Qcow1Fs`                    | Disk         | Pilote maison QCOW v1                                                |
 | `DmgFs`                      | Disk         | Adaptateur DiscUtils.Dmg pour extraction DMG                         |
 | `ParallelsFs`                | Disk         | Pilote maison Parallels                                              |
 | `FsImage`                    | Disk         | Création, extraction et réécriture d'images disque                   |
 | `RemoteDriverHelpers`        | Volume       | Helpers mutualisés pour drivers distants (NFS, AWS, GCP, Azure, SMB) |
+| `RemoteVolumeDriver`         | Volume       | Classe de base des drivers distants (store, création, montage, prune)|
 | `Cmd`                        | Gui          | Helpers try/with mutualisés pour commandes GUI                       |
 | `ContainerDetailUserControl` | Gui          | UserControl détail conteneur sélectionné                             |
 
