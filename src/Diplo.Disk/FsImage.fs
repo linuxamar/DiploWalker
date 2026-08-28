@@ -53,20 +53,23 @@ module FsImage =
     /// Essaie les adaptateurs spécialisés (Hawkynt Btrfs/XFS/HFS+, VDI, DMG)
     /// avant de fallback sur DiscUtils générique.
     let extractCore (sourcePath: string) (targetDir: string) (readOnly: bool) : int =
-        match HawkyntFs.tryExtract sourcePath targetDir with
+        match IsoFs.tryExtract sourcePath targetDir with
         | Some count -> count
         | None ->
-            match VdiFs.tryExtract sourcePath targetDir with
+            match HawkyntFs.tryExtract sourcePath targetDir with
             | Some count -> count
             | None ->
-                match DmgFs.tryExtract sourcePath targetDir with
+                match VdiFs.tryExtract sourcePath targetDir with
                 | Some count -> count
                 | None ->
-                    use disk = openDisk sourcePath readOnly
-                    use fs = openFileSystem disk
-                    let counter = ref 0
-                    DiscFsHelper.copyDirectory (realFrom targetDir) fs "\\" counter
-                    !counter
+                    match DmgFs.tryExtract sourcePath targetDir with
+                    | Some count -> count
+                    | None ->
+                        use disk = openDisk sourcePath readOnly
+                        use fs = openFileSystem disk
+                        let counter = ref 0
+                        DiscFsHelper.copyDirectory (realFrom targetDir) fs "\\" counter
+                        !counter
 
     let extract (sourcePath: string) (targetDir: string) (readOnly: bool) : Result<int, string> =
         BinaryIo.protect (fun () -> extractCore sourcePath targetDir readOnly)
@@ -147,53 +150,59 @@ module FsImage =
         if not (Directory.Exists sourceDir) then
             invalidArg "sourceDir" (sprintf "Le répertoire source n'existe pas : '%s'" sourceDir)
 
-        match format with
-        | DiskFormat.Qcow1
-        | DiskFormat.Qcow2
-        | DiskFormat.Parallels
-        | DiskFormat.Dmg
-        | DiskFormat.Unknown ->
-            invalidArg "format" (sprintf "Le format '%s' n'est pas supporté en création" (DiskFormat.toString format))
-        | _ -> ()
-
-        let dirSize = calcDirSize sourceDir
-        let minSize = 64L * 1024L * 1024L
-        let virtualSize = max minSize (dirSize + dirSize / 10L)
-
-        let parentDir = Path.GetDirectoryName(destPath)
-
-        if not (String.IsNullOrEmpty parentDir) then
-            Directory.CreateDirectory(parentDir) |> ignore
-
-        let fileCreated = File.Exists(destPath)
-
-        try
-            use disk = openOrCreateDisk destPath format virtualSize
-
-            let volumeManager = VolumeManager(disk)
-
-            let physicalVolumes =
-                volumeManager.GetPhysicalVolumes() |> Seq.cast<VolumeInfo> |> Seq.toList
-
-            if physicalVolumes.IsEmpty then
-                failwith "Aucun volume physique détecté dans le disque créé"
-
-            let pv = physicalVolumes.Head
-            Ntfs.NtfsFileSystem.Format(pv, "Diplo", Ntfs.NtfsFormatOptions()) |> ignore
-            use fs = openFileSystem disk
-            DiscFsHelper.copyIntoFs fs "\\" sourceDir
+        if format = DiskFormat.Iso then
+            // Création ISO9660 niveau 1 directement (pas de disque virtuel).
+            IsoFs.createCore sourceDir destPath |> ignore
             destPath
-        with ex ->
-            // Ne supprimer l'image que si NOUS l'avons créée : un échec de
-            // formatage sur une image EXISTANTE (ouverte par openOrCreateDisk)
-            // ne doit jamais la détruire.
-            if fileCreated then
-                try
-                    if File.Exists destPath then
-                        File.Delete destPath
-                with cleanupEx -> Log.Warning(cleanupEx, "Échec de la suppression du fichier temporaire {DestPath}", destPath)
+        else
+            match format with
+            | DiskFormat.Qcow1
+            | DiskFormat.Qcow2
+            | DiskFormat.Parallels
+            | DiskFormat.Dmg
+            | DiskFormat.Unknown ->
+                invalidArg "format" (sprintf "Le format '%s' n'est pas supporté en création" (DiskFormat.toString format))
+            | _ -> ()
 
-            reraise ()
+            let dirSize = calcDirSize sourceDir
+            let minSize = 64L * 1024L * 1024L
+            let virtualSize = max minSize (dirSize + dirSize / 10L)
+
+            let parentDir = Path.GetDirectoryName(destPath)
+
+            if not (String.IsNullOrEmpty parentDir) then
+                Directory.CreateDirectory(parentDir) |> ignore
+
+            let fileCreated = File.Exists(destPath)
+
+            try
+                use disk = openOrCreateDisk destPath format virtualSize
+
+                let volumeManager = VolumeManager(disk)
+
+                let physicalVolumes =
+                    volumeManager.GetPhysicalVolumes() |> Seq.cast<VolumeInfo> |> Seq.toList
+
+                if physicalVolumes.IsEmpty then
+                    failwith "Aucun volume physique détecté dans le disque créé"
+
+                let pv = physicalVolumes.Head
+                Ntfs.NtfsFileSystem.Format(pv, "Diplo", Ntfs.NtfsFormatOptions()) |> ignore
+                use fs = openFileSystem disk
+                DiscFsHelper.copyIntoFs fs "\\" sourceDir
+                destPath
+            with ex ->
+                // Ne supprimer l'image que si NOUS l'avons créée : un échec de
+                // formatage sur une image EXISTANTE (ouverte par openOrCreateDisk)
+                // ne doit jamais la détruire.
+                if fileCreated then
+                    try
+                        if File.Exists destPath then
+                            File.Delete destPath
+                    with cleanupEx ->
+                        Log.Warning(cleanupEx, "Échec de la suppression du fichier temporaire {DestPath}", destPath)
+
+                reraise ()
 
     let create (sourceDir: string) (destPath: string) (format: DiskFormat.Format) : Result<string, string> =
         try Ok(createCore sourceDir destPath format)

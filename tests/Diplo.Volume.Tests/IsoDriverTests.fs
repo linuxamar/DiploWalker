@@ -9,6 +9,7 @@ module IsoDriverTests =
     open FsUnit.Xunit
     open Diplo.Volume.Drivers
     open Diplo.Abstractions.SecurityValidation
+    open Diplo.Disk
 
     do addAllowedVolumeDir (Path.GetTempPath())
 

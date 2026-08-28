@@ -233,7 +233,12 @@ Diplo/
 │   ├── Diplo.Grpc/             # Types messages, services gRPC, DriverMappings
 │   ├── Diplo.Contracts/        # Types partagés entre services
 │   ├── Diplo.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
-│   ├── Diplo.Disk/             # Montage et création d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels)
+│   ├── Diplo.Disk/             # Montage et création d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels, iso)
+│   │   ├── BinaryIo.fs         # Lecture/écriture binaire + helper `protect`
+│   │   ├── DiscFsHelper.fs     # Fonctions DiscUtils partagées + `realFrom` (anti-traversal)
+│   │   ├── RawImageStream.fs   # Classe de base Stream des pilotes maison (Qcow1/Qcow2/Parallels)
+│   │   ├── Qcow1Fs.fs / Qcow2.fs / ParallelsFs.fs / VdiFs.fs / DmgFs.fs / FsImage.fs
+│   │   ├── IsoFs.fs            # Parseur ISO9660/UDF + générateur ISO9660 niveau 1
 │   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
 │   ├── Diplo.Gui/              # Interface graphique Avalonia
 │   │   ├── Views/MainWindow.axaml(.fs)
@@ -291,9 +296,10 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 | **VHDX**      | `.vhdx`                        | R/W           | DiscUtils                                    |
 | **VMDK**      | `.vmdk`                        | R/W           | DiscUtils                                    |
 | **VDI**       | `.vdi`                         | R/W           | DiscUtils                                    |
-| **Raw**       | `.img`, `.raw`, `.bin`, `.iso` | R/W           | DiscUtils (FAT, NTFS, ext)                   |
+| **Raw**       | `.img`, `.raw`, `.bin`         | R/W           | DiscUtils (FAT, NTFS, ext)                   |
 | **DMG**       | `.dmg`                         | Lecture seule | DiscUtils                                    |
 | **Parallels** | `.hdd`, `.hds`                 | R/W           | Pilote maison (`ParallelsStream`)            |
+| **ISO**       | `.iso`, `.udf`                 | Lecture seule | Parseur maison (`IsoFs.fs`) ISO9660/UDF      |
 | **Btrfs**     | (via Hawkynt)                  | R/W           | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
 | **XFS**       | (via Hawkynt)                  | R/W           | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
 | **HFS+**      | (via Hawkynt)                  | R/W           | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |
@@ -314,18 +320,21 @@ Les sources sont restreintes aux répertoires autorisés par la validation de s�
 ### Création d'images disque
 
 ``powershell
-diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw]
+diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw|iso]
 ``
 
 | Format   | Extension                      | Moteur    | Note                           |
 | -------- | ------------------------------ | --------- | ------------------------------ |
-| **Raw**  | `.img`, `.raw`, `.bin`, `.iso` | DiscUtils | Par défaut                     |
+| **Raw**  | `.img`, `.raw`, `.bin`         | DiscUtils | Par défaut                     |
 | **VHD**  | `.vhd`                         | DiscUtils | Virtual Hard Disk (dynamic)    |
 | **VHDX** | `.vhdx`                        | DiscUtils | Virtual Hard Disk v2 (dynamic) |
 | **VMDK** | `.vmdk`                        | DiscUtils | Virtual Machine Disk (dynamic) |
 | **VDI**  | `.vdi`                         | DiscUtils | VirtualBox Disk Image          |
+| **ISO**  | `.iso`                         | Parseur maison | ISO9660 niveau 1 (8.3, ASCII) |
 
 La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés. En cas d'erreur lors du formatage ou de la copie, le fichier partiel est automatiquement supprimé (rollback).
+
+Pour le format **ISO**, le générateur maison `IsoFs.create` produit un système ISO9660 niveau 1 : noms de fichiers 8.3 en majuscules ASCII, sans Joliet ni Rock Ridge. Les noms plus longs sont tronqués à la règle 8.3, et les caractères non ASCII (accents, CJK…) sont réduits à leur équivalent ASCII ou remplacés ; utilisez l'un des autres formats pour préserver ces noms.
 
 Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (pas de factory publique dans DiscUtils).
 
@@ -342,6 +351,7 @@ Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (
 | Raw       | R/W           | ✅             | DiscUtils            |
 | DMG       | Lecture seule | —              | DiscUtils            |
 | Parallels | R/W           | —              | Pilote maison        |
+| ISO       | Lecture seule | ✅             | IsoFs (ISO9660/UDF)  |
 | Btrfs     | R/W           | —              | Hawkynt (seuil 2 Go) |
 | XFS       | R/W           | —              | Hawkynt (seuil 2 Go) |
 | HFS+      | R/W           | —              | Hawkynt (seuil 2 Go) |
@@ -467,12 +477,17 @@ diplo version
 | `GrpcClientFactory`          | Core         | Construction canaux gRPC TCP/pipe avec retry                         |
 | `TestHelpers`                | TestHelpers  | Helpers temp dir pour les tests                                      |
 | `HawkyntFs`                  | Disk         | Adaptateur Hawkynt pour Btrfs/XFS/HFS+ R/W                           |
+| `IsoFs`                      | Disk         | Parseur ISO9660/UDF + générateur ISO9660 niveau 1                    |
+| `BinaryIo`                   | Disk         | Lecture/écriture binaire + helper `protect`                          |
+| `RawImageStream`             | Disk         | Classe de base `Stream` des pilotes maison (Qcow1/Qcow2/Parallels)   |
+| `DiscFsHelper`               | Disk         | Fonctions DiscUtils partagées + `realFrom` (anti-traversal)          |
 | `VdiFs`                      | Disk         | Adaptateur DiscUtils.Vdi pour VDI R/W                                |
 | `Qcow1Fs`                    | Disk         | Pilote maison QCOW v1                                                |
 | `DmgFs`                      | Disk         | Adaptateur DiscUtils.Dmg pour extraction DMG                         |
 | `ParallelsFs`                | Disk         | Pilote maison Parallels                                              |
 | `FsImage`                    | Disk         | Création, extraction et réécriture d'images disque                   |
 | `RemoteDriverHelpers`        | Volume       | Helpers mutualisés pour drivers distants (NFS, AWS, GCP, Azure, SMB) |
+| `RemoteVolumeDriver`         | Volume       | Classe de base des drivers distants (store, création, montage, prune)|
 | `Cmd`                        | Gui          | Helpers try/with mutualisés pour commandes GUI                       |
 | `ContainerDetailUserControl` | Gui          | UserControl détail conteneur sélectionné                             |
 

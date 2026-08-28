@@ -126,6 +126,29 @@ module DiskFormatTests =
         finally
             File.Delete p
 
+    [<Fact>]
+    let ``detect reconnait une image iso par la signature CD001`` () =
+        let p = tempFile ()
+
+        try
+            // Signature ISO9660 « CD001 » à l'offset 0x8001 (bloc 16 : 2048*16+1).
+            let data = Array.zeroCreate<byte> 40000
+            Encoding.ASCII.GetBytes("CD001").CopyTo(data, 0x8001)
+            writeBytes p data
+            DiskFormat.detect p |> should equal DiskFormat.Iso
+        finally
+            File.Delete p
+
+    [<Fact>]
+    let ``detect retombe sur raw pour un fichier trop court pour l'iso`` () =
+        let p = tempFile ()
+
+        try
+            writeBytes p [| 0x01uy; 0x02uy; 0x03uy |]
+            DiskFormat.detect p |> should equal DiskFormat.Raw
+        finally
+            File.Delete p
+
     [<Theory>]
     [<InlineData("Qcow2")>]
     [<InlineData("Qcow1")>]
@@ -136,6 +159,7 @@ module DiskFormatTests =
     [<InlineData("Dmg")>]
     [<InlineData("Parallels")>]
     [<InlineData("Raw")>]
+    [<InlineData("Iso")>]
     let ``isDiskImage accepte les formats montables`` (name: string) =
         let format =
             match name with
@@ -147,6 +171,7 @@ module DiskFormatTests =
             | "Vdi" -> DiskFormat.Vdi
             | "Dmg" -> DiskFormat.Dmg
             | "Parallels" -> DiskFormat.Parallels
+            | "Iso" -> DiskFormat.Iso
             | _ -> DiskFormat.Raw
 
         DiskFormat.isDiskImage format |> should equal true

@@ -183,6 +183,32 @@ module FsImageTests =
             |> should equal "contenu du fichier")
 
     [<Fact>]
+    let ``create genere un fichier ISO9660 et lisible`` () =
+        runCreate (fun _ src dest ->
+            let destIso = Path.ChangeExtension(dest, ".iso")
+            // ISO9660 niveau 1 : noms 8.3, jeu de caractères ASCII.
+            writeSourceDir src
+            let result = FsImage.create src destIso DiskFormat.Iso |> Result.defaultWith failwith
+            result |> should equal destIso
+            File.Exists(destIso) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(destIso), "re")
+            FsImage.extract destIso re false |> Result.defaultWith failwith |> ignore
+
+            File.ReadAllText(Path.Combine(re, "FICHIER.TXT"))
+            |> should equal "contenu du fichier"
+
+            File.ReadAllText(Path.Combine(re, "sous", "dossier", "FICHIER2.TXT"))
+            |> should equal "deuxieme fichier")
+
+    [<Fact>]
+    let ``ISO est detecte apres creation par FsImage.create`` () =
+        runCreate (fun _ src dest ->
+            let destIso = Path.ChangeExtension(dest, ".iso")
+            File.WriteAllText(Path.Combine(src, "fichier.txt"), "contenu")
+            FsImage.create src destIso DiskFormat.Iso |> Result.defaultWith failwith |> ignore
+            DiskFormat.detect destIso |> should equal DiskFormat.Iso)
+
+    [<Fact>]
     let ``create leve invalidArg si le repertoire source n'existe pas`` () =
         runCreate (fun root _ dest ->
             let missing = Path.Combine(root, "n'existe pas")
