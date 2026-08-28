@@ -18,6 +18,7 @@ module DiskFormat =
         | Dmg
         | Parallels
         | Raw
+        | Iso
         | Unknown
 
     let toString (format: Format) =
@@ -31,6 +32,7 @@ module DiskFormat =
         | Dmg -> "dmg"
         | Parallels -> "parallels"
         | Raw -> "raw"
+        | Iso -> "iso"
         | Unknown -> "inconnu"
 
     let private startsWith (data: byte[]) (offset: int) (pattern: byte[]) =
@@ -104,7 +106,21 @@ module DiskFormat =
                                 fs.Position <- fs.Length - 512L
                                 fs.Read(foot, 0, 512) |> ignore
                                 let isVhd = startsWith foot 0 (Encoding.ASCII.GetBytes "conectix")
-                                if isVhd then Vhd else Raw
+
+                                if isVhd then
+                                    Vhd
+                                else
+                                    // ISO9660 / UDF : l'identifiant « CD001 » se
+                                    // trouve au bloc 16, octet 1 (offset 0x8001),
+                                    // juste après l'octet de type de descripteur.
+                                    let isIso =
+                                        fs.Length >= 32774L
+                                        && (let sig' = Array.zeroCreate<byte> 6
+                                            fs.Position <- 32769L
+                                            fs.Read(sig', 0, 6) |> ignore
+                                            Encoding.ASCII.GetString(sig', 0, 5) = "CD001")
+
+                                    if isIso then Iso else Raw
 
     /// Indique si le format est une image disque prise en charge par le
     /// moteur de montage (c'est-à-dire un fichier, pas un répertoire).
@@ -118,5 +134,6 @@ module DiskFormat =
         | Vdi
         | Dmg
         | Parallels
-        | Raw -> true
+        | Raw
+        | Iso -> true
         | Unknown -> false

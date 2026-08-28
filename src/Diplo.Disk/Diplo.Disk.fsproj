@@ -15,6 +15,7 @@
     <Compile Include="DmgFs.fs" />
     <Compile Include="ParallelsFs.fs" />
     <Compile Include="HawkyntFs.fs" />
+    <Compile Include="IsoFs.fs" />
     <Compile Include="FsImage.fs" />
     <Compile Include="MountState.fs" />
     <Compile Include="DiskMounter.fs" />
