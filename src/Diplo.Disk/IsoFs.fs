@@ -59,6 +59,29 @@ module IsoSource =
     let openFile (path: string) : FileStream =
         new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)
 
+    /// Remplace les caractères interdits dans un nom de fichier Windows
+    /// (contrôles et séparateurs) par un tiret bas. Partagé par les parseurs
+    /// ISO9660 et UDF lors de l'extraction.
+    let sanitizeName (name: string) =
+        name
+        |> Seq.map (fun c ->
+            if
+                Char.IsControl c
+                || c = '\\'
+                || c = '/'
+                || c = ':'
+                || c = '*'
+                || c = '?'
+                || c = '"'
+                || c = '<'
+                || c = '>'
+                || c = '|'
+            then
+                '_'
+            else
+                c)
+        |> String.Concat
+
 /// Parseur minimal d'images ISO9660 (lecture seule) permettant d'extraire
 /// le contenu d'un fichier ISO dans un répertoire cible.
 ///
@@ -88,9 +111,18 @@ module Iso9660 =
         ||| (int data.[offset + 2] <<< 16)
         ||| (int data.[offset + 3] <<< 24)
 
+    /// Lit une valeur 32 bits little-endian en tant qu'entier non signé
+    /// (int64). Essentiel pour les tailles de fichiers > 2 Go du niveau 1,
+    /// qui dépassent Int32.MaxValue et deviendraient négatives avec un `int`.
+    let private readUInt32LE64 (data: byte[]) (offset: int) =
+        int64 data.[offset]
+        ||| (int64 data.[offset + 1] <<< 8)
+        ||| (int64 data.[offset + 2] <<< 16)
+        ||| (int64 data.[offset + 3] <<< 24)
+
     type private DirRecord =
         { extent: int
-          dataLength: int
+          dataLength: int64
           isDirectory: bool
           name: string }
 
@@ -114,7 +146,7 @@ module Iso9660 =
                           name = "\x01" } // sentinelle ignorée par l'appelant
                 else
                     let extent = readUInt32LE data (offset + 2)
-                    let dataLength = readUInt32LE data (offset + 10)
+                    let dataLength = readUInt32LE64 data (offset + 10)
                     let flags = data.[offset + 25]
                     let rawNameLen = min (int data.[offset + 32]) (length - 33) |> max 0
                     let rawName = ascii data (offset + 33) rawNameLen
@@ -125,11 +157,11 @@ module Iso9660 =
                           isDirectory = (flags &&& 0x02uy) <> 0uy
                           name = rawName }
 
-    let private readDirectoryRecords (src: IsoSource.T) (extent: int) (length: int) =
+    let private readDirectoryRecords (src: IsoSource.T) (extent: int) (length: int64) =
         let start = int64 extent * int64 blockSize
-        let count = min (src.Length - start) (int64 (max length 0))
+        let count = min (src.Length - start) (max length 0L)
 
-        if count <= 0 then
+        if count <= 0L then
             []
         elif count > int64 Int32.MaxValue then
             // Au-delà de 2 Go, `int` bouclerait sur un négatif et produirait un
@@ -159,18 +191,36 @@ module Iso9660 =
 
             records |> Seq.toList
 
-    let private readFile (src: IsoSource.T) (extent: int) (dataLength: int) =
+    let private readFile (src: IsoSource.T) (extent: int) (dataLength: int64) =
         let start = int64 extent * int64 blockSize
-        let count = min (src.Length - start) (int64 (max dataLength 0))
+        let count = min (src.Length - start) (max dataLength 0L)
 
-        if count <= 0 then
+        if count <= 0L then
             Array.empty
         elif count > int64 Int32.MaxValue then
-            // Fichier ≥ 2 Go : le cast int bouclerait en négatif et retournerait
-            // un fichier vide sans erreur — échouer explicitement.
+            // Fichier ≥ 2 Go : le stockage en mémoire dépasserait la limite d'un
+            // tableau .NET — échouer explicitement (utiliser l'extraction par
+            // blocs, qui ne matérialise pas le fichier).
             failwithf "Fichier ISO trop volumineux pour l'extraction en mémoire (%d octets)" count
         else
             src.ReadBytes start (int count)
+
+    /// Écrit le contenu d'un fichier de l'image directement dans `destPath`,
+    /// par blocs (1 Mo) — sans matérialiser le fichier en mémoire, ce qui
+    /// permet les fichiers de plusieurs Go.
+    let private extractFile (src: IsoSource.T) (extent: int) (dataLength: int64) (destPath: string) =
+        use output = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None)
+        let start = int64 extent * int64 blockSize
+        let available = max 0L (src.Length - start)
+        let total = min (max dataLength 0L) available
+        let buffer = Array.zeroCreate<byte> (1024 * 1024)
+        let mutable pos = 0L
+
+        while pos < total do
+            let toRead = int (min (total - pos) (int64 buffer.Length))
+            let chunk = src.ReadBytes (start + pos) toRead
+            output.Write(chunk, 0, chunk.Length)
+            pos <- pos + int64 chunk.Length
 
     /// Nom ISO9660 d'un fichier : "NOM.EXT;1" → retire le suffixe ;version et les points terminaux.
     let private cleanFileName (rawName: string) =
@@ -182,33 +232,12 @@ module Iso9660 =
 
     let private cleanDirName (rawName: string) = rawName.Trim([| '\x00'; '\x01'; ' ' |])
 
-    /// Remplace les caractères interdits dans un nom de fichier Windows.
-    let private sanitizeName (name: string) =
-        name
-        |> Seq.map (fun c ->
-            if
-                Char.IsControl c
-                || c = '\\'
-                || c = '/'
-                || c = ':'
-                || c = '*'
-                || c = '?'
-                || c = '"'
-                || c = '<'
-                || c = '>'
-                || c = '|'
-            then
-                '_'
-            else
-                c)
-        |> String.Concat
-
     let private pathFromRelative (targetPath: string) (relPath: string) =
         Path.Combine(Array.append [| targetPath |] (relPath.Split('/')))
 
     /// Lit le descripteur de volume principal (PVD) et retourne les
     /// (extent, longueur) du répertoire racine.
-    let readPvd (src: IsoSource.T) (isoPath: string) : int * int =
+    let readPvd (src: IsoSource.T) (isoPath: string) : int * int64 =
         let pvdOffset = int64 (16 * blockSize)
 
         if pvdOffset + 170L > src.Length then
@@ -231,7 +260,7 @@ module Iso9660 =
             failwith "Image ISO9660 invalide (enregistrement de répertoire racine manquant)"
 
         let rootExtent = readUInt32LE pvd 158
-        let rootLength = readUInt32LE pvd 166
+        let rootLength = readUInt32LE64 pvd 166
         (rootExtent, rootLength)
 
     /// Retrouve le contenu d'un fichier de l'image par son chemin ISO9660
@@ -244,7 +273,7 @@ module Iso9660 =
         if segments.Length = 0 then
             failwithf "Chemin de fichier invalide : '%s'" pathInImage
 
-        let rec find (extent: int) (length: int) (remaining: string[]) =
+        let rec find (extent: int) (length: int64) (remaining: string[]) =
             let entries = readDirectoryRecords src extent length
             let segment = remaining.[0]
             let isLast = remaining.Length = 1
@@ -282,7 +311,7 @@ module Iso9660 =
     let extract (src: IsoSource.T) (isoPath: string) (targetPath: string) : int =
         let (rootExtent, rootLength) = readPvd src isoPath
 
-        let pending = System.Collections.Generic.Queue<(string * int * int)>()
+        let pending = System.Collections.Generic.Queue<(string * int * int64)>()
         let visited = System.Collections.Generic.HashSet<string * int>()
         pending.Enqueue("", rootExtent, rootLength)
         visited.Add("", rootExtent) |> ignore
@@ -298,9 +327,9 @@ module Iso9660 =
                     if name <> "" && name <> "." && name <> ".." then
                         let sub =
                             if relDir = "" then
-                                sanitizeName name
+                                IsoSource.sanitizeName name
                             else
-                                relDir + "/" + sanitizeName name
+                                relDir + "/" + IsoSource.sanitizeName name
 
                         if sub <> "" && sub <> "." && sub <> ".." then
                             Directory.CreateDirectory(pathFromRelative targetPath sub) |> ignore
@@ -313,14 +342,14 @@ module Iso9660 =
                     if name <> "" && name <> "." && name <> ".." then
                         let sub =
                             if relDir = "" then
-                                sanitizeName name
+                                IsoSource.sanitizeName name
                             else
-                                relDir + "/" + sanitizeName name
+                                relDir + "/" + IsoSource.sanitizeName name
 
                         if sub <> "" && sub <> "." && sub <> ".." then
                             let filePath = pathFromRelative targetPath sub
                             Directory.CreateDirectory(Path.GetDirectoryName(filePath)) |> ignore
-                            File.WriteAllBytes(filePath, readFile src entry.extent entry.dataLength)
+                            extractFile src entry.extent entry.dataLength filePath
                             count <- count + 1
 
         count
@@ -343,37 +372,26 @@ module Udf =
         ||| (int data.[offset + 2] <<< 16)
         ||| (int data.[offset + 3] <<< 24)
 
-    let private sanitizeName (name: string) =
-        name
-        |> Seq.map (fun c ->
-            if
-                Char.IsControl c
-                || c = '\\'
-                || c = '/'
-                || c = ':'
-                || c = '*'
-                || c = '?'
-                || c = '"'
-                || c = '<'
-                || c = '>'
-                || c = '|'
-            then
-                '_'
-            else
-                c)
-        |> String.Concat
-
     let private pathFromRelative (targetPath: string) (relPath: string) =
         Path.Combine(Array.append [| targetPath |] (relPath.Split('/')))
 
     /// Localise le descripteur NSR dans la séquence de reconnaissance de
     /// volume (bloc 16). Retourne l'offset du descripteur ou -1.
+    ///
+    /// La séquence de reconnaissance de volume d'une image UDF est courte et
+    /// contiguë : BEA01 (bloc 16), NSR02/NSR03 (17), TEA01 (18), suivi des
+    /// descripteurs de volume. On borne donc la recherche à une fenêtre de 64
+    /// blocs : une image ISO9660 pure (sans NSR) n'a jamais de descripteur au-
+    /// delà, et tout balayage de la totalité d'une grosse image (> 2 Go) serait
+    /// d'une lenteur inacceptable (un Read par bloc de 2048 octets).
     let private findNsr (src: IsoSource.T) : int =
+        let maxBlocks = 64
         let mutable offset = 16 * blockSize
+        let mutable scanned = 0
         let mutable result = -1
         let mutable running = int64 offset + int64 blockSize <= src.Length
 
-        while running do
+        while running && scanned < maxBlocks do
             let block = src.ReadBytes (int64 offset) blockSize
             let ty = int block.[0]
             let id = ascii block 1 5
@@ -385,6 +403,7 @@ module Udf =
                 running <- false
             else
                 offset <- offset + blockSize
+                scanned <- scanned + 1
                 running <- int64 offset + int64 blockSize <= src.Length
 
         result
@@ -457,6 +476,11 @@ module Udf =
     /// mémoire à plusieurs Go avant toute autre vérification).
     let private maxIcbContentBytes = 4L * 1024L * 1024L * 1024L
 
+    /// Lit intégralement en mémoire le contenu d'un fichier UDF pointé par son
+    /// ICB. Limité aux fichiers ≤ 2 Go : au-delà, le stockage en mémoire
+    /// déborderait la capacité d'un tableau .NET — échouer explicitement
+    /// (l'extraction par blocs via `extractIcbFile` gère les fichiers de
+    /// plusieurs Go sans matérialiser le contenu).
     let private readIcbData (src: IsoSource.T) (icbOffset: int64) (partitionStart: int) (logicalBlockSize: int) =
         let desc = src.ReadBytes icbOffset 176
 
@@ -471,6 +495,9 @@ module Udf =
         let flags = readUInt16LE desc 34
         let allocationType = flags &&& 7
         let informationLength = int64 (readUInt64LE desc 56)
+
+        if informationLength > int64 Int32.MaxValue then
+            failwithf "Fichier UDF trop volumineux pour l'extraction en mémoire (%d octets)" informationLength
         // Masque uint32 : une valeur ≥ 2^31 deviendrait négative en int et
         // décalerait allocStart EN ARRIÈRE.
         let extendedAttrLength = int64 (readUInt32LE desc 168)
@@ -532,6 +559,88 @@ module Udf =
             Array.sub data 0 (int informationLength)
         else
             data
+
+    /// Écrit le contenu d'un fichier UDF directement dans `destPath`, en
+    /// parcourant les descripteurs d'allocation par blocs (1 Mo) — sans
+    /// matérialiser le fichier en mémoire, ce qui permet les fichiers de
+    /// plusieurs Go.
+    let private extractIcbFile (src: IsoSource.T) (icbOffset: int64) (partitionStart: int) (logicalBlockSize: int) (destPath: string) =
+        use output = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None)
+        let desc = src.ReadBytes icbOffset 176
+
+        if desc.Length < 176 then
+            failwith "Image UDF invalide (ICB fichier incomplet)"
+
+        let tag = readUInt16LE desc 0
+
+        if tag <> 0x0105 && tag <> 0x0201 then
+            failwithf "Image UDF invalide (ICB fichier manquant, tag 0x%04x)" tag
+
+        let flags = readUInt16LE desc 34
+        let allocationType = flags &&& 7
+        let informationLength = int64 (readUInt64LE desc 56)
+        let extendedAttrLength = int64 (readUInt32LE desc 168)
+        let allocLength = int64 (readUInt32LE desc 172)
+        let allocStart = icbOffset + 176L + extendedAttrLength
+        let allocEnd = allocStart + allocLength
+        let buffer = Array.zeroCreate<byte> (1024 * 1024)
+        let mutable accumulated = 0L
+
+        let streamThrough (start: int64) (count: int) =
+            let mutable remaining = int64 count
+            let mutable cursor = start
+
+            while remaining > 0L do
+                let toRead = int (min remaining (int64 buffer.Length))
+                let chunk = src.ReadBytes cursor toRead
+
+                if chunk.Length = 0 then
+                    failwithf "Fin de flux inattendue lors de l'extraction UDF à l'offset %d" cursor
+
+                output.Write(chunk, 0, chunk.Length)
+                remaining <- remaining - int64 chunk.Length
+                cursor <- cursor + int64 chunk.Length
+
+        if allocationType = 3 then
+            // AD_IN_ICB : les données sont stockées dans l'ICB lui-même.
+            let inlineLen = int (min informationLength (int64 allocLength))
+
+            if inlineLen > 0 then
+                streamThrough allocStart inlineLen
+        else
+            let step =
+                if allocationType = 0 then 8
+                elif allocationType = 1 then 16
+                else 20
+
+            let locOffset = if allocationType = 2 then 12 else 4
+            let mutable pos = allocStart
+
+            let mutable running =
+                pos + int64 step <= allocEnd && pos + int64 step <= src.Length
+
+            while running do
+                let ad = src.ReadBytes pos step
+                let extLength = readUInt32LE ad 0
+
+                if extLength = 0 then
+                    running <- false
+                else
+                    let length = extLength &&& 0x3FFFFFFF
+                    let location = readUInt32LE ad locOffset
+                    let start = (int64 partitionStart + int64 location) * int64 logicalBlockSize
+                    let available = min (int64 length) (max 0L (src.Length - start))
+
+                    if available > 0L then
+                        let remaining = min available (informationLength - accumulated)
+
+                        if remaining > 0L then
+                            let toRead = min remaining (int64 System.Int32.MaxValue) |> int
+                            streamThrough start toRead
+                            accumulated <- accumulated + int64 toRead
+
+                    pos <- pos + int64 step
+                    running <- pos + int64 step <= allocEnd && pos + int64 step <= src.Length
 
     /// Liste les entrées d'un répertoire UDF identifié par son ICB. Retourne
     /// pour chaque entrée (nom brut, emplacement de l'ICB enfant, estRépertoire).
@@ -656,7 +765,7 @@ module Udf =
                 // Répertoire : la séquence de descripteurs d'identifiant de
                 // fichier est stockée dans les blocs pointés par l'ICB.
                 for (rawName, childIcbLocation, isDir) in readDirEntries src icbLocation partitionStart logicalBlockSize do
-                    let name = sanitizeName rawName
+                    let name = IsoSource.sanitizeName rawName
 
                     if name <> "" && name <> "." && name <> ".." then
                         let sub = if relDir = "" then name else relDir + "/" + name
@@ -670,10 +779,9 @@ module Udf =
                             let fileIcb =
                                 (int64 partitionStart + int64 childIcbLocation) * int64 logicalBlockSize
 
-                            let fileData = readIcbData src fileIcb partitionStart logicalBlockSize
                             let filePath = pathFromRelative targetPath sub
                             Directory.CreateDirectory(Path.GetDirectoryName(filePath)) |> ignore
-                            File.WriteAllBytes(filePath, fileData)
+                            extractIcbFile src fileIcb partitionStart logicalBlockSize filePath
                             count <- count + 1
 
         count
@@ -807,6 +915,20 @@ module IsoFs =
         writeInt32LE buf offset value
         writeInt32LE buf (offset + 4) value
 
+    /// Écrit une valeur non signée (jusqu'à 32 bits) en « both endian ».
+    /// Accepte un `int64` pour représenter les tailles > 2 Go du niveau 1 ;
+    /// les masques `&&& 0xFF` extraient les octets exacts indépendamment du
+    /// signe éventuel de la valeur encodée sur 32 bits.
+    let private writeBothEndian32U (buf: byte[]) (offset: int) (value: int64) =
+        buf.[offset] <- byte (value &&& 0xFFL)
+        buf.[offset + 1] <- byte ((value >>> 8) &&& 0xFFL)
+        buf.[offset + 2] <- byte ((value >>> 16) &&& 0xFFL)
+        buf.[offset + 3] <- byte ((value >>> 24) &&& 0xFFL)
+        buf.[offset + 4] <- byte (value &&& 0xFFL)
+        buf.[offset + 5] <- byte ((value >>> 8) &&& 0xFFL)
+        buf.[offset + 6] <- byte ((value >>> 16) &&& 0xFFL)
+        buf.[offset + 7] <- byte ((value >>> 24) &&& 0xFFL)
+
     /// Écrit une valeur en « both endian » sur 4 octets (LE16 puis BE16).
     let private writeBothEndian16 (buf: byte[]) (offset: int) (value: int) =
         writeInt16LE buf offset value
@@ -851,42 +973,121 @@ module IsoFs =
 
     /// Nœud de l'arborescence des fichiers à écrire dans l'image.
     type private Node =
-        { Name: string
+        { Name: string // nom ISO9660 8.3 (unique au sein du répertoire)
+          HostPath: string // chemin hôte (répertoire = son dossier, fichier = le fichier)
           Children: Node list // non vide uniquement pour les répertoires
-          Data: byte[] option // Some = fichier (contenu), None = répertoire
           mutable Extent: int
-          mutable DataLength: int
+          mutable DataLength: int64
           mutable DirLength: int } // longueur des données du répertoire (pour les répertoires)
 
-    /// Construit l'arborescence depuis le répertoire source.
+    /// Diffuse un nom 8.3 (`BASE[.EXT]`) en une variante unique au sein d'un
+    /// répertoire, en cas de collision entre noms hôte distincts : le base est
+    /// tronqué et un compteur (`_1`, `_2`, …) y est ajouté, forme `BASE_k.EXT`.
+    /// Retourne None si aucune variante libre ne peut être générée (espace 8.3
+    /// épuisé — cas théorique en niveau 1).
+    let private mangleIsoName (initial: string) (taken: System.Collections.Generic.HashSet<string>) : string option =
+        let dotIdx = initial.LastIndexOf('.')
+
+        let basePart, extPart =
+            if dotIdx > 0 && dotIdx <= initial.Length - 1 then
+                initial.Substring(0, dotIdx), initial.Substring(dotIdx + 1)
+            else
+                initial, ""
+
+        let mutable k = 1
+        let mutable result: string option = None
+
+        while result.IsNone && k < 1000 do
+            let suffix = "_" + string k
+            let maxBase = 8 - suffix.Length
+            let nb = if basePart.Length > maxBase then basePart.Substring(0, maxBase) else basePart
+            let candidate =
+                if nb = "" then
+                    (if extPart <> "" then "." + extPart else "")
+                elif extPart <> "" then
+                    nb + suffix + "." + extPart
+                else
+                    nb + suffix
+
+            if not (taken.Contains(candidate)) then
+                result <- Some candidate
+            else
+                k <- k + 1
+
+        result
+
+    /// Assure l'unicité des noms 8.3 parmi les entrées d'un même répertoire.
+    /// `entries` = paires (nomHôte, nomISO optionnel). Les collisions sont
+    /// désambiguïsées via `mangleIsoName` ; les noms dont la variante ne peut
+    /// pas être générée sont écartés (None).
+    let private uniqueNames (entries: (string * string option) list) : (string * string) list =
+        let taken = System.Collections.Generic.HashSet<string>()
+        let result = ResizeArray<string * string>()
+
+        for (host, iso) in entries do
+            match iso with
+            | None -> ()
+            | Some name ->
+                let finalName =
+                    if taken.Contains(name) then
+                        match mangleIsoName name taken with
+                        | Some m -> m
+                        | None -> name // espace épuisé : on garde le nom, doublon assumé (dernier recours)
+                    else
+                        name
+
+                taken.Add(finalName) |> ignore
+                result.Add(host, finalName)
+
+        List.ofSeq result
+
+    /// Construit l'arborescence depuis le répertoire source, en assurant
+    /// l'unicité des noms 8.3 dans chaque répertoire. Les fichiers ne sont pas
+    /// chargés en mémoire : seule la taille (DataLength) est relevée à la
+    /// création des nœuds ; le contenu est lu au moment de l'écriture.
     let rec private buildTree (sourceDir: string) : Node list =
-        let nodes = ResizeArray<Node>()
+        let dirEntries =
+            Directory.GetDirectories(sourceDir)
+            |> Array.map (fun d -> d, toIsoName (Path.GetFileName d))
+            |> Array.toList
 
-        for dir in Directory.GetDirectories(sourceDir) do
-            match toIsoName (Path.GetFileName dir) with
-            | Some name ->
-                nodes.Add
-                    { Name = name
-                      Children = buildTree dir
-                      Data = None
-                      Extent = 0
-                      DataLength = 0
-                      DirLength = 0 }
-            | None -> ()
+        let fileEntries =
+            Directory.GetFiles(sourceDir)
+            |> Array.map (fun f -> f, toIsoName (Path.GetFileName f))
+            |> Array.toList
 
-        for file in Directory.GetFiles(sourceDir) do
-            match toIsoName (Path.GetFileName file) with
-            | Some name ->
-                nodes.Add
-                    { Name = name
-                      Children = []
-                      Data = Some(File.ReadAllBytes file)
-                      Extent = 0
-                      DataLength = 0
-                      DirLength = 0 }
-            | None -> ()
+        // Les répertoires et fichiers partagent le même espace de noms 8.3
+        // du répertoire courant : ils sont désambiguïsés ensemble.
+        let allEntries = List.append dirEntries fileEntries
+        let named = uniqueNames (List.filter (fun (_, iso) -> iso.IsSome) allEntries)
 
-        List.ofSeq nodes
+        let isDirInto (host: string) =
+            Directory.Exists host
+
+        named
+        |> List.map (fun (host, name) ->
+            if isDirInto host then
+                { Name = name
+                  HostPath = host
+                  Children = buildTree host
+                  Extent = 0
+                  DataLength = 0L
+                  DirLength = 0 }
+            else
+                let length = FileInfo(host).Length
+
+                if length > 0xFFFFFFFFL then
+                    // Le format ISO9660 stocke la taille d'un fichier sur 32
+                    // bits (max ~4 Go) : un fichier plus gros ne peut pas être
+                    // représenté en niveau 1.
+                    invalidArg "sourceDir" (sprintf "Le fichier '%s' est trop volumineux pour ISO9660 niveau 1 (%d octets)" host length)
+
+                { Name = name
+                  HostPath = host
+                  Children = []
+                  Extent = 0
+                  DataLength = length
+                  DirLength = 0 })
 
     /// Longueur physique d'un enregistrement de répertoire pour un nom donné :
     /// 33 + longueur du nom, complété à un nombre pair.
@@ -906,11 +1107,11 @@ module IsoFs =
             + (node.Children |> List.sumBy childRecordLength)
 
         for child in node.Children do
-            if child.Data.IsNone then
+            if child.Children <> [] then
                 computeDirLength child (recordLength "\x00") (recordLength "\x01")
 
     /// Enregistrement de répertoire ISO9660 conforme à la structure ECMA-119.
-    let private buildDirRecord (name: string) (extent: int) (dataLength: int) (isDir: bool) =
+    let private buildDirRecord (name: string) (extent: int) (dataLength: int64) (isDir: bool) =
         let nameBytes = Encoding.ASCII.GetBytes name
         let nameLen = nameBytes.Length
         let recLen = 33 + nameLen
@@ -920,7 +1121,7 @@ module IsoFs =
         // pair (le saut de l'enregistrement s'appuie sur cette valeur).
         buf.[0] <- byte paddedLen
         writeBothEndian32 buf 2 extent
-        writeBothEndian32 buf 10 dataLength
+        writeBothEndian32U buf 10 dataLength
         let now = DateTime.Now
         writeIsoDate buf 18 now
         buf.[25] <- if isDir then 0x02uy else 0x00uy
@@ -928,6 +1129,20 @@ module IsoFs =
         buf.[32] <- byte nameLen
         Array.blit nameBytes 0 buf 33 nameLen
         buf
+
+    /// Volume Identifier ISO9660 (≤ 32 octets ASCII) dérivé du nom du dossier
+    /// source : caractères non-alphanumériques remplacés par `_`, tronqué à
+    /// 32 caractères. Repli sur "DIPLO_ISO" si le résultat est vide.
+    let private toVolumeId (sourceDir: string) : string =
+        let name = Path.GetFileName(Path.GetFullPath sourceDir).ToUpperInvariant()
+        let sanitizeChar (c: char) = if Char.IsLetterOrDigit c || c = '_' then c else '_'
+        let sanitized = name |> Seq.map sanitizeChar |> Seq.toArray |> System.String
+
+        if System.String.IsNullOrWhiteSpace sanitized then
+            "DIPLO_ISO"
+        else
+            let cut = if sanitized.Length > 32 then sanitized.Substring(0, 32) else sanitized
+            if cut = "" then "DIPLO_ISO" else cut
 
     /// Écrit l'image ISO9660 niveau 1 dans `destPath` depuis `sourceDir`.
     /// Retourne le nombre de fichiers écrits.
@@ -940,11 +1155,12 @@ module IsoFs =
         // Nœud synthétique racine.
         let rootRecord =
             { Name = ""
+              HostPath = sourceDir
               Children = rootChildren
-              Data = None
               Extent = 0
-              DataLength = 0
+              DataLength = 0L
               DirLength = 0 }
+
 
         // Calcule les longueurs de répertoires (root + sous-répertoires).
         computeDirLength rootRecord (recordLength "\x00") (recordLength "\x01")
@@ -958,7 +1174,7 @@ module IsoFs =
 
         let rec allocSubDirs (children: Node list) =
             for child in children do
-                if child.Data.IsNone then
+                if child.Children <> [] then
                     let blocks = max 1 ((child.DirLength + blockSize - 1) / blockSize)
                     child.Extent <- !next
                     next := !next + blocks
@@ -968,14 +1184,13 @@ module IsoFs =
 
         let rec allocFiles (children: Node list) =
             for child in children do
-                match child.Data with
-                | Some data ->
-                    child.DataLength <- data.Length
-                    let blocks = max 1 ((data.Length + blockSize - 1) / blockSize)
+                if child.Children = [] then
+                    let blocks = max 1 (int ((child.DataLength + int64 blockSize - 1L) / int64 blockSize))
                     child.Extent <- !next
                     next := !next + blocks
                     fileCount <- fileCount + 1
-                | None -> allocFiles child.Children
+                else
+                    allocFiles child.Children
 
         allocFiles rootChildren
 
@@ -993,27 +1208,20 @@ module IsoFs =
             fs.Position <- int64 i * int64 blockSize
             fs.Write(data, 0, data.Length)
 
-        let writeZeroedBlocks (i: int) (count: int) =
-            fs.Position <- int64 i * int64 blockSize
-            let zeros = Array.zeroCreate<byte> blockSize
-
-            for _ in 1..count do
-                fs.Write(zeros, 0, blockSize)
-
         // Sérialise le contenu d'un répertoire (enregistrements concaténés).
         let buildDirData (node: Node) (parent: Node) : byte[] =
             let records = ResizeArray<byte[]>()
 
             // "." : se référence lui-même ; ".." : référence le parent.
-            let selfRec = buildDirRecord "\x00" node.Extent node.DirLength true
-            let parentRec = buildDirRecord "\x01" parent.Extent parent.DirLength true
+            let selfRec = buildDirRecord "\x00" node.Extent (int64 node.DirLength) true
+            let parentRec = buildDirRecord "\x01" parent.Extent (int64 parent.DirLength) true
             records.Add selfRec
             records.Add parentRec
 
             // En-tête + enfants (répertoires puis fichiers, dans l'ordre de l'arbre).
             for child in node.Children do
-                let isDir = child.Data.IsNone
-                let childLen = if isDir then child.DirLength else child.DataLength
+                let isDir = child.Children <> []
+                let childLen = if isDir then int64 child.DirLength else child.DataLength
                 records.Add(buildDirRecord child.Name child.Extent childLen isDir)
 
             Array.concat (Seq.toArray records)
@@ -1024,24 +1232,40 @@ module IsoFs =
             // Remplit sur un nombre entier de blocs.
             let buf = Array.zeroCreate<byte> (node.DirLength)
             Array.blit data 0 buf 0 (min data.Length buf.Length)
-            writeZeroedBlocks node.Extent (buf.Length / blockSize)
             fs.Position <- int64 node.Extent * int64 blockSize
             fs.Write(buf, 0, buf.Length)
 
             for child in node.Children do
-                if child.Data.IsNone then
+                if child.Children <> [] then
                     writeDirs child node
 
         writeDirs rootRecord rootRecord
 
+        // Copie le contenu d'un fichier hôte vers l'image par blocs (1 Mo),
+        // sans matérialiser le fichier en mémoire : indispensable pour les
+        // fichiers de l'ordre du Go.
+        let copyFileToImage (hostPath: string) (extent: int) (dataLength: int64) =
+            use input = new FileStream(hostPath, FileMode.Open, FileAccess.Read, FileShare.Read)
+            let buffer = Array.zeroCreate<byte> (1024 * 1024)
+            fs.Position <- int64 extent * int64 blockSize
+            let mutable remaining = dataLength
+
+            while remaining > 0L do
+                let toRead = int (min remaining (int64 buffer.Length))
+                let read = input.Read(buffer, 0, toRead)
+
+                if read = 0 then
+                    failwithf "Fin de flux inattendue lors de la lecture du fichier '%s'" hostPath
+
+                fs.Write(buffer, 0, read)
+                remaining <- remaining - int64 read
+
         let rec writeFiles (children: Node list) =
             for child in children do
-                match child.Data with
-                | Some data ->
-                    let buf = Array.zeroCreate<byte> (((data.Length + blockSize - 1) / blockSize) * blockSize)
-                    Array.blit data 0 buf 0 data.Length
-                    writeBlock child.Extent buf
-                | None -> writeFiles child.Children
+                if child.Children = [] then
+                    copyFileToImage child.HostPath child.Extent child.DataLength
+                else
+                    writeFiles child.Children
 
         writeFiles rootChildren
 
@@ -1052,8 +1276,9 @@ module IsoFs =
         pvd.[6] <- 1uy
         // Standard Identifier « CDROM » (32 octets, justifié à gauche).
         Encoding.ASCII.GetBytes("CDROM", 0, 5, pvd, 8) |> ignore
-        // Volume Identifier (32 octets) : "DIPLO_ISO".
-        Encoding.ASCII.GetBytes("DIPLO_ISO", 0, 9, pvd, 40) |> ignore
+        // Volume Identifier (32 octets), dérivé du dossier source.
+        let volumeId = toVolumeId sourceDir
+        Encoding.ASCII.GetBytes(volumeId, 0, volumeId.Length, pvd, 40) |> ignore
         // Volume Space Size (both endian).
         writeBothEndian32 pvd 80 totalBlocks
         // Volume Set Size et Volume Sequence Number (both endian, = 1).
@@ -1062,7 +1287,7 @@ module IsoFs =
         // Logical Block Size = 2048 (both endian).
         writeBothEndian16 pvd 128 blockSize
         // Root directory record (34 + nom(=1) = 35 → 36 octets complétés).
-        let rootRecordBytes = buildDirRecord "\x00" rootRecord.Extent rootRecord.DirLength true
+        let rootRecordBytes = buildDirRecord "\x00" rootRecord.Extent (int64 rootRecord.DirLength) true
         Array.blit rootRecordBytes 0 pvd 156 rootRecordBytes.Length
         writeBlock 16 pvd
 

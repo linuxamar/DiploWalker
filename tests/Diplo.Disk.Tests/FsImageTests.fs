@@ -327,3 +327,55 @@ module FsImageTests =
             // désactivé) : le test ne peut pas s'exécuter, on le saute.
             | :? PlatformNotSupportedException -> Assert.Skip("Symbolic links non supportés sur cette plateforme.")
             | :? IOException -> Assert.Skip("Privilège de création de liens symboliques indisponible."))
+
+    [<Fact>]
+    let ``ISO desambiguise les noms 8.3 en collision`` () =
+        runCreate (fun _ src dest ->
+            let destIso = Path.ChangeExtension(dest, ".iso")
+            // Les deux noms se réduisent au même 8.3 "ABCDEFGH.TXT" ; la
+            // désambiguïsation doit produire deux entrées distinctes.
+            File.WriteAllText(Path.Combine(src, "abcdefgh1.txt"), "premier")
+            File.WriteAllText(Path.Combine(src, "abcdefgh2.txt"), "deuxieme")
+            FsImage.create src destIso DiskFormat.Iso |> Result.defaultWith failwith |> ignore
+            let re = Path.Combine(Path.GetDirectoryName(destIso), "re")
+            FsImage.extract destIso re false |> Result.defaultWith failwith |> ignore
+            let names = Directory.GetFiles(re) |> Array.map Path.GetFileName |> Set.ofArray
+
+            // Deux fichiers distincts sont reconstruits.
+            names |> Set.count |> should equal 2
+            Set.contains "ABCDEFGH.TXT" names |> should equal true
+
+            let other =
+                names
+                |> Set.filter (fun n -> n <> "ABCDEFGH.TXT")
+                |> Set.toList
+                |> List.head
+
+            // Le contenu de chaque fichier est préservé (ordre préservé :
+            // le surgfixe _1 correspond au premier nom rencontré).
+            let byName = Directory.GetFiles(re) |> Array.map (fun p -> Path.GetFileName p, File.ReadAllText p) |> Map.ofArray
+
+            Map.exists (fun _ v -> v = "premier") byName |> should equal true
+            Map.exists (fun _ v -> v = "deuxieme") byName |> should equal true
+            other |> should not' (equal "ABCDEFGH.TXT"))
+
+    [<Fact>]
+    let ``ISO extrait un gros fichier (> 2 Go) sans le matérialiser en mémoire`` () =
+        runCreate (fun _ src dest ->
+            let destIso = Path.ChangeExtension(dest, ".iso")
+            // Fichier sparse de ~2,5 Go : objectif du streaming à la création
+            // (copie par blocs) et à l'extraction (lecture par blocs).
+            let bigPath = Path.Combine(src, "big.bin")
+            let bigLength = 2_500_000_000L
+
+            let fs = File.Create(bigPath)
+            fs.SetLength(bigLength)
+            fs.Dispose()
+
+            FsImage.create src destIso DiskFormat.Iso |> Result.defaultWith failwith |> ignore
+            File.Exists(destIso) |> should equal true
+            let re = Path.Combine(Path.GetDirectoryName(destIso), "re")
+            FsImage.extract destIso re false |> Result.defaultWith failwith |> ignore
+            let outPath = Path.Combine(re, "BIG.BIN")
+            File.Exists(outPath) |> should equal true
+            FileInfo(outPath).Length |> should equal bigLength)
