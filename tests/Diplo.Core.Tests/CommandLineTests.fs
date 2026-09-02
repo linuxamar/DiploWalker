@@ -29,3 +29,23 @@ module CommandLineTests =
 
     [<Fact>]
     let ``split sur une chaine de guillemets vides retourne une liste vide`` () = split "\"\"" |> should be Empty
+
+    [<Fact>]
+    let ``join sur des arguments vides retourne une chaine vide`` () = join [] |> should equal ""
+
+    [<Fact>]
+    let ``join entoure de guillemets les arguments contenant des espaces`` () =
+        join [ "exec"; "C:\\Program Files\\app.exe"; "--flag" ]
+        |> should equal "exec \"C:\\Program Files\\app.exe\" --flag"
+
+    [<Fact>]
+    let ``join entoure de guillemets un argument vide`` () = join [ "" ] |> should equal "\"\""
+
+    [<Fact>]
+    let ``join echappe les guillemets internes en les doublant`` () =
+        join [ "a\"b" ] |> should equal "\"a\"\"b\""
+
+    [<Fact>]
+    let ``split et join sont inverses l'un de l'autre`` () =
+        split (join [ "exec"; "C:\\Program Files\\app.exe"; "--flag" ])
+        |> should equal [ "exec"; "C:\\Program Files\\app.exe"; "--flag" ]

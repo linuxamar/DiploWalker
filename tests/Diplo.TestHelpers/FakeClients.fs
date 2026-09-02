@@ -31,7 +31,7 @@ type FakeContainerClient(delete: DeleteContainerResponse, create: CreateContaine
             Task.FromResult(delete)
 
         member _.CreateAsync
-            (_name, _image, ?_env, ?_command, ?_args, ?_labels, ?_pidLimit, ?_memoryLimit, ?_cpuShares, ?_mounts, ?_ct)
+            (_name, _image, ?_env, ?_command, ?_args, ?_labels, ?_pidLimit, ?_memoryLimit, ?_cpuShares, ?_mounts, ?_ports, ?_ct)
             =
             createCalls <- createCalls + 1
             Task.FromResult(create)
