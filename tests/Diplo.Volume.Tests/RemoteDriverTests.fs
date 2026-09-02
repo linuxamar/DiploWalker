@@ -293,3 +293,63 @@ module RemoteDriverTests =
         let opts = Map.ofList [ "sec", "krb5i"; "port", "2049;rm" ]
 
         NfsMountOptions.buildOptions opts |> should equal "nolock"
+
+    // ── RemotePath : branches de succès ──────────────────────────
+
+    [<Fact>]
+    let ``NfsDriver RemotePath construit server:export`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = NfsDriver(tempRoot)
+            driver.RemotePath (Map.ofList [ "server", "10.0.0.1"; "export", "data" ])
+            |> should equal "10.0.0.1:/data"
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``SmbDriver RemotePath construit unc share`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = SmbDriver(tempRoot)
+            driver.RemotePath (Map.ofList [ "server", "srv01"; "share", "myshare" ])
+            |> should equal @"\\srv01\myshare"
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``CloudAwsDriver RemotePath construit efs dns`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = CloudAwsDriver(tempRoot)
+
+            driver.RemotePath (Map.ofList [ "fsId", "fs-12345"; "region", "eu-west-1" ])
+            |> should equal "fs-12345.efs.eu-west-1.amazonaws.com:/"
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``CloudAzureDriver RemotePath construit unc azure`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = CloudAzureDriver(tempRoot)
+
+            driver.RemotePath (Map.ofList [ "storageAccount", "acc"; "shareName", "share" ])
+            |> should equal @"\\acc.file.core.windows.net\share"
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``CloudGcpDriver RemotePath construit ip:volume`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = CloudGcpDriver(tempRoot)
+
+            driver.RemotePath (Map.ofList [ "ipAddress", "10.0.0.1"; "volumeName", "vol1" ])
+            |> should equal "10.0.0.1:/vol1"
+        finally
+            cleanupDir tempRoot

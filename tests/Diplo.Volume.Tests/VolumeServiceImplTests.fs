@@ -26,6 +26,17 @@ module VolumeServiceImplTests =
         let svc = VolumeServiceImpl(registry)
         svc, mock
 
+    /// Instancie un service avec deux drivers distincts (Local et Smb) pour
+    /// vérifier le routage via l'option driverOpts["driver"].
+    let createDualDriverService () =
+        let mockLocal = MockVolumeDriver()
+        let mockSmb = MockVolumeDriver()
+        let registry = VolumeDriverRegistry()
+        registry.Register(StorageDriverType.Local, mockLocal.Mock)
+        registry.Register(StorageDriverType.Smb, mockSmb.Mock)
+        let svc = VolumeServiceImpl(registry)
+        svc, mockLocal, mockSmb
+
     let createCtx () = CancellationToken.None
 
     [<Fact>]
@@ -459,3 +470,74 @@ module VolumeServiceImplTests =
         result.VolumesDeleted |> should contain "vol-2"
         result.VolumesDeleted |> should contain "vol-3"
         result.Message |> should equal "3 volume(s) supprimé(s)"
+
+    // --- Routage via driverOpts["driver"] ---
+    [<Fact>]
+    let ``CreateVolume avec driverOpts driver achemine vers le driver cible`` () =
+        let svc, mockLocal, mockSmb = createDualDriverService ()
+        let ctx = createCtx ()
+
+        let req =
+            { Name = "routed"
+              Driver = StorageDriverType.Local
+              DriverOpts = Dictionary<string, string>()
+              Labels = Dictionary<string, string>() }
+
+        req.DriverOpts.Add("driver", "smb")
+        let result = (svc :> IVolumeService).CreateVolume(req, ctx).Result
+        result.Driver |> should equal StorageDriverType.Smb
+        // Le volume a été créé sur le driver Smb, pas sur Local.
+        mockLocal.Volumes.Count |> should equal 0
+        mockSmb.Volumes.Count |> should equal 1
+
+    [<Fact>]
+    let ``CreateVolume sans driverOpts driver utilise le driver demande`` () =
+        let svc, mockLocal, mockSmb = createDualDriverService ()
+        let ctx = createCtx ()
+
+        let req =
+            { Name = "local-only"
+              Driver = StorageDriverType.Local
+              DriverOpts = Dictionary<string, string>()
+              Labels = Dictionary<string, string>() }
+
+        let result = (svc :> IVolumeService).CreateVolume(req, ctx).Result
+        result.Driver |> should equal StorageDriverType.Local
+        mockLocal.Volumes.Count |> should equal 1
+        mockSmb.Volumes.Count |> should equal 0
+
+    // --- Marche en erreur : MountVolume ---
+    [<Fact>]
+    let ``MountVolume sans driver capable retourne l etat Error`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+
+        // Aucun volume n'existe : le driver échoue, le service renvoie Error.
+        let req: MountVolumeRequest =
+            { Id = "volume-inexistant"
+              TargetPath = Path.Combine(Path.GetTempPath(), "diplo-mount-err")
+              Options = Dictionary<string, string>() }
+
+        let result = (svc :> IVolumeService).MountVolume(req, ctx).Result
+        result.State |> should equal MountState.Error
+        result.Mountpoint |> should equal ""
+        result.Message |> should equal "Volume introuvable ou erreur de montage"
+
+    // --- Marche en erreur : introuvable côté CreateVolume ---
+    [<Fact>]
+    let ``CreateVolume avec driver non enregistre leve RpcException NotFound`` () =
+        let svc, _ = createService ()
+        let ctx = createCtx ()
+
+        let req =
+            { Name = "nfs-absent"
+              Driver = StorageDriverType.Nfs
+              DriverOpts = Dictionary<string, string>()
+              Labels = Dictionary<string, string>() }
+
+        let ex =
+            Assert.Throws<AggregateException>(fun () ->
+                (svc :> IVolumeService).CreateVolume(req, ctx).Result |> ignore)
+
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.NotFound
