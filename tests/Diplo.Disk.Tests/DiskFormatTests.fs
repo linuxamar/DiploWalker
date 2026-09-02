@@ -184,3 +184,49 @@ module DiskFormatTests =
             | _ -> DiskFormat.Unknown
 
         DiskFormat.isDiskImage format |> should equal false
+
+    // ── toString ───────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``toString retourne qcow2`` () =
+        DiskFormat.toString DiskFormat.Qcow2 |> should equal "qcow2"
+
+    [<Fact>]
+    let ``toString retourne qcow (v1)`` () =
+        DiskFormat.toString DiskFormat.Qcow1 |> should equal "qcow (v1)"
+
+    [<Fact>]
+    let ``toString retourne vhd`` () =
+        DiskFormat.toString DiskFormat.Vhd |> should equal "vhd"
+
+    [<Fact>]
+    let ``toString retourne vhdx`` () =
+        DiskFormat.toString DiskFormat.Vhdx |> should equal "vhdx"
+
+    [<Fact>]
+    let ``toString retourne vmdk`` () =
+        DiskFormat.toString DiskFormat.Vmdk |> should equal "vmdk"
+
+    [<Fact>]
+    let ``toString retourne vdi`` () =
+        DiskFormat.toString DiskFormat.Vdi |> should equal "vdi"
+
+    [<Fact>]
+    let ``toString retourne dmg`` () =
+        DiskFormat.toString DiskFormat.Dmg |> should equal "dmg"
+
+    [<Fact>]
+    let ``toString retourne parallels`` () =
+        DiskFormat.toString DiskFormat.Parallels |> should equal "parallels"
+
+    [<Fact>]
+    let ``toString retourne raw`` () =
+        DiskFormat.toString DiskFormat.Raw |> should equal "raw"
+
+    [<Fact>]
+    let ``toString retourne iso`` () =
+        DiskFormat.toString DiskFormat.Iso |> should equal "iso"
+
+    [<Fact>]
+    let ``toString retourne inconnu`` () =
+        DiskFormat.toString DiskFormat.Unknown |> should equal "inconnu"

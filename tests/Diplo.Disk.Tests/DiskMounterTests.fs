@@ -147,3 +147,60 @@ module DiskMounterTests =
             let loaded = MountState.load path
             loaded.Count |> should equal 2
             loaded.["c1"].Head.HostPath |> should equal "C:\\staging-c1")
+
+    // ── pruneStaleStaging ──────────────────────────────────────────────
+
+    [<Fact>]
+    let ``pruneStaleStaging supprime les dossiers orphelins anciens`` () =
+        let staging = DiskMounter.stagingRoot ()
+
+        try
+            let guid = Guid.NewGuid().ToString("N")
+            let dir = Path.Combine(staging, guid)
+            Directory.CreateDirectory dir |> ignore
+            // Forcer une date de creation ancienne (>24h)
+            let old = DateTime.UtcNow - TimeSpan.FromHours 25.0
+            Directory.SetCreationTimeUtc(dir, old)
+            DiskMounter.pruneStaleStaging (TimeSpan.FromHours 24.0)
+            Directory.Exists dir |> should equal false
+        finally
+            if Directory.Exists staging then
+                for d in Directory.GetDirectories staging do
+                    try
+                        Directory.Delete(d, true)
+                    with _ -> ()
+
+    [<Fact>]
+    let ``pruneStaleStaging conserve les dossiers recents`` () =
+        let staging = DiskMounter.stagingRoot ()
+
+        try
+            let guid = Guid.NewGuid().ToString("N")
+            let dir = Path.Combine(staging, guid)
+            Directory.CreateDirectory dir |> ignore
+            DiskMounter.pruneStaleStaging (TimeSpan.FromHours 24.0)
+            Directory.Exists dir |> should equal true
+        finally
+            if Directory.Exists staging then
+                for d in Directory.GetDirectories staging do
+                    try
+                        Directory.Delete(d, true)
+                    with _ -> ()
+
+    [<Fact>]
+    let ``pruneStaleStaging ne supprime pas les dossiers non-GUID`` () =
+        let staging = DiskMounter.stagingRoot ()
+
+        try
+            let dir = Path.Combine(staging, "not-a-guid")
+            Directory.CreateDirectory dir |> ignore
+            let old = DateTime.UtcNow - TimeSpan.FromHours 48.0
+            Directory.SetCreationTimeUtc(dir, old)
+            DiskMounter.pruneStaleStaging (TimeSpan.FromHours 24.0)
+            Directory.Exists dir |> should equal true
+        finally
+            if Directory.Exists staging then
+                for d in Directory.GetDirectories staging do
+                    try
+                        Directory.Delete(d, true)
+                    with _ -> ()
