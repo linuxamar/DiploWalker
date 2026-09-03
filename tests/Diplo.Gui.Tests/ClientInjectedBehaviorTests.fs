@@ -580,3 +580,119 @@ let ``ComposeTabViewModel InspectImage ecrit la reference et les labels`` () =
     port.Messages |> should contain "Tag: latest"
     port.Messages |> should contain "Taille: 2048 octets"
     port.Messages |> should contain "  com.diplo/projet = demo"
+
+let private composeFile (name: string) (content: string) =
+    let dir = Diplo.TestHelpers.TestHelpers.createTempDir "compose-op"
+    let path = IO.Path.Combine(dir, name)
+    IO.File.WriteAllText(path, content)
+    dir, path
+
+[<Fact>]
+let ``ComposeTabViewModel ComposeUp cree et demarre les services du fichier`` () =
+    let dir, path = composeFile "docker-compose.yml" "services:\n  web:\n    image: nginx:latest\n"
+
+    try
+        let port = MockOutputPort()
+        let fake =
+            new FakeContainerClient(create = { Id = "c1"; Name = "web"; State = ContainerState.Created; CreatedAt = "" })
+
+        let vm = composeVm port fake
+        vm.ComposeFilePath <- path
+        (vm.ComposeUpCommand :> ICommand).Execute(null)
+        waitUntil (fun () -> fake.CreateCalls = 1) |> should equal true
+        port.Successes
+        |> Seq.exists (fun m -> m.Contains "Démarrage du projet 'docker-compose'")
+        |> should equal true
+        port.Successes
+        |> Seq.exists (fun m -> m.Contains "Conteneur web créé")
+        |> should equal true
+        port.Successes
+        |> Seq.exists (fun m -> m.Contains "Conteneur web démarré")
+        |> should equal true
+    finally
+        Diplo.TestHelpers.TestHelpers.cleanupDir dir
+
+[<Fact>]
+let ``ComposeTabViewModel ComposeDown arrete et supprime les conteneurs du projet`` () =
+    let dir, path = composeFile "docker-compose.yml" "services:\n  web:\n    image: nginx:latest\n"
+
+    try
+        let port = MockOutputPort()
+        let labels = Dictionary<string, string>()
+        labels.[Diplo.Core.Compose.ComposeModels.composeProjectLabel] <- "docker-compose"
+        labels.[Diplo.Core.Compose.ComposeModels.composeServiceLabel] <- "web"
+
+        let info =
+            { Id = "c1"
+              Name = "web"
+              Image = "nginx:latest"
+              State = ContainerState.Running
+              CreatedAt = "2026-01-01"
+              Labels = labels }
+
+        let fake = new FakeContainerClient(list = { Containers = List<ContainerInfo>([| info |]) })
+        let vm = composeVm port fake
+        vm.ComposeFilePath <- path
+        (vm.ComposeDownCommand :> ICommand).Execute(null)
+        waitUntil (fun () -> fake.ListCalls = 1) |> should equal true
+        port.Successes
+        |> Seq.exists (fun m -> m.Contains "Arrêt du projet 'docker-compose'")
+        |> should equal true
+        port.Successes
+        |> Seq.exists (fun m -> m.Contains "Conteneur web arrêté et supprimé")
+        |> should equal true
+    finally
+        Diplo.TestHelpers.TestHelpers.cleanupDir dir
+
+[<Fact>]
+let ``ComposeTabViewModel ComposePull telecharge les images des services`` () =
+    let dir, path = composeFile "docker-compose.yml" "services:\n  web:\n    image: nginx:latest\n"
+
+    try
+        let port = MockOutputPort()
+        let fake = new FakeContainerClient(pull = { Image = "nginx:latest"; Message = "ok" })
+        let vm = composeVm port fake
+        vm.ComposeFilePath <- path
+        (vm.ComposePullCommand :> ICommand).Execute(null)
+        waitUntil (fun () -> fake.PullCalls = 1) |> should equal true
+        port.Successes
+        |> Seq.exists (fun m -> m.Contains "Téléchargement de nginx:latest")
+        |> should equal true
+    finally
+        Diplo.TestHelpers.TestHelpers.cleanupDir dir
+
+[<Fact>]
+let ``ComposeTabViewModel ComposeLogs affiche les journaux des conteneurs du projet`` () =
+    let dir, path = composeFile "docker-compose.yml" "services:\n  web:\n    image: nginx:latest\n"
+
+    try
+        let port = MockOutputPort()
+        let labels = Dictionary<string, string>()
+        labels.[Diplo.Core.Compose.ComposeModels.composeProjectLabel] <- "docker-compose"
+
+        let info =
+            { Id = "c1"
+              Name = "web"
+              Image = "nginx:latest"
+              State = ContainerState.Running
+              CreatedAt = "2026-01-01"
+              Labels = labels }
+
+        let fake =
+            new FakeContainerClient(
+                list = { Containers = List<ContainerInfo>([| info |]) },
+                logEntries = [ { Timestamp = "t1"; Stream = "stdout"; Log = "hello" } ]
+            )
+
+        let vm = composeVm port fake
+        vm.ComposeFilePath <- path
+        (vm.ComposeLogsCommand :> ICommand).Execute(null)
+        waitUntil (fun () -> fake.ListCalls = 1) |> should equal true
+        port.Successes
+        |> Seq.exists (fun m -> m.Contains "--- web ---")
+        |> should equal true
+        port.Messages
+        |> Seq.exists (fun m -> m.Contains "[t1] hello")
+        |> should equal true
+    finally
+        Diplo.TestHelpers.TestHelpers.cleanupDir dir
