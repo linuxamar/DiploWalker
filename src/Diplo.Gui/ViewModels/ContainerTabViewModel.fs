@@ -22,13 +22,20 @@ type ImageInfo =
       Taille: string
       CrééLe: string }
 
-type ContainerTabViewModel(outputPort: IOutputPort, ?logsSourceFactory: unit -> IContainerLogsSource) as this =
+type ContainerTabViewModel
+    (
+        outputPort: IOutputPort,
+        ?logsSourceFactory: unit -> IContainerLogsSource,
+        ?containerClientFactory: unit -> IContainerClient
+    ) as this =
     inherit ViewModelBase()
 
     let logsSourceFactory =
         defaultArg logsSourceFactory (fun () -> new GrpcContainerLogsSource() :> IContainerLogsSource)
 
-    let containerClient = new ContainerClient()
+    let containerClient =
+        let factory = defaultArg containerClientFactory (fun () -> new ContainerClient() :> IContainerClient)
+        factory ()
 
     let containers = ObservableCollection<ContainerInfo>()
     let images = ObservableCollection<ImageInfo>()

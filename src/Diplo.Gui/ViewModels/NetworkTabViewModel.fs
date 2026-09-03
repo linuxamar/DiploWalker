@@ -16,11 +16,14 @@ type NetworkDisplayInfo =
       Passerelle: string
       CrééLe: string }
 
-type NetworkTabViewModel(outputPort: IOutputPort) as this =
+type NetworkTabViewModel(outputPort: IOutputPort, ?networkClientFactory: unit -> INetworkClient) as this =
     inherit ViewModelBase()
 
     let networks = ObservableCollection<NetworkDisplayInfo>()
-    let networkClient = new NetworkClient()
+
+    let networkClient =
+        let factory = defaultArg networkClientFactory (fun () -> new NetworkClient() :> INetworkClient)
+        factory ()
 
     let mutable networkIdInput = ""
     let mutable networkNameInput = ""

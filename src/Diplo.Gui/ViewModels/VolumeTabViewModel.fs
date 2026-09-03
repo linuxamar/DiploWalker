@@ -18,11 +18,14 @@ type VolumeDisplayInfo =
       PointDeMontage: string
       Taille: string }
 
-type VolumeTabViewModel(outputPort: IOutputPort) as this =
+type VolumeTabViewModel(outputPort: IOutputPort, ?volumeClientFactory: unit -> IVolumeClient) as this =
     inherit ViewModelBase()
 
     let volumes = ObservableCollection<VolumeDisplayInfo>()
-    let volumeClient = new VolumeClient()
+
+    let volumeClient =
+        let factory = defaultArg volumeClientFactory (fun () -> new VolumeClient() :> IVolumeClient)
+        factory ()
 
     let mutable volumeIdInput = ""
     let mutable volumeNameInput = ""

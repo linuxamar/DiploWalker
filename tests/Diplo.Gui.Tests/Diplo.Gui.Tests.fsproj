@@ -9,6 +9,8 @@
     <Compile Include="ViewModelBaseTests.fs" />
     <Compile Include="AvaloniaOutputPortTests.fs" />
     <Compile Include="TabViewModelTests.fs" />
+    <Compile Include="OptionalBehaviorTests.fs" />
+    <Compile Include="ClientInjectedBehaviorTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
