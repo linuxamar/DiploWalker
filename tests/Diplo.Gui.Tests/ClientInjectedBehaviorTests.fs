@@ -547,3 +547,36 @@ let ``NetworkTabViewModel PruneNetworks ecrit le bilan`` () =
     (vm.PruneNetworksCommand :> ICommand).Execute(null)
     waitUntil (fun () -> fake.PruneCalls = 1) |> should equal true
     port.Successes.Head |> should haveSubstring "Réseaux nettoyés"
+
+// ── ComposeTabViewModel ─────────────────────────────────────────
+
+let private composeVm (port: MockOutputPort) (fake: FakeContainerClient) =
+    new Diplo.Gui.ViewModels.ComposeTabViewModel(
+        port,
+        containerClientFactory = fun () -> fake :> IContainerClient
+    )
+
+[<Fact>]
+let ``ComposeTabViewModel InspectImage ecrit la reference et les labels`` () =
+    let port = MockOutputPort()
+    let labels = Dictionary<string, string>()
+    labels.["com.diplo/projet"] <- "demo"
+
+    let img =
+        { Ref = "nginx"
+          Id = "sha256:abc"
+          Repository = "library/nginx"
+          Tag = "latest"
+          Size = 2048L
+          CreatedAt = "2026-01-01"
+          Labels = labels }
+
+    let fake = new FakeContainerClient(inspectImage = img)
+    let vm = composeVm port fake
+    vm.InspectImageRef <- "nginx:latest"
+    (vm.InspectImageCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.InspectImageCalls = 1) |> should equal true
+    port.Messages |> should contain "Référentiel: nginx"
+    port.Messages |> should contain "Tag: latest"
+    port.Messages |> should contain "Taille: 2048 octets"
+    port.Messages |> should contain "  com.diplo/projet = demo"
