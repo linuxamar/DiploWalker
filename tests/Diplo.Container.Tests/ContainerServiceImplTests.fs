@@ -1572,17 +1572,27 @@ module ContainerServiceImplTests =
 
     [<Fact>]
     let ``LoginRegistry retourne success`` () =
-        let svc, _, _ = createService ()
-        let ctx = createCtx ()
+        let stateFile =
+            Path.Combine(Path.GetTempPath(), "diplo-login-ok-" + Guid.NewGuid().ToString("N") + ".json")
 
-        let req: LoginRegistryRequest =
-            { Registry = "myregistry.azurecr.io"
-              Username = "user"
-              Password = "secret" }
+        try
+            RegistryAuth.setStateFile stateFile
+            let svc, _, _ = createService ()
+            let ctx = createCtx ()
 
-        let result = (svc :> IContainerService).LoginRegistry(req, ctx).Result
-        result.Success |> should equal true
-        result.Message |> shouldContain "registre"
+            let req: LoginRegistryRequest =
+                { Registry = "myregistry.azurecr.io"
+                  Username = "user"
+                  Password = "secret" }
+
+            let result = (svc :> IContainerService).LoginRegistry(req, ctx).Result
+            result.Success |> should equal true
+            result.Message |> shouldContain "registre"
+        finally
+            try
+                File.Delete stateFile
+            with _ ->
+                ()
 
     [<Fact>]
     let ``LoginRegistry sans registre leve InvalidArgument`` () =
@@ -1603,11 +1613,21 @@ module ContainerServiceImplTests =
 
     [<Fact>]
     let ``LogoutRegistry retourne success`` () =
-        let svc, _, _ = createService ()
-        let ctx = createCtx ()
-        let req: LogoutRegistryRequest = { Registry = "myregistry.azurecr.io" }
-        let result = (svc :> IContainerService).LogoutRegistry(req, ctx).Result
-        result.Success |> should equal true
+        let stateFile =
+            Path.Combine(Path.GetTempPath(), "diplo-logout-ok-" + Guid.NewGuid().ToString("N") + ".json")
+
+        try
+            RegistryAuth.setStateFile stateFile
+            let svc, _, _ = createService ()
+            let ctx = createCtx ()
+            let req: LogoutRegistryRequest = { Registry = "myregistry.azurecr.io" }
+            let result = (svc :> IContainerService).LogoutRegistry(req, ctx).Result
+            result.Success |> should equal true
+        finally
+            try
+                File.Delete stateFile
+            with _ ->
+                ()
 
     [<Fact>]
     let ``LoginRegistry persiste l'identifiant de maniere chiffree`` () =
