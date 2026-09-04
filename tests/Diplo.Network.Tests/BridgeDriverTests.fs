@@ -85,3 +85,11 @@ module BridgeDriverTests =
         match driver.Create("test-net", "10.0.0.0/24", "999.999.999.999", "", Map.empty, Map.empty) with
         | Error _ -> ()
         | Ok _ -> failwith "Create devrait retourner Error avec une gateway invalide"
+
+    [<Fact>]
+    let ``Prune retourne vide quand aucun reseau n'existe`` () =
+        let driver = createDriver ()
+
+        match driver.Prune() with
+        | Ok removed -> removed |> should be Empty
+        | Error msg -> failwithf "Prune a echoue: %s" msg
