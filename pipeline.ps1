@@ -192,6 +192,24 @@ if ($Restore) {
 if ($runTests) {
     Write-Host "═══ Tests unitaires ═══" -ForegroundColor Cyan
 
+    # Une restauration complète de la solution est requise avant de tester :
+    # après un -Clean, les assets (obj/project.assets.json) ont été purgés et
+    # une restauration projet par projet échoue sur les références croisées
+    # (code de sortie 5, « Zéro tests exécutés »). Restaurer la solution
+    # entière rend `-DoTests` autonome dans n'importe quelle console.
+    if (-not $Restore) {
+        Write-Host "  ▸ Restauration NuGet de la solution..." -ForegroundColor Yellow
+        $solutionForTests = Join-Path $PSScriptRoot "Diplo.slnx"
+        if (-not (Test-Path $solutionForTests)) {
+            $solutionForTests = Join-Path $PSScriptRoot "Diplo.sln"
+        }
+        dotnet restore $solutionForTests
+        if ($LASTEXITCODE -ne 0) {
+            throw "Échec de la restauration NuGet avant les tests."
+        }
+        Write-Host "  ✓ Restauration effectuée." -ForegroundColor Green
+    }
+
     $allPassed = $true
     foreach ($test in $testProjects) {
         $currentStep++
@@ -209,15 +227,7 @@ if ($runTests) {
             Write-Host "  ✗ Échec des tests : $test" -ForegroundColor Red
             $allPassed = $false
         } else {
-            # Un projet non restauré peut sortir en code 0 sans exécuter les tests :
-            # on vérifie que la DLL de test a réellement été produite.
-            $testDll = Get-ChildItem -Path (Join-Path $PSScriptRoot "tests\$test\bin") -Filter "$test.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($null -eq $testDll) {
-                Write-Host "  ✗ Aucune DLL de test produite : $test — exécutez -Restore avant -DoTests" -ForegroundColor Red
-                $allPassed = $false
-            } else {
-                Write-Host "  ✓ OK" -ForegroundColor Green
-            }
+            Write-Host "  ✓ OK" -ForegroundColor Green
         }
     }
 
