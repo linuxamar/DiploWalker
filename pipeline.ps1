@@ -25,7 +25,8 @@ param(
     [switch]$DoPublish,
     [string]$SignCert,
     [string]$SignPassword,
-    [string]$SignThumbprint
+    [string]$SignThumbprint,
+    [string]$TestLogDir
 )
 
 # -DoTests et -DoPublish peuvent être combinés :
@@ -42,6 +43,7 @@ if (-not $DoTests -and -not $DoPublish -and -not $Clean -and -not $Restore) {
     Write-Host "  -Restore    restaure les packages NuGet en 1er"
     Write-Host "  -DoTests    lance les tests unitaires uniquement"
     Write-Host "  -DoPublish  lance la publication uniquement"
+    Write-Host "  -TestLogDir dossier où journaliser la sortie de chaque projet de test"
     Write-Host ""
     Write-Host "  Exemples :"
     Write-Host "    .\pipeline.ps1 -DoTests -DoPublish   # tests puis publication"
@@ -230,9 +232,22 @@ if ($runTests) {
         Write-Host ""
         Write-Host "  ▸ $test" -ForegroundColor Yellow
         Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Tests : $test ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
-        dotnet test --project $testPath --configuration Release --no-restore
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ✗ Échec des tests : $test" -ForegroundColor Red
+        # Tue les testhosts orphelins du projet précédent : ils retiennent les
+        # verrous sur les DLL de sortie partagées et font échouer le projet
+        # suivant en cascade (collision de remplacement de fichier).
+        Get-Process testhost,testhost.x64,vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep 2
+
+        # Journalisation détaillée : sortie complète de `dotnet test` écrite dans
+        # un fichier par projet (pour diagnostic, cf. -TestLogDir).
+        $testLogRoot = if ($TestLogDir) { $TestLogDir } else { Join-Path $PSScriptRoot "pipeline-tests" }
+        $safeName = $test -replace '[^A-Za-z0-9._-]', '_'
+        $projectLog = Join-Path $testLogRoot "$safeName.log"
+        New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
+        dotnet test --project $testPath --configuration Release --no-restore *>&1 | Tee-Object -FilePath $projectLog -ErrorAction SilentlyContinue
+        $testExitCode = $LASTEXITCODE
+        if ($testExitCode -ne 0) {
+            Write-Host "  ✗ Échec des tests : $test — détails dans $projectLog" -ForegroundColor Red
             $allPassed = $false
         } else {
             Write-Host "  ✓ OK" -ForegroundColor Green
