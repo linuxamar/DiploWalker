@@ -11,6 +11,7 @@
     <Compile Include="DriverMappingsTests.fs" />
     <Compile Include="MessageSerializationTests.fs" />
     <Compile Include="ContainerdClientTests.fs" />
+    <Compile Include="ContainerdClientExtendedTests.fs" />
     <Compile Include="RegistryAuthTests.fs" />
     <Compile Include="ContainerServiceImplTests.fs" />
   </ItemGroup>
