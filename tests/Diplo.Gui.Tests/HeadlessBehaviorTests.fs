@@ -180,3 +180,99 @@ let ``ComposePs peuple la liste des services du projet`` () =
         |> should equal true
     finally
         Diplo.TestHelpers.TestHelpers.cleanupDir dir
+
+// ── MainWindowViewModel ────────────────────────────────────────
+
+let private mainWindowVm () =
+    HeadlessRunner.setupHeadless ()
+    new Diplo.Gui.ViewModels.MainWindowViewModel()
+
+/// Accès au journal brut via le type concret sous-jacent.
+let private mainWindowPort (vm: Diplo.Gui.ViewModels.MainWindowViewModel) =
+    vm.OutputPort :?> Diplo.Gui.Services.AvaloniaOutputPort
+
+[<Fact>]
+let ``MainWindow expose les cinq onglets non nuls`` () =
+    let vm = mainWindowVm ()
+    vm.ContainerTab |> should not' (be Null)
+    vm.VolumeTab |> should not' (be Null)
+    vm.NetworkTab |> should not' (be Null)
+    vm.ComposeTab |> should not' (be Null)
+    vm.SettingsTab |> should not' (be Null)
+
+[<Fact>]
+let ``MainWindow expose les onglets du bon type`` () =
+    let vm = mainWindowVm ()
+
+    vm.ContainerTab
+    |> should be instanceOfType<Diplo.Gui.ViewModels.ContainerTabViewModel>
+
+    vm.VolumeTab
+    |> should be instanceOfType<Diplo.Gui.ViewModels.VolumeTabViewModel>
+
+    vm.NetworkTab
+    |> should be instanceOfType<Diplo.Gui.ViewModels.NetworkTabViewModel>
+
+    vm.ComposeTab
+    |> should be instanceOfType<Diplo.Gui.ViewModels.ComposeTabViewModel>
+
+    vm.SettingsTab
+    |> should be instanceOfType<Diplo.Gui.ViewModels.SettingsTabViewModel>
+
+[<Fact>]
+let ``MainWindow expose OutputPort en tant qu'IOutputPort non nul`` () =
+    let vm = mainWindowVm ()
+    vm.OutputPort |> should not' (be Null)
+    vm.OutputPort |> should be instanceOfType<Diplo.Core.Output.IOutputPort>
+
+[<Fact>]
+let ``MainWindow LogOutput reflète les lignes écrites sur l'OutputPort`` () =
+    let vm = mainWindowVm ()
+    vm.OutputPort.WriteLine("ligne de test")
+    waitPump (fun () -> vm.LogOutput.Contains "ligne de test") |> should equal true
+    vm.LogOutput.Contains "ligne de test" |> should equal true
+
+[<Fact>]
+let ``MainWindow LogOutput agrège plusieurs lignes avec format horodaté`` () =
+    let vm = mainWindowVm ()
+    vm.OutputPort.WriteLine("première")
+    vm.OutputPort.WriteSuccess("seconde")
+    vm.OutputPort.WriteWarning("troisième")
+    waitPump (fun () -> vm.LogOutput.Contains "troisième") |> should equal true
+    vm.LogOutput.Contains "[" |> should equal true
+    vm.LogOutput.Contains "première" |> should equal true
+    vm.LogOutput.Contains "seconde" |> should equal true
+    vm.LogOutput.Contains "troisième" |> should equal true
+
+[<Fact>]
+let ``MainWindow LogOutput est tronqué à 500 lignes`` () =
+    let vm = mainWindowVm ()
+
+    for i in 1 .. 520 do
+        vm.OutputPort.WriteLine($"message %d{i}")
+
+    waitPump (fun () ->
+        (mainWindowPort vm).LogLines.Count >= 500
+        && vm.LogOutput.Contains "message 520")
+    |> should equal true
+
+    (mainWindowPort vm).LogLines.Count |> should equal 500
+    (mainWindowPort vm).LogLines.[0].Text |> should equal "message 21"
+    (mainWindowPort vm).LogLines.[(mainWindowPort vm).LogLines.Count - 1].Text
+    |> should equal "message 520"
+
+[<Fact>]
+let ``MainWindow AboutCommand écrit les deux lignes d'information`` () =
+    let vm = mainWindowVm ()
+    vm.AboutCommand.Execute(null)
+
+    waitPump (fun () -> (mainWindowPort vm).LogLines.Count >= 2)
+    |> should equal true
+
+    vm.LogOutput.Contains "Diplo — Gestion Docker" |> should equal true
+    vm.LogOutput.Contains "Interface graphique Avalonia" |> should equal true
+
+[<Fact>]
+let ``MainWindow QuitCommand est exposé`` () =
+    let vm = mainWindowVm ()
+    vm.QuitCommand |> should not' (be Null)
