@@ -192,6 +192,14 @@ if ($Restore) {
 if ($runTests) {
     Write-Host "═══ Tests unitaires ═══" -ForegroundColor Cyan
 
+    # Libère les verrous de fichiers de sortie (obj/bin) détenus par les
+    # serveurs MSBuild / compilateur laissés par des exécutions précédentes.
+    # Sans cela, `dotnet test` peut échouer en cascade sur une collision de
+    # remplacement de fichier (System.IO.FileSystem.ReplaceFile).
+    Write-Host "  ▸ Arrêt des serveurs de compilation..." -ForegroundColor Yellow
+    dotnet build-server shutdown | Out-Null
+    Write-Host "  ✓ Serveurs de compilation arrêtés." -ForegroundColor Green
+
     # Une restauration complète de la solution est requise avant de tester :
     # après un -Clean, les assets (obj/project.assets.json) ont été purgés et
     # une restauration projet par projet échoue sur les références croisées
