@@ -23,6 +23,10 @@ module ComposeOrchestratorTests =
         let mutable created = ResizeArray<string * string>()
         let mutable createdPorts = ResizeArray<(int * int * string) list>()
         let mutable createdLabels = ResizeArray<IDictionary<string, string>>()
+        let mutable createdEnv = ResizeArray<IDictionary<string, string>>()
+        let mutable createdCommand = ResizeArray<string list option>()
+        let mutable createdArgs = ResizeArray<string list option>()
+        let mutable createdMounts = ResizeArray<(string * string * bool) list option>()
         let mutable started = ResizeArray<string>()
         let mutable stopped = ResizeArray<string>()
         let mutable deleted = ResizeArray<string>()
@@ -31,10 +35,15 @@ module ComposeOrchestratorTests =
         let mutable logEntries = ResizeArray<ContainerLogEntry>()
         let mutable failFromCreate = Int32.MaxValue
         let mutable createCount = 0
+        let failOnStopIds = ResizeArray<string>()
 
         member _.Created = created |> Seq.toList
         member _.CreatedPorts = createdPorts |> Seq.toList
         member _.CreatedLabels = createdLabels |> Seq.toList
+        member _.CreatedEnv = createdEnv |> Seq.toList
+        member _.CreatedCommand = createdCommand |> Seq.toList
+        member _.CreatedArgs = createdArgs |> Seq.toList
+        member _.CreatedMounts = createdMounts |> Seq.toList
         member _.Started = started |> Seq.toList
         member _.Stopped = stopped |> Seq.toList
         member _.Deleted = deleted |> Seq.toList
@@ -49,6 +58,8 @@ module ComposeOrchestratorTests =
 
         member _.SetLogEntries(entries: seq<ContainerLogEntry>) =
             logEntries <- ResizeArray(entries)
+
+        member _.FailOnStopIds = failOnStopIds
 
         interface IDisposable with
             member _.Dispose() = ()
@@ -65,6 +76,10 @@ module ComposeOrchestratorTests =
                 created.Add(name, image)
                 createdPorts.Add(defaultArg _ports [])
                 createdLabels.Add(defaultArg labels (dict []))
+                createdEnv.Add(defaultArg _env (dict []))
+                createdCommand.Add(_command)
+                createdArgs.Add(_args)
+                createdMounts.Add(_mounts)
 
                 Task.FromResult(
                     { CreateContainerResponse.Id = "id-" + name
@@ -78,6 +93,9 @@ module ComposeOrchestratorTests =
                 Task.FromResult({ StartContainerResponse.State = ContainerState.Running; Message = "Démarré" })
 
             member _.StopAsync(id, ?_timeoutSeconds, ?_ct) =
+                if failOnStopIds.Contains(id) then
+                    raise (Exception("échec simulé de l'arrêt"))
+
                 stopped.Add(id)
                 Task.FromResult({ StopContainerResponse.State = ContainerState.Stopped; Message = "Arrêté" })
 
@@ -560,6 +578,293 @@ services:
 
             output.Errors
             |> List.exists (fun e -> e.Contains "Dockerfile introuvable" && e.Contains "worker")
+            |> should equal true
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``ParseFile derive le nom de projet du nom du fichier si absent`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "mon projet.yaml"
+                    """services:
+  web:
+    image: nginx:latest
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            let compose = orchestrator.ParseFile(path)
+            compose.ProjectName |> should equal "mon-projet"
+            compose.Version |> should equal "3.8"
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``ParseFile utilise build comme image de repli`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "compose.yaml"
+                    """name: app
+services:
+  web:
+    build: ./web
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            let compose = orchestrator.ParseFile(path)
+            let svc = compose.Services.Head
+            svc.Build |> should equal (Some "./web")
+            svc.Image |> should equal "app_web"
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``ParseFile analyse l'environnement au format mapping`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "compose.yaml"
+                    """name: app
+services:
+  web:
+    image: nginx:latest
+    environment:
+      MODE: prod
+      DEBUG: "1"
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            let compose = orchestrator.ParseFile(path)
+            let env = compose.Services.Head.Environment
+            env |> should haveLength 2
+            env |> List.exists (fun e -> e.Key = "MODE" && e.Value = "prod") |> should equal true
+            env |> List.exists (fun e -> e.Key = "DEBUG" && e.Value = "1") |> should equal true
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``ParseFile analyse command (sequence et scalaire) et entrypoint`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "compose.yaml"
+                    """name: app
+services:
+  web:
+    image: nginx:latest
+    command:
+      - echo
+      - bonjour
+    entrypoint:
+      - sh
+      - -c
+  db:
+    image: postgres:16
+    command: echo demarrage
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            let compose = orchestrator.ParseFile(path)
+
+            let web = compose.Services.[0]
+            web.Command |> should equal (Some [ "echo"; "bonjour" ])
+            web.Args |> should equal (Some [ "sh"; "-c" ])
+
+            let db = compose.Services.[1]
+            db.Command |> should equal (Some [ "echo"; "demarrage" ])
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``ParseFile leve InvalidArgument pour un nom de service invalide`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "compose.yaml"
+                    """name: app
+services:
+  "mauvais nom":
+    image: nginx:latest
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            let raised =
+                try
+                    orchestrator.ParseFile(path) |> ignore
+                    false
+                with :? Grpc.Core.RpcException as ex ->
+                    ex.Status.StatusCode |> should equal Grpc.Core.StatusCode.InvalidArgument
+                    true
+
+            raised |> should equal true
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``ParseFile leve InvalidArgument pour une image invalide`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "compose.yaml"
+                    """name: app
+services:
+  web:
+    image: "mauvaise image"
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            let raised =
+                try
+                    orchestrator.ParseFile(path) |> ignore
+                    false
+                with :? Grpc.Core.RpcException as ex ->
+                    ex.Status.StatusCode |> should equal Grpc.Core.StatusCode.InvalidArgument
+                    true
+
+            raised |> should equal true
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``ParseFile leve InvalidArgument pour une commande invalide`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "compose.yaml"
+                    """name: app
+services:
+  web:
+    image: nginx:latest
+    command:
+      - ""
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            let raised =
+                try
+                    orchestrator.ParseFile(path) |> ignore
+                    false
+                with :? Grpc.Core.RpcException as ex ->
+                    ex.Status.StatusCode |> should equal Grpc.Core.StatusCode.InvalidArgument
+                    true
+
+            raised |> should equal true
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``ParseFile leve InvalidArgument quand la racine n'est pas un mapping`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path = writeCompose dir "compose.yaml" "- element1\n- element2\n"
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            let raised =
+                try
+                    orchestrator.ParseFile(path) |> ignore
+                    false
+                with :? Grpc.Core.RpcException as ex ->
+                    ex.Status.StatusCode |> should equal Grpc.Core.StatusCode.InvalidArgument
+                    true
+
+            raised |> should equal true
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``Up transmet environnement, commande, arguments et volumes`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "compose.yaml"
+                    """name: app
+services:
+  web:
+    image: nginx:latest
+    environment:
+      MODE: prod
+    command:
+      - echo
+      - bonjour
+    entrypoint:
+      - sh
+    volumes:
+      - "./data:/app/data"
+      - "./cfg:/etc/cfg:ro"
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+            use orchestrator = new ComposeOrchestrator(output, client)
+            run (orchestrator.Up(path))
+
+            client.CreatedEnv |> List.head |> fun env -> env.["MODE"] |> should equal "prod"
+            client.CreatedCommand |> List.head |> should equal (Some [ "echo"; "bonjour" ])
+            client.CreatedArgs |> List.head |> should equal (Some [ "sh" ])
+
+            client.CreatedMounts
+            |> List.head
+            |> should equal (Some [ ("./data", "/app/data", false); ("./cfg", "/etc/cfg", true) ])
+        finally
+            TestHelpers.cleanupDir dir
+
+    [<Fact>]
+    let ``Down signale un arret partiel en cas d'echec`` () =
+        let dir = TestHelpers.createTempDir "compose"
+
+        try
+            let path =
+                writeCompose dir "compose.yaml"
+                    """name: app
+services:
+  web:
+    image: nginx:latest
+"""
+
+            let output = MockOutputPort()
+            let client = new RecordingContainerClient()
+
+            client.SetListedContainers(
+                [ container ("ctr-web", "app_web_0", "nginx:latest", ContainerState.Running, [ composeProjectLabel, "app"; composeServiceLabel, "web" ])
+                  container ("ctr-db", "app_db_0", "postgres:16", ContainerState.Running, [ composeProjectLabel, "app"; composeServiceLabel, "db" ]) ]
+            )
+
+            client.FailOnStopIds.Add("ctr-db")
+            use orchestrator = new ComposeOrchestrator(output, client)
+            run (orchestrator.Down(path))
+
+            client.Stopped |> should equal [ "ctr-web" ]
+            client.Deleted |> should equal [ "ctr-web" ]
+            output.Warnings |> should contain "Projet 'app' partiellement arrêté (1 OK, 1 échec(s))"
+
+            output.Errors
+            |> List.exists (fun e -> e.Contains "app_db_0" && e.Contains "échec de l'arrêt")
             |> should equal true
         finally
             TestHelpers.cleanupDir dir
