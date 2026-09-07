@@ -502,7 +502,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 member _.GetAsyncEnumerator(ct2) =
                     let cts = CancellationTokenSource.CreateLinkedTokenSource(ct, ct2)
                     let channel = System.Threading.Channels.Channel.CreateUnbounded<string>()
-                    producer channel.Writer cts.Token |> Async.StartAsTask |> ignore
+                    let producerTask = producer channel.Writer cts.Token |> Async.StartAsTask
                     let mutable current = ""
 
                     { new IAsyncEnumerator<string> with
@@ -524,7 +524,16 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                             ValueTask<bool>(task)
 
                         member _.DisposeAsync() =
+                            // Arrête le producteur et observe ses éventuelles
+                            // exceptions pour éviter un UnobservedTaskException.
+                            cts.Cancel()
                             channel.Writer.TryComplete() |> ignore
+                            producerTask.ContinueWith(
+                                (fun (t: Task) -> if t.IsFaulted then t.Exception |> ignore),
+                                TaskContinuationOptions.OnlyOnFaulted
+                            )
+                            |> ignore
+
                             ValueTask() } }
 
         member _.ExecInContainer(namespaceName, id, command) =
@@ -603,8 +612,20 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
 
                     -1
                 else
-                    Task.WaitAll(pumpOut, pumpErr)
-                    pumpIn.Wait()
+                    // Après la sortie du processus, les tubes de sortie se ferment
+                    // naturellement : on borne malgré tout l'attente des pumps pour
+                    // ne pas suspendre indéfiniment le thread si le stdin n'est
+                    // jamais fermé par le client.
+                    try
+                        proc.StandardInput.Close()
+                    with _ ->
+                        ()
+
+                    try
+                        Task.WaitAll([| pumpIn; pumpOut; pumpErr |], 30_000) |> ignore
+                    with _ ->
+                        ()
+
                     proc.ExitCode
             with ex ->
                 Log.Error(ex, "Erreur lors de l'exécution en flux dans le conteneur {ContainerId}", id)
