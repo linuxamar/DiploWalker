@@ -28,7 +28,10 @@
                         <Button Content="📥 Télécharger" Command="{Binding ContainerTab.PullImageCommand}" Margin="0,0,4,0" />
                         <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectContainerCommand}" Margin="0,0,12,0" />
                         <Button Content="📁 Espaces" Command="{Binding ContainerTab.ListNamespacesCommand}" Margin="0,0,4,0" />
-                        <Button Content="ℹ Version" Command="{Binding ContainerTab.VersionCommand}" />
+                        <Button Content="ℹ Version" Command="{Binding ContainerTab.VersionCommand}" Margin="0,0,8,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding ContainerTab.PruneContainersCommand}" Margin="0,0,8,0" />
+                        <Button Content="📢 Événements" Command="{Binding ContainerTab.GetContainerEventsCommand}" Margin="0,0,4,0" />
+                        <Button Content="⏹ Arrêter" Command="{Binding ContainerTab.StopFollowEventsCommand}" />
                     </WrapPanel>
 
                     <!-- Champs de création / recherche -->

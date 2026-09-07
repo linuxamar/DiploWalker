@@ -73,6 +73,14 @@ type ContainerTabViewModel
             logCts.Dispose()
             logCts <- null
 
+    let mutable eventsCts: CancellationTokenSource = null
+
+    let cancelPreviousEventsStream () =
+        if eventsCts <> null then
+            eventsCts.Cancel()
+            eventsCts.Dispose()
+            eventsCts <- null
+
     let listContainersCmd =
         RelayCommand(Action(fun () -> this.ListContainers() |> ignore))
 
@@ -128,6 +136,30 @@ type ContainerTabViewModel
 
     let registryLogoutCmd =
         RelayCommand(Action(fun () -> this.RegistryLogout() |> ignore))
+
+    let pauseContainerCmd =
+        RelayCommand(Action(fun () -> this.PauseContainer() |> ignore))
+
+    let unpauseContainerCmd =
+        RelayCommand(Action(fun () -> this.UnpauseContainer() |> ignore))
+
+    let waitContainerCmd =
+        RelayCommand(Action(fun () -> this.WaitContainer() |> ignore))
+
+    let pruneContainersCmd =
+        RelayCommand(Action(fun () -> this.PruneContainers() |> ignore))
+
+    let pruneImagesCmd =
+        RelayCommand(Action(fun () -> this.PruneImages() |> ignore))
+
+    let commitImageCmd =
+        RelayCommand(Action(fun () -> this.CommitImage() |> ignore))
+
+    let getContainerEventsCmd =
+        RelayCommand(Action(fun () -> this.GetContainerEvents() |> ignore))
+
+    let stopFollowEventsCmd =
+        RelayCommand(Action(fun () -> cancelPreviousEventsStream ()))
 
     member _.Containers = containers
     member _.Images = images
@@ -276,6 +308,14 @@ type ContainerTabViewModel
     member _.ListNamespacesCommand = listNamespacesCmd
     member _.RegistryLoginCommand = registryLoginCmd
     member _.RegistryLogoutCommand = registryLogoutCmd
+    member _.PauseContainerCommand = pauseContainerCmd
+    member _.UnpauseContainerCommand = unpauseContainerCmd
+    member _.WaitContainerCommand = waitContainerCmd
+    member _.PruneContainersCommand = pruneContainersCmd
+    member _.PruneImagesCommand = pruneImagesCmd
+    member _.CommitImageCommand = commitImageCmd
+    member _.GetContainerEventsCommand = getContainerEventsCmd
+    member _.StopFollowEventsCommand = stopFollowEventsCmd
 
     member private this.ListContainers() =
         Cmd.run outputPort (fun () ->
@@ -682,9 +722,152 @@ type ContainerTabViewModel
                         outputPort.WriteError(response.Message)
             })
 
+    member private this.PauseContainer() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let target = this.ResolveTargetId()
+
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                else
+                    let! response = containerClient.PauseAsync(id = target)
+                    outputPort.WriteSuccess(sprintf "Conteneur %s suspendu - %s" target response.Message)
+            })
+
+    member private this.UnpauseContainer() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let target = this.ResolveTargetId()
+
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                else
+                    let! response = containerClient.UnpauseAsync(id = target)
+                    outputPort.WriteSuccess(sprintf "Conteneur %s repris - %s" target response.Message)
+            })
+
+    member private this.WaitContainer() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let target = this.ResolveTargetId()
+
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                else
+                    let! response =
+                        containerClient.WaitAsync(id = target, timeoutSeconds = this.ContainerTimeout)
+
+                    outputPort.WriteSuccess(
+                        sprintf "Conteneur %s terminé (code: %d) - %s" target response.ExitCode response.Message
+                    )
+            })
+
+    member private this.PruneContainers() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.PruneContainersAsync()
+
+                if response.Deleted.Count = 0 then
+                    outputPort.WriteSuccess("Aucun conteneur arrêté à supprimer")
+                else
+                    outputPort.WriteSuccess(
+                        sprintf "%d conteneur(s) arrêté(s) supprimé(s): %s"
+                            response.Deleted.Count
+                            (String.Join(", ", response.Deleted))
+                    )
+            })
+
+    member private this.PruneImages() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let! response = containerClient.PruneImagesAsync()
+
+                if response.Deleted.Count = 0 then
+                    outputPort.WriteSuccess("Aucune image inutilisée à supprimer")
+                else
+                    outputPort.WriteSuccess(
+                        sprintf "%d image(s) inutilisée(s) supprimée(s): %s"
+                            response.Deleted.Count
+                            (String.Join(", ", response.Deleted))
+                    )
+            })
+
+    member private this.CommitImage() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let target = this.ResolveTargetId()
+
+                if String.IsNullOrEmpty target then
+                    outputPort.WriteWarning("Aucun identifiant de conteneur (saisie ou sélection)")
+                elif String.IsNullOrWhiteSpace(this.ContainerImageTarget) then
+                    outputPort.WriteWarning("Une référence d'image est requise (champ Réf. image cible)")
+                else
+                    let! response =
+                        containerClient.CommitImageAsync(containerId = target, imageRef = this.ContainerImageTarget)
+
+                    outputPort.WriteSuccess(
+                        sprintf "Image %s créée depuis %s - %s"
+                            this.ContainerImageTarget
+                            target
+                            response.Message
+                    )
+            })
+
+    member private this.GetContainerEvents() =
+        Cmd.run outputPort (fun () ->
+            task {
+                cancelPreviousEventsStream ()
+                let cts = new CancellationTokenSource()
+                eventsCts <- cts
+
+                try
+                    let stream = containerClient.WatchEventsStream(cts.Token)
+                    let enumerator = stream.GetAsyncEnumerator(cts.Token)
+
+                    try
+                        let mutable moving = true
+                        let mutable cancelled = false
+
+                        while moving do
+                            try
+                                let! hasNext = enumerator.MoveNextAsync().AsTask()
+
+                                if hasNext then
+                                    let e = enumerator.Current
+
+                                    outputPort.WriteLine(
+                                        sprintf
+                                            "[%s] %s %s (%s)"
+                                            e.Timestamp
+                                            e.EventType
+                                            e.Id
+                                            e.Status
+                                    )
+                                else
+                                    moving <- false
+                            with :? OperationCanceledException ->
+                                // Arrêt volontaire du suivi (bouton ⏹) :
+                                // ce n'est PAS une erreur à afficher.
+                                cancelled <- true
+                                moving <- false
+
+                        if not cancelled then
+                            outputPort.WriteSuccess("Suivi des événements terminé")
+                    finally
+                        enumerator.DisposeAsync().AsTask() |> ignore
+                finally
+                    if eventsCts = cts then
+                        eventsCts <- null
+
+                    cts.Dispose()
+            })
+
     interface IDisposable with
         member _.Dispose() =
             (containerClient :> IDisposable).Dispose()
             if logCts <> null then
                 logCts.Cancel()
                 logCts.Dispose()
+            if eventsCts <> null then
+                eventsCts.Cancel()
+                eventsCts.Dispose()
