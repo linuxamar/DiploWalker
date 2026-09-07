@@ -437,7 +437,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     interface IContainerClient with
         member _.CreateAsync
-            (name, image, ?env, ?command, ?args, ?labels, ?pidLimit, ?memoryLimit, ?cpuShares, ?mounts, ?ct)
+            (name, image, ?env, ?command, ?args, ?labels, ?pidLimit, ?memoryLimit, ?cpuShares, ?mounts, ?ports, ?ct)
             =
             this.CreateAsync(
                 name,
@@ -450,6 +450,7 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
                 ?memoryLimit = memoryLimit,
                 ?cpuShares = cpuShares,
                 ?mounts = mounts,
+                ?ports = ports,
                 ?ct = ct
             )
 

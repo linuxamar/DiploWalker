@@ -114,3 +114,7 @@ module ProcessExecTests =
     let ``runUnit leve une exception en cas de timeout`` () =
         (fun () -> ProcessExec.runUnit "cmd.exe" [ "/c"; "ping"; "-n"; "5"; "127.0.0.1" ] (Some 500) None)
         |> should throw typeof<TimeoutException>
+
+    [<Fact>]
+    let ``MountTimeoutMs vaut 30000`` () =
+        ProcessExec.MountTimeoutMs |> should equal 30_000

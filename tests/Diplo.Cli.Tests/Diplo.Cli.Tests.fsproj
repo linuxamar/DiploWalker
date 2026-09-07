@@ -8,7 +8,9 @@
   <ItemGroup>
     <Compile Include="CommandSettingsTests.fs" />
     <Compile Include="ExitCodeTests.fs" />
+    <Compile Include="ExitCodeCoverageTests.fs" />
     <Compile Include="SuccessPathTests.fs" />
+    <Compile Include="CommandCoverageTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

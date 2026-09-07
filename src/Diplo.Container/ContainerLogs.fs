@@ -23,42 +23,6 @@ module ContainerLogs =
     let fileFor (id: string) =
         Path.Combine(logsDir (), sprintf "%s.log" id)
 
-    /// Lit le journal d'un conteneur : dernières `tail` lignes, filtrées par
-    /// `since` (comparaison ordinale sur le début de ligne, adaptée aux
-    /// horodatages ISO). Retourne [||] si aucun journal n'existe.
-    /// Ouvre le fichier avec un partage large (lecture/écriture/suppression)
-    /// car la sortie du conteneur en cours d'exécution verrouille le fichier
-    /// en écriture : File.ReadAllLines (partage strict) lèverait IOException.
-    let read (id: string) (tail: int) (since: string) =
-        let file = fileFor id
-
-        if not (File.Exists file) then
-            [||]
-        else
-            use fs =
-                new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
-
-            use reader = new StreamReader(fs)
-            let text = reader.ReadToEnd()
-
-            let lines =
-                if String.IsNullOrEmpty text then
-                    [||]
-                else
-                    text.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                    |> Array.map (fun l -> l.TrimEnd('\r'))
-
-            let lines =
-                if String.IsNullOrEmpty since then
-                    lines
-                else
-                    lines |> Array.skipWhile (fun l -> String.CompareOrdinal(l, since) < 0)
-
-            if tail > 0 && lines.Length > tail then
-                lines.[lines.Length - tail ..]
-            else
-                lines
-
     /// Longueur actuelle (en octets) du journal d'un conteneur (0 si absent).
     let fileLength (id: string) =
         let file = fileFor id
@@ -124,6 +88,12 @@ module ContainerLogs =
                         lines
 
                 lines, watermark
+
+    /// Lit le journal d'un conteneur de manière bornée (fenêtre au plus 1 Go,
+    /// partagée avec readUpToCore) : dernières `tail` lignes, filtrées par
+    /// `since`. Retourne [||] si aucun journal n'existe.
+    let read (id: string) (tail: int) (since: string) : string array =
+        readUpToCore id tail since |> fst
 
     let readUpTo (id: string) (tail: int) (since: string) : Result<string array * int64, string> =
         try Ok(readUpToCore id tail since)

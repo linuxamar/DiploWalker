@@ -9,6 +9,10 @@
     <Compile Include="ViewModelBaseTests.fs" />
     <Compile Include="AvaloniaOutputPortTests.fs" />
     <Compile Include="TabViewModelTests.fs" />
+    <Compile Include="OptionalBehaviorTests.fs" />
+    <Compile Include="ClientInjectedBehaviorTests.fs" />
+    <Compile Include="HeadlessApp.fs" />
+    <Compile Include="HeadlessBehaviorTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +23,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FsUnit.xUnit"  />
+    <PackageReference Include="Avalonia.Headless"  />
   </ItemGroup>
 
   <ItemGroup>

@@ -15,11 +15,15 @@ type ComposeServiceInfo =
       État: string
       Projet: string }
 
-type ComposeTabViewModel(outputPort: IOutputPort) as this =
+type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -> IContainerClient) as this =
     inherit ViewModelBase()
 
     let composeServices = ObservableCollection<ComposeServiceInfo>()
-    let composeClient = new ContainerClient()
+
+    let composeClient =
+        let factory = defaultArg containerClientFactory (fun () -> new ContainerClient() :> IContainerClient)
+        factory ()
+
     let composeEditor = ComposeEditorViewModel()
 
     let mutable composeFilePath = ""
@@ -184,21 +188,21 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeUp() =
         Cmd.run outputPort (fun () ->
             task {
-                use orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort, containerClient = composeClient)
                 do! orchestrator.Up(this.ComposeFilePath)
             })
 
     member private this.ComposeDown() =
         Cmd.run outputPort (fun () ->
             task {
-                use orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort, containerClient = composeClient)
                 do! orchestrator.Down(this.ComposeFilePath)
             })
 
     member private this.ComposePs() =
         Cmd.run outputPort (fun () ->
             task {
-                use orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort, containerClient = composeClient)
                 let compose = orchestrator.ParseFile(this.ComposeFilePath)
                 let! response = composeClient.ListAsync(all = true)
 
@@ -231,7 +235,7 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeLogs() =
         Cmd.run outputPort (fun () ->
             task {
-                use orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort, containerClient = composeClient)
 
                 let service =
                     if String.IsNullOrEmpty(this.ComposeServiceName) then
@@ -245,14 +249,14 @@ type ComposeTabViewModel(outputPort: IOutputPort) as this =
     member private this.ComposeBuild() =
         Cmd.run outputPort (fun () ->
             task {
-                use orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort, containerClient = composeClient)
                 do! orchestrator.Build(this.ComposeFilePath)
             })
 
     member private this.ComposePull() =
         Cmd.run outputPort (fun () ->
             task {
-                use orchestrator = new ComposeOrchestrator(outputPort)
+                use orchestrator = new ComposeOrchestrator(outputPort, containerClient = composeClient)
                 do! orchestrator.Pull(this.ComposeFilePath)
             })
 

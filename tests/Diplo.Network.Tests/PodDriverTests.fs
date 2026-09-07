@@ -158,3 +158,128 @@ module PodDriverTests =
             | Ok ep -> ep.Ipv4Address |> should equal "10.244.9.10"
             | Error msg -> failwithf "Connect a échoué: %s" msg
         | Error msg -> failwithf "Create a échoué: %s" msg
+
+    // ─── Sémantique de suppression (force) ──────────────────────────────
+
+    [<Fact>]
+    let ``Remove est refusé quand le pod a des endpoints actifs sans force`` () =
+        let driver = createDriver ()
+
+        match driver.Create("force-pod", "10.244.10.0/24", "10.244.10.1", "", Map.empty, Map.empty) with
+        | Ok created ->
+            match driver.Connect(created.Id, "container-active", "", None, Map.empty) with
+            | Ok _ ->
+                match driver.Remove(created.Id, false) with
+                | Error msg -> msg |> should haveSubstring "endpoint(s) actif(s)"
+                | Ok _ -> failwith "Remove devrait être refusé avec des endpoints actifs sans force"
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
+
+    [<Fact>]
+    let ``Remove avec force supprime un pod avec endpoints actifs`` () =
+        let driver = createDriver ()
+
+        match driver.Create("force-pod-2", "10.244.11.0/24", "10.244.11.1", "", Map.empty, Map.empty) with
+        | Ok created ->
+            driver.Connect(created.Id, "container-active", "", None, Map.empty) |> ignore
+
+            match driver.Remove(created.Id, true) with
+            | Ok _ ->
+                match driver.Inspect(created.Id) with
+                | Error _ -> ()
+                | Ok _ -> failwith "Inspect devrait retourner Error après suppression"
+            | Error msg -> failwithf "Remove avec force a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
+
+    // ─── Limite de conteneurs ───────────────────────────────────────────
+
+    [<Fact>]
+    let ``Create avec max_containers invalide utilise la valeur par defaut`` () =
+        let driver = createDriver ()
+        let options = Map.ofList [ ("max_containers", "abc") ]
+
+        match driver.Create("invalid-max", "10.244.12.0/24", "10.244.12.1", "", options, Map.empty) with
+        | Ok created ->
+            match driver.Connect(created.Id, "c1", "", None, Map.empty) with
+            | Ok ep -> ep.Message.Contains("1/32") |> should equal true
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
+
+    [<Fact>]
+    let ``Create avec max_containers zero utilise la valeur par defaut`` () =
+        let driver = createDriver ()
+        let options = Map.ofList [ ("max_containers", "0") ]
+
+        match driver.Create("zero-max", "10.244.13.0/24", "10.244.13.1", "", options, Map.empty) with
+        | Ok created ->
+            match driver.Connect(created.Id, "c1", "", None, Map.empty) with
+            | Ok ep -> ep.Message.Contains("1/32") |> should equal true
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
+
+    [<Fact>]
+    let ``Create avec max_containers superieur a la limite utilise la valeur par defaut`` () =
+        let driver = createDriver ()
+        let options = Map.ofList [ ("max_containers", "999") ]
+
+        match driver.Create("over-max", "10.244.14.0/24", "10.244.14.1", "", options, Map.empty) with
+        | Ok created ->
+            match driver.Connect(created.Id, "c1", "", None, Map.empty) with
+            | Ok ep -> ep.Message.Contains("1/32") |> should equal true
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
+
+    [<Fact>]
+    let ``Connect refuse quand la limite de conteneurs est atteinte`` () =
+        let driver = createDriver ()
+        let options = Map.ofList [ ("max_containers", "2") ]
+
+        match driver.Create("limit-pod", "10.244.15.0/24", "10.244.15.1", "", options, Map.empty) with
+        | Ok created ->
+            driver.Connect(created.Id, "c1", "", None, Map.empty) |> ignore
+            driver.Connect(created.Id, "c2", "", None, Map.empty) |> ignore
+
+            match driver.Connect(created.Id, "c3", "", None, Map.empty) with
+            | Error msg -> msg |> should haveSubstring "limite de 2 conteneurs"
+            | Ok _ -> failwith "Connect devrait refuser quand la limite est atteinte"
+        | Error msg -> failwithf "Create a échoué: %s" msg
+
+    // ─── Prune ──────────────────────────────────────────────────────────
+
+    [<Fact>]
+    let ``Prune supprime les pods sans endpoint actif`` () =
+        let driver = createDriver ()
+
+        match driver.Create("prune-pod-1", "10.244.16.0/24", "10.244.16.1", "", Map.empty, Map.empty) with
+        | Ok p1 ->
+            driver.Create("prune-pod-2", "10.244.17.0/24", "10.244.17.1", "", Map.empty, Map.empty)
+            |> ignore
+
+            match driver.Prune() with
+            | Ok removed ->
+                removed.Length |> should equal 2
+                removed |> List.contains p1.Id |> should equal true
+
+                match driver.List() with
+                | Ok nets -> nets.Length |> should equal 0
+                | Error msg -> failwithf "List a échoué: %s" msg
+            | Error msg -> failwithf "Prune a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
+
+    [<Fact>]
+    let ``Prune conserve les pods avec endpoints actifs`` () =
+        let driver = createDriver ()
+
+        match driver.Create("active-pod", "10.244.18.0/24", "10.244.18.1", "", Map.empty, Map.empty) with
+        | Ok created ->
+            driver.Connect(created.Id, "container-keep", "", None, Map.empty) |> ignore
+
+            match driver.Prune() with
+            | Ok removed ->
+                removed.Length |> should equal 0
+
+                match driver.List() with
+                | Ok nets -> nets.Length |> should equal 1
+                | Error msg -> failwithf "List a échoué: %s" msg
+            | Error msg -> failwithf "Prune a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg

@@ -87,3 +87,71 @@ type ServiceGuardsTests() =
     let ``requireSafeCommand lève si commande vide`` () =
         (fun () -> ServiceGuards.requireSafeCommand [||])
         |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``requireSafePath ne lève pas pour un chemin sûr`` () =
+        ServiceGuards.requireSafePath @"C:\data\fichier.txt" "Chemin"
+
+    [<Fact>]
+    let ``requireSafePath lève si chemin vide`` () =
+        (fun () -> ServiceGuards.requireSafePath "" "Chemin")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``requireSafePath lève si traversée de répertoire`` () =
+        (fun () -> ServiceGuards.requireSafePath @"..\..\fichier.txt" "Chemin")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``requireSafePath lève si caractère dangereux`` () =
+        (fun () -> ServiceGuards.requireSafePath @"C:\data\a;b" "Chemin")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``requireLocalAddress accepte localhost`` () =
+        ServiceGuards.requireLocalAddress "http://localhost:50051"
+
+    [<Fact>]
+    let ``requireLocalAddress accepte 127.0.0.1`` () =
+        ServiceGuards.requireLocalAddress "http://127.0.0.1:50051"
+
+    [<Fact>]
+    let ``requireLocalAddress accepte un named pipe`` () =
+        ServiceGuards.requireLocalAddress "http://pipe:/diplo-container"
+
+    [<Fact>]
+    let ``requireLocalAddress rejette hôte distant`` () =
+        (fun () -> ServiceGuards.requireLocalAddress "http://evil.example.com:50051")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``requireLocalAddress rejette adresse vide`` () =
+        (fun () -> ServiceGuards.requireLocalAddress "")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``requireVolumeId ne lève pas si identifiant valide`` () =
+        ServiceGuards.requireVolumeId "vol-1"
+
+    [<Fact>]
+    let ``requireVolumeId lève si identifiant vide`` () =
+        (fun () -> ServiceGuards.requireVolumeId "")
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``requireVolumeFound ne lève pas si trouvé`` () =
+        ServiceGuards.requireVolumeFound "vol-1" true
+
+    [<Fact>]
+    let ``requireVolumeFound lève NotFound si introuvable`` () =
+        (fun () -> ServiceGuards.requireVolumeFound "vol-1" false)
+        |> should throw typeof<RpcException>
+
+    [<Fact>]
+    let ``requireTargetPath ne lève pas si chemin valide`` () =
+        ServiceGuards.requireTargetPath "/mnt/data"
+
+    [<Fact>]
+    let ``requireTargetPath lève si chemin vide`` () =
+        (fun () -> ServiceGuards.requireTargetPath "")
+        |> should throw typeof<RpcException>

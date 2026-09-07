@@ -113,3 +113,18 @@ module NoneDriverTests =
             | Ok nets -> nets.Length |> should equal 0
             | Error msg -> failwithf "List a echoue: %s" msg
         | Error msg -> failwithf "Create a echoue: %s" msg
+
+    [<Fact>]
+    let ``Prune supprime tous les reseaux None`` () =
+        let driver = createDriver ()
+        driver.Create("prune-none-1", "", "", "", Map.empty, Map.empty) |> ignore
+        driver.Create("prune-none-2", "", "", "", Map.empty, Map.empty) |> ignore
+
+        match driver.Prune() with
+        | Ok removed ->
+            removed.Length |> should equal 2
+
+            match driver.List() with
+            | Ok nets -> nets.Length |> should equal 0
+            | Error msg -> failwithf "List a echoue: %s" msg
+        | Error msg -> failwithf "Prune a echoue: %s" msg

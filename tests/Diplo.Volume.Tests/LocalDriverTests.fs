@@ -180,3 +180,184 @@ module LocalDriverTests =
             size |> should equal 10L
         finally
             cleanupDir tempRoot
+
+    [<Fact>]
+    let ``GetVolumeSize retourne 0 pour un id inexistant`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            driver.GetVolumeSize("inexistant") |> should equal 0L
+        finally
+            cleanupDir tempRoot
+
+    // ── RemoveVolume monté ───────────────────────────────────────
+
+    [<Fact>]
+    let ``RemoveVolume sans force sur volume monte leve FailedPrecondition`` () =
+        ensureCwdAllowed ()
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            let (id, _) = driver.CreateVolume("mounted-del", Map.empty, Map.empty)
+            driver.MountVolume(id, "target", "") |> ignore
+            let ex = Assert.Throws<Grpc.Core.RpcException>(fun () -> driver.RemoveVolume(id, false) |> ignore)
+            ex.StatusCode |> should equal Grpc.Core.StatusCode.FailedPrecondition
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``RemoveVolume avec force sur volume monte supprime`` () =
+        ensureCwdAllowed ()
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            let (id, _) = driver.CreateVolume("mounted-force", Map.empty, Map.empty)
+            driver.MountVolume(id, "target", "") |> ignore
+            driver.RemoveVolume(id, true) |> should equal true
+            driver.InspectVolume(id).IsNone |> should equal true
+        finally
+            cleanupDir tempRoot
+
+    // ── ListVolumes filtres ──────────────────────────────────────
+
+    [<Fact>]
+    let ``ListVolumes filtre par nom (insensible a la casse)`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            driver.CreateVolume("AlphaVol", Map.empty, Map.empty) |> ignore
+            driver.CreateVolume("BetaVol", Map.empty, Map.empty) |> ignore
+
+            let names =
+                driver.ListVolumes(Map.ofList [ "name", "alpha" ])
+                |> List.map (fun v -> v.GetProperty("name").GetString())
+
+            names.Length |> should equal 1
+            names.Head |> should equal "AlphaVol"
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``ListVolumes filtre par presence de label`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            driver.CreateVolume("labeled", Map.empty, Map.ofList [ "env", "test" ]) |> ignore
+            driver.CreateVolume("plain", Map.empty, Map.empty) |> ignore
+
+            let names =
+                driver.ListVolumes(Map.ofList [ "label", "env" ])
+                |> List.map (fun v -> v.GetProperty("name").GetString())
+
+            names.Length |> should equal 1
+            names.Head |> should equal "labeled"
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``ListVolumes filtre par valeur de label`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            driver.CreateVolume("prod", Map.empty, Map.ofList [ "env", "prod" ]) |> ignore
+            driver.CreateVolume("dev", Map.empty, Map.ofList [ "env", "dev" ]) |> ignore
+
+            let names =
+                driver.ListVolumes(Map.ofList [ "label", "env=prod" ])
+                |> List.map (fun v -> v.GetProperty("name").GetString())
+
+            names.Length |> should equal 1
+            names.Head |> should equal "prod"
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``ListVolumes combine les filtres name et label`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            driver.CreateVolume("web-prod", Map.empty, Map.ofList [ "env", "prod" ]) |> ignore
+            driver.CreateVolume("web-dev", Map.empty, Map.ofList [ "env", "dev" ]) |> ignore
+            driver.CreateVolume("api-prod", Map.empty, Map.ofList [ "env", "prod" ]) |> ignore
+
+            let names =
+                driver.ListVolumes(Map.ofList [ "name", "web"; "label", "env=prod" ])
+                |> List.map (fun v -> v.GetProperty("name").GetString())
+
+            names.Length |> should equal 1
+            names.Head |> should equal "web-prod"
+        finally
+            cleanupDir tempRoot
+
+    // ── CreateVolume/MountVolume avec chemin externe (path) ──────
+
+    [<Fact>]
+    let ``CreateVolume avec option path pointe sur le repertoire externe`` () =
+        ensureCwdAllowed ()
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            let external = Path.Combine(tempRoot, "extern-data")
+            let (id, mountpoint) = driver.CreateVolume("path-vol", Map.ofList [ "path", external ], Map.empty)
+            mountpoint |> should equal external
+            Directory.Exists(external) |> should equal true
+            // Le _data interne n'est pas créé pour un volume référencé.
+            let (_, mountDir) = driver.MountVolume(id, "target", "")
+            Directory.Exists(mountDir) |> should equal true
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``MountVolume avec volume externe copie son contenu`` () =
+        ensureCwdAllowed ()
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            let external = Path.Combine(tempRoot, "extern-content")
+            let (id, mountpoint) = driver.CreateVolume("path-content", Map.ofList [ "path", external ], Map.empty)
+            File.WriteAllText(Path.Combine(mountpoint, "fichier.txt"), "externe")
+            let (success, mountDir) = driver.MountVolume(id, "target", "")
+            success |> should equal true
+            File.ReadAllText(Path.Combine(mountDir, "fichier.txt")) |> should equal "externe"
+        finally
+            cleanupDir tempRoot
+
+    // ── PruneVolumes ─────────────────────────────────────────────
+
+    [<Fact>]
+    let ``PruneVolumes supprime les volumes non montes et ignore les montes`` () =
+        ensureCwdAllowed ()
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            let (idMount, _) = driver.CreateVolume("keep-mounted", Map.empty, Map.empty)
+            driver.MountVolume(idMount, "target", "") |> ignore
+            let (idFree, _) = driver.CreateVolume("to-prune", Map.empty, Map.empty)
+
+            let removed = driver.PruneVolumes()
+            removed |> should contain idFree
+            removed |> should not' (contain idMount)
+            driver.InspectVolume(idFree).IsNone |> should equal true
+            driver.InspectVolume(idMount).IsSome |> should equal true
+        finally
+            cleanupDir tempRoot
+
+    [<Fact>]
+    let ``PruneVolumes retourne vide quand aucun volume`` () =
+        let tempRoot = createTempDir ()
+
+        try
+            let driver = LocalVolumeDriver(tempRoot)
+            driver.PruneVolumes() |> should be Empty
+        finally
+            cleanupDir tempRoot

@@ -27,6 +27,7 @@ type IContainerClient =
         ?memoryLimit: int64 *
         ?cpuShares: int *
         ?mounts: (string * string * bool) list *
+        ?ports: (int * int * string) list *
         ?ct: CancellationToken ->
             Task<CreateContainerResponse>
 

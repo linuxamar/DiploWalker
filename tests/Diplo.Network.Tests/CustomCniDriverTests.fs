@@ -112,3 +112,43 @@ module CustomCniDriverTests =
             | Ok _ -> ()
             | Error msg -> failwithf "Disconnect a echoue: %s" msg
         | Error msg -> failwithf "Create a echoue: %s" msg
+
+    [<Fact>]
+    let ``Prune supprime tous les reseaux CNI`` () =
+        let driver = createDriver ()
+
+        match driver.Create("prune-cni-1", "10.244.0.0/16", "", "", Map.empty, Map.empty) with
+        | Ok n1 ->
+            driver.Create("prune-cni-2", "10.245.0.0/16", "", "", Map.empty, Map.empty)
+            |> ignore
+
+            match driver.Prune() with
+            | Ok removed ->
+                removed.Length |> should equal 2
+                removed |> List.contains n1.Id |> should equal true
+
+                match driver.List() with
+                | Ok nets -> nets.Length |> should equal 0
+                | Error msg -> failwithf "List a echoue: %s" msg
+            | Error msg -> failwithf "Prune a echoue: %s" msg
+        | Error msg -> failwithf "Create a echoue: %s" msg
+
+    [<Fact>]
+    let ``GetAvailableSubnet retourne un sous-reseau non utilise`` () =
+        let driver = CustomCniDriver()
+        let subnet = driver.GetAvailableSubnet()
+        subnet |> should not' (equal "")
+
+    [<Fact>]
+    let ``GetAvailableSubnet evite les sous-reseaux deja utilises`` () =
+        let driver = createDriver ()
+
+        match driver.Create("sub-cni", "10.244.0.0/16", "", "", Map.empty, Map.empty) with
+        | Ok created ->
+            match driver.Inspect(created.Id) with
+            | Ok info -> info.Subnet |> should equal "10.244.0.0/16"
+            | Error msg -> failwithf "Inspect a echoue: %s" msg
+        | Error msg -> failwithf "Create a echoue: %s" msg
+
+        let next = (CustomCniDriver()).GetAvailableSubnet()
+        next |> should not' (equal "10.244.0.0/16")

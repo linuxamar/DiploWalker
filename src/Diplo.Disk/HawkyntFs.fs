@@ -17,10 +17,7 @@ module HawkyntFs =
 
         for entry in reader.Entries do
             if not (System.String.IsNullOrEmpty(entry.Name)) then
-                let relPath =
-                    entry.Name.TrimStart('/', '\\').Replace('/', Path.DirectorySeparatorChar)
-
-                let fullPath = Path.Combine(targetDir, relPath)
+                let fullPath = DiscFsHelper.realFrom targetDir entry.Name
 
                 if entry.IsDirectory then
                     Directory.CreateDirectory(fullPath) |> ignore
@@ -43,10 +40,7 @@ module HawkyntFs =
 
         for entry in reader.Entries do
             if not (System.String.IsNullOrEmpty(entry.Name)) then
-                let relPath =
-                    entry.Name.TrimStart('/', '\\').Replace('/', Path.DirectorySeparatorChar)
-
-                let fullPath = Path.Combine(targetDir, relPath)
+                let fullPath = DiscFsHelper.realFrom targetDir entry.Name
 
                 if entry.IsDirectory then
                     Directory.CreateDirectory(fullPath) |> ignore
@@ -75,8 +69,7 @@ module HawkyntFs =
                     entry.FullPath
 
             if not (System.String.IsNullOrEmpty(name)) then
-                let relPath = name.TrimStart('/', '\\').Replace('/', Path.DirectorySeparatorChar)
-                let fullPath = Path.Combine(targetDir, relPath)
+                let fullPath = DiscFsHelper.realFrom targetDir name
 
                 if entry.IsDirectory then
                     Directory.CreateDirectory(fullPath) |> ignore

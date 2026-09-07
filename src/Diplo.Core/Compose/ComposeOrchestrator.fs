@@ -12,9 +12,10 @@ open Diplo.Core.Output
 open Diplo.Abstractions
 open YamlDotNet.RepresentationModel
 
-type ComposeOrchestrator(output: IOutputPort) =
+type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient) =
 
-    let containerClient = new ContainerClient()
+    let containerClient =
+        containerClient |> Option.defaultWith (fun () -> new ContainerClient() :> IContainerClient)
 
     let tryGetChild (node: YamlMappingNode) (key: string) : YamlNode option =
         match node.Children.TryGetValue(YamlScalarNode(key)) with

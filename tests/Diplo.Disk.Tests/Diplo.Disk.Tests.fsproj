@@ -7,10 +7,17 @@
 
   <ItemGroup>
     <Compile Include="TestImage.fs" />
+    <Compile Include="BinaryIoTests.fs" />
+    <Compile Include="DiscFsHelperTests.fs" />
+    <Compile Include="MountStateTests.fs" />
+    <Compile Include="IsoSourceTests.fs" />
     <Compile Include="DiskFormatTests.fs" />
     <Compile Include="FsImageTests.fs" />
     <Compile Include="Qcow2Tests.fs" />
     <Compile Include="HawkyntFsTests.fs" />
+    <Compile Include="Qcow1FsTests.fs" />
+    <Compile Include="ParallelsFsTests.fs" />
+    <Compile Include="DmgVdiFsTests.fs" />
     <Compile Include="DiskMounterTests.fs" />
   </ItemGroup>
 

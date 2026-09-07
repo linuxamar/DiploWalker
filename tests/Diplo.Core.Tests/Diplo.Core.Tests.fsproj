@@ -6,14 +6,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="DiploChannelTests.fs" />
     <Compile Include="DiploConfigTests.fs" />
+    <Compile Include="GrpcTestHost.fs" />
     <Compile Include="ContainerClientTests.fs" />
     <Compile Include="VolumeClientTests.fs" />
     <Compile Include="NetworkClientTests.fs" />
     <Compile Include="ComposeTests.fs" />
+    <Compile Include="ComposeOrchestratorTests.fs" />
     <Compile Include="MountParserTests.fs" />
     <Compile Include="CommandLineTests.fs" />
+    <Compile Include="GrpcClientFactoryTests.fs" />
+    <Compile Include="DiploClientsTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,12 +34,14 @@
     <PackageReference Include="FsUnit.xUnit"  />
     <PackageReference Include="Grpc.Core.Testing"  />
     <PackageReference Include="Grpc.Net.Client"  />
+    <PackageReference Include="protobuf-net.Grpc.AspNetCore"  />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Diplo.Abstractions\Diplo.Abstractions.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Core\Diplo.Core.fsproj" />
     <ProjectReference Include="..\..\src\Diplo.Grpc\Diplo.Grpc.fsproj" />
+    <ProjectReference Include="..\..\tests\Diplo.TestHelpers\Diplo.TestHelpers.fsproj" />
   </ItemGroup>
 
 </Project>

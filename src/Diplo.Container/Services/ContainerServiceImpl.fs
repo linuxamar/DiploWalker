@@ -31,7 +31,7 @@ module private ContainerStreaming =
         inherit Stream()
 
         let channel =
-            Channel.CreateUnbounded<byte[]>(UnboundedChannelOptions(SingleReader = false, SingleWriter = false))
+            Channel.CreateBounded<byte[]>(BoundedChannelOptions(32, SingleReader = false, SingleWriter = false))
 
         let reader = channel.Reader
         let writer = channel.Writer
@@ -837,7 +837,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                         try
                             let info = client.InspectContainer(DefaultNamespace, request.Id)
                             tryGetInt64 info "exit_code" |> int
-                        with _ ->
+                        with ex ->
+                            Log.Warning(ex, "Impossible de récupérer le code de sortie de {ContainerId}", request.Id)
                             exitCode
 
                     return
@@ -936,7 +937,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                         channel.Writer.TryComplete(ex) |> ignore
                 }
 
-            observeProducerTask "stats-stream" (Task.Run(fun () -> run () |> ignore))
+            observeProducerTask "stats-stream" (run () :> Task)
             |> ignore
 
             toAsyncEnumerable channel.Reader
@@ -958,7 +959,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                                 let state =
                                     try
                                         mapState (tryGetString (client.TaskInfo(DefaultNamespace, id)) "status")
-                                    with _ ->
+                                    with ex ->
+                                        Log.Debug(ex, "Impossible de lire l'état de {ContainerId}", id)
                                         ContainerState.Unknown
 
                                 current[id] <- state
@@ -1019,7 +1021,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                         channel.Writer.TryComplete(ex) |> ignore
                 }
 
-            observeProducerTask "events-stream" (Task.Run(fun () -> run () |> ignore))
+            observeProducerTask "events-stream" (run () :> Task)
             |> ignore
 
             toAsyncEnumerable channel.Reader
@@ -1132,11 +1134,14 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                                 let! _ = pumpTask
                                 return ()
                     finally
-                        enumerator.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
+                        try
+                            enumerator.DisposeAsync().AsTask().Wait(10_000) |> ignore
+                        with _ ->
+                            ()
                         channel.Writer.TryComplete() |> ignore
                 }
 
-            observeProducerTask "exec-stream" (Task.Run(fun () -> run () |> ignore))
+            observeProducerTask "exec-stream" (run () :> Task)
             |> ignore
 
             toAsyncEnumerable channel.Reader
@@ -1333,7 +1338,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                             ()
                 }
 
-            observeProducerTask "export-stream" (Task.Run(fun () -> run () |> ignore))
+            observeProducerTask "export-stream" (run () :> Task)
             |> ignore
 
             toAsyncEnumerable channel.Reader
@@ -1363,7 +1368,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                                 else
                                     cont <- false
                         finally
-                            enumerator.DisposeAsync().AsTask().GetAwaiter().GetResult() |> ignore
+                            try
+                                enumerator.DisposeAsync().AsTask().Wait(10_000) |> ignore
+                            with _ ->
+                                ()
 
                         fs.Flush()
                     finally

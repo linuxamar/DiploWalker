@@ -25,7 +25,8 @@ param(
     [switch]$DoPublish,
     [string]$SignCert,
     [string]$SignPassword,
-    [string]$SignThumbprint
+    [string]$SignThumbprint,
+    [string]$TestLogDir
 )
 
 # -DoTests et -DoPublish peuvent être combinés :
@@ -42,6 +43,7 @@ if (-not $DoTests -and -not $DoPublish -and -not $Clean -and -not $Restore) {
     Write-Host "  -Restore    restaure les packages NuGet en 1er"
     Write-Host "  -DoTests    lance les tests unitaires uniquement"
     Write-Host "  -DoPublish  lance la publication uniquement"
+    Write-Host "  -TestLogDir dossier où journaliser la sortie de chaque projet de test"
     Write-Host ""
     Write-Host "  Exemples :"
     Write-Host "    .\pipeline.ps1 -DoTests -DoPublish   # tests puis publication"
@@ -192,6 +194,32 @@ if ($Restore) {
 if ($runTests) {
     Write-Host "═══ Tests unitaires ═══" -ForegroundColor Cyan
 
+    # Libère les verrous de fichiers de sortie (obj/bin) détenus par les
+    # serveurs MSBuild / compilateur laissés par des exécutions précédentes.
+    # Sans cela, `dotnet test` peut échouer en cascade sur une collision de
+    # remplacement de fichier (System.IO.FileSystem.ReplaceFile).
+    Write-Host "  ▸ Arrêt des serveurs de compilation..." -ForegroundColor Yellow
+    dotnet build-server shutdown | Out-Null
+    Write-Host "  ✓ Serveurs de compilation arrêtés." -ForegroundColor Green
+
+    # Une restauration complète de la solution est requise avant de tester :
+    # après un -Clean, les assets (obj/project.assets.json) ont été purgés et
+    # une restauration projet par projet échoue sur les références croisées
+    # (code de sortie 5, « Zéro tests exécutés »). Restaurer la solution
+    # entière rend `-DoTests` autonome dans n'importe quelle console.
+    if (-not $Restore) {
+        Write-Host "  ▸ Restauration NuGet de la solution..." -ForegroundColor Yellow
+        $solutionForTests = Join-Path $PSScriptRoot "Diplo.slnx"
+        if (-not (Test-Path $solutionForTests)) {
+            $solutionForTests = Join-Path $PSScriptRoot "Diplo.sln"
+        }
+        dotnet restore $solutionForTests
+        if ($LASTEXITCODE -ne 0) {
+            throw "Échec de la restauration NuGet avant les tests."
+        }
+        Write-Host "  ✓ Restauration effectuée." -ForegroundColor Green
+    }
+
     $allPassed = $true
     foreach ($test in $testProjects) {
         $currentStep++
@@ -204,20 +232,25 @@ if ($runTests) {
         Write-Host ""
         Write-Host "  ▸ $test" -ForegroundColor Yellow
         Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Tests : $test ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
-        dotnet test --project $testPath --configuration Release --no-restore
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ✗ Échec des tests : $test" -ForegroundColor Red
+        # Tue les testhosts orphelins du projet précédent : ils retiennent les
+        # verrous sur les DLL de sortie partagées et font échouer le projet
+        # suivant en cascade (collision de remplacement de fichier).
+        Get-Process testhost,testhost.x64,vstest.console -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep 2
+
+        # Journalisation détaillée : sortie complète de `dotnet test` écrite dans
+        # un fichier par projet (pour diagnostic, cf. -TestLogDir).
+        $testLogRoot = if ($TestLogDir) { $TestLogDir } else { Join-Path $PSScriptRoot "pipeline-tests" }
+        $safeName = $test -replace '[^A-Za-z0-9._-]', '_'
+        $projectLog = Join-Path $testLogRoot "$safeName.log"
+        New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
+        dotnet test --project $testPath --configuration Release --no-restore *>&1 | Tee-Object -FilePath $projectLog -ErrorAction SilentlyContinue
+        $testExitCode = $LASTEXITCODE
+        if ($testExitCode -ne 0) {
+            Write-Host "  ✗ Échec des tests : $test — détails dans $projectLog" -ForegroundColor Red
             $allPassed = $false
         } else {
-            # Un projet non restauré peut sortir en code 0 sans exécuter les tests :
-            # on vérifie que la DLL de test a réellement été produite.
-            $testDll = Get-ChildItem -Path (Join-Path $PSScriptRoot "tests\$test\bin") -Filter "$test.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($null -eq $testDll) {
-                Write-Host "  ✗ Aucune DLL de test produite : $test — exécutez -Restore avant -DoTests" -ForegroundColor Red
-                $allPassed = $false
-            } else {
-                Write-Host "  ✓ OK" -ForegroundColor Green
-            }
+            Write-Host "  ✓ OK" -ForegroundColor Green
         }
     }
 
