@@ -435,6 +435,150 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
             return response
         }
 
+    member _.PauseAsync(id: string, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrWhiteSpace(id) then
+                invalidArg (nameof id) ServiceGuards.ContainerIdRequired
+
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.PauseContainer({ Id = id }, ct)
+            return response
+        }
+
+    member _.UnpauseAsync(id: string, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrWhiteSpace(id) then
+                invalidArg (nameof id) ServiceGuards.ContainerIdRequired
+
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.UnpauseContainer({ Id = id }, ct)
+            return response
+        }
+
+    member _.WaitAsync(id: string, ?timeoutSeconds: int, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrWhiteSpace(id) then
+                invalidArg (nameof id) ServiceGuards.ContainerIdRequired
+
+            let ct = defaultArg ct CancellationToken.None
+
+            let! response =
+                client.WaitContainer(
+                    { Id = id
+                      TimeoutSeconds = defaultArg timeoutSeconds 0 },
+                    ct
+                )
+
+            return response
+        }
+
+    member _.PruneContainersAsync(?ct: CancellationToken) =
+        task {
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.PruneContainers({ Placeholder = false }, ct)
+            return response
+        }
+
+    member _.PruneImagesAsync(?ct: CancellationToken) =
+        task {
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.PruneImages({ Placeholder = false }, ct)
+            return response
+        }
+
+    member _.CommitImageAsync(
+        containerId: string,
+        imageRef: string,
+        ?message: string,
+        ?author: string,
+        ?ct: CancellationToken
+    ) =
+        task {
+            if String.IsNullOrWhiteSpace(containerId) then
+                invalidArg (nameof containerId) ServiceGuards.ContainerIdRequired
+
+            if String.IsNullOrWhiteSpace(imageRef) then
+                invalidArg (nameof imageRef) "La référence de l'image est requise"
+
+            let ct = defaultArg ct CancellationToken.None
+
+            let request: CommitImageRequest =
+                { ContainerId = containerId
+                  ImageRef = imageRef
+                  Message = defaultArg message ""
+                  Author = defaultArg author "" }
+
+            let! response = client.CommitImage(request, ct)
+            return response
+        }
+
+    member _.ReadFileAsync(id: string, path: string, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrWhiteSpace(id) then
+                invalidArg (nameof id) ServiceGuards.ContainerIdRequired
+
+            if String.IsNullOrWhiteSpace(path) then
+                invalidArg (nameof path) "Le chemin du fichier est requis"
+
+            let ct = defaultArg ct CancellationToken.None
+
+            let! response = client.ReadFile({ Id = id; Path = path }, ct)
+            return response
+        }
+
+    member _.WriteFileAsync(id: string, path: string, data: byte[], ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrWhiteSpace(id) then
+                invalidArg (nameof id) ServiceGuards.ContainerIdRequired
+
+            if String.IsNullOrWhiteSpace(path) then
+                invalidArg (nameof path) "Le chemin du fichier est requis"
+
+            if isNull data then
+                invalidArg (nameof data) "Les données du fichier sont requises"
+
+            let ct = defaultArg ct CancellationToken.None
+
+            let request: WriteFileRequest =
+                { Id = id
+                  Path = path
+                  Data = data }
+
+            let! response = client.WriteFile(request, ct)
+            return response
+        }
+
+    member _.ExportImageStream(imageRef: string, ?namespaceName: string, ?ct: CancellationToken) =
+        if String.IsNullOrWhiteSpace(imageRef) then
+            invalidArg (nameof imageRef) "La référence de l'image est requise"
+
+        let ns = defaultArg namespaceName ""
+        let request: ExportImageRequest = { ImageRef = imageRef; NamespaceName = ns }
+        client.ExportImage(request, defaultArg ct CancellationToken.None)
+
+    member _.ImportImage(chunks: IAsyncEnumerable<ImageChunk>, ?ct: CancellationToken) =
+        task {
+            if isNull chunks then
+                invalidArg (nameof chunks) "Le flux de données de l'image est requis"
+
+            let ct = defaultArg ct CancellationToken.None
+            let! response = client.ImportImage(chunks, ct)
+            return response
+        }
+
+    member _.WatchEventsStream(?ct: CancellationToken) =
+        client.WatchEvents({ Placeholder = false }, defaultArg ct CancellationToken.None)
+
+    member _.GetContainerStatsStream(id: string, ?intervalSeconds: int, ?ct: CancellationToken) =
+        if String.IsNullOrWhiteSpace(id) then
+            invalidArg (nameof id) ServiceGuards.ContainerIdRequired
+
+        let request: GetContainerStatsStreamRequest =
+            { Id = id
+              IntervalSeconds = defaultArg intervalSeconds 0 }
+
+        client.GetContainerStatsStream(request, defaultArg ct CancellationToken.None)
+
     interface IContainerClient with
         member _.CreateAsync
             (name, image, ?env, ?command, ?args, ?labels, ?pidLimit, ?memoryLimit, ?cpuShares, ?mounts, ?ports, ?ct)
@@ -509,3 +653,38 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
         member _.TagImageAsync(source, target, ?namespaceName, ?ct) =
             this.TagImageAsync(source, target, ?namespaceName = namespaceName, ?ct = ct)
+
+        member _.PauseAsync(id, ?ct) = this.PauseAsync(id, ?ct = ct)
+
+        member _.UnpauseAsync(id, ?ct) = this.UnpauseAsync(id, ?ct = ct)
+
+        member _.WaitAsync(id, ?timeoutSeconds, ?ct) =
+            this.WaitAsync(id, ?timeoutSeconds = timeoutSeconds, ?ct = ct)
+
+        member _.PruneContainersAsync(?ct) = this.PruneContainersAsync(?ct = ct)
+
+        member _.PruneImagesAsync(?ct) = this.PruneImagesAsync(?ct = ct)
+
+        member _.CommitImageAsync(containerId, imageRef, ?message, ?author, ?ct) =
+            this.CommitImageAsync(
+                containerId,
+                imageRef,
+                ?message = message,
+                ?author = author,
+                ?ct = ct
+            )
+
+        member _.ReadFileAsync(id, path, ?ct) = this.ReadFileAsync(id, path, ?ct = ct)
+
+        member _.WriteFileAsync(id, path, data, ?ct) =
+            this.WriteFileAsync(id, path, data, ?ct = ct)
+
+        member _.ExportImageStream(imageRef, ?namespaceName, ?ct) =
+            this.ExportImageStream(imageRef, ?namespaceName = namespaceName, ?ct = ct)
+
+        member _.ImportImage(chunks, ?ct) = this.ImportImage(chunks, ?ct = ct)
+
+        member _.WatchEventsStream(?ct) = this.WatchEventsStream(?ct = ct)
+
+        member _.GetContainerStatsStream(id, ?intervalSeconds, ?ct) =
+            this.GetContainerStatsStream(id, ?intervalSeconds = intervalSeconds, ?ct = ct)

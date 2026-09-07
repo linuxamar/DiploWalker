@@ -83,6 +83,46 @@ type IContainerClient =
     abstract member TagImageAsync:
         source: string * target: string * ?namespaceName: string * ?ct: CancellationToken -> Task<TagImageResponse>
 
+    abstract member PauseAsync: id: string * ?ct: CancellationToken -> Task<PauseContainerResponse>
+
+    abstract member UnpauseAsync: id: string * ?ct: CancellationToken -> Task<UnpauseContainerResponse>
+
+    abstract member WaitAsync:
+        id: string * ?timeoutSeconds: int * ?ct: CancellationToken -> Task<WaitContainerResponse>
+
+    abstract member PruneContainersAsync: ?ct: CancellationToken -> Task<PruneContainersResponse>
+
+    abstract member PruneImagesAsync: ?ct: CancellationToken -> Task<PruneImagesResponse>
+
+    abstract member CommitImageAsync:
+        containerId: string *
+        imageRef: string *
+        ?message: string *
+        ?author: string *
+        ?ct: CancellationToken ->
+            Task<CommitImageResponse>
+
+    abstract member ReadFileAsync: id: string * path: string * ?ct: CancellationToken -> Task<ReadFileResponse>
+
+    abstract member WriteFileAsync:
+        id: string * path: string * data: byte[] * ?ct: CancellationToken -> Task<WriteFileResponse>
+
+    /// Flux d'export d'une image (tar), consommé par la commande CLI.
+    abstract member ExportImageStream:
+        imageRef: string * ?namespaceName: string * ?ct: CancellationToken -> IAsyncEnumerable<ImageChunk>
+
+    abstract member ImportImage:
+        chunks: IAsyncEnumerable<ImageChunk> * ?ct: CancellationToken -> Task<ImportImageResponse>
+
+    /// Flux d'événements conteneurs (create, start, stop, exit, pause,
+    /// unpause, delete) jusqu'à l'annulation via `ct`.
+    abstract member WatchEventsStream: ?ct: CancellationToken -> IAsyncEnumerable<ContainerEvent>
+
+    /// Flux de métriques émis au fil de l'eau jusqu'à l'annulation via `ct`.
+    abstract member GetContainerStatsStream:
+        id: string * ?intervalSeconds: int * ?ct: CancellationToken ->
+            IAsyncEnumerable<GetContainerStatsResponse>
+
 /// Contrat des appels gRPC réseaux consommés par les commandes CLI.
 type INetworkClient =
     inherit IDisposable
