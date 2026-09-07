@@ -65,18 +65,27 @@ Après un `Kill`, les deux lectures stdout/stderr attendaient chacune leur fin s
 `enumerator.DisposeAsync().AsTask().GetAwaiter().GetResult()` bloquait le thread sans bornes (et rendait le code illisible). Le `task {}` ne permettant pas de `do!` dans un `finally`, le nettoyage est désormais borné par `.Wait(10_000)` sous `try`.
 - **Commit** : `556f116`.
 
-## Criticité faible — observations (pas de correctif)
+## Criticité faible — observations traitées et vérifiées
 
-Ces points sont documentés, non modifiés, et considérés acceptables après vérification :
+### `CachedConfig` chargé sous verrou — corrigé
+Le loader était exécuté sous le verrou : les lecteurs concurrents étaient bloqués pendant le chargement, et un loader appelant `Value` sur la même instance conduisait à une récursion infinie.
+- **Correctif** : le chargement paresseux est confié à `Lazy<'T>` (`ExecutionAndPublication`). Le verrou n'est tenu que pour échanger l'instance, jamais pendant le chargement ; le loader est exécuté une seule fois sous concurrence, et un chargement réentrant lève une `InvalidOperationException` (testé).
+- **Commit** : `9c38d06`.
 
-- **`CachedConfig` chargé sous verrou** : le chargement du config est supposé thread-safe (loader sous `lock` réentrant, appel unique au démarrage). Aucun changement.
-- **Sync-over-async du `ChannelStream`** : les `WriteAsync` bloquants sont inhérents à l'API `Stream` synchrone et restent bornés par le canal borné en 32 éléments, lu de manière concurrente.
-- **`reader.Extract` en RAM par fichier (HawkyntFs)** : l'API Hawkynt ne fournit que `byte[]` pour l'extraction ; la matérialisation RAM par fichier est conservée, indirectement bornée par `maxInMemoryBytes` (2 Go) sur l'image source.
-- **Écriture HawkyntFs vers l'image, pas le disque hôte** : comportement d'origine, conforme à la fonction (écrivain pointant sur l'image source). La revue a confirmé qu'aucune écriture ne cible le système de fichiers hôte.
-- **Création de liens symboliques NTFS (test ignoré)** : le test `create gere les liens symboliques NTFS` est ignoré faute de privilège sur la machine ; comportement non couvert, hors périmètre.
+### Sync-over-async du `ChannelStream` — vérifié, aucun correctif nécessaire
+`ChannelStream` fournit déjà des surcharges `ReadAsync`/`WriteAsync` correctement asynchrones (canal borné en 32 segments, backpressure). Le `Read`/`Write` synchrone bloquant est le contrat obligatoire de `Stream` et n'est appelé par aucun consommateur : tous les appelants vérifiés passent par les surcharges async.
+
+### `reader.Extract` en RAM par fichier (HawkyntFs) — vérifié, borné
+L'API Hawkynt n'expose que `byte[]` pour l'extraction (pas de variante par flux). La mémoire est indirectement bornée : l'image est limitée à `maxInMemoryBytes` (2 Go) avant toute extraction, donc la RAM au pic reste ≤ image (2 Go) + plus gros fichier extrait, lui-même borné par la taille de l'image. Aucun chemin non borné.
+
+### Écriture HawkyntFs vers l'image, pas le disque hôte — vérifié, comportement conforme
+`tryWriteBack` écrit dans l'image (via un fichier temporaire à côté de l'image, puis `File.Replace`) — c'est la fonction attendue. Aucune écriture ne cible le système de fichiers hôte en dehors de ce chemin ; `relPath` est toujours dérivé d'une énumération de `sourceDir`, donc confiné.
+
+### Test de liens symboliques NTFS ignoré — inchangé
+Le test `create gere les liens symboliques NTFS` requiert un privilège système (mode développeur) non disponible sur la machine. Non couvert, hors périmètre.
 
 ## Vérifications finales
 
 - `dotnet build Diplo.slnx -c Release` : **0 avertissement, 0 erreur**.
-- `pipeline.ps1 -DoTests` : **194 réussies, 1 ignorée (liens symboliques), 0 échec**.
-- Branche `dev`, 7 commits de correctifs, chacun sur un sujet distinct, message en français.
+- `pipeline.ps1 -DoTests` : **194 réussies, 1 ignorée (liens symboliques), 0 échec** ; `Diplo.Abstractions.Tests` : **253/253** après le correctif `CachedConfig`.
+- Branche `dev`, 8 commits de correctifs, chacun sur un sujet distinct, message en français.
