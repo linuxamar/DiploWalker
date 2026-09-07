@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="FSharp.Core" />
     <PackageReference Include="protobuf-net.Grpc" />
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>

@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="LTRData.DiscUtils" />
+    <PackageReference Include="FSharp.Core" />
     <PackageReference Include="Hawkynt.FileFormats.FileSystems" />
     <PackageReference Include="Serilog" />
   </ItemGroup>
