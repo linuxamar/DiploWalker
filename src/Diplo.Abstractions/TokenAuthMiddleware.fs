@@ -34,10 +34,11 @@ type private RateLimiter(maxRequests: int, windowSeconds: int) =
         let windowStart = now.AddSeconds(-float windowSeconds)
 
         for kvp in hits do
-            lock (box kvp.Value) (fun () -> kvp.Value.RemoveAll(fun t -> t < windowStart) |> ignore)
+            lock (box kvp.Value) (fun () ->
+                kvp.Value.RemoveAll(fun t -> t < windowStart) |> ignore
 
-            if kvp.Value.Count = 0 then
-                hits.TryRemove(kvp.Key) |> ignore
+                if kvp.Value.Count = 0 then
+                    hits.TryRemove(kvp.Key) |> ignore)
 
 let private rateLimiter = RateLimiter(maxRequests = 30, windowSeconds = 60)
 
