@@ -119,6 +119,118 @@ module ExitCodeCoverageTests =
         code |> should equal 1
         output.Errors |> should not' (be Empty)
 
+    [<Fact>]
+    let ``container pause sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (PauseContainerCommand(output)) (PauseContainerSettings(Id = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container unpause sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (UnpauseContainerCommand(output)) (UnpauseContainerSettings(Id = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container wait sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (WaitContainerCommand(output)) (WaitContainerSettings(Id = null, Timeout = 5))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container stats-stream sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (StatsStreamCommand(output)) (StatsStreamSettings(Id = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``image commit sans conteneur retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ImageCommitCommand(output)) (ImageCommitSettings(ContainerId = null, ImageRef = "app"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``image commit sans référence retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ImageCommitCommand(output)) (ImageCommitSettings(ContainerId = "c1", ImageRef = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``image export sans référence retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ImageExportCommand(output)) (ImageExportSettings(Ref = null, Output = "x.tar"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``image export sans sortie retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ImageExportCommand(output)) (ImageExportSettings(Ref = "nginx", Output = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``image import sans fichier retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ImageImportCommand(output)) (ImageImportSettings(File = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``image import fichier introuvable retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ImageImportCommand(output)) (ImageImportSettings(File = "C:\\nope\\img.tar"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container read-file sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ReadFileCommand(output)) (ReadFileSettings(Id = null, Path = "/etc/hostname", Output = "o.txt"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container read-file sans chemin retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ReadFileCommand(output)) (ReadFileSettings(Id = "c1", Path = null, Output = "o.txt"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container read-file sans sortie retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (ReadFileCommand(output)) (ReadFileSettings(Id = "c1", Path = "/etc/hostname", Output = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container write-file sans identifiant retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (WriteFileCommand(output)) (WriteFileSettings(Id = null, Path = "/tmp/f", Input = "in.txt"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container write-file sans chemin retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (WriteFileCommand(output)) (WriteFileSettings(Id = "c1", Path = null, Input = "in.txt"))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container write-file sans entrée retourne 1`` () =
+        let output = MockOutputPort()
+        let code = run (WriteFileCommand(output)) (WriteFileSettings(Id = "c1", Path = "/tmp/f", Input = null))
+        code |> should equal 1
+        output.Errors |> should not' (be Empty)
+
     // ─── Réseaux ──────────────────────────────────────────────────────
     open Diplo.Cli.Network
 

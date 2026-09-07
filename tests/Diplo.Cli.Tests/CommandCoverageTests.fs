@@ -405,6 +405,198 @@ module CommandCoverageTests =
         code |> should equal 1
         output.Errors |> should contain "Échec logout"
 
+    [<Fact>]
+    let ``container pause en succès retourne 0 et contacte le client`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(pause = { State = ContainerState.Paused; Message = "ok" })
+        let code = run (PauseContainerCommand(output, withContainer client)) (PauseContainerSettings(Id = "c1"))
+        code |> should equal 0
+        client.PauseCalls |> should equal 1
+        output.Successes |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container unpause en succès retourne 0 et contacte le client`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(unpause = { State = ContainerState.Running; Message = "ok" })
+        let code = run (UnpauseContainerCommand(output, withContainer client)) (UnpauseContainerSettings(Id = "c1"))
+        code |> should equal 0
+        client.UnpauseCalls |> should equal 1
+        output.Successes |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container wait en sortie retourne 0 et écrit le code de sortie`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(wait = { ExitCode = 0; State = ContainerState.Stopped; Message = "" })
+        let code = run (WaitContainerCommand(output, withContainer client)) (WaitContainerSettings(Id = "c1", Timeout = 10))
+        code |> should equal 0
+        client.WaitCalls |> should equal 1
+        output.Successes |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container wait en timeout retourne 0 et prévient`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(wait = { ExitCode = -1; State = ContainerState.Running; Message = "timeout" })
+        let code = run (WaitContainerCommand(output, withContainer client)) (WaitContainerSettings(Id = "c1", Timeout = 1))
+        code |> should equal 0
+        output.Warnings |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container prune avec conteneurs retourne 0 et liste les suppressions`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(pruneContainers = { Deleted = List<string>([ "c1"; "c2" ]) })
+        let code = run (PruneContainersCommand(output, withContainer client)) (PruneContainersSettings())
+        code |> should equal 0
+        client.PruneContainersCalls |> should equal 1
+        output.Lines |> should contain "  - c1"
+
+    [<Fact>]
+    let ``container prune sans conteneur retourne 0 et prévient`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(pruneContainers = { Deleted = List<string>() })
+        let code = run (PruneContainersCommand(output, withContainer client)) (PruneContainersSettings())
+        code |> should equal 0
+        output.Warnings |> should not' (be Empty)
+
+    [<Fact>]
+    let ``container events lit les événements du flux et retourne 0`` () =
+        let output = MockOutputPort()
+
+        let client =
+            new FakeContainerClient(
+                containerEvents =
+                    [
+                        { Timestamp = "t1"; EventType = "start"; Id = "c1"; Status = "Running"; ExitCode = 0 }
+                        { Timestamp = "t2"; EventType = "stop"; Id = "c1"; Status = "Stopped"; ExitCode = 0 }
+                    ]
+            )
+
+        let code = run (ContainerEventsCommand(output, withContainer client)) (ContainerEventsSettings())
+        code |> should equal 0
+        client.EventsCalls |> should equal 1
+        output.Lines |> should contain "[t1] start    c1 Running"
+        output.Lines |> should contain "[t2] stop     c1 Stopped"
+
+    [<Fact>]
+    let ``container stats-stream lit les métriques du flux et retourne 0`` () =
+        let output = MockOutputPort()
+
+        let client =
+            new FakeContainerClient(
+                statsStream = [ { CpuUsage = 0.5; MemoryUsage = 1L; MemoryLimit = 2L; NetworkRx = 3L; NetworkTx = 4L; DiskRead = 5L; DiskWrite = 6L; Pids = 7 } ]
+            )
+
+        let code =
+            run (StatsStreamCommand(output, withContainer client)) (StatsStreamSettings(Id = "c1", Interval = 1))
+
+        code |> should equal 0
+        client.StatsStreamCalls |> should equal 1
+        output.Lines |> should not' (be Empty)
+
+    [<Fact>]
+    let ``image prune avec images retourne 0 et liste les suppressions`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(pruneImages = { Deleted = List<string>([ "i1" ]) })
+        let code = run (ImagePruneCommand(output, withContainer client)) (ImagePruneSettings())
+        code |> should equal 0
+        client.PruneImagesCalls |> should equal 1
+        output.Lines |> should contain "  - i1"
+
+    [<Fact>]
+    let ``image commit en succès retourne 0 et écrit le message`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(commit = { ImageRef = "app:v1"; Success = true; Message = "Image créée" })
+
+        let code =
+            run
+                (ImageCommitCommand(output, withContainer client))
+                (ImageCommitSettings(ContainerId = "c1", ImageRef = "app:v1"))
+
+        code |> should equal 0
+        client.CommitCalls |> should equal 1
+        output.Successes |> should contain "Image créée"
+
+    [<Fact>]
+    let ``image commit en échec retourne 1 et écrit l'erreur`` () =
+        let output = MockOutputPort()
+        let client = new FakeContainerClient(commit = { ImageRef = ""; Success = false; Message = "Échec commit" })
+
+        let code =
+            run
+                (ImageCommitCommand(output, withContainer client))
+                (ImageCommitSettings(ContainerId = "c1", ImageRef = "app:v1"))
+
+        code |> should equal 1
+        output.Errors |> should contain "Échec commit"
+
+    [<Fact>]
+    let ``image export écrit le fichier à partir des morceaux du flux`` () =
+        let output = MockOutputPort()
+        let root = TestHelpers.createTempDir "cli-export"
+        let dest = Path.Combine(root, "img.tar")
+
+        try
+            let payload = System.Text.Encoding.UTF8.GetBytes("contenu")
+            let client = new FakeContainerClient(exportChunks = [ { Data = payload } ])
+            let code = run (ImageExportCommand(output, withContainer client)) (ImageExportSettings(Ref = "nginx", Output = dest))
+            code |> should equal 0
+            client.ExportCalls |> should equal 1
+            File.Exists(dest) |> should equal true
+            File.ReadAllBytes(dest) |> should equal payload
+        finally
+            TestHelpers.cleanupDir root
+
+    [<Fact>]
+    let ``image import lit un fichier local et retourne 0`` () =
+        let output = MockOutputPort()
+        let root = TestHelpers.createTempDir "cli-import"
+        let src = Path.Combine(root, "img.tar")
+        File.WriteAllBytes(src, System.Text.Encoding.UTF8.GetBytes("archive"))
+
+        try
+            let client = new FakeContainerClient(importImage = { ImageRefs = List<string>([ "nginx" ]); Message = "Importé" })
+            let code = run (ImageImportCommand(output, withContainer client)) (ImageImportSettings(File = src))
+            code |> should equal 0
+            client.ImportCalls |> should equal 1
+            output.Successes |> should contain "Importé"
+        finally
+            TestHelpers.cleanupDir root
+
+    [<Fact>]
+    let ``container read-file en succès retourne 0 et écrit le fichier`` () =
+        let output = MockOutputPort()
+        let root = TestHelpers.createTempDir "cli-readfile"
+        let dest = Path.Combine(root, "out.txt")
+
+        try
+            let payload = System.Text.Encoding.UTF8.GetBytes("hôte")
+            let client = new FakeContainerClient(readFile = { Data = payload; Success = true; Message = "" })
+            let code = run (ReadFileCommand(output, withContainer client)) (ReadFileSettings(Id = "c1", Path = "/etc/hostname", Output = dest))
+            code |> should equal 0
+            client.ReadFileCalls |> should equal 1
+            File.Exists(dest) |> should equal true
+            File.ReadAllBytes(dest) |> should equal payload
+        finally
+            TestHelpers.cleanupDir root
+
+    [<Fact>]
+    let ``container write-file en succès retourne 0 et contacte le client`` () =
+        let output = MockOutputPort()
+        let root = TestHelpers.createTempDir "cli-writefile"
+        let src = Path.Combine(root, "in.txt")
+        File.WriteAllText(src, "contenu", System.Text.Encoding.UTF8)
+
+        try
+            let client = new FakeContainerClient(writeFile = { Success = true; Message = "Écrit" })
+
+            let code =
+                run (WriteFileCommand(output, withContainer client)) (WriteFileSettings(Id = "c1", Path = "/tmp/f", Input = src))
+
+            code |> should equal 0
+            client.WriteFileCalls |> should equal 1
+            output.Successes |> should contain "Écrit"
+        finally
+            TestHelpers.cleanupDir root
+
     // ─── Volumes ──────────────────────────────────────────────────────
     open Diplo.Cli.Volume
 
