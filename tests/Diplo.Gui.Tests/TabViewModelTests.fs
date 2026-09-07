@@ -109,6 +109,14 @@ let ``ContainerTabViewModel expose les commandes ICommand`` () =
     vm.TagImageCommand |> should not' (be Null)
     vm.RegistryLoginCommand |> should not' (be Null)
     vm.RegistryLogoutCommand |> should not' (be Null)
+    vm.PauseContainerCommand |> should not' (be Null)
+    vm.UnpauseContainerCommand |> should not' (be Null)
+    vm.WaitContainerCommand |> should not' (be Null)
+    vm.PruneContainersCommand |> should not' (be Null)
+    vm.PruneImagesCommand |> should not' (be Null)
+    vm.CommitImageCommand |> should not' (be Null)
+    vm.GetContainerEventsCommand |> should not' (be Null)
+    vm.StopFollowEventsCommand |> should not' (be Null)
 
 [<Fact>]
 let ``ContainerTabViewModel etat initial`` () =
