@@ -138,6 +138,19 @@ module ComposeOrchestratorTests =
             member _.RemoveImageAsync(_ref, ?_namespaceName, ?_ct) = raise (NotImplementedException())
             member _.TagImageAsync(_source, _target, ?_namespaceName, ?_ct) = raise (NotImplementedException())
 
+            member _.PauseAsync(_id, ?_ct) = raise (NotImplementedException())
+            member _.UnpauseAsync(_id, ?_ct) = raise (NotImplementedException())
+            member _.WaitAsync(_id, ?_timeoutSeconds, ?_ct) = raise (NotImplementedException())
+            member _.PruneContainersAsync(?_ct) = raise (NotImplementedException())
+            member _.PruneImagesAsync(?_ct) = raise (NotImplementedException())
+            member _.CommitImageAsync(_containerId, _imageRef, ?_message, ?_author, ?_ct) = raise (NotImplementedException())
+            member _.ReadFileAsync(_id, _path, ?_ct) = raise (NotImplementedException())
+            member _.WriteFileAsync(_id, _path, _data, ?_ct) = raise (NotImplementedException())
+            member _.ExportImageStream(_imageRef, ?_namespaceName, ?_ct) = raise (NotImplementedException())
+            member _.ImportImage(_chunks, ?_ct) = raise (NotImplementedException())
+            member _.WatchEventsStream(?_ct) = raise (NotImplementedException())
+            member _.GetContainerStatsStream(_id, ?_intervalSeconds, ?_ct) = raise (NotImplementedException())
+
     let private run (t: Task) = t.GetAwaiter().GetResult()
 
     let private container (id: string, name: string, image: string, state: ContainerState, labels: (string * string) list) =
