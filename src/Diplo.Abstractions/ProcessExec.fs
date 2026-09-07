@@ -66,10 +66,10 @@ module ProcessExec =
             with _ ->
                 ()
             // Lectures interrompues par le Kill : on les laisse se terminer pour
-            // éviter une exception de disposition sur le Process.
+            // éviter une exception de disposition sur le Process, avec une
+            // attente bornée pour ne pas suspendre le thread indéfiniment.
             try
-                stdoutRead.GetAwaiter().GetResult() |> ignore
-                stderrRead.GetAwaiter().GetResult() |> ignore
+                Task.WaitAll([| stdoutRead :> Task; stderrRead :> Task |], 5_000) |> ignore
             with _ ->
                 ()
 
