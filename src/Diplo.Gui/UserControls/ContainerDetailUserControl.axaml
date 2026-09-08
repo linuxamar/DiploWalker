@@ -156,6 +156,48 @@
                         Background="{DynamicResource SystemChromeGrayColor}"/>
         </Grid>
 
+        <Separator Margin="10,4,10,6"/>
+
+        <!-- Catalogue d'images -->
+        <WrapPanel Margin="10,0,0,6">
+          <TextBlock Text="Réf. image :" VerticalAlignment="Center" Margin="0,0,4,4"
+                     Opacity="0.7"/>
+          <TextBox Text="{Binding ContainerTab.ContainerImageRef}" Width="200"
+                   Margin="0,0,12,4" PlaceholderText="image:tag (catalogue)"/>
+          <TextBlock Text="Cible :" VerticalAlignment="Center" Margin="0,0,4,4"
+                     Opacity="0.7"/>
+          <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200"
+                   Margin="0,0,12,4" PlaceholderText="nouveau:tag (mise à jour)"/>
+          <TextBlock Text="Note :" VerticalAlignment="Center" Margin="0,0,4,4"
+                     Opacity="0.7"/>
+          <TextBox Text="{Binding ContainerTab.CatalogNote}" Width="200"
+                   Margin="0,0,12,4" PlaceholderText="note optionnelle"/>
+          <Button Content="📋 Lister" Command="{Binding ContainerTab.ListCatalogCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="➕ Inscrire" Command="{Binding ContainerTab.AddToCatalogCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="✏️ Mettre à jour" Command="{Binding ContainerTab.UpdateCatalogCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="🗑 Retirer" Command="{Binding ContainerTab.RemoveFromCatalogCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+        </WrapPanel>
+
+        <Grid ColumnDefinitions="*,Auto" Margin="10,0,10,4">
+          <DataGrid Grid.Column="0" ItemsSource="{Binding ContainerTab.Catalogue}"
+                    AutoGenerateColumns="False" IsReadOnly="True"
+                    GridLinesVisibility="Horizontal" CanUserResizeColumns="True"
+                    CanUserSortColumns="True" MaxHeight="200">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Référence" Binding="{Binding Ref}" Width="280" />
+              <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="200" />
+              <DataGridTextColumn Header="Ajouté" Binding="{Binding AddedAt}" Width="140" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"
+                        ResizeDirection="Columns" Margin="4,0,0,0"
+                        Background="{DynamicResource SystemChromeGrayColor}"/>
+        </Grid>
+
       </StackPanel>
     </DockPanel>
   </Border>

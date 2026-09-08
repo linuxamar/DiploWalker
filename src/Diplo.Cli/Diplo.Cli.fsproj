@@ -16,6 +16,7 @@
     <Compile Include="ConfigCommands.fs" />
     <Compile Include="DiskCommands.fs" />
     <Compile Include="ComposeCommands.fs" />
+    <Compile Include="CatalogCommands.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

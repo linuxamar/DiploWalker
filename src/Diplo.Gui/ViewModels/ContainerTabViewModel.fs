@@ -4,6 +4,7 @@ open System
 open System.Collections.ObjectModel
 open System.Threading
 open Avalonia.Threading
+open Diplo.Core
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
@@ -22,11 +23,17 @@ type ImageInfo =
       Taille: string
       CrééLe: string }
 
+type CatalogRow =
+    { Ref: string
+      Note: string
+      AddedAt: string }
+
 type ContainerTabViewModel
     (
         outputPort: IOutputPort,
         ?logsSourceFactory: unit -> IContainerLogsSource,
-        ?containerClientFactory: unit -> IContainerClient
+        ?containerClientFactory: unit -> IContainerClient,
+        ?catalogPathProvider: unit -> string
     ) as this =
     inherit ViewModelBase()
 
@@ -37,8 +44,12 @@ type ContainerTabViewModel
         let factory = defaultArg containerClientFactory (fun () -> new ContainerClient() :> IContainerClient)
         factory ()
 
+    let catalogPathProvider =
+        defaultArg catalogPathProvider (fun () -> ImageCatalog.catalogPath ())
+
     let containers = ObservableCollection<ContainerInfo>()
     let images = ObservableCollection<ImageInfo>()
+    let catalogue = ObservableCollection<CatalogRow>()
 
     let mutable containerIdInput = ""
     let mutable containerNameInput = ""
@@ -51,6 +62,7 @@ type ContainerTabViewModel
     let mutable containerNewName = ""
     let mutable containerImageRef = ""
     let mutable containerImageTarget = ""
+    let mutable catalogNote = ""
     let mutable containerFollow = false
     let mutable containerTail = 100
     let mutable containerSince = ""
@@ -111,6 +123,11 @@ type ContainerTabViewModel
     let inspectImageCmd = RelayCommand(Action(fun () -> this.InspectImage() |> ignore))
     let removeImageCmd = RelayCommand(Action(fun () -> this.RemoveImage() |> ignore))
     let tagImageCmd = RelayCommand(Action(fun () -> this.TagImage() |> ignore))
+
+    let listCatalogCmd = RelayCommand(Action(fun () -> this.ListCatalog() |> ignore))
+    let addToCatalogCmd = RelayCommand(Action(fun () -> this.AddToCatalog() |> ignore))
+    let updateCatalogCmd = RelayCommand(Action(fun () -> this.UpdateCatalog() |> ignore))
+    let removeFromCatalogCmd = RelayCommand(Action(fun () -> this.RemoveFromCatalog() |> ignore))
 
     let createContainerCmd =
         RelayCommand(Action(fun () -> this.CreateContainer() |> ignore))
@@ -301,6 +318,19 @@ type ContainerTabViewModel
     member _.InspectImageCommand = inspectImageCmd
     member _.RemoveImageCommand = removeImageCmd
     member _.TagImageCommand = tagImageCmd
+    member _.ListCatalogCommand = listCatalogCmd
+    member _.AddToCatalogCommand = addToCatalogCmd
+    member _.UpdateCatalogCommand = updateCatalogCmd
+    member _.RemoveFromCatalogCommand = removeFromCatalogCmd
+
+    member _.Catalogue = catalogue
+
+    member _.CatalogNote
+        with get () = catalogNote
+        and set v =
+            catalogNote <- v
+            this.OnPropertyChanged()
+
     member _.CreateContainerCommand = createContainerCmd
     member _.GetContainerLogsCommand = getContainerLogsCmd
     member _.StopFollowLogsCommand = stopFollowLogsCmd
@@ -578,6 +608,118 @@ type ContainerTabViewModel
                         this.ContainerImageTarget
                         response.Message
                 )
+            })
+
+    member private this.RefreshCatalogue() =
+        Dispatcher.UIThread.Post(fun () ->
+            catalogue.Clear()
+
+            for e in ImageCatalog.load (catalogPathProvider ()) do
+                catalogue.Add
+                    { Ref = e.Ref
+                      Note = defaultArg e.Note ""
+                      AddedAt = e.AddedAt })
+
+    member private this.ListCatalog() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let entries = ImageCatalog.load (catalogPathProvider ())
+                this.RefreshCatalogue()
+                outputPort.WriteSuccess(sprintf "%d image(s) au catalogue" (List.length entries))
+            })
+
+    member private this.AddToCatalog() =
+        Cmd.run outputPort (fun () ->
+            task {
+                if String.IsNullOrWhiteSpace(this.ContainerImageRef) then
+                    outputPort.WriteWarning("Une référence d'image est requise (champ Réf. image)")
+                else
+                    let! response = containerClient.PullImageAsync(image = this.ContainerImageRef)
+                    outputPort.WriteSuccess(sprintf "Image %s téléchargée - %s" this.ContainerImageRef response.Message)
+
+                    let note =
+                        if String.IsNullOrWhiteSpace(this.CatalogNote) then
+                            None
+                        else
+                            Some this.CatalogNote
+
+                    let path = catalogPathProvider ()
+
+                    if ImageCatalog.add path this.ContainerImageRef note then
+                        outputPort.WriteSuccess(sprintf "Image %s ajoutée au catalogue" this.ContainerImageRef)
+                    else
+                        outputPort.WriteWarning(sprintf "L'image %s est déjà au catalogue" this.ContainerImageRef)
+
+                    this.RefreshCatalogue()
+            })
+
+    member private this.UpdateCatalog() =
+        Cmd.run outputPort (fun () ->
+            task {
+                if String.IsNullOrWhiteSpace(this.ContainerImageRef) then
+                    outputPort.WriteWarning("Une référence d'image est requise (champ Réf. image)")
+                else
+                    let hasTarget = not (String.IsNullOrWhiteSpace(this.ContainerImageTarget))
+
+                    if hasTarget then
+                        let! response =
+                            containerClient.TagImageAsync(
+                                source = this.ContainerImageRef,
+                                target = this.ContainerImageTarget
+                            )
+
+                        outputPort.WriteSuccess(
+                            sprintf
+                                "Image %s étiquetée en %s - %s"
+                                this.ContainerImageRef
+                                this.ContainerImageTarget
+                                response.Message
+                        )
+
+                    let newRef =
+                        if hasTarget then
+                            Some this.ContainerImageTarget
+                        else
+                            None
+
+                    let note =
+                        if String.IsNullOrWhiteSpace(this.CatalogNote) then
+                            None
+                        else
+                            Some this.CatalogNote
+
+                    let path = catalogPathProvider ()
+
+                    if ImageCatalog.update path this.ContainerImageRef newRef note then
+                        outputPort.WriteSuccess(sprintf "Entrée %s mise à jour dans le catalogue" this.ContainerImageRef)
+                    else
+                        outputPort.WriteWarning(sprintf "L'image %s n'est pas au catalogue" this.ContainerImageRef)
+
+                    this.RefreshCatalogue()
+            })
+
+    member private this.RemoveFromCatalog() =
+        Cmd.run outputPort (fun () ->
+            task {
+                if String.IsNullOrWhiteSpace(this.ContainerImageRef) then
+                    outputPort.WriteWarning("Une référence d'image est requise (champ Réf. image)")
+                else
+                    let path = catalogPathProvider ()
+
+                    if not (ImageCatalog.load path |> List.exists (fun e -> e.Ref = this.ContainerImageRef)) then
+                        outputPort.WriteWarning(sprintf "L'image %s n'est pas au catalogue" this.ContainerImageRef)
+                    else
+                        let! response = containerClient.RemoveImageAsync(ref = this.ContainerImageRef)
+
+                        if response.Success then
+                            ImageCatalog.remove path this.ContainerImageRef |> ignore
+                            outputPort.WriteSuccess(
+                                sprintf "Image %s supprimée et retirée du catalogue" this.ContainerImageRef
+                            )
+                        else
+                            outputPort.WriteWarning(response.Message)
+
+                        this.RefreshCatalogue()
             })
 
     member private this.CreateContainer() =

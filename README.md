@@ -371,6 +371,7 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
     - Configuration : Nouveau nom, Montages
     - Journaux & Exec : Suivre, Lignes, Depuis, Commande
 - **Images** (Expander repliable en bas) : Liste/Inspecter/Supprimer/Étiqueter
+- **Catalogue d'images** (Expander repliable en bas) : liste locale persistante (`diplo-catalog.json`) avec inscription (pull), mise à jour (tag) et retrait (rmi)
 
 **Onglet Volumes** — Liste + création d'images disque (sélection dossier/fichier, format)
 
@@ -426,6 +427,12 @@ diplo container image-tag <source> <cible>
 diplo container pull <ref> [--user <utilisateur>]
 diplo container login <registre> --username <u> [--password <p>]
 diplo container logout <registre>
+
+# Catalogue d'images
+diplo container catalog-list [--catalog <fichier>]
+diplo container catalog-add <ref> [--note <texte>] [--no-pull] [--catalog <fichier>]
+diplo container catalog-update <ref> [--target <nouvelle_ref>] [--note <texte>] [--catalog <fichier>]
+diplo container catalog-delete <ref> [--no-docker] [--catalog <fichier>]
 
 # Volumes
 diplo volume list

@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Include="DiploChannelTests.fs" />
     <Compile Include="DiploConfigTests.fs" />
+    <Compile Include="ImageCatalogTests.fs" />
     <Compile Include="GrpcTestHost.fs" />
     <Compile Include="ContainerClientTests.fs" />
     <Compile Include="VolumeClientTests.fs" />

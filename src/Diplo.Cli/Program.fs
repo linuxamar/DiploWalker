@@ -6,6 +6,7 @@ open Diplo.Cli.Volume
 open Diplo.Cli.Network
 open Diplo.Cli.Compose
 open Diplo.Cli.Disk
+open Diplo.Cli.Catalog
 open Spectre.Console.Cli
 
 let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) =
@@ -54,7 +55,11 @@ let main argv =
                 addCmd c "image-export" typeof<ImageExportCommand>
                 addCmd c "image-import" typeof<ImageImportCommand>
                 addCmd c "read-file" typeof<ReadFileCommand>
-                addCmd c "write-file" typeof<WriteFileCommand>)
+                addCmd c "write-file" typeof<WriteFileCommand>
+                addCmd c "catalog-list" typeof<CatalogListCommand>
+                addCmd c "catalog-add" typeof<CatalogAddCommand>
+                addCmd c "catalog-update" typeof<CatalogUpdateCommand>
+                addCmd c "catalog-delete" typeof<CatalogDeleteCommand>)
         )
         |> ignore
 
