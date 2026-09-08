@@ -42,7 +42,19 @@ let main argv =
                 addCmd c "image-list" typeof<ImageListCommand>
                 addCmd c "image-inspect" typeof<ImageInspectCommand>
                 addCmd c "image-remove" typeof<ImageRemoveCommand>
-                addCmd c "image-tag" typeof<ImageTagCommand>)
+                addCmd c "image-tag" typeof<ImageTagCommand>
+                addCmd c "pause" typeof<PauseContainerCommand>
+                addCmd c "unpause" typeof<UnpauseContainerCommand>
+                addCmd c "wait" typeof<WaitContainerCommand>
+                addCmd c "prune" typeof<PruneContainersCommand>
+                addCmd c "events" typeof<ContainerEventsCommand>
+                addCmd c "stats-stream" typeof<StatsStreamCommand>
+                addCmd c "image-prune" typeof<ImagePruneCommand>
+                addCmd c "image-commit" typeof<ImageCommitCommand>
+                addCmd c "image-export" typeof<ImageExportCommand>
+                addCmd c "image-import" typeof<ImageImportCommand>
+                addCmd c "read-file" typeof<ReadFileCommand>
+                addCmd c "write-file" typeof<WriteFileCommand>)
         )
         |> ignore
 

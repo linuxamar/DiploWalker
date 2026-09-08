@@ -2,6 +2,7 @@ namespace Diplo.Cli.Container
 
 open System
 open System.Collections.Generic
+open System.IO
 open System.Runtime.ExceptionServices
 open System.Threading
 open System.Threading.Tasks
@@ -11,6 +12,7 @@ open Diplo.Core
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
+open Diplo.Grpc.Container
 open Spectre.Console.Cli
 open Spectre.Console
 
@@ -793,4 +795,535 @@ type ImageTagCommand(output: IOutputPort, clients: IDiploClients) =
                 let! response = client.TagImageAsync(settings.Source, settings.Target, ns)
                 output.WriteSuccess(response.Message)
                 return 0
+        }
+
+// ── pause ─────────────────────────────────────────────────────────
+type PauseContainerSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+type PauseContainerCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<PauseContainerSettings>()
+    new(output: IOutputPort) = PauseContainerCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.Id) then
+                output.WriteError(ServiceGuards.ContainerIdRequired)
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+                let! response = client.PauseAsync(settings.Id)
+                output.WriteSuccess(sprintf "Conteneur %s en pause (%s)" settings.Id (response.State.ToString()))
+                return 0
+        }
+
+// ── unpause ───────────────────────────────────────────────────────
+type UnpauseContainerSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+type UnpauseContainerCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<UnpauseContainerSettings>()
+    new(output: IOutputPort) = UnpauseContainerCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.Id) then
+                output.WriteError(ServiceGuards.ContainerIdRequired)
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+                let! response = client.UnpauseAsync(settings.Id)
+                output.WriteSuccess(sprintf "Conteneur %s repris (%s)" settings.Id (response.State.ToString()))
+                return 0
+        }
+
+// ── wait ──────────────────────────────────────────────────────────
+type WaitContainerSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandOption("-t|--timeout")>]
+    member val Timeout = 0 with get, set
+
+type WaitContainerCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<WaitContainerSettings>()
+    new(output: IOutputPort) = WaitContainerCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.Id) then
+                output.WriteError(ServiceGuards.ContainerIdRequired)
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+                let timeout = if settings.Timeout < 0 then 0 else settings.Timeout
+                let! response = client.WaitAsync(settings.Id, timeout)
+
+                // code -1 = abandon par délai d'attente (voir WaitContainer).
+                if response.ExitCode = -1 then
+                    output.WriteWarning(
+                        if String.IsNullOrWhiteSpace(response.Message) then
+                            sprintf "Conteneur %s toujours en cours après %d s" settings.Id timeout
+                        else
+                            response.Message
+                    )
+
+                    return 0
+                else
+                    output.WriteSuccess(sprintf "Conteneur %s terminé (code de sortie %d)" settings.Id response.ExitCode)
+                    return 0
+        }
+
+// ── prune (conteneurs) ────────────────────────────────────────────
+type PruneContainersSettings() =
+    inherit CommandSettings()
+
+type PruneContainersCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<PruneContainersSettings>()
+    new(output: IOutputPort) = PruneContainersCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
+        task {
+            use client = clients.CreateContainerClient()
+            let! response = client.PruneContainersAsync()
+
+            if response.Deleted.Count = 0 then
+                output.WriteWarning("Aucun conteneur arrêté à supprimer.")
+            else
+                output.WriteSuccess(sprintf "%d conteneur(s) supprimé(s) :" response.Deleted.Count)
+
+                for id in response.Deleted do
+                    output.WriteLine(sprintf "  - %s" id)
+
+            return 0
+        }
+
+// ── events ────────────────────────────────────────────────────────
+type ContainerEventsSettings() =
+    inherit CommandSettings()
+
+type ContainerEventsCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<ContainerEventsSettings>()
+    new(output: IOutputPort) = ContainerEventsCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, _settings, ct) : Task<int> =
+        task {
+            use client = clients.CreateContainerClient()
+
+            try
+                use ctrlC = new CtrlCHandler()
+                use linked = CancellationTokenSource.CreateLinkedTokenSource(ct, ctrlC.Token)
+                let watchCt = linked.Token
+                let stream = client.WatchEventsStream(ct = watchCt)
+                let enumerator = stream.GetAsyncEnumerator(watchCt)
+                let mutable failure: System.Exception option = None
+
+                try
+                    let mutable moving = true
+
+                    while moving do
+                        let! hasNext = enumerator.MoveNextAsync().AsTask()
+
+                        if hasNext then
+                            let evt = enumerator.Current
+
+                            let exit =
+                                if evt.ExitCode <> 0 then
+                                    sprintf " (exit %d)" evt.ExitCode
+                                else
+                                    ""
+
+                            output.WriteLine(
+                                sprintf "[%s] %-8s %s %s%s" evt.Timestamp evt.EventType evt.Id evt.Status exit
+                            )
+                        else
+                            moving <- false
+                with ex ->
+                    failure <- Some ex
+
+                do! enumerator.DisposeAsync().AsTask()
+
+                match failure with
+                | Some ex -> ExceptionDispatchInfo.Capture(ex).Throw()
+                | None -> ()
+
+                return 0
+            with
+            | :? Grpc.Core.RpcException as rex when rex.StatusCode = Grpc.Core.StatusCode.Cancelled -> return 0
+            | :? OperationCanceledException -> return 0
+            | ex ->
+                output.WriteError(ex.Message)
+                return 1
+        }
+
+// ── stats-stream ──────────────────────────────────────────────────
+type StatsStreamSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandOption("-i|--interval")>]
+    member val Interval = 0 with get, set
+
+type StatsStreamCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<StatsStreamSettings>()
+    new(output: IOutputPort) = StatsStreamCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.Id) then
+                output.WriteError(ServiceGuards.ContainerIdRequired)
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+
+                try
+                    use ctrlC = new CtrlCHandler()
+                    use linked = CancellationTokenSource.CreateLinkedTokenSource(ct, ctrlC.Token)
+                    let watchCt = linked.Token
+                    let interval = if settings.Interval < 0 then 0 else settings.Interval
+                    let stream = client.GetContainerStatsStream(settings.Id, interval, ct = watchCt)
+                    let enumerator = stream.GetAsyncEnumerator(watchCt)
+                    let mutable failure: System.Exception option = None
+
+                    try
+                        let mutable moving = true
+
+                        while moving do
+                            let! hasNext = enumerator.MoveNextAsync().AsTask()
+
+                            if hasNext then
+                                let s = enumerator.Current
+
+                                output.WriteLine(
+                                    sprintf "CPU %.2f | Mémoire %d/%d | rx %d tx %d | disque r %d w %d | %d PID"
+                                        s.CpuUsage
+                                        s.MemoryUsage
+                                        s.MemoryLimit
+                                        s.NetworkRx
+                                        s.NetworkTx
+                                        s.DiskRead
+                                        s.DiskWrite
+                                        s.Pids
+                                )
+                            else
+                                moving <- false
+                    with ex ->
+                        failure <- Some ex
+
+                    do! enumerator.DisposeAsync().AsTask()
+
+                    match failure with
+                    | Some ex -> ExceptionDispatchInfo.Capture(ex).Throw()
+                    | None -> ()
+
+                    return 0
+                with
+                | :? Grpc.Core.RpcException as rex when rex.StatusCode = Grpc.Core.StatusCode.Cancelled -> return 0
+                | :? OperationCanceledException -> return 0
+                | ex ->
+                    output.WriteError(ex.Message)
+                    return 1
+        }
+
+// ── image prune ───────────────────────────────────────────────────
+type ImagePruneSettings() =
+    inherit CommandSettings()
+
+type ImagePruneCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<ImagePruneSettings>()
+    new(output: IOutputPort) = ImagePruneCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, _settings, _ct) : Task<int> =
+        task {
+            use client = clients.CreateContainerClient()
+            let! response = client.PruneImagesAsync()
+
+            if response.Deleted.Count = 0 then
+                output.WriteWarning("Aucune image inutilisée à supprimer.")
+            else
+                output.WriteSuccess(sprintf "%d image(s) supprimée(s) :" response.Deleted.Count)
+
+                for id in response.Deleted do
+                    output.WriteLine(sprintf "  - %s" id)
+
+            return 0
+        }
+
+// ── image commit ──────────────────────────────────────────────────
+type ImageCommitSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<CONTAINER_ID>")>]
+    member val ContainerId: string = null with get, set
+
+    [<CommandArgument(1, "<IMAGE_REF>")>]
+    member val ImageRef: string = null with get, set
+
+    [<CommandOption("--message")>]
+    member val Message: string = null with get, set
+
+    [<CommandOption("--author")>]
+    member val Author: string = null with get, set
+
+type ImageCommitCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<ImageCommitSettings>()
+    new(output: IOutputPort) = ImageCommitCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.ContainerId) then
+                output.WriteError(ServiceGuards.ContainerIdRequired)
+                return 1
+            elif String.IsNullOrWhiteSpace(settings.ImageRef) then
+                output.WriteError("La référence de l'image est requise")
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+
+                let! response =
+                    client.CommitImageAsync(
+                        settings.ContainerId,
+                        settings.ImageRef,
+                        ?message =
+                            (if String.IsNullOrWhiteSpace(settings.Message) then
+                                 None
+                             else
+                                 Some settings.Message),
+                        ?author =
+                            (if String.IsNullOrWhiteSpace(settings.Author) then
+                                 None
+                             else
+                                 Some settings.Author)
+                    )
+
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                    return 0
+                else
+                    output.WriteError(response.Message)
+                    return 1
+        }
+
+// ── image export ──────────────────────────────────────────────────
+type ImageExportSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<REF>")>]
+    member val Ref: string = null with get, set
+
+    [<CommandOption("--namespace")>]
+    member val Namespace: string = null with get, set
+
+    [<CommandOption("-o|--output")>]
+    member val Output: string = null with get, set
+
+type ImageExportCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<ImageExportSettings>()
+    new(output: IOutputPort) = ImageExportCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.Ref) then
+                output.WriteError("La référence de l'image est requise")
+                return 1
+            elif String.IsNullOrWhiteSpace(settings.Output) then
+                output.WriteError("Le fichier de sortie est requis (--output)")
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+                let ns = if isNull settings.Namespace then "" else settings.Namespace
+                let stream = client.ExportImageStream(settings.Ref, ns)
+                let enumerator = stream.GetAsyncEnumerator(CancellationToken.None)
+                let mutable total = 0L
+                let mutable failure: System.Exception option = None
+
+                try
+                    use fs = new FileStream(settings.Output, FileMode.Create, FileAccess.Write, FileShare.Read)
+
+                    try
+                        let mutable moving = true
+
+                        while moving do
+                            let! hasNext = enumerator.MoveNextAsync().AsTask()
+
+                            if hasNext then
+                                let chunk = enumerator.Current
+
+                                if not (isNull chunk.Data) && chunk.Data.Length > 0 then
+                                    fs.Write(chunk.Data, 0, chunk.Data.Length)
+                                    total <- total + int64 chunk.Data.Length
+                            else
+                                moving <- false
+                    with ex ->
+                        failure <- Some ex
+                with ex ->
+                    failure <- Some ex
+
+                do! enumerator.DisposeAsync().AsTask()
+
+                match failure with
+                | Some ex ->
+                    output.WriteError(ex.Message)
+                    return 1
+                | None ->
+                    output.WriteSuccess(sprintf "Image '%s' exportée vers %s (%d octets)" settings.Ref settings.Output total)
+                    return 0
+        }
+
+// ── image import ──────────────────────────────────────────────────
+
+module private ImageTransfer =
+
+    /// Découpe un fichier local en morceaux de 64 Ko pour l'import gRPC.
+    let imageChunksOfFile (path: string) : IAsyncEnumerable<ImageChunk> =
+        { new IAsyncEnumerable<ImageChunk> with
+            member _.GetAsyncEnumerator(_ct) =
+                let fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)
+                let buffer = Array.zeroCreate<byte> (64 * 1024)
+                let mutable current: ImageChunk = Unchecked.defaultof<ImageChunk>
+
+                { new IAsyncEnumerator<ImageChunk> with
+                    member _.Current = current
+
+                    member _.MoveNextAsync() =
+                        let n = fs.Read(buffer, 0, buffer.Length)
+
+                        if n > 0 then
+                            current <-
+                                { ImageChunk.Data = (if n = buffer.Length then buffer else buffer[0 .. n - 1]) }
+
+                            ValueTask<bool>(true)
+                        else
+                            ValueTask<bool>(false)
+
+                    member _.DisposeAsync() =
+                        fs.Dispose()
+                        ValueTask() } }
+
+type ImageImportSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<FILE>")>]
+    member val File: string = null with get, set
+
+    [<CommandOption("--namespace")>]
+    member val Namespace: string = null with get, set
+
+type ImageImportCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<ImageImportSettings>()
+    new(output: IOutputPort) = ImageImportCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.File) then
+                output.WriteError("Le fichier à importer est requis")
+                return 1
+            elif not (File.Exists settings.File) then
+                output.WriteError(sprintf "Fichier introuvable : %s" settings.File)
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+                let chunks = ImageTransfer.imageChunksOfFile settings.File
+                let! response = client.ImportImage chunks
+                output.WriteSuccess(response.Message)
+
+                for r in response.ImageRefs do
+                    output.WriteLine(sprintf "  - %s" r)
+
+                return 0
+        }
+
+// ── read-file ─────────────────────────────────────────────────────
+type ReadFileSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandArgument(1, "<PATH>")>]
+    member val Path: string = null with get, set
+
+    [<CommandOption("-o|--output")>]
+    member val Output: string = null with get, set
+
+type ReadFileCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<ReadFileSettings>()
+    new(output: IOutputPort) = ReadFileCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.Id) then
+                output.WriteError(ServiceGuards.ContainerIdRequired)
+                return 1
+            elif String.IsNullOrWhiteSpace(settings.Path) then
+                output.WriteError("Le chemin du fichier est requis")
+                return 1
+            elif String.IsNullOrWhiteSpace(settings.Output) then
+                output.WriteError("Le fichier de sortie est requis (--output)")
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+                let! response = client.ReadFileAsync(settings.Id, settings.Path)
+
+                if response.Success then
+                    File.WriteAllBytes(settings.Output, response.Data)
+                    output.WriteSuccess(sprintf "%d octets copiés vers %s" response.Data.Length settings.Output)
+                    return 0
+                else
+                    output.WriteError(response.Message)
+                    return 1
+        }
+
+// ── write-file ────────────────────────────────────────────────────
+type WriteFileSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<ID>")>]
+    member val Id: string = null with get, set
+
+    [<CommandArgument(1, "<PATH>")>]
+    member val Path: string = null with get, set
+
+    [<CommandOption("-i|--input")>]
+    member val Input: string = null with get, set
+
+type WriteFileCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<WriteFileSettings>()
+    new(output: IOutputPort) = WriteFileCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.Id) then
+                output.WriteError(ServiceGuards.ContainerIdRequired)
+                return 1
+            elif String.IsNullOrWhiteSpace(settings.Path) then
+                output.WriteError("Le chemin du fichier est requis")
+                return 1
+            elif String.IsNullOrWhiteSpace(settings.Input) then
+                output.WriteError("Le fichier source est requis (--input)")
+                return 1
+            elif not (File.Exists settings.Input) then
+                output.WriteError(sprintf "Fichier introuvable : %s" settings.Input)
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+                let data = File.ReadAllBytes settings.Input
+                let! response = client.WriteFileAsync(settings.Id, settings.Path, data)
+
+                if response.Success then
+                    output.WriteSuccess(response.Message)
+                    return 0
+                else
+                    output.WriteError(response.Message)
+                    return 1
         }

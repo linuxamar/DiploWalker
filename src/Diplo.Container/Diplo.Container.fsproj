@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="protobuf-net.Grpc.AspNetCore" />
+    <PackageReference Include="FSharp.Core" />
     <PackageReference Include="Grpc.Core.Api" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>

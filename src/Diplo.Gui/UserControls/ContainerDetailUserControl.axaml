@@ -62,6 +62,12 @@
                   Margin="0,0,4,4" Padding="8,4"/>
           <Button Content="⏹ Arrêter" Command="{Binding ContainerTab.StopContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="⏸ Suspendre" Command="{Binding ContainerTab.PauseContainerCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="▶ Reprendre" Command="{Binding ContainerTab.UnpauseContainerCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="⏳ Attendre" Command="{Binding ContainerTab.WaitContainerCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
           <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.DeleteContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
           <Button Content="✏ Renommer" Command="{Binding ContainerTab.RenameContainerCommand}"
@@ -118,7 +124,7 @@
           <TextBlock Text="Cible :" VerticalAlignment="Center" Margin="0,0,4,4"
                      Opacity="0.7"/>
           <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200"
-                   Margin="0,0,12,4" PlaceholderText="nouveau:tag (tag)"/>
+                   Margin="0,0,12,4" PlaceholderText="nouveau:tag (tag/commit)"/>
           <Button Content="📋 Lister" Command="{Binding ContainerTab.ListImagesCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
           <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectImageCommand}"
@@ -126,6 +132,10 @@
           <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.RemoveImageCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
           <Button Content="🏷 Étiqueter" Command="{Binding ContainerTab.TagImageCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="📸 Committer" Command="{Binding ContainerTab.CommitImageCommand}"
+                  Margin="0,0,4,4" Padding="8,4"/>
+          <Button Content="🧹 Nettoyer" Command="{Binding ContainerTab.PruneImagesCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
         </WrapPanel>
 

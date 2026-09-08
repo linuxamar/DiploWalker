@@ -348,6 +348,145 @@ let ``ContainerTabViewModel RegistryLogout reussit`` () =
     |> Seq.exists (fun m -> m.Contains "déconnecté")
     |> should equal true
 
+[<Fact>]
+let ``ContainerTabViewModel PauseContainer appelle le client`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient(pause = { State = ContainerState.Paused; Message = "ok" })
+    let vm = containerVm port fake
+    vm.ContainerIdInput <- "c1"
+    (vm.PauseContainerCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.PauseCalls = 1) |> should equal true
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "Conteneur c1 suspendu")
+    |> should equal true
+
+[<Fact>]
+let ``ContainerTabViewModel PauseContainer sans identifiant ecrit un avertissement`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient()
+    let vm = containerVm port fake
+    (vm.PauseContainerCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> port.Warnings.Length = 1) |> should equal true
+    port.Warnings.Head |> should haveSubstring "Aucun identifiant"
+    fake.PauseCalls |> should equal 0
+
+[<Fact>]
+let ``ContainerTabViewModel UnpauseContainer appelle le client`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient(unpause = { State = ContainerState.Running; Message = "ok" })
+    let vm = containerVm port fake
+    vm.ContainerIdInput <- "c1"
+    (vm.UnpauseContainerCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.UnpauseCalls = 1) |> should equal true
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "Conteneur c1 repris")
+    |> should equal true
+
+[<Fact>]
+let ``ContainerTabViewModel WaitContainer appelle le client avec le timeout configure`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient(wait = { ExitCode = 0; State = ContainerState.Stopped; Message = "ok" })
+    let vm = containerVm port fake
+    vm.ContainerIdInput <- "c1"
+    vm.ContainerTimeout <- 25
+    (vm.WaitContainerCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.WaitCalls = 1) |> should equal true
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "Conteneur c1 terminé (code: 0)")
+    |> should equal true
+
+[<Fact>]
+let ``ContainerTabViewModel PruneContainers ecrit le bilan`` () =
+    let port = MockOutputPort()
+    let deleted = List<string>([| "c1"; "c2" |])
+    let fake = new FakeContainerClient(pruneContainers = { Deleted = deleted })
+    let vm = containerVm port fake
+    (vm.PruneContainersCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.PruneContainersCalls = 1) |> should equal true
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "2 conteneur(s) arrêté(s) supprimé(s): c1, c2")
+    |> should equal true
+
+[<Fact>]
+let ``ContainerTabViewModel PruneContainers sans resultat l'indique`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient(pruneContainers = { Deleted = List<string>() })
+    let vm = containerVm port fake
+    (vm.PruneContainersCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.PruneContainersCalls = 1) |> should equal true
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "Aucun conteneur arrêté à supprimer")
+    |> should equal true
+
+[<Fact>]
+let ``ContainerTabViewModel PruneImages ecrit le bilan`` () =
+    let port = MockOutputPort()
+    let deleted = List<string>([| "sha256:abc" |])
+    let fake = new FakeContainerClient(pruneImages = { Deleted = deleted })
+    let vm = containerVm port fake
+    (vm.PruneImagesCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.PruneImagesCalls = 1) |> should equal true
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "1 image(s) inutilisée(s) supprimée(s): sha256:abc")
+    |> should equal true
+
+[<Fact>]
+let ``ContainerTabViewModel CommitImage appelle le client`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient(commit = { ImageRef = "myimg:1.0"; Success = true; Message = "ok" })
+    let vm = containerVm port fake
+    vm.ContainerIdInput <- "c1"
+    vm.ContainerImageTarget <- "myimg:1.0"
+    (vm.CommitImageCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.CommitCalls = 1) |> should equal true
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "Image myimg:1.0 créée depuis c1")
+    |> should equal true
+
+[<Fact>]
+let ``ContainerTabViewModel CommitImage sans cible ecrit un avertissement`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient()
+    let vm = containerVm port fake
+    vm.ContainerIdInput <- "c1"
+    (vm.CommitImageCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> port.Warnings.Length = 1) |> should equal true
+    port.Warnings.Head |> should haveSubstring "référence d'image est requise"
+    fake.CommitCalls |> should equal 0
+
+[<Fact>]
+let ``ContainerTabViewModel GetContainerEvents affiche les evenements au fil de l'eau`` () =
+    let port = MockOutputPort()
+    let events =
+        seq {
+            { Timestamp = "t1"; EventType = "start"; Id = "c1"; Status = "ok"; ExitCode = 0 }
+            { Timestamp = "t2"; EventType = "pause"; Id = "c1"; Status = "ok"; ExitCode = 0 }
+        }
+
+    let fake = new FakeContainerClient(containerEvents = events)
+    let vm = containerVm port fake
+    (vm.GetContainerEventsCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.EventsCalls = 1) |> should equal true
+    waitUntil (fun () -> port.Messages.Length = 2) |> should equal true
+    port.Messages |> should contain "[t1] start c1 (ok)"
+    port.Messages |> should contain "[t2] pause c1 (ok)"
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "Suivi des événements terminé")
+    |> should equal true
+
+[<Fact>]
+let ``ContainerTabViewModel StopFollowEvents annule le flux d'evenements`` () =
+    let port = MockOutputPort()
+    let events = seq { { Timestamp = "t1"; EventType = "start"; Id = "c1"; Status = "ok"; ExitCode = 0 } }
+    let fake = new FakeContainerClient(containerEvents = events)
+    let vm = containerVm port fake
+    (vm.GetContainerEventsCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> port.Messages.Length = 1) |> should equal true
+    (vm.StopFollowEventsCommand :> ICommand).Execute(null)
+    // Un nouvel appel annule le précédent sans success final dupliqué.
+    (vm.GetContainerEventsCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.EventsCalls = 2) |> should equal true
+
 // ── VolumeTabViewModel ─────────────────────────────────────────
 
 let private volumeVm (port: MockOutputPort) (fake: FakeVolumeClient) =

@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Protobuf"  />
+    <PackageReference Include="FSharp.Core"  />
     <PackageReference Include="Grpc.Net.Client"  />
   </ItemGroup>
 

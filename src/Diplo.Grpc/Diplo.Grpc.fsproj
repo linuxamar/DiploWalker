@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="protobuf-net" />
+    <PackageReference Include="FSharp.Core" />
     <PackageReference Include="protobuf-net.Grpc" />
     <PackageReference Include="System.ServiceModel.Primitives" />
   </ItemGroup>

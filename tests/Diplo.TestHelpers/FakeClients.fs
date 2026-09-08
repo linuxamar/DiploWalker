@@ -21,6 +21,20 @@ module internal FakeClientsInternals =
                     member _.MoveNextAsync() = ValueTask<bool>(false)
                     member _.DisposeAsync() = ValueTask() } }
 
+    /// Énumération asynchrone bornée construite depuis une séquence, utilisée
+    /// pour fournir des données aux membres streaming des fakes.
+    let toAsyncEnumerable<'T> (items: seq<'T>) : IAsyncEnumerable<'T> =
+        { new IAsyncEnumerable<'T> with
+            member _.GetAsyncEnumerator(_ct) =
+                let e = items.GetEnumerator()
+
+                { new IAsyncEnumerator<'T> with
+                    member _.Current = e.Current
+                    member _.MoveNextAsync() = ValueTask<bool>(e.MoveNext())
+                    member _.DisposeAsync() =
+                        e.Dispose()
+                        ValueTask() } }
+
 /// Fake IContainerClient : chaque membre retourne une réponse injectable via le
 /// constructeur (paramètres nommés). Les membres non fournis utilisent une
 /// réponse bénigne par défaut. Des compteurs d'appels permettent de vérifier
@@ -47,6 +61,18 @@ type FakeContainerClient
         ?stats: GetContainerStatsResponse,
         ?execOutputs: seq<ExecOutput>,
         ?logEntries: seq<ContainerLogEntry>,
+        ?pause: PauseContainerResponse,
+        ?unpause: UnpauseContainerResponse,
+        ?wait: WaitContainerResponse,
+        ?pruneContainers: PruneContainersResponse,
+        ?pruneImages: PruneImagesResponse,
+        ?commit: CommitImageResponse,
+        ?readFile: ReadFileResponse,
+        ?writeFile: WriteFileResponse,
+        ?exportChunks: seq<ImageChunk>,
+        ?importImage: ImportImageResponse,
+        ?containerEvents: seq<ContainerEvent>,
+        ?statsStream: seq<GetContainerStatsResponse>,
         ?versionError: exn
     ) =
     let deleteR = defaultArg delete { Success = true; Message = "" }
@@ -105,6 +131,18 @@ type FakeContainerClient
               Pids = 0 }
     let execR = defaultArg execOutputs Seq.empty
     let logsR = defaultArg logEntries Seq.empty
+    let pauseR = defaultArg pause { State = ContainerState.Paused; Message = "" }
+    let unpauseR = defaultArg unpause { State = ContainerState.Running; Message = "" }
+    let waitR = defaultArg wait { ExitCode = 0; State = ContainerState.Stopped; Message = "" }
+    let pruneContainersR = defaultArg pruneContainers { Deleted = List<string>() }
+    let pruneImagesR = defaultArg pruneImages { Deleted = List<string>() }
+    let commitR = defaultArg commit { ImageRef = ""; Success = true; Message = "" }
+    let readFileR = defaultArg readFile { Data = Array.empty<byte>; Success = true; Message = "" }
+    let writeFileR = defaultArg writeFile { Success = true; Message = "" }
+    let exportR = defaultArg exportChunks Seq.empty
+    let importImageR = defaultArg importImage { ImageRefs = List<string>(); Message = "" }
+    let eventsR = defaultArg containerEvents Seq.empty
+    let statsStreamR = defaultArg statsStream Seq.empty
     let versionErr = versionError
 
     let mutable deleteCalls = 0
@@ -127,6 +165,18 @@ type FakeContainerClient
     let mutable statsCalls = 0
     let mutable execCalls = 0
     let mutable logsCalls = 0
+    let mutable pauseCalls = 0
+    let mutable unpauseCalls = 0
+    let mutable waitCalls = 0
+    let mutable pruneContainersCalls = 0
+    let mutable pruneImagesCalls = 0
+    let mutable commitCalls = 0
+    let mutable readFileCalls = 0
+    let mutable writeFileCalls = 0
+    let mutable exportCalls = 0
+    let mutable importCalls = 0
+    let mutable eventsCalls = 0
+    let mutable statsStreamCalls = 0
 
     member _.DeleteCalls = deleteCalls
     member _.CreateCalls = createCalls
@@ -148,6 +198,18 @@ type FakeContainerClient
     member _.StatsCalls = statsCalls
     member _.ExecCalls = execCalls
     member _.LogsCalls = logsCalls
+    member _.PauseCalls = pauseCalls
+    member _.UnpauseCalls = unpauseCalls
+    member _.WaitCalls = waitCalls
+    member _.PruneContainersCalls = pruneContainersCalls
+    member _.PruneImagesCalls = pruneImagesCalls
+    member _.CommitCalls = commitCalls
+    member _.ReadFileCalls = readFileCalls
+    member _.WriteFileCalls = writeFileCalls
+    member _.ExportCalls = exportCalls
+    member _.ImportCalls = importCalls
+    member _.EventsCalls = eventsCalls
+    member _.StatsStreamCalls = statsStreamCalls
 
     interface IDisposable with
         member _.Dispose() = ()
@@ -241,6 +303,54 @@ type FakeContainerClient
         member _.TagImageAsync(_source, _target, ?_namespaceName, ?_ct) =
             tagImageCalls <- tagImageCalls + 1
             Task.FromResult(tagImageR)
+
+        member _.PauseAsync(_id, ?_ct) =
+            pauseCalls <- pauseCalls + 1
+            Task.FromResult(pauseR)
+
+        member _.UnpauseAsync(_id, ?_ct) =
+            unpauseCalls <- unpauseCalls + 1
+            Task.FromResult(unpauseR)
+
+        member _.WaitAsync(_id, ?_timeoutSeconds, ?_ct) =
+            waitCalls <- waitCalls + 1
+            Task.FromResult(waitR)
+
+        member _.PruneContainersAsync(?_ct) =
+            pruneContainersCalls <- pruneContainersCalls + 1
+            Task.FromResult(pruneContainersR)
+
+        member _.PruneImagesAsync(?_ct) =
+            pruneImagesCalls <- pruneImagesCalls + 1
+            Task.FromResult(pruneImagesR)
+
+        member _.CommitImageAsync(_containerId, _imageRef, ?_message, ?_author, ?_ct) =
+            commitCalls <- commitCalls + 1
+            Task.FromResult(commitR)
+
+        member _.ReadFileAsync(_id, _path, ?_ct) =
+            readFileCalls <- readFileCalls + 1
+            Task.FromResult(readFileR)
+
+        member _.WriteFileAsync(_id, _path, _data, ?_ct) =
+            writeFileCalls <- writeFileCalls + 1
+            Task.FromResult(writeFileR)
+
+        member _.ExportImageStream(_imageRef, ?_namespaceName, ?_ct) =
+            exportCalls <- exportCalls + 1
+            FakeClientsInternals.toAsyncEnumerable exportR
+
+        member _.ImportImage(_chunks, ?_ct) =
+            importCalls <- importCalls + 1
+            Task.FromResult(importImageR)
+
+        member _.WatchEventsStream(?_ct) =
+            eventsCalls <- eventsCalls + 1
+            FakeClientsInternals.toAsyncEnumerable eventsR
+
+        member _.GetContainerStatsStream(_id, ?_intervalSeconds, ?_ct) =
+            statsStreamCalls <- statsStreamCalls + 1
+            FakeClientsInternals.toAsyncEnumerable statsStreamR
 
 /// Fake INetworkClient : mêmes conventions que FakeContainerClient.
 type FakeNetworkClient

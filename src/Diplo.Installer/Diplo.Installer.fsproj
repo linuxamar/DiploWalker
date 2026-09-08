@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.ServiceProcess.ServiceController"  />
+    <PackageReference Include="FSharp.Core"  />
   </ItemGroup>
 
 </Project>

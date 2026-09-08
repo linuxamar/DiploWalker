@@ -9,6 +9,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Grpc.AspNetCore.HealthChecks"  />
+    <PackageReference Include="FSharp.Core"  />
     <PackageReference Include="Serilog"  />
     <PackageReference Include="Grpc.Core.Api"  />
     <PackageReference Include="Serilog.Extensions.Hosting"  />
