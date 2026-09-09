@@ -11,6 +11,7 @@
     <Compile Include="TabViewModelTests.fs" />
     <Compile Include="OptionalBehaviorTests.fs" />
     <Compile Include="ClientInjectedBehaviorTests.fs" />
+    <Compile Include="ImagesTabViewModelTests.fs" />
     <Compile Include="CatalogViewModelTests.fs" />
     <Compile Include="HeadlessApp.fs" />
     <Compile Include="HeadlessBehaviorTests.fs" />

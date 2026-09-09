@@ -19,6 +19,58 @@
 
         <Grid RowDefinitions="*,5,Auto">
             <TabControl Grid.Row="0" Margin="4">
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="🖼"/><TextBlock Text=" Images" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
+                        <Button Content="🔄 Lister" Command="{Binding ImagesTab.ListImagesCommand}" Margin="0,0,4,0" />
+                        <TextBox Text="{Binding ImagesTab.ImageSearchInput}" Width="220" Margin="0,0,12,0"
+                                 PlaceholderText="🔍 Rechercher une image (réf/tag)…" />
+                        <Button Content="📥 Télécharger" Command="{Binding ImagesTab.PullImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding ImagesTab.InspectImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="✏ Étiqueter" Command="{Binding ImagesTab.TagImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding ImagesTab.RemoveImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding ImagesTab.PruneImagesCommand}" Margin="0,0,4,0" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Réf. télécharger:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ImagesTab.PullRefInput}" Width="180" Margin="0,0,12,0"
+                                 PlaceholderText="nom:tag" />
+                        <TextBlock Text="User (pull):" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ImagesTab.PullUserInput}" Width="120" Margin="0,0,12,0"
+                                 PlaceholderText="user:pass" />
+                        <TextBlock Text="Espace:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ImagesTab.ImageNsInput}" Width="120" Margin="0,0,12,0"
+                                 PlaceholderText="namespace" />
+                    </WrapPanel>
+
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Source étiqueter:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ImagesTab.TagSourceInput}" Width="180" Margin="0,0,12,0"
+                                 PlaceholderText="source:tag" />
+                        <TextBlock Text="Cible étiqueter:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBox Text="{Binding ImagesTab.TagTargetInput}" Width="180" Margin="0,0,12,0"
+                                 PlaceholderText="cible:tag" />
+                        <TextBlock Text="Réf. (inspecter/suppr.):" VerticalAlignment="Center" Margin="0,0,4,0"
+                                   Opacity="0.7" />
+                        <TextBox Text="{Binding ImagesTab.ImageRefInput}" Width="180" Margin="0,0,12,0"
+                                 PlaceholderText="réf. image (sinon sélection)" />
+                    </WrapPanel>
+
+                    <DataGrid ItemsSource="{Binding ImagesTab.Images}" AutoGenerateColumns="False"
+                              IsReadOnly="True" GridLinesVisibility="Horizontal"
+                              CanUserResizeColumns="True" CanUserSortColumns="True"
+                              SelectedItem="{Binding ImagesTab.SelectedImage}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Référentiel" Binding="{Binding Ref}" Width="200" />
+                            <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="120" />
+                            <DataGridTextColumn Header="Taille" Binding="{Binding Taille}" Width="120" />
+                            <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="160" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
             <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="🐳"/><TextBlock Text=" Conteneurs" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <!-- Toolbar principal -->

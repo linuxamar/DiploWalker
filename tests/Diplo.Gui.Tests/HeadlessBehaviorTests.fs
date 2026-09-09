@@ -76,6 +76,35 @@ let ``ListImages peuple la collection sur le dispatcher`` () =
     vm.Images.[0].Référentiel |> should equal "nginx"
     vm.Images.[0].Tag |> should equal "latest"
 
+// ── ImagesTabViewModel ─────────────────────────────────────────
+
+let private imagesVm (port: MockOutputPort) (fake: FakeContainerClient) =
+    new Diplo.Gui.ViewModels.ImagesTabViewModel(
+        port,
+        containerClientFactory = fun () -> fake :> IContainerClient
+    )
+
+[<Fact>]
+let ``ImagesTabViewModel ListImages peuple la collection sur le dispatcher`` () =
+    HeadlessRunner.setupHeadless ()
+    let port = MockOutputPort()
+
+    let img =
+        { Ref = "nginx"
+          Id = "sha256:1"
+          Repository = "library/nginx"
+          Tag = "latest"
+          Size = 2048L
+          CreatedAt = "2026-01-01" }
+
+    let fake = new FakeContainerClient(listImages = { Images = List<ImageInfo>([| img |]) })
+    let vm = imagesVm port fake
+    (vm.ListImagesCommand :> ICommand).Execute(null)
+    waitPump (fun () -> vm.Images.Count = 1) |> should equal true
+    vm.Images.[0].Ref |> should equal "nginx"
+    vm.Images.[0].RefComplet |> should equal "nginx:latest"
+    vm.Images.[0].Taille |> should equal "2048 octets"
+
 // ── VolumeTabViewModel ─────────────────────────────────────────
 
 let private volumeVm (port: MockOutputPort) (fake: FakeVolumeClient) =
@@ -191,9 +220,10 @@ let private mainWindowPort (vm: Diplo.Gui.ViewModels.MainWindowViewModel) =
     vm.OutputPort :?> Diplo.Gui.Services.AvaloniaOutputPort
 
 [<Fact>]
-let ``MainWindow expose les cinq onglets non nuls`` () =
+let ``MainWindow expose les six onglets non nuls`` () =
     let vm = mainWindowVm ()
     vm.ContainerTab |> should not' (be Null)
+    vm.ImagesTab |> should not' (be Null)
     vm.VolumeTab |> should not' (be Null)
     vm.NetworkTab |> should not' (be Null)
     vm.ComposeTab |> should not' (be Null)
@@ -205,6 +235,9 @@ let ``MainWindow expose les onglets du bon type`` () =
 
     vm.ContainerTab
     |> should be instanceOfType<Diplo.Gui.ViewModels.ContainerTabViewModel>
+
+    vm.ImagesTab
+    |> should be instanceOfType<Diplo.Gui.ViewModels.ImagesTabViewModel>
 
     vm.VolumeTab
     |> should be instanceOfType<Diplo.Gui.ViewModels.VolumeTabViewModel>

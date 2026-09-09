@@ -17,6 +17,7 @@ type MainWindowViewModel() as this =
     let mutable logOutputCache = ""
 
     let containerTab = new ContainerTabViewModel(outputPort)
+    let imagesTab = new ImagesTabViewModel(outputPort)
     let volumeTab = new VolumeTabViewModel(outputPort)
     let networkTab = new NetworkTabViewModel(outputPort)
     let composeTab = new ComposeTabViewModel(outputPort)
@@ -46,6 +47,7 @@ type MainWindowViewModel() as this =
     member _.LogOutput = logOutputCache
 
     member _.ContainerTab = containerTab
+    member _.ImagesTab = imagesTab
     member _.VolumeTab = volumeTab
     member _.NetworkTab = networkTab
     member _.ComposeTab = composeTab
@@ -74,6 +76,7 @@ type MainWindowViewModel() as this =
     interface IDisposable with
         member _.Dispose() =
             (containerTab :> IDisposable).Dispose()
+            (imagesTab :> IDisposable).Dispose()
             (volumeTab :> IDisposable).Dispose()
             (networkTab :> IDisposable).Dispose()
             (composeTab :> IDisposable).Dispose()
