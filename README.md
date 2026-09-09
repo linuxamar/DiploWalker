@@ -18,7 +18,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 ### Clients
 
-- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux et images disque (`disk create-image`)
+- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux, images disque (`disk create-image`) et recherche d'images en ligne
 - **GUI** : `Diplo.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
 - **Résilience** : les canaux gRPC (`DiploChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
 
@@ -360,9 +360,16 @@ Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (
 
 L'interface graphique Avalonia utilise un thème système par défaut avec des onglets organisés :
 
+**Onglet Images** :
+
+- **Toolbar** : Lister, Rechercher, Télécharger, Inspecter, Étiqueter, Supprimer, Nettoyer
+- **Champs** : Réf. (pull), User (pull), Espace, image source / image cible (étiqueter), Référence (inspecter/supprimer)
+- **DataGrid** (haut) : images locales (Référentiel, Tag, Taille, Créé le)
+- **Recherche en ligne** (bas) : résultats des catalogues (Registre, Référence, Étoiles, Description) avec bouton **Tirer la sélection** — déclenchée par la touche Entrée dans le champ de recherche (cf. « Recherche d'images en ligne »)
+
 **Onglet Conteneurs** — Vue splitée avec :
 
-- **Toolbar** en haut : Lister, Créer, Télécharger, Inspecter, Espaces, Version
+- **Toolbar** en haut : Lister, Créer, Télécharger, Inspecter, Espaces, Version, Nettoyer, Événements, Arrêter
 - **Champs** : ID, Nom, Image, User (pull), Espace, Timeout, Tous, Forcer
 - **DataGrid** (gauche) : liste des conteneurs avec sélection
 - **ContainerDetailUserControl** (droite) : panneau de détail pour le conteneur sélectionné
@@ -370,8 +377,7 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
     - Actions : Démarrer, Arrêter, Supprimer, Renommer, Processus, Métriques
     - Configuration : Nouveau nom, Montages
     - Journaux & Exec : Suivre, Lignes, Depuis, Commande
-- **Images** (Expander repliable en bas) : Liste/Inspecter/Supprimer/Étiqueter
-- **Catalogue d'images** (Expander repliable en bas) : liste locale persistante (`diplo-catalog.json`) avec inscription (pull), mise à jour (tag) et retrait (rmi)
+    - **Catalogue d'images** : liste locale persistante (`diplo-catalog.json`) avec Lister, Inscrire (pull), Mettre à jour (tag) et Retirer (rmi)
 
 **Onglet Volumes** — Liste + création d'images disque (sélection dossier/fichier, format)
 
@@ -380,6 +386,21 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
 **Onglet Compose** — Éditeur YAML avec colorisation syntaxique (AvalonEdit + TextMate) et validation temps réel
 
 **Onglet Paramètres** — Édition de `diplo.json` (adresses services, transport, namespace, logLevel)
+
+**Menu** — *Fichier* → **Exporter le journal…** (écrit les lignes horodatées du journal dans un fichier `.txt` choisi via le sélecteur de fichier), *Quitter* ; *Aide* → **À propos**
+
+## Recherche d'images en ligne
+
+La recherche d'images interroge les catalogues en ligne depuis le CLI (`diplo container image-search`) ou l'onglet **Images** de la GUI (champ de recherche validé par Entrée ; les résultats se tirent via « Tirer la sélection »). Elle est limitée aux **quatre registres autorisés** et ne nécessite **aucun identifiant** (catalogues publics) ; le pull d'un résultat utilise ensuite l'identifiant enregistré pour le registre concerné.
+
+| Registre | Mécanisme de recherche |
+| --- | --- |
+| **docker.io** | API de recherche publique de Docker Hub |
+| **quay.io** | API de recherche publique de Quay |
+| **mcr.microsoft.com** | Catalogue public `_catalog` (`/v2/_catalog`) téléchargé puis **filtré localement** : pas de requête serveur (le MCR ignore `?n=`), correspondance insensible à la casse sur le nom du référentiel, limite appliquée côté client |
+| **ghcr.io** | Aucune API de recherche publique → aucun résultat |
+
+Sans registre ciblé, les quatre fournisseurs sont interrogés dans l'ordre de la liste blanche (docker.io, quay.io, ghcr.io, mcr.microsoft.com). Un registre hors liste blanche est rejeté avec un avertissement et la recherche s'effectue alors sur tous les registres.
 
 ## Authentification aux registres
 
@@ -434,6 +455,7 @@ diplo container image-inspect <ref>
 diplo container image-remove <ref>
 diplo container image-tag <source> <cible>
 diplo container pull <ref> [--user <utilisateur>]
+diplo container image-search <terme> [--registry <registre>] [--limit <n>]   # docker.io, quay.io, mcr.microsoft.com ; ghcr.io : aucun résultat (alias <registre> acceptés)
 diplo container login <registre> --username <u> [--password <p>]   # ghcr.io, docker.io, quay.io, mcr.microsoft.com (alias : ghcr, dockerhub, quay, mcr)
 diplo container logout <registre>
 

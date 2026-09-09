@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Projet             | Rôle                                                                                                                                                                                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Diplo.Abstractions | Interfaces partagées, validation, sécurité, modules utilitaires mutualisés                                                                                                                                                                                    |
-| Diplo.Container    | Service gRPC de gestion des conteneurs (containerd) — création, cycle de vie, montage de volumes (`--mount`)                                                                                                                                                  |
+| Diplo.Container    | Service gRPC de gestion des conteneurs (containerd) — création, cycle de vie, montage de volumes (`--mount`), recherche d'images en ligne dans les catalogues autorisés (docker.io, quay.io, mcr.microsoft.com, ghcr.io) |
 | Diplo.Volume       | Service gRPC de gestion des volumes persistants                                                                                                                                                                                                               |
 | Diplo.Network      | Service gRPC de gestion des réseaux (CNI)                                                                                                                                                                                                                     |
 | Diplo.Installer    | Installation Windows (services, containerd, CNI)                                                                                                                                                                                                              |
@@ -53,13 +53,15 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 | `ParallelsFs`                | Diplo.Disk         | Pilote maison pour les images Parallels (.hdd, .hds) : lecture/écriture in-place via `ParallelsStream`.                                                                                                                                                                                |
 | `FsImage`                    | Diplo.Disk         | Création d'images disque (`create`), extraction (`extract`) et réécriture (`writeBack`) de systèmes de fichiers. Chaîne d'adaptateurs IsoFs → Hawkynt → VdiFs → DmgFs → DiscUtils. Supporte Raw, VHD, VHDX, VMDK, VDI et ISO en création (`createCore` court-circuite le format ISO via `IsoFs.createCore`, défini en lecture seule). |
 | `IsoFs`                      | Diplo.Disk         | Parseur maison ISO9660 (`IsoSource`/`Iso9660`/`Udf`/`IsoImage`, déplacé de `Diplo.Volume`) + générateur ISO9660 niveau 1 (`create`, noms 8.3 ASCII, sans Joliet/Rock Ridge). `tryExtract` retourne `None` si le format n'est pas détecté ou en cas d'erreur (log warning) ; `tryWriteBack` renvoie `false` (ISO en lecture seule). Consommé par `FsImage` et par la façade `IsoDriver` de `Diplo.Volume`. |
+| `RegistrySearch`             | Diplo.Container    | Recherche d'images dans les catalogues en ligne des registres autorisés : docker.io et quay.io via leur API de recherche publique ; mcr.microsoft.com via le catalogue `_catalog` public téléchargé puis filtré **localement** (insensible à la casse, pas de requête serveur) ; ghcr.io sans API publique → aucun résultat. `searchWith` injecte un `HttpClient` (testable), `search` utilise le client partagé (timeout 30 s). Liste blanche : docker.io, quay.io, ghcr.io, mcr.microsoft.com. |
+| `ImagesTabViewModel`         | Diplo.Gui          | ViewModel de l'onglet Images : liste des images locales (lister/télécharger/inspecter/étiqueter/supprimer/nettoyer), recherche en ligne déclenchée par la touche Entrée dans le champ dédié, grille de résultats avec « Tirer la sélection ». |
 
 ## Stack
 
 - **.NET 10** (`dotnet 10.0.400` installé localement).
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
-- **GUI** : Avalonia 12.1.1 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate).
+- **GUI** : Avalonia 12.1.1 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate). Menu **Fichier** → *Exporter le journal…* (écrit les lignes horodatées du journal dans un `.txt` via le sélecteur de fichier).
 - **Tests** : xUnit v4 + FsUnit.xUnit — 960 tests au total.
 
 ### Ports gRPC (Debug / Release)
