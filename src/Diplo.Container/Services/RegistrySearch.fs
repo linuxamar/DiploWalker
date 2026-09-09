@@ -15,8 +15,9 @@ type RegistryImageHit =
       Stars: int }
 
 /// Recherche d'images dans les catalogues en ligne des registres autorisés.
-/// docker.io et quay.io exposent une API publique de recherche ; ghcr.io et
-/// mcr.microsoft.com n'en exposent aucune : leurs résultats sont vides.
+/// docker.io et quay.io exposent une API publique de recherche ; le catalogue
+/// de mcr.microsoft.com est public mais sans requête serveur (filtrage local) ;
+/// ghcr.io n'expose aucune recherche : ses résultats sont vides.
 [<RequireQualifiedAccess>]
 module RegistrySearch =
 
@@ -102,6 +103,49 @@ module RegistrySearch =
                 return []
         }
 
+    /// Recherche mcr.microsoft.com : le catalogue « _catalog » est public mais
+    /// ne prend aucune requête serveur — il est téléchargé puis filtré en local
+    /// (correspondance insensible à la casse sur le nom du référentiel).
+    let mcrSearch
+        (client: HttpClient)
+        (query: string)
+        (limit: int)
+        (ct: CancellationToken)
+        : Task<RegistryImageHit list> =
+        task {
+            try
+                let! json = client.GetStringAsync("https://mcr.microsoft.com/v2/_catalog", ct)
+
+                use doc = JsonDocument.Parse json
+
+                match doc.RootElement.TryGetProperty("repositories") with
+                | true, repos ->
+                    let mutable hits: RegistryImageHit list = []
+                    let mutable count = 0
+
+                    for el in repos.EnumerateArray() do
+                        let repo = el.GetString()
+
+                        if
+                            count < limit
+                            && not (String.IsNullOrWhiteSpace repo)
+                            && repo.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
+                        then
+                            hits <-
+                                { Registry = "mcr.microsoft.com"
+                                  Repository = repo
+                                  Description = ""
+                                  Stars = 0 }
+                                :: hits
+
+                            count <- count + 1
+
+                    return List.rev hits
+                | _ -> return []
+            with _ ->
+                return []
+        }
+
     /// Registres sans API publique de recherche : aucune correspondance.
     let private unsupported
         (_client: HttpClient)
@@ -115,7 +159,7 @@ module RegistrySearch =
         [ "docker.io", dockerHubSearch
           "quay.io", quaySearch
           "ghcr.io", unsupported
-          "mcr.microsoft.com", unsupported ]
+          "mcr.microsoft.com", mcrSearch ]
 
     /// Recherche sur un client HTTP injecté (testable). Sans registre ciblé,
     /// interroge tous les fournisseurs autorisés dans l'ordre de la liste

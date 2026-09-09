@@ -23,7 +23,8 @@ let private run (work: Task<'T>) =
     work |> Async.AwaitTask |> Async.RunSynchronously
 
 // Tests du module RegistrySearch : parsing des API publiques de Docker Hub et de
-// Quay, registres sans API publique (ghcr.io, MCR) renvoyant une liste vide.
+// Quay, filtre local du catalogue public MCR, registre sans API publique (ghcr.io)
+// renvoyant une liste vide.
 
 [<Fact>]
 let ``dockerHubSearch parse repo_name, description et star_count`` () =
@@ -71,6 +72,8 @@ let ``searchWith sans registre interroge tous les fournisseurs autorises`` () =
                 """{ "results": [ { "repo_name": "nginx", "short_description": "web", "star_count": 1 } ] }"""
             elif uri.Host = "quay.io" then
                 """{ "results": [ { "name": "team/app", "description": "app" } ] }"""
+            elif uri.Host = "mcr.microsoft.com" then
+                """{ "repositories": [ "azure/nginx", "k8s/pause" ] }"""
             else
                 "{}")
 
@@ -79,7 +82,9 @@ let ``searchWith sans registre interroge tous les fournisseurs autorises`` () =
     let hits =
         run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None)
 
-    hits |> List.map (fun h -> h.Registry) |> should equal [ "docker.io"; "quay.io" ]
+    hits
+    |> List.map (fun h -> h.Registry)
+    |> should equal [ "docker.io"; "quay.io"; "mcr.microsoft.com" ]
 
 [<Fact>]
 let ``searchWith cible docker.io uniquement`` () =
@@ -108,13 +113,50 @@ let ``searchWith sur ghcr.io ne renvoie rien`` () =
     hits |> should be Empty
 
 [<Fact>]
-let ``searchWith sur mcr.microsoft.com ne renvoie rien`` () =
-    use client = new HttpClient(new StubHttpHandler(fun _ -> "{}"))
+let ``searchWith cible mcr.microsoft.com interroge son catalogue public`` () =
+    let handler =
+        new StubHttpHandler(fun _ ->
+            """{ "repositories": [ "mssql/server", "mssql/bdc/mssql-server-ha", "k8s/pause" ] }""")
+
+    use client = new HttpClient(handler)
 
     let hits =
-        run (RegistrySearch.searchWith client (Some "mcr.microsoft.com") "nginx" 25 CancellationToken.None)
+        run (RegistrySearch.searchWith client (Some "mcr.microsoft.com") "mssql" 25 CancellationToken.None)
 
-    hits |> should be Empty
+    hits.Length |> should equal 2
+    hits.[0].Registry |> should equal "mcr.microsoft.com"
+    hits.[0].Repository |> should equal "mssql/server"
+    hits.[0].Description |> should equal ""
+    hits.[0].Stars |> should equal 0
+    hits.[1].Repository |> should equal "mssql/bdc/mssql-server-ha"
+
+[<Fact>]
+let ``mcrSearch respecte la limite demandee`` () =
+    let handler =
+        new StubHttpHandler(fun _ ->
+            """{ "repositories": [ "mssql/server", "mssql/server2", "mssql/server3" ] }""")
+
+    use client = new HttpClient(handler)
+
+    let hits =
+        run (RegistrySearch.mcrSearch client "mssql" 2 CancellationToken.None)
+
+    hits.Length |> should equal 2
+    hits |> List.forall (fun h -> h.Registry = "mcr.microsoft.com") |> should equal true
+
+[<Fact>]
+let ``mcrSearch est insensible a la casse`` () =
+    let handler =
+        new StubHttpHandler(fun _ ->
+            """{ "repositories": [ "Mssql/server", "k8s/pause" ] }""")
+
+    use client = new HttpClient(handler)
+
+    let hits =
+        run (RegistrySearch.mcrSearch client "MSSQL" 25 CancellationToken.None)
+
+    hits.Length |> should equal 1
+    hits.Head.Repository |> should equal "Mssql/server"
 
 [<Fact>]
 let ``reponse invalide renvoie une liste vide`` () =
