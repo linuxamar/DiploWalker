@@ -14,6 +14,7 @@
     <Compile Include="ContainerdClientExtendedTests.fs" />
     <Compile Include="RegistryAuthTests.fs" />
     <Compile Include="ContainerServiceImplTests.fs" />
+    <Compile Include="RegistrySearchTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

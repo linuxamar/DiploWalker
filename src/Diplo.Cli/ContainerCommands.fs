@@ -709,6 +709,52 @@ type ImageListCommand(output: IOutputPort, clients: IDiploClients) =
             return 0
         }
 
+// ── image search ─────────────────────────────────────────────────
+type ImageSearchSettings() =
+    inherit CommandSettings()
+
+    [<CommandArgument(0, "<QUERY>")>]
+    member val Query: string = null with get, set
+
+    [<CommandOption("--registry")>]
+    member val Registry: string = null with get, set
+
+    [<CommandOption("--limit")>]
+    member val Limit: int = 25 with get, set
+
+type ImageSearchCommand(output: IOutputPort, clients: IDiploClients) =
+    inherit AsyncCommand<ImageSearchSettings>()
+    new(output: IOutputPort) = ImageSearchCommand(output, DiploClients())
+
+    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+        task {
+            if String.IsNullOrWhiteSpace(settings.Query) then
+                output.WriteError("La requête de recherche est requise")
+                return 1
+            else
+                use client = clients.CreateContainerClient()
+                let registry = if isNull settings.Registry then "" else settings.Registry
+                let! response = client.SearchImagesAsync(settings.Query, registry, settings.Limit)
+
+                if not (String.IsNullOrEmpty(response.Message)) then
+                    output.WriteWarning(response.Message)
+
+                if response.Results.Count = 0 then
+                    output.WriteWarning("Aucune image trouvée dans les catalogues en ligne.")
+                else
+                    output.WriteTable(
+                        response.Results,
+                        [| "Registre"; "Référence"; "Étoiles"; "Description" |],
+                        fun r ->
+                            [| r.Registry
+                               r.Ref
+                               string r.Stars
+                               r.Description |]
+                    )
+
+                return 0
+        }
+
 // ── image inspect ─────────────────────────────────────────────────
 type ImageInspectSettings() =
     inherit CommandSettings()

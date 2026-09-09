@@ -83,6 +83,13 @@ type IContainerClient =
     abstract member TagImageAsync:
         source: string * target: string * ?namespaceName: string * ?ct: CancellationToken -> Task<TagImageResponse>
 
+    abstract member SearchImagesAsync:
+        query: string *
+        ?registry: string *
+        ?limit: int *
+        ?ct: CancellationToken ->
+            Task<SearchRegistryResponse>
+
     abstract member PauseAsync: id: string * ?ct: CancellationToken -> Task<PauseContainerResponse>
 
     abstract member UnpauseAsync: id: string * ?ct: CancellationToken -> Task<UnpauseContainerResponse>

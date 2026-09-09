@@ -24,7 +24,8 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
                         <Button Content="🔄 Lister" Command="{Binding ImagesTab.ListImagesCommand}" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ImagesTab.ImageSearchInput}" Width="220" Margin="0,0,12,0"
-                                 PlaceholderText="🔍 Rechercher une image (réf/tag)…" />
+                                 x:Name="ImageSearchBox"
+                                 PlaceholderText="🔍 Rechercher (docker.io, quay.io, ghcr.io, mcr.microsoft.com)…" />
                         <Button Content="📥 Télécharger" Command="{Binding ImagesTab.PullImageCommand}" Margin="0,0,4,0" />
                         <Button Content="🔍 Inspecter" Command="{Binding ImagesTab.InspectImageCommand}" Margin="0,0,4,0" />
                         <Button Content="✏ Étiqueter" Command="{Binding ImagesTab.TagImageCommand}" Margin="0,0,4,0" />
@@ -68,6 +69,26 @@
                             <DataGridTextColumn Header="Créé le" Binding="{Binding CrééLe}" Width="160" />
                         </DataGrid.Columns>
                     </DataGrid>
+
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" Spacing="4">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="📥 Tirer la sélection"
+                                    Command="{Binding ImagesTab.SearchResultPullCommand}" Margin="4,0,0,0" />
+                            <TextBlock Text="{Binding ImagesTab.SearchStatus}" VerticalAlignment="Center"
+                                       FontWeight="SemiBold" TextWrapping="Wrap" />
+                        </DockPanel>
+                        <DataGrid ItemsSource="{Binding ImagesTab.SearchResults}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" GridLinesVisibility="Horizontal"
+                                  CanUserResizeColumns="True" CanUserSortColumns="True"
+                                  MaxHeight="220" SelectedItem="{Binding ImagesTab.SelectedSearchResult}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Registre" Binding="{Binding Registre}" Width="140" />
+                                <DataGridTextColumn Header="Référence" Binding="{Binding Ref}" Width="260" />
+                                <DataGridTextColumn Header="Étoiles" Binding="{Binding Étoiles}" Width="80" />
+                                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
                 </DockPanel>
             </TabItem>
 

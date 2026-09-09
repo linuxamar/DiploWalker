@@ -137,6 +137,7 @@ module ComposeOrchestratorTests =
             member _.InspectImageAsync(_ref, ?_namespaceName, ?_ct) = raise (NotImplementedException())
             member _.RemoveImageAsync(_ref, ?_namespaceName, ?_ct) = raise (NotImplementedException())
             member _.TagImageAsync(_source, _target, ?_namespaceName, ?_ct) = raise (NotImplementedException())
+            member _.SearchImagesAsync(_query, ?_registry, ?_limit, ?_ct) = raise (NotImplementedException())
 
             member _.PauseAsync(_id, ?_ct) = raise (NotImplementedException())
             member _.UnpauseAsync(_id, ?_ct) = raise (NotImplementedException())

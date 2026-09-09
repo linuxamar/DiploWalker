@@ -11,6 +11,7 @@
     <Compile Include="ContainerLogs.fs" />
     <Compile Include="Clients\ProcessRunner.fs" />
     <Compile Include="Clients\ContainerdClient.fs" />
+    <Compile Include="Services\RegistrySearch.fs" />
     <Compile Include="Services\ContainerServiceImpl.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

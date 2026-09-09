@@ -297,6 +297,21 @@ module ``Vérification des paramètres des commandes`` =
         let settings = ImageTagSettings()
         settings.Target |> should be Null
 
+    [<Fact>]
+    let ``ImageSearchSettings.Query est null par défaut`` () =
+        let settings = ImageSearchSettings()
+        settings.Query |> should be Null
+
+    [<Fact>]
+    let ``ImageSearchSettings.Registry est null par défaut`` () =
+        let settings = ImageSearchSettings()
+        settings.Registry |> should be Null
+
+    [<Fact>]
+    let ``ImageSearchSettings.Limit est 25 par défaut`` () =
+        let settings = ImageSearchSettings()
+        settings.Limit |> should equal 25
+
     // --- Disk settings ---
     open Diplo.Cli.Disk
 
@@ -461,6 +476,11 @@ module ``Vérification des paramètres des commandes`` =
     [<Fact>]
     let ``ImageTagCommand hérite de AsyncCommand<ImageTagSettings>`` () =
         typeof<ImageTagCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ImageTagSettings>>)
+        |> should be True
+
+    [<Fact>]
+    let ``ImageSearchCommand hérite de AsyncCommand<ImageSearchSettings>`` () =
+        typeof<ImageSearchCommand>.IsSubclassOf(typeof<Spectre.Console.Cli.AsyncCommand<ImageSearchSettings>>)
         |> should be True
 
     // --- Disk commands ---

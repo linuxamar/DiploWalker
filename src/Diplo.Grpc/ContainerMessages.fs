@@ -620,6 +620,45 @@ type TagImageResponse =
       mutable Message: string }
 
 // ═══════════════════════════════════════════════
+// SearchRegistry
+// ═══════════════════════════════════════════════
+
+[<ProtoContract>]
+[<CLIMutable>]
+type SearchRegistryRequest =
+    { [<ProtoMember(1)>]
+      mutable Query: string
+      [<ProtoMember(2)>]
+      mutable Registry: string
+      [<ProtoMember(3)>]
+      mutable Limit: int }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type RegistrySearchResult =
+    { [<ProtoMember(1)>]
+      mutable Registry: string
+      [<ProtoMember(2)>]
+      mutable Ref: string
+      [<ProtoMember(3)>]
+      mutable Description: string
+      [<ProtoMember(4)>]
+      mutable Stars: int }
+
+[<ProtoContract>]
+[<CLIMutable>]
+type SearchRegistryResponse =
+    { [<ProtoMember(1)>]
+      mutable Results: System.Collections.Generic.List<RegistrySearchResult>
+      [<ProtoMember(2)>]
+      mutable Message: string }
+
+    [<ProtoAfterDeserialization>]
+    member this.EnsureCollections() =
+        if isNull this.Results then
+            this.Results <- System.Collections.Generic.List<RegistrySearchResult>()
+
+// ═══════════════════════════════════════════════
 // Pause / UnpauseContainer
 // ═══════════════════════════════════════════════
 

@@ -44,6 +44,7 @@ let main argv =
                 addCmd c "image-inspect" typeof<ImageInspectCommand>
                 addCmd c "image-remove" typeof<ImageRemoveCommand>
                 addCmd c "image-tag" typeof<ImageTagCommand>
+                addCmd c "image-search" typeof<ImageSearchCommand>
                 addCmd c "pause" typeof<PauseContainerCommand>
                 addCmd c "unpause" typeof<UnpauseContainerCommand>
                 addCmd c "wait" typeof<WaitContainerCommand>

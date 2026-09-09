@@ -50,7 +50,7 @@ let ``ImagesTabViewModel ListImages ecrit le bilan et contacte le client`` () =
     |> should equal true
 
 [<Fact>]
-let ``ImagesTabViewModel ListImages invite une recherche vide a garder toutes les images`` () =
+let ``ImagesTabViewModel ListImages affiche toutes les images chargees`` () =
     let port = MockOutputPort()
 
     let imgs =
@@ -70,51 +70,87 @@ let ``ImagesTabViewModel ListImages invite une recherche vide a garder toutes le
     vm.Images.Count |> should equal 4
 
 [<Fact>]
-let ``ImagesTabViewModel ImageSearchInput filtre la liste par reference`` () =
+let ``ImagesTabViewModel SearchImages avec saisie vide ecrit une erreur sans appeler le client`` () =
     let port = MockOutputPort()
-
-    let imgs =
-        List<ImageInfo>(
-            [|
-                { Ref = "nginx"; Id = "a"; Repository = "nginx"; Tag = "latest"; Size = 1L; CreatedAt = "2026-01-01" }
-                { Ref = "redis"; Id = "b"; Repository = "redis"; Tag = "7"; Size = 1L; CreatedAt = "2026-01-01" }
-                { Ref = "nginx"; Id = "c"; Repository = "nginx"; Tag = "alpine"; Size = 1L; CreatedAt = "2026-01-01" }
-                { Ref = "postgres"; Id = "d"; Repository = "postgres"; Tag = "16"; Size = 1L; CreatedAt = "2026-01-01" }
-            |]
-        )
-
-    let fake = new FakeContainerClient(listImages = { Images = imgs })
+    let fake = new FakeContainerClient()
     let vm = imagesVm port fake
-    (vm.ListImagesCommand :> ICommand).Execute(null)
-    waitUntil (fun () -> vm.Images.Count = 4) |> should equal true
-    vm.ImageSearchInput <- "NGINX"
-    vm.Images.Count |> should equal 2
-    vm.ImageSearchInput <- "redis"
-    vm.Images.Count |> should equal 1
-    vm.ImageSearchInput <- "7"
-    vm.Images.Count |> should equal 1
-    vm.Images.[0].RefComplet |> should equal "redis:7"
+    (vm.SearchImagesCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> port.Errors.Length = 1) |> should equal true
+    port.Errors.Head |> should haveSubstring "Saisissez un terme de recherche"
+    fake.SearchImagesCalls |> should equal 0
 
 [<Fact>]
-let ``ImagesTabViewModel ImageSearchInput vide restaure toute la liste`` () =
+let ``ImagesTabViewModel SearchImages peuple les resultats des registres`` () =
     let port = MockOutputPort()
 
-    let imgs =
-        List<ImageInfo>(
+    let results =
+        List<RegistrySearchResult>(
             [|
-                { Ref = "nginx"; Id = "a"; Repository = "nginx"; Tag = "latest"; Size = 1L; CreatedAt = "2026-01-01" }
-                { Ref = "redis"; Id = "b"; Repository = "redis"; Tag = "7"; Size = 1L; CreatedAt = "2026-01-01" }
+                { Registry = "docker.io"; Ref = "docker.io/nginx"; Description = "Serveur web"; Stars = 100 }
+                { Registry = "quay.io"; Ref = "quay.io/team/app"; Description = "Application"; Stars = 0 }
             |]
         )
 
-    let fake = new FakeContainerClient(listImages = { Images = imgs })
+    let fake = new FakeContainerClient(searchImages = { Results = results; Message = "" })
     let vm = imagesVm port fake
-    (vm.ListImagesCommand :> ICommand).Execute(null)
-    waitUntil (fun () -> vm.Images.Count = 2) |> should equal true
-    vm.ImageSearchInput <- "redis"
-    vm.Images.Count |> should equal 1
-    vm.ImageSearchInput <- ""
-    vm.Images.Count |> should equal 2
+    vm.ImageSearchInput <- "nginx"
+    (vm.SearchImagesCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.SearchImagesCalls = 1) |> should equal true
+    vm.SearchResults.Count |> should equal 2
+    vm.SearchResults.[0].Registre |> should equal "docker.io"
+    vm.SearchResults.[0].Ref |> should equal "docker.io/nginx"
+    vm.SearchResults.[0].Étoiles |> should equal "100"
+    Assert.Contains("2 résultat(s)", vm.SearchStatus)
+
+[<Fact>]
+let ``ImagesTabViewModel SearchImages signale une liste vide`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient(searchImages = { Results = List<RegistrySearchResult>(); Message = "" })
+    let vm = imagesVm port fake
+    vm.ImageSearchInput <- "xyz"
+    (vm.SearchImagesCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.SearchImagesCalls = 1) |> should equal true
+    vm.SearchResults.Count |> should equal 0
+    Assert.Contains("Aucune image trouvée", vm.SearchStatus)
+
+[<Fact>]
+let ``ImagesTabViewModel SearchImages relaie le message du serveur`` () =
+    let port = MockOutputPort()
+
+    let fake =
+        new FakeContainerClient(
+            searchImages =
+                { Results = List<RegistrySearchResult>()
+                  Message = "Registre « zz » non autorisé : recherche sur tous les registres" }
+        )
+
+    let vm = imagesVm port fake
+    vm.ImageSearchInput <- "nginx"
+    (vm.SearchImagesCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.SearchImagesCalls = 1) |> should equal true
+    port.Warnings |> should contain "Registre « zz » non autorisé : recherche sur tous les registres"
+
+[<Fact>]
+let ``ImagesTabViewModel SearchResultPull sans selection ecrit un avertissement`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient()
+    let vm = imagesVm port fake
+    (vm.SearchResultPullCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> port.Warnings.Length = 1) |> should equal true
+    port.Warnings.Head |> should haveSubstring "Aucun résultat de recherche sélectionné"
+    fake.PullCalls |> should equal 0
+
+[<Fact>]
+let ``ImagesTabViewModel SearchResultPull tire la reference selectionnee`` () =
+    let port = MockOutputPort()
+    let fake = new FakeContainerClient(pull = { Image = "docker.io/nginx"; Message = "ok" })
+    let vm = imagesVm port fake
+    vm.SelectedSearchResult <- { Registre = "docker.io"; Ref = "docker.io/nginx"; Description = ""; Étoiles = "0" }
+    (vm.SearchResultPullCommand :> ICommand).Execute(null)
+    waitUntil (fun () -> fake.PullCalls = 1) |> should equal true
+    port.Successes
+    |> Seq.exists (fun m -> m.Contains "Image docker.io/nginx téléchargée")
+    |> should equal true
 
 [<Fact>]
 let ``ImagesTabViewModel PullImage sans reference ecrit une erreur`` () =

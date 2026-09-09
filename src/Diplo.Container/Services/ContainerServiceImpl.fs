@@ -796,6 +796,39 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                       Message = sprintf "Image marquée de '%s' vers '%s'" request.Source request.Target }
             }
 
+        // ─── Recherche d'images dans les catalogues en ligne ────────────────
+
+        member _.SearchRegistry(request, _context) =
+            task {
+                ServiceGuards.requireNonEmpty request.Query "La requête de recherche"
+
+                let limit = if request.Limit <= 0 then 25 else min request.Limit 100
+
+                let registry, message =
+                    if String.IsNullOrWhiteSpace(request.Registry) then
+                        None, ""
+                    else
+                        match RegistryProviders.tryResolve request.Registry with
+                        | Some host -> Some host, ""
+                        | None ->
+                            None,
+                            sprintf "Registre « %s » non autorisé : recherche sur tous les registres" request.Registry
+
+                let! hits = RegistrySearch.search registry request.Query limit CancellationToken.None
+
+                let results =
+                    hits
+                    |> List.map (fun h ->
+                        { RegistrySearchResult.Registry = h.Registry
+                          Ref = sprintf "%s/%s" h.Registry h.Repository
+                          Description = h.Description
+                          Stars = h.Stars })
+
+                return
+                    { SearchRegistryResponse.Results = List<RegistrySearchResult>(results)
+                      Message = message }
+            }
+
         // ─── Pause / Unpause ────────────────────────────────────────────────
 
         member _.PauseContainer(request, _context) =

@@ -21,13 +21,21 @@ type ImageDisplayInfo =
         else
             sprintf "%s:%s" this.Ref this.Tag
 
+/// Résultat d'une recherche dans les catalogues en ligne d'un registre.
+type ImageSearchResultDisplay =
+    { Registre: string
+      Ref: string
+      Description: string
+      Étoiles: string }
+
 /// Onglet dédié à la gestion des images Docker : lister, télécharger (insert),
-/// étiqueter (update), supprimer (delete), inspecter et nettoyer.
+/// étiqueter (update), supprimer (delete), inspecter, nettoyer et rechercher
+/// dans les catalogues en ligne des registres autorisés.
 type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -> IContainerClient) as this =
     inherit ViewModelBase()
 
     let images = ObservableCollection<ImageDisplayInfo>()
-    let allImages = ResizeArray<ImageDisplayInfo>()
+    let searchResults = ObservableCollection<ImageSearchResultDisplay>()
 
     let containerClient =
         let factory = defaultArg containerClientFactory (fun () -> new ContainerClient() :> IContainerClient)
@@ -40,11 +48,17 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
     let mutable imageNsInput = ""
     let mutable imageRefInput = ""
     let mutable searchInput = ""
+    let mutable searchStatus =
+        "Recherche dans les catalogues en ligne (docker.io, quay.io, ghcr.io, mcr.microsoft.com) avec Entrée."
 
     let mutable selectedImage: ImageDisplayInfo = Unchecked.defaultof<ImageDisplayInfo>
+    let mutable selectedSearchResult: ImageSearchResultDisplay = Unchecked.defaultof<ImageSearchResultDisplay>
 
     let getSelectedImage () = Volatile.Read(&selectedImage)
     let setSelectedImage v = Interlocked.Exchange(&selectedImage, v) |> ignore
+
+    let getSelectedSearchResult () = Volatile.Read(&selectedSearchResult)
+    let setSelectedSearchResult v = Interlocked.Exchange(&selectedSearchResult, v) |> ignore
 
     let listImagesCmd = RelayCommand(Action(fun () -> this.ListImages() |> ignore))
     let pullImageCmd = RelayCommand(Action(fun () -> this.PullImage() |> ignore))
@@ -52,6 +66,8 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
     let inspectImageCmd = RelayCommand(Action(fun () -> this.InspectImage() |> ignore))
     let removeImageCmd = RelayCommand(Action(fun () -> this.RemoveImage() |> ignore))
     let pruneImagesCmd = RelayCommand(Action(fun () -> this.PruneImages() |> ignore))
+    let searchImagesCmd = RelayCommand(Action(fun () -> this.SearchImages() |> ignore))
+    let searchResultPullCmd = RelayCommand(Action(fun () -> this.PullSearchResult() |> ignore))
 
     member _.Images = images
 
@@ -59,6 +75,20 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
         with get () = getSelectedImage ()
         and set v =
             setSelectedImage v
+            this.OnPropertyChanged()
+
+    member _.SearchResults = searchResults
+
+    member _.SelectedSearchResult
+        with get () = getSelectedSearchResult ()
+        and set v =
+            setSelectedSearchResult v
+            this.OnPropertyChanged()
+
+    member _.SearchStatus
+        with get () = searchStatus
+        and set v =
+            searchStatus <- v
             this.OnPropertyChanged()
 
     member _.PullRefInput
@@ -102,7 +132,6 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
         and set v =
             searchInput <- v
             this.OnPropertyChanged()
-            this.ApplyFilter()
 
     member _.ListImagesCommand = listImagesCmd
     member _.PullImageCommand = pullImageCmd
@@ -110,6 +139,8 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
     member _.InspectImageCommand = inspectImageCmd
     member _.RemoveImageCommand = removeImageCmd
     member _.PruneImagesCommand = pruneImagesCmd
+    member _.SearchImagesCommand = searchImagesCmd
+    member _.SearchResultPullCommand = searchResultPullCmd
 
     member private this.NamespaceOption () =
         if String.IsNullOrWhiteSpace(this.ImageNsInput) then
@@ -141,34 +172,63 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
                 let! response = containerClient.ListImagesAsync(?namespaceName = this.NamespaceOption())
 
                 UiThread.Post(fun () ->
-                    allImages.Clear()
+                    images.Clear()
 
                     for img in response.Images do
-                        allImages.Add(
+                        images.Add(
                             { Ref = img.Ref
                               Tag = img.Tag
                               Taille = sprintf "%d octets" img.Size
                               CrééLe = img.CreatedAt }
-                        )
-
-                    this.ApplyFilter())
+                        ))
 
                 outputPort.WriteSuccess(sprintf "%d image(s) trouvée(s)" response.Images.Count)
             })
 
-    /// Réapplique la recherche sur la liste d'images chargée.
-    member private this.ApplyFilter() =
-        let query = this.ImageSearchInput.Trim()
+    /// Lance la recherche dans les catalogues en ligne des registres autorisés.
+    /// Déclenchée par la touche Entrée dans le champ de recherche.
+    member this.SearchImages() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let query = this.ImageSearchInput.Trim()
 
-        images.Clear()
+                if String.IsNullOrEmpty query then
+                    outputPort.WriteError("Saisissez un terme de recherche (docker.io, quay.io, ghcr.io, mcr.microsoft.com)")
+                else
+                    let! response = containerClient.SearchImagesAsync(query)
 
-        for info in allImages do
-            if
-                String.IsNullOrEmpty query
-                || info.Ref.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
-                || info.Tag.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
-            then
-                images.Add(info)
+                    if not (String.IsNullOrEmpty(response.Message)) then
+                        outputPort.WriteWarning(response.Message)
+
+                    UiThread.Post(fun () ->
+                        searchResults.Clear()
+
+                        for r in response.Results do
+                            searchResults.Add(
+                                { Registre = r.Registry
+                                  Ref = r.Ref
+                                  Description = r.Description
+                                  Étoiles = string r.Stars }
+                            )
+
+                        this.SearchStatus <-
+                            if response.Results.Count = 0 then
+                                sprintf "Aucune image trouvée pour « %s » dans les catalogues en ligne." query
+                            else
+                                sprintf "%d résultat(s) pour « %s » dans les catalogues en ligne." response.Results.Count query)
+            })
+
+    member private this.PullSearchResult() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let sel = getSelectedSearchResult ()
+
+                if isNull (box sel) then
+                    outputPort.WriteWarning("Aucun résultat de recherche sélectionné")
+                else
+                    let! response = containerClient.PullImageAsync(image = sel.Ref)
+                    outputPort.WriteSuccess(sprintf "Image %s téléchargée - %s" sel.Ref response.Message)
+            })
 
     member private this.PullImage() =
         Cmd.run outputPort (fun () ->

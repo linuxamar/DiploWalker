@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Reflection
 open Avalonia.Controls
+open Avalonia.Input
 open Avalonia.Interactivity
 open Avalonia.Markup.Xaml
 open AvaloniaEdit.TextMate
@@ -45,6 +46,17 @@ type MainWindow() as this =
             aboutItem.Command <- Diplo.Gui.ViewModels.RelayCommand(Action(fun () -> this.OnAbout(null, null)))
         else
             failwith "Contrôle introuvable dans le XAML : AboutMenuItem"
+
+        // Recherche d'images : déclenchée par la touche Entrée.
+        let searchBox = this.FindControl<TextBox>("ImageSearchBox")
+
+        if not (isNull searchBox) then
+            searchBox.KeyDown.Add(fun e ->
+                if e.Key = Key.Enter then
+                    viewModel.ImagesTab.SearchImages() |> ignore
+                    e.Handled <- true)
+        else
+            failwith "Contrôle introuvable dans le XAML : ImageSearchBox"
 
         // Disposer le ViewModel (clients gRPC, CTS de suivi...) à la fermeture :
         // sinon les flux « suivre » continuent et les canaux restent ouverts.

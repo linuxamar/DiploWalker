@@ -90,6 +90,9 @@ type IContainerService =
     abstract member ImportImage:
         request: IAsyncEnumerable<ImageChunk> * ct: CancellationToken -> Task<ImportImageResponse>
 
+    abstract member SearchRegistry:
+        request: SearchRegistryRequest * ct: CancellationToken -> Task<SearchRegistryResponse>
+
     abstract member LoginRegistry: request: LoginRegistryRequest * ct: CancellationToken -> Task<LoginRegistryResponse>
 
     abstract member LogoutRegistry:

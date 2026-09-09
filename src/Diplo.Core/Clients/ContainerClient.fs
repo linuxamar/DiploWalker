@@ -435,6 +435,24 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
             return response
         }
 
+    member _.SearchImagesAsync(query: string, ?registry: string, ?limit: int, ?ct: CancellationToken) =
+        task {
+            if String.IsNullOrWhiteSpace(query) then
+                invalidArg (nameof query) "La requête de recherche est requise"
+
+            let registry = defaultArg registry ""
+            let limit = defaultArg limit 25
+            let ct = defaultArg ct CancellationToken.None
+
+            let request: SearchRegistryRequest =
+                { Query = query
+                  Registry = registry
+                  Limit = limit }
+
+            let! response = client.SearchRegistry(request, ct)
+            return response
+        }
+
     member _.PauseAsync(id: string, ?ct: CancellationToken) =
         task {
             if String.IsNullOrWhiteSpace(id) then
@@ -653,6 +671,9 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
         member _.TagImageAsync(source, target, ?namespaceName, ?ct) =
             this.TagImageAsync(source, target, ?namespaceName = namespaceName, ?ct = ct)
+
+        member _.SearchImagesAsync(query, ?registry, ?limit, ?ct) =
+            this.SearchImagesAsync(query, ?registry = registry, ?limit = limit, ?ct = ct)
 
         member _.PauseAsync(id, ?ct) = this.PauseAsync(id, ?ct = ct)
 

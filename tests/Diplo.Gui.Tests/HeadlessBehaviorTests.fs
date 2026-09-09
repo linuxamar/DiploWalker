@@ -105,6 +105,35 @@ let ``ImagesTabViewModel ListImages peuple la collection sur le dispatcher`` () 
     vm.Images.[0].RefComplet |> should equal "nginx:latest"
     vm.Images.[0].Taille |> should equal "2048 octets"
 
+[<Fact>]
+let ``ImagesTabViewModel SearchImages peuple les resultats sur le dispatcher`` () =
+    HeadlessRunner.setupHeadless ()
+    let port = MockOutputPort()
+
+    let fake =
+        new FakeContainerClient(
+            searchImages =
+                { Results =
+                      List<RegistrySearchResult>(
+                          [|
+                              { Registry = "docker.io"
+                                Ref = "docker.io/nginx"
+                                Description = "Serveur web"
+                                Stars = 100 }
+                          |]
+                      )
+                  Message = "" }
+        )
+
+    let vm = imagesVm port fake
+    vm.ImageSearchInput <- "nginx"
+    (vm.SearchImagesCommand :> ICommand).Execute(null)
+    waitPump (fun () -> vm.SearchResults.Count = 1) |> should equal true
+    vm.SearchResults.[0].Registre |> should equal "docker.io"
+    vm.SearchResults.[0].Ref |> should equal "docker.io/nginx"
+    vm.SearchResults.[0].Étoiles |> should equal "100"
+    Assert.Contains("1 résultat(s)", vm.SearchStatus)
+
 // ── VolumeTabViewModel ─────────────────────────────────────────
 
 let private volumeVm (port: MockOutputPort) (fake: FakeVolumeClient) =

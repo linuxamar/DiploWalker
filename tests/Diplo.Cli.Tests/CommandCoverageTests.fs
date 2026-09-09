@@ -256,6 +256,66 @@ module CommandCoverageTests =
         output.Successes |> should contain "Tag créé"
 
     [<Fact>]
+    let ``image search vide retourne 1 et écrit l'erreur`` () =
+        let output = MockOutputPort()
+        let code = run (ImageSearchCommand(output, withContainer(new FakeContainerClient()))) (ImageSearchSettings())
+
+        code |> should equal 1
+        output.Errors |> should contain "La requête de recherche est requise"
+
+    [<Fact>]
+    let ``image search vide retourne 0 et prévient`` () =
+        let output = MockOutputPort()
+        let code = run (ImageSearchCommand(output, withContainer(new FakeContainerClient()))) (ImageSearchSettings(Query = "xyz"))
+
+        code |> should equal 0
+        output.Warnings |> should contain "Aucune image trouvée dans les catalogues en ligne."
+
+    [<Fact>]
+    let ``image search et relais du message du serveur`` () =
+        let output = MockOutputPort()
+
+        let client =
+            new FakeContainerClient(
+                searchImages =
+                    { Results = List<RegistrySearchResult>()
+                      Message = "Registre « zz » non autorisé : recherche sur tous les registres" }
+            )
+
+        let code =
+            run (ImageSearchCommand(output, withContainer client)) (ImageSearchSettings(Query = "nginx", Registry = "zz"))
+
+        code |> should equal 0
+        output.Warnings |> should contain "Registre « zz » non autorisé : recherche sur tous les registres"
+        client.SearchImagesCalls |> should equal 1
+
+    [<Fact>]
+    let ``image search avec résultats retourne 0 et table`` () =
+        let output = MockOutputPort()
+
+        let client =
+            new FakeContainerClient(
+                searchImages =
+                    { Results =
+                          List<RegistrySearchResult>(
+                              [
+                                  { Registry = "docker.io"
+                                    Ref = "docker.io/nginx"
+                                    Description = "Serveur web"
+                                    Stars = 100 }
+                              ]
+                          )
+                      Message = "" }
+            )
+
+        let code =
+            run (ImageSearchCommand(output, withContainer client)) (ImageSearchSettings(Query = "nginx"))
+
+        code |> should equal 0
+        output.Tables |> should not' (be Empty)
+        client.SearchImagesCalls |> should equal 1
+
+    [<Fact>]
     let ``container exec en succès retourne 0 et écrit la sortie`` () =
         let output = MockOutputPort()
 
