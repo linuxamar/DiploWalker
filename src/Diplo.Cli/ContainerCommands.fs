@@ -186,18 +186,22 @@ type PullImageCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
 
-                let! response =
-                    client.PullImageAsync(
-                        settings.Image,
-                        ?user =
-                            (if String.IsNullOrWhiteSpace(settings.User) then
-                                 None
-                             else
-                                 Some settings.User)
-                    )
+                try
+                    let! response =
+                        client.PullImageAsync(
+                            settings.Image,
+                            ?user =
+                                (if String.IsNullOrWhiteSpace(settings.User) then
+                                     None
+                                 else
+                                     Some settings.User)
+                        )
 
-                output.WriteSuccess(response.Message)
-                return 0
+                    output.WriteSuccess(response.Message)
+                    return 0
+                with :? Grpc.Core.RpcException as rex ->
+                    output.WriteError(rex.Status.Detail)
+                    return 1
         }
 
 // ── login / logout (registres) ────────────────────────────────────
@@ -220,7 +224,7 @@ type RegistryLoginCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Registry) then
-                output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                output.WriteError("Le registre est requis (ex. ghcr.io, docker.io, quay.io, mcr.microsoft.com)")
                 return 1
             elif String.IsNullOrWhiteSpace(settings.Username) then
                 output.WriteError("Le nom d'utilisateur est requis (--username)")
@@ -233,13 +237,18 @@ type RegistryLoginCommand(output: IOutputPort, clients: IDiploClients) =
                         settings.Password
 
                 use client = clients.CreateContainerClient()
-                let! response = client.LoginRegistryAsync(settings.Registry, settings.Username, password)
 
-                if response.Success then
-                    output.WriteSuccess(response.Message)
-                    return 0
-                else
-                    output.WriteError(response.Message)
+                try
+                    let! response = client.LoginRegistryAsync(settings.Registry, settings.Username, password)
+
+                    if response.Success then
+                        output.WriteSuccess(response.Message)
+                        return 0
+                    else
+                        output.WriteError(response.Message)
+                        return 1
+                with :? Grpc.Core.RpcException as rex ->
+                    output.WriteError(rex.Status.Detail)
                     return 1
         }
 
@@ -256,17 +265,22 @@ type RegistryLogoutCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Registry) then
-                output.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                output.WriteError("Le registre est requis (ex. ghcr.io, docker.io, quay.io, mcr.microsoft.com)")
                 return 1
             else
                 use client = clients.CreateContainerClient()
-                let! response = client.LogoutRegistryAsync(settings.Registry)
 
-                if response.Success then
-                    output.WriteSuccess(response.Message)
-                    return 0
-                else
-                    output.WriteError(response.Message)
+                try
+                    let! response = client.LogoutRegistryAsync(settings.Registry)
+
+                    if response.Success then
+                        output.WriteSuccess(response.Message)
+                        return 0
+                    else
+                        output.WriteError(response.Message)
+                        return 1
+                with :? Grpc.Core.RpcException as rex ->
+                    output.WriteError(rex.Status.Detail)
                     return 1
         }
 

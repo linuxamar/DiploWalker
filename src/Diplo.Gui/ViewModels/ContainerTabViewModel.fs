@@ -352,7 +352,7 @@ type ContainerTabViewModel
             task {
                 let! response = containerClient.ListAsync(all = this.ContainerAll)
 
-                Dispatcher.UIThread.Post(fun () ->
+                UiThread.Post(fun () ->
                     containers.Clear()
 
                     for c in response.Containers do
@@ -532,7 +532,7 @@ type ContainerTabViewModel
 
                 let! response = containerClient.ListImagesAsync(?namespaceName = ns)
 
-                Dispatcher.UIThread.Post(fun () ->
+                UiThread.Post(fun () ->
                     images.Clear()
 
                     for img in response.Images do
@@ -611,7 +611,7 @@ type ContainerTabViewModel
             })
 
     member private this.RefreshCatalogue() =
-        Dispatcher.UIThread.Post(fun () ->
+        UiThread.Post(fun () ->
             catalogue.Clear()
 
             for e in ImageCatalog.load (catalogPathProvider ()) do
@@ -830,7 +830,7 @@ type ContainerTabViewModel
         Cmd.run outputPort (fun () ->
             task {
                 if String.IsNullOrEmpty(this.RegistryInput) then
-                    outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                    outputPort.WriteError("Le registre est requis (ex. ghcr.io, docker.io, quay.io, mcr.microsoft.com)")
                 elif String.IsNullOrEmpty(this.RegistryUsernameInput) then
                     outputPort.WriteError("Le nom d'utilisateur est requis")
                 elif String.IsNullOrEmpty(this.RegistryPasswordInput) then
@@ -854,7 +854,7 @@ type ContainerTabViewModel
         Cmd.run outputPort (fun () ->
             task {
                 if String.IsNullOrEmpty(this.RegistryInput) then
-                    outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                    outputPort.WriteError("Le registre est requis (ex. ghcr.io, docker.io, quay.io, mcr.microsoft.com)")
                 else
                     let! response = containerClient.LogoutRegistryAsync(registry = this.RegistryInput)
 

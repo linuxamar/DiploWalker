@@ -7,6 +7,7 @@ open Diplo.Core.Clients
 open Diplo.Grpc
 open Diplo.Core.Output
 open Diplo.Grpc.Network
+open Diplo.Gui.Services
 
 type NetworkDisplayInfo =
     { Id: string
@@ -148,7 +149,7 @@ type NetworkTabViewModel(outputPort: IOutputPort, ?networkClientFactory: unit ->
             task {
                 let! response = networkClient.ListAsync()
 
-                Dispatcher.UIThread.Post(fun () ->
+                UiThread.Post(fun () ->
                     networks.Clear()
 
                     for n in response.Networks do

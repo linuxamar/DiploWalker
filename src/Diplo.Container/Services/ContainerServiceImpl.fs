@@ -1400,21 +1400,54 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                 // RegistryAuth.protect et sort en Unknown au lieu d'InvalidArgument.
                 ServiceGuards.requireNonEmpty request.Password "Le mot de passe"
 
-                RegistryAuth.add (RegistryAuth.stateFile ()) request.Registry request.Username request.Password
+                let registry =
+                    match RegistryProviders.tryResolve request.Registry with
+                    | Some host -> host
+                    | None ->
+                        raise (
+                            RpcException(
+                                Status(
+                                    StatusCode.InvalidArgument,
+                                    sprintf
+                                        "Registre non pris en charge : '%s'. Fournisseurs autorisés : %s"
+                                        request.Registry
+                                        RegistryProviders.label
+                                )
+                            )
+                        )
+
+                RegistryAuth.add (RegistryAuth.stateFile ()) registry request.Username request.Password
 
                 return
                     { LoginRegistryResponse.Success = true
-                      Message = sprintf "Authentification configurée pour le registre '%s'" request.Registry }
+                      Message = sprintf "Authentification configurée pour le registre '%s'" registry }
             }
 
         member _.LogoutRegistry(request, _context) =
             task {
                 ServiceGuards.requireNonEmpty request.Registry "L'adresse du registre"
-                RegistryAuth.remove (RegistryAuth.stateFile ()) request.Registry
+
+                let registry =
+                    match RegistryProviders.tryResolve request.Registry with
+                    | Some host -> host
+                    | None ->
+                        raise (
+                            RpcException(
+                                Status(
+                                    StatusCode.InvalidArgument,
+                                    sprintf
+                                        "Registre non pris en charge : '%s'. Fournisseurs autorisés : %s"
+                                        request.Registry
+                                        RegistryProviders.label
+                                )
+                            )
+                        )
+
+                RegistryAuth.remove (RegistryAuth.stateFile ()) registry
 
                 return
                     { LogoutRegistryResponse.Success = true
-                      Message = sprintf "Déconnexion du registre '%s' effectuée" request.Registry }
+                      Message = sprintf "Déconnexion du registre '%s' effectuée" registry }
             }
 
         // ─── Namespaces ─────────────────────────────────────────────────────

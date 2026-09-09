@@ -1581,7 +1581,7 @@ module ContainerServiceImplTests =
             let ctx = createCtx ()
 
             let req: LoginRegistryRequest =
-                { Registry = "myregistry.azurecr.io"
+                { Registry = "ghcr.io"
                   Username = "user"
                   Password = "secret" }
 
@@ -1620,7 +1620,7 @@ module ContainerServiceImplTests =
             RegistryAuth.setStateFile stateFile
             let svc, _, _ = createService ()
             let ctx = createCtx ()
-            let req: LogoutRegistryRequest = { Registry = "myregistry.azurecr.io" }
+            let req: LogoutRegistryRequest = { Registry = "ghcr.io" }
             let result = (svc :> IContainerService).LogoutRegistry(req, ctx).Result
             result.Success |> should equal true
         finally
@@ -1640,14 +1640,14 @@ module ContainerServiceImplTests =
             let ctx = createCtx ()
 
             let req: LoginRegistryRequest =
-                { Registry = "myregistry.azurecr.io"
+                { Registry = "ghcr.io"
                   Username = "user"
                   Password = "secret" }
 
             let result = (svc :> IContainerService).LoginRegistry(req, ctx).Result
             result.Success |> should equal true
 
-            RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) "myregistry.azurecr.io"
+            RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) "ghcr.io"
             |> should equal (Some "user:secret")
 
             let raw = File.ReadAllText stateFile
@@ -1669,22 +1669,108 @@ module ContainerServiceImplTests =
             let ctx = createCtx ()
 
             let login: LoginRegistryRequest =
-                { Registry = "myregistry.azurecr.io"
+                { Registry = "ghcr.io"
                   Username = "user"
                   Password = "secret" }
 
             (svc :> IContainerService).LoginRegistry(login, ctx).Result |> ignore
-            let logout: LogoutRegistryRequest = { Registry = "myregistry.azurecr.io" }
+            let logout: LogoutRegistryRequest = { Registry = "ghcr.io" }
             let result = (svc :> IContainerService).LogoutRegistry(logout, ctx).Result
             result.Success |> should equal true
 
-            RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) "myregistry.azurecr.io"
+            RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) "ghcr.io"
             |> should equal None
         finally
             try
                 File.Delete stateFile
             with _ ->
                 ()
+
+    [<Fact>]
+    let ``LoginRegistry avec un alias de fournisseur persiste sous le host canonique`` () =
+        let stateFile =
+            Path.Combine(Path.GetTempPath(), "diplo-login-" + Guid.NewGuid().ToString("N") + ".json")
+
+        try
+            RegistryAuth.setStateFile stateFile
+            let svc, _, _ = createService ()
+            let ctx = createCtx ()
+
+            let req: LoginRegistryRequest =
+                { Registry = "dockerhub"
+                  Username = "user"
+                  Password = "secret" }
+
+            let result = (svc :> IContainerService).LoginRegistry(req, ctx).Result
+            result.Success |> should equal true
+            result.Message |> shouldContain "docker.io"
+
+            RegistryAuth.tryGetUserArg (RegistryAuth.stateFile ()) "docker.io"
+            |> should equal (Some "user:secret")
+        finally
+            try
+                File.Delete stateFile
+            with _ ->
+                ()
+
+    [<Fact>]
+    let ``LoginRegistry rejette un registre non autorise`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+
+        let req: LoginRegistryRequest =
+            { Registry = "myregistry.azurecr.io"
+              Username = "user"
+              Password = "secret" }
+
+        let ex =
+            Assert.Throws<AggregateException>(fun () ->
+                (svc :> IContainerService).LoginRegistry(req, ctx).Result |> ignore)
+
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+        rpcEx.Status.Detail |> shouldContain "non pris en charge"
+        rpcEx.Status.Detail |> shouldContain "ghcr.io"
+
+    [<Fact>]
+    let ``LoginRegistry d'un registre non autorise ne persiste rien`` () =
+        let stateFile =
+            Path.Combine(Path.GetTempPath(), "diplo-login-" + Guid.NewGuid().ToString("N") + ".json")
+
+        try
+            RegistryAuth.setStateFile stateFile
+            let svc, _, _ = createService ()
+            let ctx = createCtx ()
+
+            let req: LoginRegistryRequest =
+                { Registry = "reg.example.com"
+                  Username = "user"
+                  Password = "secret" }
+
+            Assert.Throws<AggregateException>(fun () ->
+                (svc :> IContainerService).LoginRegistry(req, ctx).Result |> ignore)
+            |> ignore
+
+            RegistryAuth.load (RegistryAuth.stateFile ()) |> Map.toList |> should be Empty
+        finally
+            try
+                File.Delete stateFile
+            with _ ->
+                ()
+
+    [<Fact>]
+    let ``LogoutRegistry rejette un registre non autorise`` () =
+        let svc, _, _ = createService ()
+        let ctx = createCtx ()
+        let req: LogoutRegistryRequest = { Registry = "myregistry.azurecr.io" }
+
+        let ex =
+            Assert.Throws<AggregateException>(fun () ->
+                (svc :> IContainerService).LogoutRegistry(req, ctx).Result |> ignore)
+
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+        rpcEx.Status.Detail |> shouldContain "non pris en charge"
 
     // ─── Namespaces ─────────────────────────────────────────────────────────
 

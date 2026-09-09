@@ -16,6 +16,7 @@
     <Compile Include="DiploJsonTests.fs" />
     <Compile Include="ProcessExecTests.fs" />
     <Compile Include="NetworkConfigTests.fs" />
+    <Compile Include="RegistryProvidersTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

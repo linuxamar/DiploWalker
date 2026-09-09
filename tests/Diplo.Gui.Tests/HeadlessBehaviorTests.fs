@@ -4,7 +4,6 @@ open System
 open System.Collections.Generic
 open System.Threading
 open System.Windows.Input
-open Avalonia.Threading
 open Xunit
 open FsUnit.Xunit
 open Diplo.Core.Clients
@@ -15,19 +14,19 @@ open Diplo.Grpc.Volume
 open Diplo.TestHelpers
 
 // Tests des méthodes des ViewModels qui ne peuvent s'exécuter que sur un vrai
-// Dispatcher Avalonia : elles remplissent leurs collections via
-// Dispatcher.UIThread.Post. Le harnais headless (HeadlessRunner.setupHeadless)
-// initialise le Dispatcher sur le thread courant ; RunJobs traite ensuite les
-// rappels poster.
+// Dispatcher Avalonia : elles remplissent leurs collections via UiThread.Post.
+// Le harnais headless (HeadlessRunner.setupHeadless) possède un thread dédié
+// qui pompe le Dispatcher ; waitPump ne fait que poller les collections.
 
 let private waitPump (predicate: unit -> bool) =
     let sw = Diagnostics.Stopwatch.StartNew()
+    let mutable ok = predicate ()
 
-    while not (predicate ()) && sw.ElapsedMilliseconds < 3000L do
-        Dispatcher.UIThread.RunJobs()
+    while not ok && sw.ElapsedMilliseconds < 3000L do
         Thread.Sleep(10)
+        ok <- predicate ()
 
-    predicate ()
+    ok
 
 // ── ContainerTabViewModel ──────────────────────────────────────
 

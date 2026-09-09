@@ -383,17 +383,26 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
 
 ## Authentification aux registres
 
-Les identifiants des registres privés sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) dans `%ProgramData%\Diplo\registry-auth.json`. Ils ne transitent **jamais** par la ligne de commande de `ctr` : lors d'un `pull`, le service génère un **helper d'identification** conforme au protocole `docker-credential` (`%ProgramData%\Diplo\cred-helper\`) qui retourne les identifiants via stdin, et un répertoire hosts temporaire pointant vers ce helper (nettoyé en fin d'opération). Les identifiants sont automatiquement fournis à containerd pour l'image tirée (registres nommés ou `docker.io` redirigé vers `registry-1.docker.io`).
+Les extractions d'images (CLI, GUI) sont limitées à **quatre fournisseurs** : `ghcr.io`, `docker.io`, `quay.io` et `mcr.microsoft.com`. Des alias courts sont acceptés pour `login`/`logout` : `ghcr`, `dockerhub` (ou `docker`), `quay`, `mcr`. Toute autre source est refusée par le serveur, et **toute extraction anonyme est impossible** : un compte doit être enregistré pour le registre concerné (sauf `--user utilisateur:secret` sur la ligne de commande, qui prime sur l'identifiant enregistré).
+
+Les identifiants sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) dans `%ProgramData%\Diplo\registry-auth.json`. Ils ne transitent **jamais** par la ligne de commande de `ctr` : lors d'un `pull`, le service génère un **helper d'identification** conforme au protocole `docker-credential` (`%ProgramData%\Diplo\cred-helper\`) qui retourne les identifiants via stdin, et un répertoire hosts temporaire pointant vers ce helper (nettoyé en fin d'opération). Les identifiants sont automatiquement fournis à containerd pour l'image tirée (`docker.io` redirigé vers `registry-1.docker.io`).
+
+### Obtention des jetons par fournisseur
+
+- **ghcr.io** — GitHub Packages : nom d'utilisateur GitHub + *personal access token* (portée `read:packages`).
+- **docker.io** — Docker Hub : identifiant Docker Hub + *Access Token* généré dans les paramètres du compte.
+- **quay.io** — Red Hat Quay : identifiant du namespace (ou *robot account*) + jeton de l'utilisateur ou du robot.
+- **mcr.microsoft.com** — Microsoft Container Registry : identifiant Azure + jeton de registre.
 
 ### CLI
 
-``powershell
-diplo container login myregistry.azurecr.io --username user          # le mot de passe est demandé en mode masqué
-diplo container login myregistry.azurecr.io --username user --password secret
-diplo container logout myregistry.azurecr.io
-diplo container pull myregistry.azurecr.io/team/app:latest           # utilise l'identifiant enregistré
-diplo container pull myregistry.azurecr.io/team/app:latest --user inline:secret   # identifiant explicite (prime sur l'enregistré)
-``
+```powershell
+diplo container login ghcr.io --username user          # le mot de passe est demandé en mode masqué
+diplo container login ghcr --username user --password secret   # alias accepté
+diplo container logout ghcr                             # alias accepté
+diplo container pull ghcr.io/org/app:latest             # utilise l'identifiant enregistré
+diplo container pull ghcr.io/org/app:latest --user user:secret   # identifiant explicite (prime sur l'enregistré)
+```
 
 ### GUI
 
@@ -425,7 +434,7 @@ diplo container image-inspect <ref>
 diplo container image-remove <ref>
 diplo container image-tag <source> <cible>
 diplo container pull <ref> [--user <utilisateur>]
-diplo container login <registre> --username <u> [--password <p>]
+diplo container login <registre> --username <u> [--password <p>]   # ghcr.io, docker.io, quay.io, mcr.microsoft.com (alias : ghcr, dockerhub, quay, mcr)
 diplo container logout <registre>
 
 # Catalogue d'images

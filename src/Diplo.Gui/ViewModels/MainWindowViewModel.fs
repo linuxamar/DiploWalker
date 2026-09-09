@@ -14,6 +14,7 @@ type MainWindowViewModel() as this =
     let outputPort = AvaloniaOutputPort()
     let logText = Text.StringBuilder()
     let maxLogLines = 500
+    let mutable logOutputCache = ""
 
     let containerTab = new ContainerTabViewModel(outputPort)
     let volumeTab = new VolumeTabViewModel(outputPort)
@@ -32,16 +33,17 @@ type MainWindowViewModel() as this =
         for i in start .. outputPort.LogLines.Count - 1 do
             logText.AppendLine(outputPort.LogLines.[i].DisplayText) |> ignore
 
+        logOutputCache <- logText.ToString()
         this.OnPropertyChanged(nameof this.LogOutput)
 
     do
         outputPort.LogLines.CollectionChanged.Add(fun _ ->
-            Dispatcher.UIThread.Post(fun () ->
+            UiThread.Post(fun () ->
                 trimLogLines ()
                 updateLog ()))
 
     member _.OutputPort = outputPort :> IOutputPort
-    member _.LogOutput = logText.ToString()
+    member _.LogOutput = logOutputCache
 
     member _.ContainerTab = containerTab
     member _.VolumeTab = volumeTab

@@ -524,21 +524,79 @@ type ContainerdClientTests() =
         result |> shouldContain "Version inconnue"
 
     [<Fact>]
-    member _.``PullImage sans identifiant n'ajoute pas --user``() =
+    member _.``PullImage sans compte enregistre leve AuthentificationRequise``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+
+        let stateFile =
+            System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "diplo-pull-noauth-" + System.Guid.NewGuid().ToString("N") + ".json"
+            )
+
+        try
+            RegistryAuth.setStateFile stateFile
+            let client =
+                ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+            let ex =
+                Assert.Throws<RpcException>(fun () -> client.PullImage("nginx:latest", None) |> ignore)
+
+            ex.StatusCode |> should equal StatusCode.InvalidArgument
+            ex.Status.Detail |> shouldContain "Authentification requise"
+            runner.SecureCommands |> should be Empty
+        finally
+            try
+                System.IO.File.Delete stateFile
+            with _ ->
+                ()
+
+    [<Fact>]
+    member _.``PullImage d'un registre non autorise leve InvalidArgument meme avec --user``() =
         let runner = createRunner ()
         runner.OnCommand("image pull", "resolved")
 
         let client =
             ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
-        let result = client.PullImage("nginx:latest", None)
-        result |> should equal "resolved"
+        let ex =
+            Assert.Throws<RpcException>(fun () ->
+                client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret") |> ignore)
 
-        let (_, args) =
-            runner.SecureCommands
-            |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
+        ex.StatusCode |> should equal StatusCode.InvalidArgument
+        ex.Status.Detail |> shouldContain "non autorisée"
+        ex.Status.Detail |> shouldContain "ghcr.io"
+        runner.SecureCommands |> should be Empty
 
-        (args |> String.concat " ") |> shouldNotContain "--user"
+    [<Fact>]
+    member _.``PullImage d'un registre non autorise leve InvalidArgument meme avec compte enregistre``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+
+        let stateFile =
+            System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "diplo-pull-" + System.Guid.NewGuid().ToString("N") + ".json"
+            )
+
+        try
+            RegistryAuth.setStateFile stateFile
+            RegistryAuth.add stateFile "myregistry.azurecr.io" "user" "pass"
+            let client =
+                ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+            let ex =
+                Assert.Throws<RpcException>(fun () ->
+                    client.PullImage("myregistry.azurecr.io/team/app:latest", None) |> ignore)
+
+            ex.StatusCode |> should equal StatusCode.InvalidArgument
+            ex.Status.Detail |> shouldContain "non autorisée"
+            runner.SecureCommands |> should be Empty
+        finally
+            try
+                System.IO.File.Delete stateFile
+            with _ ->
+                ()
 
     [<Fact>]
     member _.``PullImage avec --user inline utilise l'identifiant explicite``() =
@@ -548,12 +606,10 @@ type ContainerdClientTests() =
         let client =
             ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
-        let result =
-            client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret")
-
+        let result = client.PullImage("ghcr.io/team/app:latest", Some "inline:secret")
         result |> should equal "resolved"
 
-        // Identifiant EXPLICITE : repli historique sur argv (choix de l'utilisateur).
+        // Identifiant EXPLICITE : repli sur argv (choix de l'utilisateur).
         let (_, args) =
             runner.SecureCommands
             |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
@@ -575,13 +631,12 @@ type ContainerdClientTests() =
 
         try
             RegistryAuth.setStateFile stateFile
-            RegistryAuth.add stateFile "myregistry.azurecr.io" "stored" "pass"
+            RegistryAuth.add stateFile "ghcr.io" "stored" "pass"
 
             let client =
                 ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
-            let result =
-                client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret")
+            let result = client.PullImage("ghcr.io/team/app:latest", Some "inline:secret")
 
             result |> should equal "resolved"
 
@@ -611,12 +666,12 @@ type ContainerdClientTests() =
 
         try
             RegistryAuth.setStateFile stateFile
-            RegistryAuth.add stateFile "myregistry.azurecr.io" "user" "secret"
+            RegistryAuth.add stateFile "ghcr.io" "user" "secret"
 
             let client =
                 ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
-            let result = client.PullImage("myregistry.azurecr.io/team/app:latest", None)
+            let result = client.PullImage("ghcr.io/team/app:latest", None)
             result |> should equal "resolved"
 
             let (_, args) =
