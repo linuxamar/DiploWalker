@@ -39,6 +39,7 @@ type MainWindow() as this =
 
         viewModel.VolumeTab.SetStorageProvider(this.StorageProvider)
         viewModel.ComposeTab.SetStorageProvider(this.StorageProvider)
+        viewModel.SetStorageProvider(this.StorageProvider)
         this.setUpComposeEditor ()
         let aboutItem = this.FindControl<MenuItem>("AboutMenuItem")
 

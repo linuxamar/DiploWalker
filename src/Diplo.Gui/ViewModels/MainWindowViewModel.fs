@@ -1,9 +1,12 @@
 namespace Diplo.Gui.ViewModels
 
 open System
+open System.IO
+open System.Threading.Tasks
 open System.Windows.Input
 open Avalonia
 open Avalonia.Controls.ApplicationLifetimes
+open Avalonia.Platform.Storage
 open Avalonia.Threading
 open Diplo.Core.Output
 open Diplo.Gui.Services
@@ -15,6 +18,7 @@ type MainWindowViewModel() as this =
     let logText = Text.StringBuilder()
     let maxLogLines = 500
     let mutable logOutputCache = ""
+    let mutable storageProvider: IStorageProvider = null
 
     let containerTab = new ContainerTabViewModel(outputPort)
     let imagesTab = new ImagesTabViewModel(outputPort)
@@ -72,6 +76,50 @@ type MainWindowViewModel() as this =
                 (outputPort :> IOutputPort)
                     .WriteLine("Interface graphique Avalonia pour la gestion de conteneurs, volumes et réseaux."))
         )
+
+    member _.SetStorageProvider(sp: IStorageProvider) = storageProvider <- sp
+
+    member _.ExportLogCommand: ICommand =
+        RelayCommand(Action(fun () -> this.ExportLog() |> ignore))
+
+    /// Écrit l'état actuel du journal (lignes horodatées) dans le fichier donné.
+    /// Séparée du sélecteur de fichier pour être testable hors interface.
+    member _.ExportJournalTo(path: string) : Task<int> =
+        task {
+            let lines =
+                outputPort.LogLines
+                |> Seq.map (fun e -> e.DisplayText)
+                |> Seq.toArray
+
+            do! File.WriteAllLinesAsync(path, lines)
+            return lines.Length
+        }
+
+    member private this.ExportLog() =
+        let output = outputPort :> IOutputPort
+
+        Cmd.run outputPort (fun () ->
+            task {
+                if isNull storageProvider then
+                    output.WriteWarning("Fournisseur de stockage non disponible")
+                else
+                    let! file =
+                        storageProvider.SaveFilePickerAsync(
+                            FilePickerSaveOptions(
+                                Title = "Exporter le journal",
+                                SuggestedFileName = "diplo-journal.txt",
+                                DefaultExtension = "txt",
+                                FileTypeChoices = [ FilePickerFileType("Texte", Patterns = [| "*.txt" |]) ]
+                            )
+                        )
+
+                    if not (isNull file) then
+                        let! count = this.ExportJournalTo file.Path.LocalPath
+
+                        output.WriteSuccess(
+                            sprintf "Journal exporté : %d ligne(s) vers %s" count file.Path.LocalPath
+                        )
+            })
 
     interface IDisposable with
         member _.Dispose() =

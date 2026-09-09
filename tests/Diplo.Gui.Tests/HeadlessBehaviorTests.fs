@@ -337,3 +337,38 @@ let ``MainWindow AboutCommand écrit les deux lignes d'information`` () =
 let ``MainWindow QuitCommand est exposé`` () =
     let vm = mainWindowVm ()
     vm.QuitCommand |> should not' (be Null)
+
+[<Fact>]
+let ``MainWindow ExportLogCommand sans fournisseur de stockage ecrit un avertissement`` () =
+    let vm = mainWindowVm ()
+    vm.ExportLogCommand.Execute(null)
+
+    waitPump (fun () ->
+        (mainWindowPort vm).LogLines
+        |> Seq.exists (fun l -> l.Text.Contains "Fournisseur de stockage non disponible"))
+    |> should equal true
+
+[<Fact>]
+let ``MainWindow ExportJournalTo ecrit les lignes du journal dans un fichier`` () =
+    let vm = mainWindowVm ()
+    vm.OutputPort.WriteLine("première ligne")
+    vm.OutputPort.WriteSuccess("seconde ligne")
+    waitPump (fun () -> vm.LogOutput.Contains "seconde ligne") |> should equal true
+
+    let dir = Diplo.TestHelpers.TestHelpers.createTempDir "journal-export"
+    let path = System.IO.Path.Combine(dir, "journal.txt")
+
+    try
+        let count = vm.ExportJournalTo(path) |> Async.AwaitTask |> Async.RunSynchronously
+        count |> should equal 2
+
+        let content = System.IO.File.ReadAllLines path
+        content.Length |> should equal 2
+        content.[0].Contains "première ligne" |> should equal true
+        content.[1].Contains "seconde ligne" |> should equal true
+
+        content
+        |> Array.forall (fun l -> l.Contains "[")
+        |> should equal true
+    finally
+        Diplo.TestHelpers.TestHelpers.cleanupDir dir
