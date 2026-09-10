@@ -19,3 +19,4 @@
 ## Extended context
 
 - See `CLAUDE.md` for full repository conventions and background
+- `CONTEXT.md` holds session state — read it at session start
