@@ -22,5 +22,10 @@ let main args =
             |> ignore
 
             builder.Services.AddSingleton<IDiskMounter>(DiskMounter()) |> ignore
-            builder.Services.AddSingleton<ContainerServiceImpl>() |> ignore)
+            builder.Services.AddSingleton<ContainerServiceImpl>(fun sp ->
+                ContainerServiceImpl(
+                    sp.GetRequiredService<IContainerdClient>(),
+                    sp.GetRequiredService<IDiskMounter>()
+                ))
+            |> ignore)
         (fun app -> app.MapGrpcService<ContainerServiceImpl>() |> ignore)

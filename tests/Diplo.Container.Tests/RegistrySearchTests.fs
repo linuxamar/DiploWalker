@@ -19,6 +19,13 @@ type StubHttpHandler(reply: Uri -> string) =
         response.Content <- new StringContent(reply request.RequestUri, Encoding.UTF8, "application/json")
         Task.FromResult(response)
 
+/// Handler qui renvoie toujours le code d'état demandé (erreurs serveur simulées).
+type ErrorHttpHandler(status: HttpStatusCode) =
+    inherit HttpMessageHandler()
+
+    override _.SendAsync(_request: HttpRequestMessage, _ct: CancellationToken) =
+        Task.FromResult(new HttpResponseMessage(status))
+
 let private run (work: Task<'T>) =
     work |> Async.AwaitTask |> Async.RunSynchronously
 
@@ -167,4 +174,48 @@ let ``reponse invalide renvoie une liste vide`` () =
         run (RegistrySearch.dockerHubSearch client "nginx" 25 CancellationToken.None)
 
     hits |> should be Empty
+
+[<Fact>]
+let ``dockerHubSearch avec reponse 500 renvoie une liste vide`` () =
+    use client = new HttpClient(new ErrorHttpHandler(HttpStatusCode.InternalServerError))
+
+    let hits =
+        run (RegistrySearch.dockerHubSearch client "nginx" 25 CancellationToken.None)
+
+    hits |> should be Empty
+
+[<Fact>]
+let ``quaySearch avec reponse 404 renvoie une liste vide`` () =
+    use client = new HttpClient(new ErrorHttpHandler(HttpStatusCode.NotFound))
+
+    let hits =
+        run (RegistrySearch.quaySearch client "nginx" 25 CancellationToken.None)
+
+    hits |> should be Empty
+
+[<Fact>]
+let ``searchWith ignore un fournisseur en erreur et garde les autres resultats`` () =
+    let handler =
+        { new HttpMessageHandler() with
+            override _.SendAsync(request: HttpRequestMessage, _ct: CancellationToken) =
+                if request.RequestUri.Host = "hub.docker.com" then
+                    Task.FromException<HttpResponseMessage>(HttpRequestException("erreur réseau"))
+                else
+                    let response = new HttpResponseMessage(HttpStatusCode.OK)
+                    response.Content <-
+                        new StringContent(
+                            """{ "results": [ { "name": "team/app", "description": "app" } ] }""",
+                            Encoding.UTF8,
+                            "application/json"
+                        )
+
+                    Task.FromResult(response) }
+
+    use client = new HttpClient(handler)
+
+    let hits =
+        run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None)
+
+    hits.Length |> should equal 1
+    hits.Head.Registry |> should equal "quay.io"
 

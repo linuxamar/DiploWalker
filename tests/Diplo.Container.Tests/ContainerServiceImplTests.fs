@@ -6,6 +6,9 @@ module ContainerServiceImplTests =
     open System
     open System.Collections.Generic
     open System.IO
+    open System.Net
+    open System.Net.Http
+    open System.Text
     open System.Text.Json
     open System.Threading
     open System.Threading.Tasks
@@ -1819,3 +1822,132 @@ module ContainerServiceImplTests =
 
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+
+    // ─── Recherche d'images (SearchRegistry) ────────────────────────────────
+
+    /// Handler HTTP déterministe pour les tests de SearchRegistry : répond
+    /// selon l'hôte demandé et mémorise les URL consultées.
+    type CapturingSearchHandler() as this =
+        inherit HttpMessageHandler()
+
+        let urls = ResizeArray<string>()
+        let client = new HttpClient(this)
+
+        member _.Urls = urls |> Seq.toList
+        member _.Client = client
+
+        override _.SendAsync(request: HttpRequestMessage, _ct: CancellationToken) =
+            urls.Add(request.RequestUri.ToString())
+
+            let body =
+                match request.RequestUri.Host with
+                | "hub.docker.com" ->
+                    """{ "count": 1, "results": [ { "repo_name": "nginx", "short_description": "Serveur web", "star_count": 1200 } ] }"""
+                | "quay.io" -> """{ "results": [ { "name": "team/app", "description": "App interne" } ] }"""
+                | "mcr.microsoft.com" -> """{ "repositories": [ "azure/nginx" ] }"""
+                | _ -> "{}"
+
+            let response = new HttpResponseMessage(HttpStatusCode.OK)
+            response.Content <- new StringContent(body, Encoding.UTF8, "application/json")
+            Task.FromResult(response)
+
+    let createSearchService () =
+        let handler = new CapturingSearchHandler()
+        let mock = MockContainerdClient()
+        let mounter = MockDiskMounter()
+        let svc = ContainerServiceImpl(mock.Mock, mounter, registrySearchClient = handler.Client)
+        svc, handler
+
+    [<Fact>]
+    let ``SearchRegistry sans requete leve InvalidArgument`` () =
+        let svc, _ = createSearchService ()
+        let ctx = createCtx ()
+        let req: SearchRegistryRequest = { Query = ""; Registry = ""; Limit = 25 }
+
+        let ex =
+            Assert.Throws<AggregateException>(fun () ->
+                (svc :> IContainerService).SearchRegistry(req, ctx).Result |> ignore)
+
+        let rpcEx = ex.InnerException :?> RpcException
+        rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
+        rpcEx.Status.Detail |> shouldContain "La requête de recherche ne peut pas être vide"
+
+    [<Fact>]
+    let ``SearchRegistry interroge tous les registres autorises par defaut`` () =
+        let svc, handler = createSearchService ()
+        let ctx = createCtx ()
+        let req: SearchRegistryRequest = { Query = "nginx"; Registry = ""; Limit = 25 }
+
+        let result = (svc :> IContainerService).SearchRegistry(req, ctx).Result
+
+        result.Results.Count |> should equal 3
+        result.Message |> should equal ""
+        handler.Urls |> List.exists (fun u -> u.Contains "hub.docker.com") |> should equal true
+        handler.Urls |> List.exists (fun u -> u.Contains "quay.io") |> should equal true
+        handler.Urls |> List.exists (fun u -> u.Contains "mcr.microsoft.com") |> should equal true
+
+    [<Fact>]
+    let ``SearchRegistry avec limite nulle utilise la valeur par defaut 25`` () =
+        let svc, handler = createSearchService ()
+        let ctx = createCtx ()
+        let req: SearchRegistryRequest = { Query = "nginx"; Registry = ""; Limit = 0 }
+
+        let result = (svc :> IContainerService).SearchRegistry(req, ctx).Result
+
+        result.Results.Count |> should equal 3
+        let hubUrl = handler.Urls |> List.find (fun u -> u.Contains "hub.docker.com")
+        hubUrl |> shouldContain "page_size=25"
+
+    [<Fact>]
+    let ``SearchRegistry borne la limite a 100`` () =
+        let svc, handler = createSearchService ()
+        let ctx = createCtx ()
+        let req: SearchRegistryRequest = { Query = "nginx"; Registry = ""; Limit = 500 }
+
+        let result = (svc :> IContainerService).SearchRegistry(req, ctx).Result
+
+        result.Results.Count |> should equal 3
+        let hubUrl = handler.Urls |> List.find (fun u -> u.Contains "hub.docker.com")
+        hubUrl |> shouldContain "page_size=100"
+
+    [<Fact>]
+    let ``SearchRegistry sur un registre non autorise cherche partout avec un avertissement`` () =
+        let svc, handler = createSearchService ()
+        let ctx = createCtx ()
+        let req: SearchRegistryRequest = { Query = "nginx"; Registry = "myregistry.azurecr.io"; Limit = 25 }
+
+        let result = (svc :> IContainerService).SearchRegistry(req, ctx).Result
+
+        result.Message |> shouldContain "myregistry.azurecr.io"
+        result.Message |> shouldContain "non autorisé"
+        result.Results.Count |> should equal 3
+        handler.Urls |> List.exists (fun u -> u.Contains "azurecr.io") |> should equal false
+
+    [<Fact>]
+    let ``SearchRegistry sur un registre autorise cible uniquement ce registre`` () =
+        let svc, handler = createSearchService ()
+        let ctx = createCtx ()
+        let req: SearchRegistryRequest = { Query = "nginx"; Registry = "docker"; Limit = 25 }
+
+        let result = (svc :> IContainerService).SearchRegistry(req, ctx).Result
+
+        result.Message |> should equal ""
+        result.Results |> Seq.forall (fun r -> r.Registry = "docker.io") |> should equal true
+        handler.Urls |> List.exists (fun u -> u.Contains "quay.io") |> should equal false
+
+    [<Fact>]
+    let ``SearchRegistry mappe les resultats (registre, ref, description, etoiles)`` () =
+        let svc, _ = createSearchService ()
+        let ctx = createCtx ()
+        let req: SearchRegistryRequest = { Query = "nginx"; Registry = ""; Limit = 25 }
+
+        let result = (svc :> IContainerService).SearchRegistry(req, ctx).Result
+
+        let hub = result.Results |> Seq.find (fun r -> r.Registry = "docker.io")
+        hub.Ref |> should equal "docker.io/nginx"
+        hub.Description |> should equal "Serveur web"
+        hub.Stars |> should equal 1200
+
+        let quay = result.Results |> Seq.find (fun r -> r.Registry = "quay.io")
+        quay.Ref |> should equal "quay.io/team/app"
+        quay.Description |> should equal "App interne"

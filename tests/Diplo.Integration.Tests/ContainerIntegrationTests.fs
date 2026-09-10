@@ -166,7 +166,12 @@ module ContainerIntegrationTests =
         builder.Services.AddCodeFirstGrpc() |> ignore
         builder.Services.AddSingleton<IContainerdClient>(mock) |> ignore
         builder.Services.AddSingleton<IDiskMounter>(Diplo.Disk.DiskMounter()) |> ignore
-        builder.Services.AddSingleton<ContainerServiceImpl>() |> ignore
+        builder.Services.AddSingleton<ContainerServiceImpl>(fun sp ->
+            ContainerServiceImpl(
+                sp.GetRequiredService<IContainerdClient>(),
+                sp.GetRequiredService<IDiskMounter>()
+            ))
+        |> ignore
 
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(System.Net.IPAddress.Loopback, 0, fun lo -> lo.Protocols <- HttpProtocols.Http2))

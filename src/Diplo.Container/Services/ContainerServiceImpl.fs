@@ -6,6 +6,7 @@ open System.Collections.Generic
 open System.Collections.Concurrent
 open System.IO
 open System.Linq
+open System.Net.Http
 open System.Text
 open System.Text.Json
 open System.Threading
@@ -186,7 +187,7 @@ module private ContainerStreaming =
 open ContainerStreaming
 
 [<ServiceContract(Name = "IContainerService")>]
-type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
+type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?registrySearchClient: HttpClient) =
 
     [<Literal>]
     static let DefaultNamespace = "default"
@@ -814,7 +815,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter) =
                             None,
                             sprintf "Registre « %s » non autorisé : recherche sur tous les registres" request.Registry
 
-                let! hits = RegistrySearch.search registry request.Query limit CancellationToken.None
+                let! hits =
+                    match registrySearchClient with
+                    | Some c -> RegistrySearch.searchWith c registry request.Query limit CancellationToken.None
+                    | None -> RegistrySearch.search registry request.Query limit CancellationToken.None
 
                 let results =
                     hits

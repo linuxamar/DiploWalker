@@ -128,7 +128,7 @@ let ``ImagesTabViewModel SearchImages peuple les resultats sur le dispatcher`` (
     let vm = imagesVm port fake
     vm.ImageSearchInput <- "nginx"
     (vm.SearchImagesCommand :> ICommand).Execute(null)
-    waitPump (fun () -> vm.SearchResults.Count = 1) |> should equal true
+    waitPump (fun () -> vm.SearchResults.Count = 1 && vm.SearchStatus.Contains("1 résultat(s)")) |> should equal true
     vm.SearchResults.[0].Registre |> should equal "docker.io"
     vm.SearchResults.[0].Ref |> should equal "docker.io/nginx"
     vm.SearchResults.[0].Étoiles |> should equal "100"
@@ -347,6 +347,56 @@ let ``MainWindow ExportLogCommand sans fournisseur de stockage ecrit un avertiss
         (mainWindowPort vm).LogLines
         |> Seq.exists (fun l -> l.Text.Contains "Fournisseur de stockage non disponible"))
     |> should equal true
+
+[<Fact>]
+let ``MainWindow ExportLogCommand avec un picker annule reste silencieux`` () =
+    let vm = mainWindowVm ()
+    // Fake sans fichier retourné : SaveFilePickerAsync renvoie null.
+    vm.SetStorageProvider(new FakeStorageProvider())
+    vm.OutputPort.WriteLine("ligne avant export")
+    waitPump (fun () -> vm.LogOutput.Contains "ligne avant export") |> should equal true
+
+    vm.ExportLogCommand.Execute(null)
+
+    // Aucun succès ni erreur : l'annulation n'écrit rien.
+    waitPump (fun () ->
+        (mainWindowPort vm).LogLines
+        |> Seq.exists (fun l -> l.Text.Contains "Journal exporté"))
+    |> should equal false
+
+    waitPump (fun () ->
+        (mainWindowPort vm).LogLines
+        |> Seq.exists (fun l -> l.Text.Contains "Fournisseur de stockage non disponible"))
+    |> should equal false
+
+[<Fact>]
+let ``MainWindow ExportLogCommand avec un fournisseur écrit le journal dans le fichier choisi`` () =
+    let vm = mainWindowVm ()
+    vm.OutputPort.WriteLine("ligne un")
+    vm.OutputPort.WriteSuccess("ligne deux")
+    waitPump (fun () -> vm.LogOutput.Contains "ligne deux") |> should equal true
+
+    let dir = Diplo.TestHelpers.TestHelpers.createTempDir "journal-export-succes"
+    let target = System.IO.Path.Combine(dir, "journal.txt")
+
+    try
+        vm.SetStorageProvider(new FakeStorageProvider(saveFile = new FakeStorageFile(target)))
+        vm.ExportLogCommand.Execute(null)
+
+        waitPump (fun () ->
+            (mainWindowPort vm).LogLines
+            |> Seq.exists (fun l ->
+                l.Text.Contains "Journal exporté"
+                && l.Text.Contains "journal.txt"))
+        |> should equal true
+
+        System.IO.File.Exists target |> should equal true
+        let content = System.IO.File.ReadAllLines target
+        content.Length |> should equal 2
+        content.[0].Contains "ligne un" |> should equal true
+        content.[1].Contains "ligne deux" |> should equal true
+    finally
+        Diplo.TestHelpers.TestHelpers.cleanupDir dir
 
 [<Fact>]
 let ``MainWindow ExportJournalTo ecrit les lignes du journal dans un fichier`` () =
