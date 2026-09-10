@@ -21,11 +21,13 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     new(port: int) =
         let ch = DiploChannel.forContainer port
-        new ContainerClient(ch, true)
+        // Le canal provient du cache mutualisé (M1) : il n'est PAS possédé par le
+        // client, sa disposition ne doit pas fermer un canal partagé.
+        new ContainerClient(ch, false)
 
     new() =
         match DiploConfig.containerAddress () with
-        | Some address -> new ContainerClient(DiploChannel.forAddress address, true)
+        | Some address -> new ContainerClient(DiploChannel.forAddress address, false)
         | None -> new ContainerClient(DiploPorts.Container)
 
     member _.CreateAsync
@@ -157,13 +159,14 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
             return response
         }
 
-    member _.ListAsync(?all: bool, ?filters: IDictionary<string, string>, ?ct: CancellationToken) =
+    member _.ListAsync(?namespaceName: string, ?all: bool, ?filters: IDictionary<string, string>, ?ct: CancellationToken) =
         task {
             let a = defaultArg all false
             let ct = defaultArg ct CancellationToken.None
 
             let request =
                 { All = a
+                  NamespaceName = defaultArg namespaceName ""
                   Filters = Dictionary<string, string>() }
 
             filters
@@ -555,6 +558,11 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
             if isNull data then
                 invalidArg (nameof data) "Les données du fichier sont requises"
 
+            // M14 : même borne que le serveur (ServiceGuards.MaxFileTransferBytes) —
+            // refus immédiat côté client, sans construire une requête de 50+ Mo.
+            if data.LongLength > int64 ServiceGuards.MaxFileTransferBytes then
+                invalidArg (nameof data) "Les données dépassent la limite de 50 Mo pour un transfert de fichier"
+
             let ct = defaultArg ct CancellationToken.None
 
             let request: WriteFileRequest =
@@ -627,8 +635,8 @@ type ContainerClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
         member _.InspectAsync(id, ?ct) = this.InspectAsync(id, ?ct = ct)
 
-        member _.ListAsync(?all, ?filters, ?ct) =
-            this.ListAsync(?all = all, ?filters = filters, ?ct = ct)
+        member _.ListAsync(?namespaceName, ?all, ?filters, ?ct) =
+            this.ListAsync(?namespaceName = namespaceName, ?all = all, ?filters = filters, ?ct = ct)
 
         member _.GetLogsStream(id, ?follow, ?tail, ?since, ?ct) =
             this.GetLogsStream(id, ?follow = follow, ?tail = tail, ?since = since, ?ct = ct)

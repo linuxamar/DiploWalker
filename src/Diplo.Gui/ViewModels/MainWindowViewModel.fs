@@ -27,25 +27,56 @@ type MainWindowViewModel() as this =
     let composeTab = new ComposeTabViewModel(outputPort)
     let settingsTab = new SettingsTabViewModel(outputPort)
 
-    let trimLogLines () =
-        while outputPort.LogLines.Count > maxLogLines do
-            outputPort.LogLines.RemoveAt(0)
+    let dropFirstLines (sb: System.Text.StringBuilder) (count: int) =
+        if count > 0 && sb.Length > 0 then
+            let mutable remaining = count
+            let mutable idx = -1
+            let mutable i = 0
+
+            while remaining > 0 && i < sb.Length do
+                if sb.[i] = '\n' then
+                    remaining <- remaining - 1
+                    idx <- i
+
+                i <- i + 1
+
+            if idx >= 0 then
+                sb.Remove(0, idx + 1) |> ignore
+
+    let mutable renderedLineCount = 0
 
     let updateLog () =
-        logText.Clear() |> ignore
-        let start = max 0 (outputPort.LogLines.Count - maxLogLines)
+        let count = outputPort.LogLines.Count
 
-        for i in start .. outputPort.LogLines.Count - 1 do
+        if renderedLineCount > count then
+            // Le journal a été vidé en externe (Clear) : on repart de zéro.
+            logText.Clear() |> ignore
+            renderedLineCount <- 0
+
+        for i in renderedLineCount .. count - 1 do
             logText.AppendLine(outputPort.LogLines.[i].DisplayText) |> ignore
 
+        renderedLineCount <- count
         logOutputCache <- logText.ToString()
         this.OnPropertyChanged(nameof this.LogOutput)
+
+    let trimLogLines () =
+        let excess = outputPort.LogLines.Count - maxLogLines
+
+        if excess > 0 then
+            // Les lignes les plus anciennes sont retirées du texte ET de la
+            // collection pour conserver l'alignement (pas de balayage O(n²)).
+            dropFirstLines logText excess
+            renderedLineCount <- renderedLineCount - excess
+
+            for _ in 1 .. excess do
+                outputPort.LogLines.RemoveAt(0)
 
     do
         outputPort.LogLines.CollectionChanged.Add(fun _ ->
             UiThread.Post(fun () ->
-                trimLogLines ()
-                updateLog ()))
+                updateLog ()
+                trimLogLines ()))
 
     member _.OutputPort = outputPort :> IOutputPort
     member _.LogOutput = logOutputCache
@@ -128,3 +159,4 @@ type MainWindowViewModel() as this =
             (volumeTab :> IDisposable).Dispose()
             (networkTab :> IDisposable).Dispose()
             (composeTab :> IDisposable).Dispose()
+            (settingsTab :> IDisposable).Dispose()

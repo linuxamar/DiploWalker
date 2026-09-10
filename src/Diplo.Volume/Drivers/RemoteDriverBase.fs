@@ -74,10 +74,10 @@ module RemoteDriverHelpers =
     /// Démontage NFS-like : umount → fallback mount -u → error.
     let unmountNfsLike (targetPath: string) =
         try
-            ProcessExec.runUnit "umount" [ targetPath ] (Some ProcessExec.MountTimeoutMs) None
+            ProcessExec.runUnit "umount" [ targetPath ] (Some ProcessExec.MountTimeoutMs) None None
         with _ ->
             try
-                ProcessExec.runUnit "mount" [ "-u"; targetPath ] (Some ProcessExec.MountTimeoutMs) None
+                ProcessExec.runUnit "mount" [ "-u"; targetPath ] (Some ProcessExec.MountTimeoutMs) None None
             with ex ->
                 raise (
                     RpcException(

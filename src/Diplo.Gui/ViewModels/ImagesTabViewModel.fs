@@ -62,6 +62,19 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
     let getSelectedSearchResult () = Volatile.Read(&selectedSearchResult)
     let setSelectedSearchResult v = Interlocked.Exchange(&selectedSearchResult, v) |> ignore
 
+    let searchCtsGate = obj()
+    let mutable searchCts: CancellationTokenSource = null
+
+    // Une nouvelle recherche annule celle en cours : le jeton est signalé puis
+    // détaché sous verrou ; la disposition revient au worker qui l'a créé.
+    let cancelPreviousSearch () =
+        lock searchCtsGate (fun () ->
+            let cts = searchCts
+
+            if not (isNull cts) then
+                cts.Cancel()
+                searchCts <- null)
+
     let listImagesCmd = RelayCommand(Action(fun () -> this.ListImages() |> ignore))
     let pullImageCmd = RelayCommand(Action(fun () -> this.PullImage() |> ignore))
     let tagImageCmd = RelayCommand(Action(fun () -> this.TagImage() |> ignore))
@@ -198,6 +211,10 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
     member this.SearchImages() =
         Cmd.run outputPort (fun () ->
             task {
+                cancelPreviousSearch ()
+                let cts = new CancellationTokenSource()
+                searchCts <- cts
+
                 let query = this.ImageSearchInput.Trim()
 
                 if String.IsNullOrEmpty query then
@@ -209,27 +226,40 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
                         else
                             Some(this.RegistreInput.Trim())
 
-                    let! response = containerClient.SearchImagesAsync(query, ?registry = registry)
+                    try
+                        try
+                            let! response =
+                                containerClient.SearchImagesAsync(query, ?registry = registry, ct = cts.Token)
 
-                    if not (String.IsNullOrEmpty(response.Message)) then
-                        outputPort.WriteWarning(response.Message)
+                            if not (String.IsNullOrEmpty(response.Message)) then
+                                outputPort.WriteWarning(response.Message)
 
-                    UiThread.Post(fun () ->
-                        searchResults.Clear()
+                            UiThread.Post(fun () ->
+                                searchResults.Clear()
 
-                        for r in response.Results do
-                            searchResults.Add(
-                                { Registre = r.Registry
-                                  Ref = r.Ref
-                                  Description = r.Description
-                                  Étoiles = string r.Stars }
-                            )
+                                for r in response.Results do
+                                    searchResults.Add(
+                                        { Registre = r.Registry
+                                          Ref = r.Ref
+                                          Description = r.Description
+                                          Étoiles = string r.Stars }
+                                    )
 
-                        this.SearchStatus <-
-                            if response.Results.Count = 0 then
-                                sprintf "Aucune image trouvée pour « %s » dans les catalogues en ligne." query
-                            else
-                                sprintf "%d résultat(s) pour « %s » dans les catalogues en ligne." response.Results.Count query)
+                                this.SearchStatus <-
+                                    if response.Results.Count = 0 then
+                                        sprintf "Aucune image trouvée pour « %s » dans les catalogues en ligne." query
+                                    else
+                                        sprintf "%d résultat(s) pour « %s » dans les catalogues en ligne." response.Results.Count query)
+                        with :? OperationCanceledException ->
+                            () // Recherche remplacée par une plus récente : rien à afficher.
+                    finally
+                        // Le détachement du champ et la disposition se font sous
+                        // le même verrou que l'annulation : pas de double Dispose.
+                        lock searchCtsGate (fun () ->
+                            if searchCts = cts then
+                                searchCts <- null
+
+                            cts.Dispose())
             })
 
     member private this.PullSearchResult() =
@@ -332,4 +362,6 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
             })
 
     interface IDisposable with
-        member _.Dispose() = (containerClient :> IDisposable).Dispose()
+        member _.Dispose() =
+            cancelPreviousSearch ()
+            (containerClient :> IDisposable).Dispose()

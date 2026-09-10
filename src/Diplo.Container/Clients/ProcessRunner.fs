@@ -10,4 +10,4 @@ type ProcessRunner(?timeoutMs: int) =
 
     interface IProcessRunner with
         member _.RunWithArgs(fileName, args) =
-            ProcessExec.run fileName args (Some timeout) None
+            ProcessExec.run fileName args (Some timeout) None None

@@ -47,7 +47,10 @@ module ImageCatalog =
                 JsonSerializer.Deserialize<CatalogEntry list>(File.ReadAllText path, options)
             else
                 []
-        with _ ->
+        with ex ->
+            // M15 : un catalogue illisible ne passe plus en silence — avertir,
+            // puis repli sur catalogue vide.
+            Log.Warning(ex, "Catalogue d'images illisible {Path} (repli sur un catalogue vide)", path)
             []
 
     /// Écrit le catalogue dans `path` (le répertoire parent est créé au besoin).

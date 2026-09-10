@@ -145,7 +145,8 @@ module ContainerIntegrationTests =
 
             member _.ResumeContainer(_ns, _id) = ()
 
-            member _.WaitForContainerExit(_ns, _id, _timeoutSeconds) = 0
+            member _.WaitForContainerExit(_ns, _id, _timeoutSeconds, _ct) =
+                System.Threading.Tasks.Task.FromResult(0)
 
             member _.UpdateContainer(_ns, _id, _mem, _cpu, _pids) = ()
 
@@ -383,7 +384,7 @@ module ContainerIntegrationTests =
 
             client.CreateContainer(createReq, CancellationToken.None).Result |> ignore
             client.CreateContainer(createReq, CancellationToken.None).Result |> ignore
-            let listReq: ListContainersRequest = { All = false; Filters = Dictionary() }
+            let listReq: ListContainersRequest = { All = false; NamespaceName = ""; Filters = Dictionary() }
             let listResult = client.ListContainers(listReq, CancellationToken.None).Result
             listResult.Containers.Count |> should equal 2)
 

@@ -690,14 +690,16 @@ type ContainerdClientTests() =
         let result = client.PullImage("ghcr.io/team/app:latest", Some "inline:secret")
         result |> should equal "resolved"
 
-        // Identifiant EXPLICITE : repli sur argv (choix de l'utilisateur).
+        // H6 : l'identifiant EXPLICITE passe aussi par le hosts-dir du helper —
+        // plus aucun secret dans argv.
         let (_, args) =
             runner.SecureCommands
             |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
 
         let joined = args |> String.concat " "
-        joined |> shouldContain "--user"
-        joined |> shouldContain "inline:secret"
+        joined |> shouldContain "--hosts-dir"
+        joined |> shouldNotContain "--user"
+        joined |> shouldNotContain "inline:secret"
 
     [<Fact>]
     member _.``PullImage --user inline prime sur l'identifiant enregistre``() =
@@ -726,7 +728,8 @@ type ContainerdClientTests() =
                 |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
 
             let joined = args |> String.concat " "
-            joined |> shouldContain "inline:secret"
+            joined |> shouldContain "--hosts-dir"
+            joined |> shouldNotContain "inline:secret"
             joined |> shouldNotContain "stored:pass"
         finally
             try

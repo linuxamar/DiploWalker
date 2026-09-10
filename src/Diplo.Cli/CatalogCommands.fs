@@ -70,7 +70,7 @@ type CatalogAddCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<CatalogAddSettings>()
     new(output: IOutputPort) = CatalogAddCommand(output, DiploClients())
 
-    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+    override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace settings.Ref then
                 output.WriteError("La référence de l'image est requise")
@@ -80,7 +80,7 @@ type CatalogAddCommand(output: IOutputPort, clients: IDiploClients) =
 
                 if not settings.NoPull then
                     use client = clients.CreateContainerClient()
-                    let! response = client.PullImageAsync(image = settings.Ref)
+                    let! response = client.PullImageAsync(image = settings.Ref, ct = ct)
                     output.WriteSuccess(sprintf "Image %s téléchargée - %s" settings.Ref response.Message)
 
                 let note =
@@ -117,7 +117,7 @@ type CatalogUpdateCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<CatalogUpdateSettings>()
     new(output: IOutputPort) = CatalogUpdateCommand(output, DiploClients())
 
-    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+    override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace settings.Ref then
                 output.WriteError("La référence de l'image est requise")
@@ -128,7 +128,7 @@ type CatalogUpdateCommand(output: IOutputPort, clients: IDiploClients) =
 
                 if hasTarget then
                     use client = clients.CreateContainerClient()
-                    let! response = client.TagImageAsync(source = settings.Ref, target = settings.Target)
+                    let! response = client.TagImageAsync(source = settings.Ref, target = settings.Target, ct = ct)
                     output.WriteSuccess(sprintf "Image %s étiquetée en %s - %s" settings.Ref settings.Target response.Message)
 
                 let newRef =
@@ -168,7 +168,7 @@ type CatalogDeleteCommand(output: IOutputPort, clients: IDiploClients) =
     inherit AsyncCommand<CatalogDeleteSettings>()
     new(output: IOutputPort) = CatalogDeleteCommand(output, DiploClients())
 
-    override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
+    override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace settings.Ref then
                 output.WriteError("La référence de l'image est requise")
@@ -185,7 +185,7 @@ type CatalogDeleteCommand(output: IOutputPort, clients: IDiploClients) =
                     return 0
                 else
                     use client = clients.CreateContainerClient()
-                    let! response = client.RemoveImageAsync(ref = settings.Ref)
+                    let! response = client.RemoveImageAsync(ref = settings.Ref, ct = ct)
 
                     if not response.Success then
                         output.WriteError(response.Message)

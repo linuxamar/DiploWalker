@@ -11,6 +11,30 @@ module ServiceGuards =
     [<Literal>]
     let ContainerIdRequired = "L'identifiant du conteneur est requis"
 
+    /// Taille maximale d'un transfert de fichier unique (WriteFile/ReadFile) — 50 Mo.
+    /// Bornée des deux côtés (client et serveur) : au-delà, l'encodage base64
+    /// (+33 %) et la mémoire des messages gRPC deviendraient excessifs.
+    [<Literal>]
+    let MaxFileTransferBytes = 50 * 1024 * 1024
+
+    /// Nombre maximal d'éléments retournés par les opérations de liste (serveur) :
+    /// garde-fou anti-pagination saturée d'un contenant/registre local volumineux
+    /// (M14). La pagination par curseur n'existe pas ici, on borne donc la réponse.
+    [<Literal>]
+    let MaxListItems = 10_000
+
+    /// Vérifie que les données ne dépassent pas la limite de transfert de fichier unique.
+    let requireFileTransferWithinLimit (data: byte[]) (label: string) =
+        if not (isNull data) && data.LongLength > int64 MaxFileTransferBytes then
+            raise (
+                RpcException(
+                    Status(
+                        StatusCode.InvalidArgument,
+                        sprintf "%s dépasse la limite de %.0f Mo" label (float MaxFileTransferBytes / (1024. * 1024.))
+                    )
+                )
+            )
+
     /// Vérifie que la chaîne n'est pas null ou vide.
     let requireNonEmpty (value: string) (label: string) =
         if System.String.IsNullOrWhiteSpace(value) then

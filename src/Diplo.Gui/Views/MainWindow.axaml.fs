@@ -7,6 +7,7 @@ open Avalonia.Controls
 open Avalonia.Input
 open Avalonia.Interactivity
 open Avalonia.Markup.Xaml
+open Avalonia.Threading
 open AvaloniaEdit.TextMate
 open Diplo.Gui.ViewModels
 
@@ -14,6 +15,10 @@ type MainWindow() as this =
     inherit Window()
 
     let viewModel = new MainWindowViewModel()
+
+    // Antirebond de la recherche en ligne : chaque Entrée réarme le minuteur,
+    // la recherche ne part qu'après ~250 ms sans nouvelle frappe.
+    let searchTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(250.0))
 
     do
         this.DataContext <- viewModel
@@ -48,13 +53,18 @@ type MainWindow() as this =
         else
             failwith "Contrôle introuvable dans le XAML : AboutMenuItem"
 
-        // Recherche d'images : déclenchée par la touche Entrée.
+        // Recherche d'images : déclenchée par la touche Entrée (avec antirebond).
+        searchTimer.Tick.Add(fun _ ->
+            searchTimer.Stop()
+            viewModel.ImagesTab.SearchImages() |> ignore)
+
         let searchBox = this.FindControl<TextBox>("ImageSearchBox")
 
         if not (isNull searchBox) then
             searchBox.KeyDown.Add(fun e ->
                 if e.Key = Key.Enter then
-                    viewModel.ImagesTab.SearchImages() |> ignore
+                    searchTimer.Stop()
+                    searchTimer.Start()
                     e.Handled <- true)
         else
             failwith "Contrôle introuvable dans le XAML : ImageSearchBox"
@@ -65,7 +75,8 @@ type MainWindow() as this =
         if not (isNull registryBox) then
             registryBox.KeyDown.Add(fun e ->
                 if e.Key = Key.Enter then
-                    viewModel.ImagesTab.SearchImages() |> ignore
+                    searchTimer.Stop()
+                    searchTimer.Start()
                     e.Handled <- true)
         else
             failwith "Contrôle introuvable dans le XAML : RegistreSearchBox"

@@ -63,6 +63,11 @@ module Qcow1 =
         let l1TableOffset = be64 buf 40
         let l1Size = be32 buf 48
 
+        // Borne de sécurité sur une image forgée : une table L1 débordante
+        // provoquerait des parcours énormes (voir readBytesAtCore).
+        if l1Size < 1 || int64 l1Size > int64 (1 <<< 24) then
+            failwithf "Table L1 invalide (l1_size = %d)" l1Size
+
         { Version = version
           ClusterBits = clusterBits
           ClusterSize = clusterSize
@@ -116,13 +121,14 @@ module Qcow1 =
                 Array.Clear(buf, bOff, remaining)
                 remaining <- 0
             else
-                let l1Index = int (vOff >>> clusterBits)
+                let l1Index64 = vOff >>> clusterBits
                 let clusterOff = vOff &&& dataMask
 
-                if l1Index >= h.L1Size then
+                if l1Index64 >= int64 h.L1Size then
                     Array.Clear(buf, bOff, remaining)
                     remaining <- 0
                 else
+                    let l1Index = int l1Index64
                     let l1EntryOff = h.L1TableOffset + int64 l1Index * 8L
                     let descriptor = readUInt64At s l1EntryOff
 

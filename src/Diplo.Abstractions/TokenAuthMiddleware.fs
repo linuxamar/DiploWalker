@@ -43,6 +43,8 @@ type private RateLimiter(maxRequests: int, windowSeconds: int) =
 let private rateLimiter = RateLimiter(maxRequests = 30, windowSeconds = 60)
 
 /// Timer de nettoyage : purge les entrées expirées toutes les 2 minutes.
+/// Détenu au niveau du module pour la persistance du rate limiter entre les
+/// requêtes ; dispose sur l'arrêt du service (voir disposePurge).
 let private purgeTimer =
     new System.Threading.Timer(
         (fun _ -> rateLimiter.PurgeExpired()),
@@ -51,6 +53,14 @@ let private purgeTimer =
         System.TimeSpan.FromMinutes(2.0)
     )
 
+/// Dispose le timer de purge (appelé à l'arrêt du service — M9) : évite de
+/// laisser un Timer racine actif indéfiniment.
+let disposePurge () =
+    try
+        purgeTimer.Dispose()
+    with _ ->
+        ()
+
 type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddleware>) =
 
     /// Chemins exclus de l'authentification (health checks, probes).
@@ -58,6 +68,13 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
         path.StartsWith("/healthz", StringComparison.OrdinalIgnoreCase)
 
     member _.Invoke(context: HttpContext) : Task =
+        // Erreurs serveur : aucune mise en cache, et le corps de la réponse écrit
+        // est bien retourné comme tâche (M9 — sinon la réponse peut être tronquée).
+        let writeError (status: int) (message: string) =
+            context.Response.Headers.CacheControl <- "no-store"
+            context.Response.StatusCode <- status
+            context.Response.WriteAsync(message)
+
         let path = context.Request.Path.Value
 
         if isExcludedPath path then
@@ -72,14 +89,12 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
 
             if not (rateLimiter.IsAllowed(clientIp)) then
                 logger.LogWarning("Rate limit dépassé pour {ClientIp}", clientIp)
-                context.Response.StatusCode <- 429
-                context.Response.WriteAsync("Trop de requêtes — réessayez plus tard")
+                writeError 429 "Trop de requêtes — réessayez plus tard"
             else
                 match loadToken () with
                 | None ->
                     logger.LogWarning("Fichier auth-token.json introuvable — accès refusé (fail-closed)")
-                    context.Response.StatusCode <- 401
-                    context.Response.WriteAsync("Fichier auth-token.json introuvable")
+                    writeError 401 "Fichier auth-token.json introuvable"
                 | Some _ ->
                     match context.Request.Headers.TryGetValue("authorization") with
                     | true, values when values.Count > 0 ->
@@ -92,8 +107,7 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
                                 next.Invoke(context)
                             else
                                 logger.LogWarning("Token invalide depuis {ClientIp}", clientIp)
-                                context.Response.StatusCode <- 401
-                                context.Response.WriteAsync("Token invalide")
+                                writeError 401 "Token invalide"
                         else
                             // Ne jamais journaliser la valeur brute de l'en-tête
                             // (elle peut contenir un secret) : schéma seul + longueur.
@@ -112,9 +126,7 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
                                 header.Length
                             )
 
-                            context.Response.StatusCode <- 401
-                            context.Response.WriteAsync("Format Authorization invalide")
+                            writeError 401 "Format Authorization invalide"
                     | _ ->
                         logger.LogWarning("En-tête Authorization manquant depuis {ClientIp}", clientIp)
-                        context.Response.StatusCode <- 401
-                        context.Response.WriteAsync("En-tête Authorization manquant")
+                        writeError 401 "En-tête Authorization manquant"

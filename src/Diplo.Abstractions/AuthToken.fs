@@ -10,9 +10,18 @@ open Serilog
 
 let authTokenDir = @"C:\ProgramData\Diplo"
 
-/// Chemin du fichier de token. Mutable pour permettre aux tests
-/// de rediriger vers un répertoire temporaire.
-let mutable authTokenPath = Path.Combine(authTokenDir, "auth-token.json")
+let private defaultTokenPath = Path.Combine(authTokenDir, "auth-token.json")
+
+/// Chemin du fichier de token, injectable (M8) : plus de global mutable public.
+/// Un verrou garde l'échange pour les redirections de tests concurrents.
+let private tokenPathRef = ref defaultTokenPath
+
+/// Redirige le fichier de token (utile pour les tests).
+let setTokenPath (path: string) =
+    lock tokenPathRef (fun () -> tokenPathRef := path)
+
+/// Chemin courant du fichier de token.
+let tokenPath () = !tokenPathRef
 
 let private jsonOptions =
     JsonSerializerOptions(WriteIndented = true, PropertyNameCaseInsensitive = true, MaxDepth = 32)
@@ -36,7 +45,7 @@ let saveToken (token: string) =
         JsonSerializer.Serialize({ Token = token; ExpiresAt = expiresAt }, jsonOptions)
     // Écriture atomique : d'abord dans un fichier temporaire avec ACL
     // restrictif, puis remplacement atomique — aucune fenêtre d'exposition.
-    let tmpPath = authTokenPath + "." + Guid.NewGuid().ToString("N") + ".tmp"
+    let tmpPath = tokenPath () + "." + Guid.NewGuid().ToString("N") + ".tmp"
 
     try
         // Créer le fichier VIDE d'abord, resserrer l'ACL, puis écrire le contenu :
@@ -65,17 +74,17 @@ let saveToken (token: string) =
         File.WriteAllText(tmpPath, json)
 
         try
-            File.Replace(tmpPath, authTokenPath, null)
+            File.Replace(tmpPath, tokenPath (), null)
         with :? FileNotFoundException ->
-            File.Move(tmpPath, authTokenPath)
+            File.Move(tmpPath, tokenPath ())
     with ex ->
         try
             File.Delete(tmpPath)
         with _ ->
             ()
 
-        Log.Error(ex, "Impossible de sauvegarder le token dans {Path}", authTokenPath)
-        failwithf "Sécurité du token compromise: impossible de protéger %s" authTokenPath
+        Log.Error(ex, "Impossible de sauvegarder le token dans {Path}", tokenPath ())
+        failwithf "Sécurité du token compromise: impossible de protéger %s" (tokenPath ())
 
 /// Cache du token avec TTL pour éviter les lectures disque répétées.
 /// Le token est rechargé uniquement quand le cache expire ou que le fichier change.
@@ -89,8 +98,8 @@ type private TokenCache() =
 
     let loadFromDisk () =
         try
-            if File.Exists(authTokenPath) then
-                let fileInfo = new FileInfo(authTokenPath)
+            if File.Exists(tokenPath ()) then
+                let fileInfo = new FileInfo(tokenPath ())
                 let writeTimeUtc = fileInfo.LastWriteTimeUtc
                 let now = DateTime.UtcNow
                 // Recharger si premier accès, TTL expiré, ou fichier modifié
@@ -99,7 +108,7 @@ type private TokenCache() =
                     || (now - lastLoadUtc) > cacheTtl
                     || writeTimeUtc > lastWriteUtc
                 then
-                    let json = File.ReadAllText(authTokenPath)
+                    let json = File.ReadAllText(tokenPath ())
 
                     // JsonDocument loue des buffers du pool : à disposer.
                     use doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
@@ -129,7 +138,7 @@ type private TokenCache() =
             else
                 cachedToken <- None
         with ex ->
-            Log.Warning(ex, "Erreur lors de la lecture du token dans {Path}", authTokenPath)
+            Log.Warning(ex, "Erreur lors de la lecture du token dans {Path}", tokenPath ())
             cachedToken <- None
 
     member _.GetToken() : string option =

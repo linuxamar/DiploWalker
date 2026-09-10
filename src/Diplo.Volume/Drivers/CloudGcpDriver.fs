@@ -22,4 +22,4 @@ type CloudGcpDriver(dataRoot: string) =
             )
 
     override _.Mount remotePath targetPath _opts =
-        ProcessExec.runUnit "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some ProcessExec.MountTimeoutMs) None
+        ProcessExec.runUnit "mount" [ "-o"; "nolock"; remotePath; targetPath ] (Some ProcessExec.MountTimeoutMs) None None

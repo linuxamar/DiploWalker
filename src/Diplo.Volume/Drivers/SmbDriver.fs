@@ -34,11 +34,13 @@ type SmbDriver(dataRoot: string) =
                 [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ]
                 (Some ProcessExec.MountTimeoutMs)
                 (Some(password + "\n"))
+                None
         | Some user, None ->
             ProcessExec.runUnit
                 "net"
                 [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ]
                 (Some ProcessExec.MountTimeoutMs)
+                None
                 None
         | None, _ ->
             ProcessExec.runUnit
@@ -46,6 +48,7 @@ type SmbDriver(dataRoot: string) =
                 [ "use"; targetPath; remotePath; "/persistent:no" ]
                 (Some ProcessExec.MountTimeoutMs)
                 None
+                None
 
     override _.Unmount targetPath =
-        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some ProcessExec.MountTimeoutMs) None
+        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some ProcessExec.MountTimeoutMs) None None

@@ -38,46 +38,55 @@ module private ContainerStreaming =
         let writer = channel.Writer
 
         // Segment en cours de consommation (lecture partielle entre deux appels).
+        // `pending` est partagé entre Read (sync), ReadAsync et Write : l'accès
+        // est sérialisé par `gate` pour éviter toute race.
+        let gate = obj ()
         let mutable pending: (byte[] * int) option = None
 
         /// Lit au plus `count` octets : consomme d'abord le segment partiel
         /// restant, puis attend un nouveau segment ; retourne dès que `count`
         /// octets sont réunis OU que tous les segments disponibles sont épuisés.
-        let readInto (buffer: byte[]) (offset: int) (count: int) : int =
-            let mutable total = 0
-            let mutable cont = true
+        /// Cœur asynchrone pur (aucun blocage synchrone dessus).
+        let readIntoCore (buffer: byte[]) (offset: int) (count: int) (ct: System.Threading.CancellationToken) : Task<int> =
+            task {
+                let mutable total = 0
+                let mutable cont = true
 
-            while cont do
-                match pending with
-                | Some(chunk, pos) ->
-                    let available = chunk.Length - pos
-                    let take = min available (count - total)
-                    Array.blit chunk pos buffer (offset + total) take
-                    total <- total + take
+                while cont do
+                    match lock gate (fun () -> pending) with
+                    | Some(chunk, pos) ->
+                        let available = chunk.Length - pos
+                        let take = min available (count - total)
+                        Array.blit chunk pos buffer (offset + total) take
+                        total <- total + take
 
-                    if pos + take >= chunk.Length then
-                        pending <- None
-                    else
-                        pending <- Some(chunk, pos + take)
+                        let newPending =
+                            if pos + take >= chunk.Length then
+                                None
+                            else
+                                Some(chunk, pos + take)
 
-                    if total >= count then cont <- false
-                | None ->
-                    if total > 0 then
-                        // Des octets déjà lus : ne pas bloquer sur un nouveau
-                        // segment, livrer ce qui est disponible maintenant.
-                        cont <- false
-                    else
-                        let has = reader.WaitToReadAsync().AsTask().GetAwaiter().GetResult()
+                        lock gate (fun () -> pending <- newPending)
 
-                        if has then
-                            let mutable chunk: byte[] = null
-
-                            if reader.TryRead(&chunk) && not (isNull chunk) && chunk.Length > 0 then
-                                pending <- Some(chunk, 0)
-                        else
+                        if total >= count then cont <- false
+                    | None ->
+                        if total > 0 then
+                            // Des octets déjà lus : ne pas bloquer sur un nouveau
+                            // segment, livrer ce qui est disponible maintenant.
                             cont <- false
+                        else
+                            let! has = reader.WaitToReadAsync(ct)
 
-            total
+                            if has then
+                                let mutable chunk: byte[] = null
+
+                                if reader.TryRead(&chunk) && not (isNull chunk) && chunk.Length > 0 then
+                                    lock gate (fun () -> pending <- Some(chunk, 0))
+                            else
+                                cont <- false
+
+                return total
+            }
 
         interface IDisposable with
             member _.Dispose() = writer.TryComplete() |> ignore
@@ -98,48 +107,30 @@ module private ContainerStreaming =
 
         override _.Seek(_, _) = raise (NotSupportedException())
 
-        override _.Read(buffer: byte[], offset: int, count: int) : int = readInto buffer offset count
+        override _.Read(buffer: byte[], offset: int, count: int) : int =
+            // Chemin synchrone (client StartExec) : on le fait tourner sur un
+            // thread de pool via le cœur asynchrone pour ne jamais bloquer le
+            // SynchronizationContext du caller (H2), puis on attend le résultat
+            // ici sans capturer le contexte.
+            let work: Func<Task<int>> =
+                Func<Task<int>>(fun () ->
+                    readIntoCore buffer offset count System.Threading.CancellationToken.None)
+
+            Task.Run<int>(work).GetAwaiter().GetResult()
 
         override _.Write(buffer: byte[], offset: int, count: int) =
             if count > 0 then
                 let chunk = Array.sub buffer offset count
-                writer.WriteAsync(chunk).AsTask().GetAwaiter().GetResult() |> ignore
+
+                // Attente sur un thread de pool pour ne jamais bloquer le
+                // SynchronizationContext du caller, sans perdre de données.
+                let work: Func<Task> =
+                    Func<Task>(fun () -> writer.WriteAsync(chunk).AsTask())
+
+                Task.Run(work).GetAwaiter().GetResult()
 
         override _.ReadAsync(buffer, offset, count, ct) =
-            task {
-                let mutable total = 0
-                let mutable cont = true
-
-                while cont do
-                    match pending with
-                    | Some(chunk, pos) ->
-                        let available = chunk.Length - pos
-                        let take = min available (count - total)
-                        Array.blit chunk pos buffer (offset + total) take
-                        total <- total + take
-
-                        if pos + take >= chunk.Length then
-                            pending <- None
-                        else
-                            pending <- Some(chunk, pos + take)
-
-                        if total >= count then cont <- false
-                    | None ->
-                        if total > 0 then
-                            cont <- false
-                        else
-                            let! has = reader.WaitToReadAsync(ct).AsTask()
-
-                            if has then
-                                let mutable chunk: byte[] = null
-
-                                if reader.TryRead(&chunk) && not (isNull chunk) && chunk.Length > 0 then
-                                    pending <- Some(chunk, 0)
-                            else
-                                cont <- false
-
-                return total
-            }
+            readIntoCore buffer offset count ct
 
         override _.WriteAsync(buffer, offset, count, ct) =
             task {
@@ -528,36 +519,73 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
         member _.ListContainers(request, _context) =
             task {
-                let ids = client.ListContainers(DefaultNamespace, request.All) |> Seq.toArray
+                let ns =
+                    if String.IsNullOrEmpty(request.NamespaceName) then
+                        DefaultNamespace
+                    else
+                        request.NamespaceName
 
-                let containers =
-                    ids
-                    |> Array.Parallel.map (fun id ->
-                        try
-                            let info = client.InspectContainer(DefaultNamespace, id)
-                            let ti = client.TaskInfo(DefaultNamespace, id)
+                let allIds = client.ListContainers(ns, request.All) |> Seq.toArray
 
-                            { ContainerInfo.Id = id
-                              Name = ""
-                              Image = tryGetString info "image"
-                              State = mapState (tryGetString ti "status")
-                              CreatedAt = tryGetString info "created_at"
-                              Labels = Dictionary<string, string>() }
-                        with ex ->
-                            Log.Warning(
-                                ex,
-                                "Erreur lors de l'inspection du conteneur {ContainerId} pour ListContainers",
-                                id
-                            )
+                // M14 : borne de liste serveur — une réponse démesurée saturerait
+                // la mémoire du client et le plafond de message gRPC (64 Mo).
+                let ids =
+                    if allIds.Length > ServiceGuards.MaxListItems then
+                        Log.Warning(
+                            "Liste des conteneurs tronquée à {Limit} éléments (reçu {Count})",
+                            ServiceGuards.MaxListItems,
+                            allIds.Length
+                        )
 
-                            { ContainerInfo.Id = id
-                              Name = ""
-                              Image = ""
-                              State = ContainerState.Unknown
-                              CreatedAt = ""
-                              Labels = Dictionary<string, string>() })
+                        allIds[.. ServiceGuards.MaxListItems - 1]
+                    else
+                        allIds
 
-                return { ListContainersResponse.Containers = List<ContainerInfo>(containers) }
+                let inspect (id: string) =
+                    try
+                        let info = client.InspectContainer(DefaultNamespace, id)
+                        let ti = client.TaskInfo(DefaultNamespace, id)
+
+                        { ContainerInfo.Id = id
+                          Name = ""
+                          Image = tryGetString info "image"
+                          State = mapState (tryGetString ti "status")
+                          CreatedAt = tryGetString info "created_at"
+                          Labels = Dictionary<string, string>() }
+                    with ex ->
+                        Log.Warning(
+                            ex,
+                            "Erreur lors de l'inspection du conteneur {ContainerId} pour ListContainers",
+                            id
+                        )
+
+                        { ContainerInfo.Id = id
+                          Name = ""
+                          Image = ""
+                          State = ContainerState.Unknown
+                          CreatedAt = ""
+                          Labels = Dictionary<string, string>() }
+
+                // Concurrence bornée (M2) : chaque inspection lance des
+                // processus ctr — Array.Parallel.map non borné saturerait le
+                // CPU et le pool de threads. L'annulation du contexte est aussi
+                // respectée.
+                let opts = ParallelOptions()
+                opts.MaxDegreeOfParallelism <- max 4 Environment.ProcessorCount
+                opts.CancellationToken <- _context
+                let results = ResizeArray<ContainerInfo>(ids.Length)
+
+                do!
+                    Parallel.ForEachAsync(
+                        ids,
+                        opts,
+                        fun id (_ct: System.Threading.CancellationToken) ->
+                            let c = inspect id
+                            lock results (fun () -> results.Add c)
+                            System.Threading.Tasks.ValueTask.CompletedTask
+                    )
+
+                return { ListContainersResponse.Containers = List<ContainerInfo>(results) }
             }
 
         member _.GetContainerLogs(request, context) =
@@ -714,19 +742,47 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                     else
                         request.NamespaceName
 
-                let images = client.ListImages(ns) |> Seq.toArray
+                let allImages = client.ListImages(ns) |> Seq.toArray
 
-                let infos =
-                    images
-                    |> Array.Parallel.map (fun imgJson ->
-                        { ImageInfo.Ref = tryGetString imgJson "ref"
-                          Id = tryGetString imgJson "id"
-                          Repository = tryGetString imgJson "repository"
-                          Tag = tryGetString imgJson "tag"
-                          Size = tryGetInt64 imgJson "size"
-                          CreatedAt = tryGetString imgJson "created_at" })
+                // M14 : borne de liste serveur (cf. ListContainers).
+                let images =
+                    if allImages.Length > ServiceGuards.MaxListItems then
+                        Log.Warning(
+                            "Liste des images tronquée à {Limit} éléments (reçu {Count})",
+                            ServiceGuards.MaxListItems,
+                            allImages.Length
+                        )
 
-                return { ListImagesResponse.Images = List<ImageInfo>(infos) }
+                        allImages[.. ServiceGuards.MaxListItems - 1]
+                    else
+                        allImages
+
+                let toInfo (imgJson: JsonElement) =
+                    { ImageInfo.Ref = tryGetString imgJson "ref"
+                      Id = tryGetString imgJson "id"
+                      Repository = tryGetString imgJson "repository"
+                      Tag = tryGetString imgJson "tag"
+                      Size = tryGetInt64 imgJson "size"
+                      CreatedAt = tryGetString imgJson "created_at" }
+
+                // Concurrence bornée (M2) : évite un Array.Parallel.map non
+                // borné et respecte l'annulation du contexte.
+                let opts = ParallelOptions()
+                opts.MaxDegreeOfParallelism <- max 4 Environment.ProcessorCount
+                opts.CancellationToken <- _context
+                let results = ResizeArray<ImageInfo>(images.Length)
+
+                do!
+                    Parallel.ForEachAsync(
+                        images,
+                        opts,
+                        fun img (_ct: System.Threading.CancellationToken) ->
+                            let info = toInfo img
+                            lock results (fun () -> results.Add info)
+                            System.Threading.Tasks.ValueTask.CompletedTask
+                    )
+
+                return { ListImagesResponse.Images = List<ImageInfo>(results) }
             }
 
         member _.InspectImage(request, _context) =
@@ -861,8 +917,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
             task {
                 ServiceGuards.requireContainerId request.Id
 
-                let exitCode =
-                    client.WaitForContainerExit(DefaultNamespace, request.Id, request.TimeoutSeconds)
+                let! exitCode =
+                    client.WaitForContainerExit(DefaultNamespace, request.Id, request.TimeoutSeconds, _context)
 
                 if exitCode = -1 then
                     return
@@ -1172,7 +1228,9 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                                 return ()
                     finally
                         try
-                            enumerator.DisposeAsync().AsTask().Wait(10_000) |> ignore
+                            // Pas de .Wait() bloquant (M6) : la disposition est
+                            // démarrée et se termine en arrière-plan.
+                            enumerator.DisposeAsync().AsTask() |> ignore
                         with _ ->
                             ()
                         channel.Writer.TryComplete() |> ignore
@@ -1208,10 +1266,23 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                     else
                         let data = Convert.FromBase64String(trimmed)
 
-                        return
-                            { ReadFileResponse.Data = data
-                              Success = true
-                              Message = "" }
+                        // M14 : un fichier trop volumineux ne doit pas grossir la
+                        // réponse gRPC au-delà de la limite contractuelle (50 Mo,
+                        // ServerConfig.grpcMaxMessageSize = 64 Mo) — message explicite
+                        // au lieu d'un ResourceExhausted opaque côté client.
+                        if data.LongLength > int64 ServiceGuards.MaxFileTransferBytes then
+                            return
+                                { ReadFileResponse.Data = Array.empty
+                                  Success = false
+                                  Message =
+                                    sprintf
+                                        "Le fichier dépasse la limite de %.0f Mo"
+                                        (float ServiceGuards.MaxFileTransferBytes / (1024. * 1024.)) }
+                        else
+                            return
+                                { ReadFileResponse.Data = data
+                                  Success = true
+                                  Message = "" }
                 with ex ->
                     Log.Warning(
                         ex,
@@ -1231,7 +1302,16 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                 ServiceGuards.requireContainerId request.Id
                 ServiceGuards.requireNonEmpty request.Path "Le chemin du fichier"
                 SecurityValidation.validateContainerPath request.Path "Le chemin du fichier"
-                let command = [| "sh"; "-c"; sprintf "base64 -d > '%s'" request.Path |]
+
+                // M14 : bornée ici aussi (le client la refuse déjà) — évite un
+                // encodage base64 (+33 %) et un StartExec disproportionnés et
+                // protège le plafond de message gRPC configuré côté serveur.
+                ServiceGuards.requireFileTransferWithinLimit request.Data "Le fichier"
+
+                // H5 : le chemin est passé en paramètre positionnel ("$1", relié
+                // par le shell) et non interpolé dans le script : aucune entrée
+                // utilisateur ne transite par la chaîne de commande.
+                let command = [| "sh"; "-c"; "base64 -d > \"$1\""; "sh"; "--"; request.Path |]
 
                 try
                     let base64 = Convert.ToBase64String(request.Data)
@@ -1406,7 +1486,9 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                                     cont <- false
                         finally
                             try
-                                enumerator.DisposeAsync().AsTask().Wait(10_000) |> ignore
+                                // Pas de .Wait() bloquant (M6) : la disposition est
+                                // démarrée et se termine en arrière-plan.
+                                enumerator.DisposeAsync().AsTask() |> ignore
                             with _ ->
                                 ()
 

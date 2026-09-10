@@ -419,6 +419,7 @@ module ContainerServiceImplTests =
 
         let req =
             { All = true
+              NamespaceName = ""
               Filters = Dictionary<string, string>() }
 
         let result = (svc :> IContainerService).ListContainers(req, ctx).Result
@@ -433,6 +434,7 @@ module ContainerServiceImplTests =
 
         let req =
             { All = false
+              NamespaceName = ""
               Filters = Dictionary<string, string>() }
 
         let result = (svc :> IContainerService).ListContainers(req, ctx).Result

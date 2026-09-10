@@ -341,7 +341,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             validateNsId namespaceName id
             runCtr (nsArgs namespaceName [ "task"; "resume"; id ]) |> ignore
 
-        member _.WaitForContainerExit(namespaceName, id, timeoutSeconds) =
+        member _.WaitForContainerExit(namespaceName, id, timeoutSeconds, ct) =
             validateNsId namespaceName id
 
             let deadline =
@@ -367,19 +367,23 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     "unknown"
 
             let rec loop () =
-                let status = currentStatus ()
+                task {
+                    ct.ThrowIfCancellationRequested()
 
-                match status.ToUpperInvariant() with
-                // PAUSED n'est PAS un état terminal : attendre la reprise.
-                | "STOPPED"
-                | "DELETED"
-                | "UNKNOWN" -> 0
-                | _ ->
-                    match deadline with
-                    | Some d when DateTime.UtcNow >= d -> -1
+                    let status = currentStatus ()
+
+                    match status.ToUpperInvariant() with
+                    // PAUSED n'est PAS un état terminal : attendre la reprise.
+                    | "STOPPED"
+                    | "DELETED"
+                    | "UNKNOWN" -> return 0
                     | _ ->
-                        Thread.Sleep(1000)
-                        loop ()
+                        match deadline with
+                        | Some d when DateTime.UtcNow >= d -> return -1
+                        | _ ->
+                            do! Task.Delay(1000, ct)
+                            return! loop ()
+                }
 
             loop ()
 
@@ -696,10 +700,24 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             | Some canonical ->
                 match userArg with
                 | Some explicit ->
-                    // Identifiant EXPLICITE (option CLI --user) : repli sur argv,
-                    // seul cas restant — l'utilisateur a choisi la voie directe et
-                    // éphémère.
-                    runCtr [ "image"; "pull"; "--user"; explicit; image ] |> fun o -> o.Trim()
+                    // Identifiant EXPLICITE (option CLI --user) : H6 — le secret ne
+                    // transite plus par argv ; il est routé via un helper jetable
+                    // (hosts.toml) exactement comme les identifiants stockés.
+                    match RegistryAuth.prepareHostsDirForCredentials registry explicit with
+                    | Some hostsDir ->
+                        try
+                            runCtr [ "image"; "pull"; "--hosts-dir"; hostsDir; image ]
+                            |> fun o -> o.Trim()
+                        finally
+                            try
+                                Directory.Delete(hostsDir, true)
+                            with ex ->
+                                Log.Debug(ex, "Nettoyage du hosts-dir temporaire impossible")
+                    | None ->
+                        // Argument non au format « utilisateur:secret » : rien ne
+                        // peut être routé vers le helper — repli contraint.
+                        runCtr [ "image"; "pull"; "--user"; explicit; image ]
+                        |> fun o -> o.Trim()
                 | None ->
                     // Identifiants STOCKÉS : aucune extraction anonyme — les
                     // fournisseurs autorisés exigent tous un compte enregistré.

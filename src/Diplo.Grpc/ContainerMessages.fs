@@ -255,7 +255,9 @@ type ListContainersRequest =
     { [<ProtoMember(1)>]
       mutable All: bool
       [<ProtoMember(2)>]
-      mutable Filters: System.Collections.Generic.Dictionary<string, string> }
+      mutable Filters: System.Collections.Generic.Dictionary<string, string>
+      [<ProtoMember(3)>]
+      mutable NamespaceName: string }
 
     [<ProtoAfterDeserialization>]
     member this.EnsureCollections() =

@@ -21,12 +21,19 @@ module ProcessExec =
 
     /// Exécute `fileName` avec `args` et renvoie `(code, stdout, stderr)`.
     /// `input` (Some texte) alimente l'entrée standard ; `timeoutMs` borne la
-    /// durée totale (None = 60 s) et déclenche un `Kill` en cas de dépassement.
+    /// durée totale (None = 60 s) et déclenche un `Kill` en cas de dépassement ;
+    /// `ct` annule également l'exécution (arrêt du processus).
+    ///
+    /// L'attente utilise Process.WaitForExit(millisecondes) (attente synchrone
+    /// sur le handle du processus) pendant que stdout/stderr sont purgés en
+    /// arrière-plan par ReadToEndAsync : aucune attente async-sur-sync ni blocage
+    /// de pipe.
     let runWithResult
         (fileName: string)
         (args: seq<string>)
         (timeoutMs: int option)
         (input: string option)
+        (ct: System.Threading.CancellationToken option)
         : int * string * string =
         let timeout = timeoutMsOr timeoutMs
         let psi = ProcessStartInfo()
@@ -57,23 +64,34 @@ module ProcessExec =
             proc.StandardInput.Close()
         | None -> ()
 
-        let exited = proc.WaitForExitAsync()
-        let completed = Task.WhenAny(exited, Task.Delay(timeout)).GetAwaiter().GetResult()
+        match ct with
+        | Some token when token.CanBeCanceled ->
+            // Attente découpée pour réagir à l'annulation, sans bloquer les
+            // lectures pipes (purgées en arrière-plan).
+            let mutable exited = false
 
-        if completed <> exited then
-            try
-                proc.Kill(true)
-            with _ ->
-                ()
-            // Lectures interrompues par le Kill : on les laisse se terminer pour
-            // éviter une exception de disposition sur le Process, avec une
-            // attente bornée pour ne pas suspendre le thread indéfiniment.
-            try
-                Task.WaitAll([| stdoutRead :> Task; stderrRead :> Task |], 5_000) |> ignore
-            with _ ->
-                ()
+            while not exited && not token.IsCancellationRequested do
+                exited <- proc.WaitForExit(250)
 
-            raise (TimeoutException(sprintf "Délai d'attente dépassé pour '%s' (%dms)" fileName timeout))
+            if token.IsCancellationRequested then
+                try
+                    proc.Kill(true)
+                with _ ->
+                    ()
+                raise (OperationCanceledException(sprintf "Exécution annulée pour '%s'" fileName, token))
+        | _ ->
+            if not (proc.WaitForExit(timeout)) then
+                try
+                    proc.Kill(true)
+                with _ ->
+                    ()
+
+                try
+                    Task.WaitAll([| stdoutRead :> Task; stderrRead :> Task |], 5_000) |> ignore
+                with _ ->
+                    ()
+
+                raise (TimeoutException(sprintf "Délai d'attente dépassé pour '%s' (%dms)" fileName timeout))
 
         let stdout = stdoutRead.GetAwaiter().GetResult()
         let stderr = stderrRead.GetAwaiter().GetResult()
@@ -82,8 +100,14 @@ module ProcessExec =
     /// Exécute `fileName` avec `args` et renvoie la sortie standard. Lève si le
     /// délai d'attente est dépassé ou si le processus échoue (la sortie d'erreur
     /// est jointe au message). Paramètres comme `runWithResult`.
-    let run (fileName: string) (args: seq<string>) (timeoutMs: int option) (input: string option) : string =
-        let code, stdout, stderr = runWithResult fileName args timeoutMs input
+    let run
+        (fileName: string)
+        (args: seq<string>)
+        (timeoutMs: int option)
+        (input: string option)
+        (ct: System.Threading.CancellationToken option)
+        : string =
+        let code, stdout, stderr = runWithResult fileName args timeoutMs input ct
 
         if code <> 0 then
             let detail =
@@ -97,8 +121,14 @@ module ProcessExec =
         stdout
 
     /// Exécute sans retourner la sortie (usage montage/démontage).
-    let runUnit (fileName: string) (args: seq<string>) (timeoutMs: int option) (input: string option) : unit =
-        run fileName args timeoutMs input |> ignore
+    let runUnit
+        (fileName: string)
+        (args: seq<string>)
+        (timeoutMs: int option)
+        (input: string option)
+        (ct: System.Threading.CancellationToken option)
+        : unit =
+        run fileName args timeoutMs input ct |> ignore
 
     /// Encode un script PowerShell en Base64 UTF-16LE pour -EncodedCommand.
     /// Évite l'injection via la ligne de commande (les valeurs sont dans le script,
@@ -106,6 +136,25 @@ module ProcessExec =
     let private encodeScript (script: string) =
         let bytes = System.Text.Encoding.Unicode.GetBytes(script)
         Convert.ToBase64String(bytes)
+
+    /// Retire le préfixe « - » éventuel d'un nom de paramètre PowerShell.
+    let private stripParamPrefix (name: string) =
+        if name.Length > 0 && name.[0] = '-' then name.Substring(1) else name
+
+    /// Allowlist stricte des noms de paramètres interpolés dans le script
+    /// PowerShell : `[A-Za-z_][A-Za-z0-9_]*` (avec préfixe « - » optionnel).
+    /// Refuse tout nom qui s'écarte de ce jeu pour empêcher l'injection.
+    let private validateParameterNames (api: string) (parameters: (string * string) list) =
+        for name, _ in parameters do
+            let bare = stripParamPrefix name
+
+            let ok =
+                bare.Length > 0
+                && (Char.IsAsciiLetter bare.[0] || bare.[0] = '_')
+                && bare |> Seq.forall (fun c -> Char.IsAsciiLetterOrDigit c || c = '_')
+
+            if not ok then
+                invalidArg "parameters" (sprintf "%s : nom de paramètre PowerShell invalide '%s'" api name)
 
     /// Exécute un script PowerShell encodé avec les paramètres nommés.
     /// Les VALEURS sont injectées dans le script lui-même en Base64 UTF-8 :
@@ -118,6 +167,7 @@ module ProcessExec =
         (scriptBody: string)
         (parameters: (string * string) list)
         (timeoutMs: int option)
+        (ct: System.Threading.CancellationToken option)
         : string =
         let timeout = timeoutMsOr timeoutMs
 
@@ -143,7 +193,7 @@ module ProcessExec =
               "-EncodedCommand"
               encoded ]
 
-        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) None
+        let code, stdout, stderr = runWithResult "powershell" args (Some timeout) None ct
 
         if code <> 0 then
             let detail =
@@ -158,7 +208,17 @@ module ProcessExec =
 
     /// Exécute une commande PowerShell avec les paramètres spécifiés.
     /// Utilise -EncodedCommand pour un binding sûr des paramètres (pas de concaténation dans argv).
-    let runPowerShell (command: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
+    /// Les NOMS de paramètres sont interpolés dans le script : ils sont donc
+    /// jaugés par une allowlist stricte ([-,]?[A-Za-z_][A-Za-z0-9_]*) pour
+    /// empêcher toute injection depuis un nom contrôlé par un appelant.
+    let runPowerShell
+        (command: string)
+        (parameters: (string * string) list)
+        (timeoutMs: int option)
+        (ct: System.Threading.CancellationToken option)
+        : string =
+        validateParameterNames "runPowerShell" parameters
+
         let scriptBody =
             let paramNames = parameters |> List.mapi (fun i _ -> sprintf "$p%d" i)
 
@@ -166,12 +226,17 @@ module ProcessExec =
                 "%s -%s"
                 command
                 (parameters
-                 |> List.mapi (fun i (name, _) -> sprintf "%s %s" name paramNames.[i])
+                 |> List.mapi (fun i (name, _) -> sprintf "%s %s" (stripParamPrefix name) paramNames.[i])
                  |> String.concat " -")
 
-        runEncodedScript scriptBody parameters timeoutMs
+        runEncodedScript scriptBody parameters timeoutMs ct
 
     /// Exécute un script PowerShell brut avec des paramètres nommés.
     /// Utilise -EncodedCommand pour un binding sûr des paramètres.
-    let runPowerShellScript (scriptBody: string) (parameters: (string * string) list) (timeoutMs: int option) : string =
-        runEncodedScript scriptBody parameters timeoutMs
+    let runPowerShellScript
+        (scriptBody: string)
+        (parameters: (string * string) list)
+        (timeoutMs: int option)
+        (ct: System.Threading.CancellationToken option)
+        : string =
+        runEncodedScript scriptBody parameters timeoutMs ct

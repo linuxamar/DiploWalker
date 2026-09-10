@@ -241,7 +241,22 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                 let response =
                     { ListVolumesResponse.Volumes = System.Collections.Generic.List<VolumeInfo>() }
 
-                for vol in allVolumes do
+                // M14 : borne de liste serveur (cf. ListContainers).
+                let volumeCount = List.length allVolumes
+
+                let bounded =
+                    if volumeCount > ServiceGuards.MaxListItems then
+                        Log.Warning(
+                            "Liste des volumes tronquée à {Limit} éléments (reçu {Count})",
+                            ServiceGuards.MaxListItems,
+                            volumeCount
+                        )
+
+                        allVolumes |> List.truncate ServiceGuards.MaxListItems
+                    else
+                        allVolumes
+
+                for vol in bounded do
                     try
                         response.Volumes.Add(parseVolumeInfo vol)
                     with ex ->

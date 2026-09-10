@@ -263,25 +263,42 @@ module SecurityValidation =
             raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin du plugin CNI ne peut pas être vide")))
 
         let resolveFinal (path: string) =
-            try
-                let fi = new FileInfo(path)
+            // M10 : une résolution de lien qui échoue est une erreur EXPLICITE
+            // (fail-closed). Revenir silencieusement au chemin non résolu
+            // masquerait la cible réelle d'une junction/symlink.
+            let failClosed (kind: string) =
+                raise (
+                    RpcException(
+                        Status(
+                            StatusCode.InvalidArgument,
+                            sprintf "Impossible de résoudre le lien %s '%s' : accès refusé par sécurité" kind path
+                        )
+                    )
+                )
 
-                if fi.Exists then
-                    // Suit toute la chaîne de liens jusqu'à la cible finale
-                    let target = fi.ResolveLinkTarget(true)
+            let fi = new FileInfo(path)
 
-                    if not (isNull target) then target.FullName else fi.FullName
+            if fi.Exists then
+                try
+                    match fi.ResolveLinkTarget(true) with
+                    | null -> fi.FullName
+                    | target -> target.FullName
+                with _ ->
+                    failClosed "fichier"
+            else
+                let di = new DirectoryInfo(path)
+
+                if di.Exists then
+                    try
+                        match di.ResolveLinkTarget(true) with
+                        | null -> di.FullName
+                        | target -> target.FullName
+                    with _ ->
+                        failClosed "répertoire"
                 else
-                    let di = new DirectoryInfo(path)
-
-                    if di.Exists then
-                        let target = di.ResolveLinkTarget(true)
-
-                        if not (isNull target) then target.FullName else di.FullName
-                    else
-                        Path.GetFullPath(path)
-            with _ ->
-                Path.GetFullPath(path)
+                    // Rien n'existe encore : aucun lien à suivre — chemin candidat
+                    // (la validation d'existence est faite par l'appelant).
+                    Path.GetFullPath(path)
 
         let resolvedPath = resolveFinal pluginPath
 

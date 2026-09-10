@@ -242,7 +242,7 @@ type FakeContainerClient
             inspectCalls <- inspectCalls + 1
             Task.FromResult(inspectR)
 
-        member _.ListAsync(?_all, ?_filters, ?_ct) =
+        member _.ListAsync(?_namespaceName, ?_all, ?_filters, ?_ct) =
             listCalls <- listCalls + 1
             Task.FromResult(listR)
 

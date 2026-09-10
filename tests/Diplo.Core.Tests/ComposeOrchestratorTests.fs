@@ -105,7 +105,7 @@ module ComposeOrchestratorTests =
 
             member _.InspectAsync(_id, ?_ct) = raise (NotImplementedException())
 
-            member _.ListAsync(?_all, ?_filters, ?_ct) =
+            member _.ListAsync(?_namespaceName, ?_all, ?_filters, ?_ct) =
                 Task.FromResult(
                     { ListContainersResponse.Containers = listed }
                 )

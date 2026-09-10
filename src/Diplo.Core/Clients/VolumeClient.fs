@@ -18,11 +18,12 @@ type VolumeClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     new(port: int) =
         let ch = DiploChannel.forVolume port
-        new VolumeClient(ch, true)
+        // Canal mutualisé (M1) : non possédé, sa disposition ne ferme pas le canal partagé.
+        new VolumeClient(ch, false)
 
     new() =
         match DiploConfig.volumeAddress () with
-        | Some address -> new VolumeClient(DiploChannel.forAddress address, true)
+        | Some address -> new VolumeClient(DiploChannel.forAddress address, false)
         | None -> new VolumeClient(DiploPorts.Volume)
 
     member _.CreateAsync

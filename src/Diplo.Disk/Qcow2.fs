@@ -100,6 +100,15 @@ module Qcow2 =
         if refcountOrder <> 4 then
             failwithf "refcount_order %d non pris en charge (seul 4, soit 16 bits, l'est)" refcountOrder
 
+        // Bornes de sécurité sur une image forgée : l1_size et la table de
+        // refcounts ne doivent pas pouvoir allouer des parcours énormes ni des
+        // index L1 qui déborderaient de int (voir readBytesAtCore).
+        if refcountTableClusters < 1 || refcountTableClusters > (1 <<< 20) then
+            failwithf "Table de refcounts invalide (refcount_table_clusters = %d)" refcountTableClusters
+
+        if l1Size < 1 || int64 l1Size > int64 (1 <<< 24) then
+            failwithf "Table L1 invalide (l1_size = %d)" l1Size
+
         let refcountBits = 1 <<< refcountOrder
 
         if refcountBits <> 16 then
@@ -213,10 +222,12 @@ module Qcow2 =
         let mutable remaining = count
 
         while remaining > 0 do
-            let l1Index = int (pos >>> l1Shift)
+            let l1Index64 = pos >>> l1Shift
 
-            if l1Index >= h.L1Size then
-                failwithf "Index de table L1 %d hors limites (l1_size = %d)" l1Index h.L1Size
+            if l1Index64 >= int64 h.L1Size then
+                failwithf "Index de table L1 %d hors limites (l1_size = %d)" l1Index64 h.L1Size
+
+            let l1Index = int l1Index64
 
             let l2Index = int ((pos >>> h.ClusterBits) &&& int64 (l2Entries - 1))
             let inCluster = int (pos &&& int64 (h.ClusterSize - 1))
@@ -272,10 +283,12 @@ module Qcow2 =
         let mutable remaining = data.Length
 
         while remaining > 0 do
-            let l1Index = int (pos >>> l1Shift)
+            let l1Index64 = pos >>> l1Shift
 
-            if l1Index >= h.L1Size then
-                failwithf "Index de table L1 %d hors limites (l1_size = %d)" l1Index h.L1Size
+            if l1Index64 >= int64 h.L1Size then
+                failwithf "Index de table L1 %d hors limites (l1_size = %d)" l1Index64 h.L1Size
+
+            let l1Index = int l1Index64
 
             let l2Index = int ((pos >>> h.ClusterBits) &&& int64 (l2Entries - 1))
             let inCluster = int (pos &&& int64 (h.ClusterSize - 1))

@@ -40,6 +40,10 @@ type ContainerTabViewModel
     let logsSourceFactory =
         defaultArg logsSourceFactory (fun () -> new GrpcContainerLogsSource() :> IContainerLogsSource)
 
+    // Source de journaux créée UNE seule fois pour la durée de vie du ViewModel :
+    // un seul client gRPC partagé entre les clics (fini la recréation à chaque appel).
+    let logsSource = lazy (logsSourceFactory ())
+
     let containerClient =
         let factory = defaultArg containerClientFactory (fun () -> new ContainerClient() :> IContainerClient)
         factory ()
@@ -77,21 +81,30 @@ type ContainerTabViewModel
     let getSelectedContainer () = Volatile.Read(&selectedContainer)
     let setSelectedContainer v = Interlocked.Exchange(&selectedContainer, v) |> ignore
 
+    let logCtsGate = obj()
     let mutable logCts: CancellationTokenSource = null
 
+    // Annulation d'un suivi : le jeton est signalé puis détaché sous verrou.
+    // La disposition du CTS revient EXCLUSIVEMENT au worker qui l'a créé
+    // (finally), ce qui élimine tout double Cancel/Dispose concurrent.
     let cancelPreviousLogStream () =
-        if logCts <> null then
-            logCts.Cancel()
-            logCts.Dispose()
-            logCts <- null
+        lock logCtsGate (fun () ->
+            let cts = logCts
 
+            if not (isNull cts) then
+                cts.Cancel()
+                logCts <- null)
+
+    let eventsCtsGate = obj()
     let mutable eventsCts: CancellationTokenSource = null
 
     let cancelPreviousEventsStream () =
-        if eventsCts <> null then
-            eventsCts.Cancel()
-            eventsCts.Dispose()
-            eventsCts <- null
+        lock eventsCtsGate (fun () ->
+            let cts = eventsCts
+
+            if not (isNull cts) then
+                cts.Cancel()
+                eventsCts <- null)
 
     let listContainersCmd =
         RelayCommand(Action(fun () -> this.ListContainers() |> ignore))
@@ -740,7 +753,7 @@ type ContainerTabViewModel
     member private this.GetContainerLogs() =
         Cmd.run outputPort (fun () ->
             task {
-                use source = logsSourceFactory ()
+                let source = logsSource.Value
 
                 if this.ContainerFollow then
                     cancelPreviousLogStream ()
@@ -782,12 +795,20 @@ type ContainerTabViewModel
                             if not cancelled then
                                 outputPort.WriteSuccess("Suivi des journaux terminé")
                         finally
-                            enumerator.DisposeAsync().AsTask() |> ignore
+                            try
+                                // M6 : pas de .Wait() bloquant — la disposition
+                                // est démarrée et se termine en arrière-plan.
+                                enumerator.DisposeAsync().AsTask() |> ignore
+                            with _ ->
+                                ()
                     finally
-                        if logCts = cts then
-                            logCts <- null
+                        // Le détachement du champ et la disposition se font sous
+                        // le même verrou que l'annulation : pas de double Dispose.
+                        lock logCtsGate (fun () ->
+                            if logCts = cts then
+                                logCts <- null
 
-                        cts.Dispose()
+                            cts.Dispose())
                 else
                     let! entries =
                         source.GetSnapshot(
@@ -996,20 +1017,30 @@ type ContainerTabViewModel
                         if not cancelled then
                             outputPort.WriteSuccess("Suivi des événements terminé")
                     finally
-                        enumerator.DisposeAsync().AsTask() |> ignore
+                        try
+                            // M6 : pas de .Wait() bloquant — la disposition
+                            // est démarrée et se termine en arrière-plan.
+                            enumerator.DisposeAsync().AsTask() |> ignore
+                        with _ ->
+                            ()
                 finally
-                    if eventsCts = cts then
-                        eventsCts <- null
+                    // Le détachement du champ et la disposition se font sous
+                    // le même verrou que l'annulation : pas de double Dispose.
+                    lock eventsCtsGate (fun () ->
+                        if eventsCts = cts then
+                            eventsCts <- null
 
-                    cts.Dispose()
+                        cts.Dispose())
             })
 
     interface IDisposable with
         member _.Dispose() =
+            // Annulation uniquement : chaque CTS est disposé une seule fois par
+            // le worker qui l'a créé (finally), annulation ou fin de flux.
+            cancelPreviousLogStream ()
+            cancelPreviousEventsStream ()
+
+            if logsSource.IsValueCreated then
+                (logsSource.Value :> IDisposable).Dispose()
+
             (containerClient :> IDisposable).Dispose()
-            if logCts <> null then
-                logCts.Cancel()
-                logCts.Dispose()
-            if eventsCts <> null then
-                eventsCts.Cancel()
-                eventsCts.Dispose()
