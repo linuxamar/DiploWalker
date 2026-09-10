@@ -25,8 +25,11 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
                         <Button Content="🔄 Lister" Command="{Binding ImagesTab.ListImagesCommand}" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ImagesTab.ImageSearchInput}" Width="220" Margin="0,0,12,0"
-                                 x:Name="ImageSearchBox"
+                                 x:Name="ImageSearchBox" MaxLength="120"
                                  PlaceholderText="🔍 Rechercher (docker.io, quay.io, ghcr.io, mcr.microsoft.com)…" />
+                        <TextBox Text="{Binding ImagesTab.RegistreInput}" Width="150" Margin="0,0,12,0"
+                                 x:Name="RegistreSearchBox" MaxLength="80"
+                                 PlaceholderText="Registre (vide = tous)" />
                         <Button Content="📥 Télécharger" Command="{Binding ImagesTab.PullImageCommand}" Margin="0,0,4,0" />
                         <Button Content="🔍 Inspecter" Command="{Binding ImagesTab.InspectImageCommand}" Margin="0,0,4,0" />
                         <Button Content="✏ Étiqueter" Command="{Binding ImagesTab.TagImageCommand}" Margin="0,0,4,0" />

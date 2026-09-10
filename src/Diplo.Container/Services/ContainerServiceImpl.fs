@@ -799,7 +799,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
         // ─── Recherche d'images dans les catalogues en ligne ────────────────
 
-        member _.SearchRegistry(request, _context) =
+        member _.SearchRegistry(request, ct) =
             task {
                 ServiceGuards.requireNonEmpty request.Query "La requête de recherche"
 
@@ -817,8 +817,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 let! hits =
                     match registrySearchClient with
-                    | Some c -> RegistrySearch.searchWith c registry request.Query limit CancellationToken.None
-                    | None -> RegistrySearch.search registry request.Query limit CancellationToken.None
+                    | Some c -> RegistrySearch.searchWith c registry request.Query limit ct
+                    | None -> RegistrySearch.search registry request.Query limit ct
 
                 let results =
                     hits

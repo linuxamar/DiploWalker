@@ -219,3 +219,86 @@ let ``searchWith ignore un fournisseur en erreur et garde les autres resultats``
     hits.Length |> should equal 1
     hits.Head.Registry |> should equal "quay.io"
 
+[<Fact>]
+let ``searchWith borne le total des resultats fusionnes a limit`` () =
+    let handler =
+        new StubHttpHandler(fun uri ->
+            if uri.Host = "hub.docker.com" then
+                """{ "results": [ { "repo_name": "app1" }, { "repo_name": "app2" }, { "repo_name": "app3" } ] }"""
+            elif uri.Host = "quay.io" then
+                """{ "results": [ { "name": "team/app" } ] }"""
+            elif uri.Host = "mcr.microsoft.com" then
+                """{ "repositories": [ "microsoft/app" ] }"""
+            else
+                "{}")
+
+    use client = new HttpClient(handler)
+
+    let hits =
+        run (RegistrySearch.searchWith client None "app" 2 CancellationToken.None)
+
+    hits.Length |> should equal 2
+    hits |> List.forall (fun h -> h.Registry = "docker.io") |> should equal true
+    hits.[0].Repository |> should equal "app1"
+
+[<Fact>]
+let ``searchWith interroge les fournisseurs en parallele`` () =
+    let handler =
+        { new HttpMessageHandler() with
+            member _.SendAsync(request: HttpRequestMessage, _ct: CancellationToken) =
+                task {
+                    do! Task.Delay 250
+
+                    let body =
+                        match request.RequestUri.Host with
+                        | "hub.docker.com" -> """{ "results": [ { "repo_name": "nginx" } ] }"""
+                        | "quay.io" -> """{ "results": [ { "name": "team/app" } ] }"""
+                        | "mcr.microsoft.com" -> """{ "repositories": [ "azure/nginx" ] }"""
+                        | _ -> "{}"
+
+                    let response = new HttpResponseMessage(HttpStatusCode.OK)
+                    response.Content <- new StringContent(body, Encoding.UTF8, "application/json")
+                    return response
+                } }
+
+    use client = new HttpClient(handler)
+    let sw = System.Diagnostics.Stopwatch.StartNew()
+
+    let hits =
+        run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None)
+
+    sw.Stop()
+
+    // Trois fournisseurs à 250 ms chacun : en parallèle la durée reste proche
+    // de 250 ms, très en dessous de la somme séquentielle (~750 ms).
+    hits.Length |> should equal 3
+    sw.ElapsedMilliseconds < 600L |> should equal true
+
+[<Fact>]
+let ``mcrSearch borne la requete catalogue a n=limit`` () =
+    let urls = ResizeArray<string>()
+
+    let handler =
+        new StubHttpHandler(fun uri ->
+            lock urls (fun () -> urls.Add(uri.ToString()))
+            """{ "repositories": [ "mssql/server" ] }""")
+
+    use client = new HttpClient(handler)
+
+    let hits =
+        run (RegistrySearch.mcrSearch client "mssql" 2 CancellationToken.None)
+
+    hits.Length |> should equal 1
+    urls |> Seq.exists (fun u -> u.Contains "n=2") |> should equal true
+
+[<Fact>]
+let ``searchWith avec annulation renvoie une liste vide`` () =
+    use client = new HttpClient(new StubHttpHandler(fun _ -> """{ "results": [ { "repo_name": "nginx" } ] }"""))
+    use cts = new CancellationTokenSource()
+    cts.Cancel()
+
+    let hits =
+        run (RegistrySearch.searchWith client None "nginx" 25 cts.Token)
+
+    hits |> should be Empty
+

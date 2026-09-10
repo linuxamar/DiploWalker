@@ -166,10 +166,13 @@ module ContainerIntegrationTests =
         builder.Services.AddCodeFirstGrpc() |> ignore
         builder.Services.AddSingleton<IContainerdClient>(mock) |> ignore
         builder.Services.AddSingleton<IDiskMounter>(Diplo.Disk.DiskMounter()) |> ignore
+        builder.Services.AddSingleton<System.Net.Http.HttpClient>(Diplo.Container.Services.RegistrySearch.sharedClient)
+        |> ignore
         builder.Services.AddSingleton<ContainerServiceImpl>(fun sp ->
             ContainerServiceImpl(
                 sp.GetRequiredService<IContainerdClient>(),
-                sp.GetRequiredService<IDiskMounter>()
+                sp.GetRequiredService<IDiskMounter>(),
+                sp.GetRequiredService<System.Net.Http.HttpClient>()
             ))
         |> ignore
 

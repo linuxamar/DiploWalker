@@ -21,7 +21,12 @@ type RegistryImageHit =
 [<RequireQualifiedAccess>]
 module RegistrySearch =
 
-    let private http = new HttpClient(Timeout = TimeSpan.FromSeconds(30.0))
+    /// Client HTTP partagé du service, exposé pour être enregistré en singleton
+    /// DI (Program.fs) et injecté dans ContainerServiceImpl : une seule instance
+    /// qu'utilisent aussi bien la libération que la recherche, testée à part.
+    /// La taille maximale des réponses borne la mémoire en cas de catalogue
+    /// volumineux (mcr.microsoft.com).
+    let sharedClient = new HttpClient(Timeout = TimeSpan.FromSeconds(30.0), MaxResponseContentBufferSize = 8L * 1024L * 1024L)
 
     /// Recherche docker.io (Docker Hub).
     let dockerHubSearch
@@ -51,7 +56,9 @@ module RegistrySearch =
 
                         if not (String.IsNullOrWhiteSpace repo) then
                             let description = JsonHelpers.tryGetString el "short_description"
-                            let stars = int (JsonHelpers.tryGetInt64 el "star_count")
+                            // Borne de sécurité : une valeur démesurée (ou incohérente)
+                            // ne doit pas faire déborder la conversion int64 → int.
+                            let stars = int (min (JsonHelpers.tryGetInt64 el "star_count") (int64 Int32.MaxValue))
 
                             hits <-
                                 { Registry = "docker.io"
@@ -62,7 +69,10 @@ module RegistrySearch =
 
                     return List.rev hits
                 | _ -> return []
-            with _ ->
+            with
+            | :? OperationCanceledException -> return []
+            | ex ->
+                Serilog.Log.Warning(ex, "La recherche dans {Registry} a échoué (résultats ignorés)", "docker.io")
                 return []
         }
 
@@ -99,7 +109,10 @@ module RegistrySearch =
 
                     return List.rev hits
                 | _ -> return []
-            with _ ->
+            with
+            | :? OperationCanceledException -> return []
+            | ex ->
+                Serilog.Log.Warning(ex, "La recherche dans {Registry} a échoué (résultats ignorés)", "quay.io")
                 return []
         }
 
@@ -114,7 +127,11 @@ module RegistrySearch =
         : Task<RegistryImageHit list> =
         task {
             try
-                let! json = client.GetStringAsync("https://mcr.microsoft.com/v2/_catalog", ct)
+                // Le catalogue est paginé côté serveur : demander une page de la
+                // taille demandée borne la réponse au lieu de télécharger la totalité
+                // du catalogue (des centaines de Mo sur le réseau).
+                let url = sprintf "https://mcr.microsoft.com/v2/_catalog?n=%d" limit
+                let! json = client.GetStringAsync(url, ct)
 
                 use doc = JsonDocument.Parse json
 
@@ -142,7 +159,10 @@ module RegistrySearch =
 
                     return List.rev hits
                 | _ -> return []
-            with _ ->
+            with
+            | :? OperationCanceledException -> return []
+            | ex ->
+                Serilog.Log.Warning(ex, "La recherche dans {Registry} a échoué (résultats ignorés)", "mcr.microsoft.com")
                 return []
         }
 
@@ -162,8 +182,8 @@ module RegistrySearch =
           "mcr.microsoft.com", mcrSearch ]
 
     /// Recherche sur un client HTTP injecté (testable). Sans registre ciblé,
-    /// interroge tous les fournisseurs autorisés dans l'ordre de la liste
-    /// blanche.
+    /// interroge tous les fournisseurs autorisés en parallèle ; les résultats
+    /// sont fusionnés dans l'ordre de la liste blanche puis bornés à limit.
     let searchWith
         (client: HttpClient)
         (registry: string option)
@@ -179,15 +199,22 @@ module RegistrySearch =
                     | None -> true
                     | Some r -> host = r)
 
-            let mutable all: RegistryImageHit list = []
+            // Exécution parallèle des fournisseurs autorisés : le client HTTP est
+            // sûr en multi-thread, donc les délais de chaque registre ne
+            // s'additionnent plus. La fusion conserve l'ordre de la liste blanche
+            // et le total est borné à la limite demandée.
+            let tasks = active |> List.map (fun (_, search) -> search client query limit ct)
 
-            for (_, search) in active do
-                let! hits = search client query limit ct
-                all <- all @ hits
+            let! completed = Task.WhenAll tasks
 
-            return all
+            let merged =
+                active
+                |> List.mapi (fun i _ -> completed.[i])
+                |> List.concat
+
+            return List.truncate limit merged
         }
 
     /// Recherche avec le client HTTP partagé du service.
     let search (registry: string option) (query: string) (limit: int) (ct: CancellationToken) : Task<RegistryImageHit list> =
-        searchWith http registry query limit ct
+        searchWith sharedClient registry query limit ct

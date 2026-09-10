@@ -59,6 +59,17 @@ type MainWindow() as this =
         else
             failwith "Contrôle introuvable dans le XAML : ImageSearchBox"
 
+        // Recherche d'images : Entrée dans le champ registre déclenche aussi la recherche.
+        let registryBox = this.FindControl<TextBox>("RegistreSearchBox")
+
+        if not (isNull registryBox) then
+            registryBox.KeyDown.Add(fun e ->
+                if e.Key = Key.Enter then
+                    viewModel.ImagesTab.SearchImages() |> ignore
+                    e.Handled <- true)
+        else
+            failwith "Contrôle introuvable dans le XAML : RegistreSearchBox"
+
         // Disposer le ViewModel (clients gRPC, CTS de suivi...) à la fermeture :
         // sinon les flux « suivre » continuent et les canaux restent ouverts.
         this.Closed.Add(fun _ -> (viewModel :> IDisposable).Dispose())

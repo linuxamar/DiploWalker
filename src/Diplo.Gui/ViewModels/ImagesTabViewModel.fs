@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Collections.ObjectModel
 open System.Threading
 open Avalonia.Threading
+open Diplo.Abstractions
 open Diplo.Core.Clients
 open Diplo.Core.Output
 open Diplo.Gui.Services
@@ -48,8 +49,9 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
     let mutable imageNsInput = ""
     let mutable imageRefInput = ""
     let mutable searchInput = ""
+    let mutable registreInput = ""
     let mutable searchStatus =
-        "Recherche dans les catalogues en ligne (docker.io, quay.io, ghcr.io, mcr.microsoft.com) avec Entrée."
+        sprintf "Recherche dans les catalogues en ligne (%s) avec Entrée." RegistryProviders.label
 
     let mutable selectedImage: ImageDisplayInfo = Unchecked.defaultof<ImageDisplayInfo>
     let mutable selectedSearchResult: ImageSearchResultDisplay = Unchecked.defaultof<ImageSearchResultDisplay>
@@ -133,6 +135,12 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
             searchInput <- v
             this.OnPropertyChanged()
 
+    member _.RegistreInput
+        with get () = registreInput
+        and set v =
+            registreInput <- v
+            this.OnPropertyChanged()
+
     member _.ListImagesCommand = listImagesCmd
     member _.PullImageCommand = pullImageCmd
     member _.TagImageCommand = tagImageCmd
@@ -193,9 +201,15 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
                 let query = this.ImageSearchInput.Trim()
 
                 if String.IsNullOrEmpty query then
-                    outputPort.WriteError("Saisissez un terme de recherche (docker.io, quay.io, ghcr.io, mcr.microsoft.com)")
+                    outputPort.WriteError(sprintf "Saisissez un terme de recherche (%s)" RegistryProviders.label)
                 else
-                    let! response = containerClient.SearchImagesAsync(query)
+                    let registry =
+                        if String.IsNullOrWhiteSpace this.RegistreInput then
+                            None
+                        else
+                            Some(this.RegistreInput.Trim())
+
+                    let! response = containerClient.SearchImagesAsync(query, ?registry = registry)
 
                     if not (String.IsNullOrEmpty(response.Message)) then
                         outputPort.WriteWarning(response.Message)

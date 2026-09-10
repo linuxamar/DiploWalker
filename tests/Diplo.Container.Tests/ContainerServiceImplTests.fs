@@ -1837,7 +1837,9 @@ module ContainerServiceImplTests =
         member _.Client = client
 
         override _.SendAsync(request: HttpRequestMessage, _ct: CancellationToken) =
-            urls.Add(request.RequestUri.ToString())
+            // Les fournisseurs sont interrogés en parallèle : protéger la liste
+            // des URL consultées (ResizeArray non thread-safe).
+            lock urls (fun () -> urls.Add(request.RequestUri.ToString()))
 
             let body =
                 match request.RequestUri.Host with

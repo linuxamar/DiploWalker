@@ -64,6 +64,11 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - **GUI** : Avalonia 12.1.2 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate). Menu **Fichier** → *Exporter le journal…* (écrit les lignes horodatées du journal dans un `.txt` via le sélecteur de fichier).
 - **Tests** : xUnit v4 + FsUnit.xUnit — 1 608 tests au total.
 
+## Consignes impératives pour les agents
+
+- **La solution est `Diplo.slnx`** (formate XML compact .NET 10). Construire et tester toujours via `dotnet build Diplo.slnx` et `.\pipeline.ps1 -DoTests` — il n'existe pas de `Diplo.sln`.
+- **Suivre impérativement TOUTES les compétences dotnet** chargées (dont `dotnet-practices` et `dotnet-code-review`) à chaque écriture, modification ou relecture de code .NET : aucune exception pour une édition rapide ou un patch supposé banal.
+
 ### Contournement FS0366 (tests Avalonia GUI)
 
 Les fakes des interfaces `Avalonia.Platform.Storage` (`FakeStorageProvider.fs`) déclenchent l'erreur fantôme FS0366 « Aucune implémentation pour 'IStorageItem...' » quand F# compile contre les **références** assemblies d'Avalonia (`ref\net10.0`). Dans `tests/Diplo.Gui.Tests/Diplo.Gui.Tests.fsproj`, la cible `UseLibAvaloniaBase` (après `ResolvePackageAssets`) retire `Avalonia.Base` des `ResolvedCompileFileDefinitions` et la remplace par l'assembly `lib\net10.0\Avalonia.Base.dll` via `$(PkgAvalonia)` — exposé par la `PackageReference Include="Avalonia"` directe. Ne pas retirer cette référence ni `ExcludeAssets` : le swap ciblé d'`Avalonia.Base` seul préserve `Avalonia.dll` (AppBuilder, HeadlessApp).
