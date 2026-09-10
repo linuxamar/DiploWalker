@@ -54,7 +54,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 | `FsImage`                    | Diplo.Disk         | Création d'images disque (`create`), extraction (`extract`) et réécriture (`writeBack`) de systèmes de fichiers. Chaîne d'adaptateurs IsoFs → Hawkynt → VdiFs → DmgFs → DiscUtils. Supporte Raw, VHD, VHDX, VMDK, VDI et ISO en création (`createCore` court-circuite le format ISO via `IsoFs.createCore`, défini en lecture seule). |
 | `IsoFs`                      | Diplo.Disk         | Parseur maison ISO9660 (`IsoSource`/`Iso9660`/`Udf`/`IsoImage`, déplacé de `Diplo.Volume`) + générateur ISO9660 niveau 1 (`create`, noms 8.3 ASCII, sans Joliet/Rock Ridge). `tryExtract` retourne `None` si le format n'est pas détecté ou en cas d'erreur (log warning) ; `tryWriteBack` renvoie `false` (ISO en lecture seule). Consommé par `FsImage` et par la façade `IsoDriver` de `Diplo.Volume`. |
 | `RegistrySearch`             | Diplo.Container    | Recherche d'images dans les catalogues en ligne des registres autorisés : docker.io et quay.io via leur API de recherche publique ; mcr.microsoft.com via le catalogue `_catalog` public téléchargé puis filtré **localement** (insensible à la casse, pas de requête serveur) ; ghcr.io sans API publique → aucun résultat. `searchWith` injecte un `HttpClient` (testable), `search` utilise le client partagé (timeout 30 s). Liste blanche : docker.io, quay.io, ghcr.io, mcr.microsoft.com. |
-| `ImagesTabViewModel`         | Diplo.Gui          | ViewModel de l'onglet Images : liste des images locales (lister/télécharger/inspecter/étiqueter/supprimer/nettoyer), recherche en ligne déclenchée par la touche Entrée dans le champ dédié, grille de résultats avec « Tirer la sélection ». |
+| `ImagesTabViewModel`         | Diplo.Gui          | ViewModel de l'onglet Images : liste des images locales (lister/télécharger/inspecter/étiqueter/supprimer/nettoyer), recherche en ligne déclenchée par la touche Entrée dans le champ dédié (débouncée 250 ms, annulable via `CancellationTokenSource` sous verrou), grille de résultats avec « Tirer la sélection ». |
 
 ## Stack
 
@@ -62,7 +62,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - Solution : **`Diplo.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
 - **GUI** : Avalonia 12.1.2 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate). Menu **Fichier** → *Exporter le journal…* (écrit les lignes horodatées du journal dans un `.txt` via le sélecteur de fichier).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 1 608 tests au total.
+- **Tests** : xUnit v4 + FsUnit.xUnit — 1 612 tests au total (dont 1 ignoré dans `Diplo.Disk.Tests` faute de privilège de création de liens symboliques NTFS).
 
 ## Consignes impératives pour les agents
 
@@ -72,6 +72,10 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 ### Contournement FS0366 (tests Avalonia GUI)
 
 Les fakes des interfaces `Avalonia.Platform.Storage` (`FakeStorageProvider.fs`) déclenchent l'erreur fantôme FS0366 « Aucune implémentation pour 'IStorageItem...' » quand F# compile contre les **références** assemblies d'Avalonia (`ref\net10.0`). Dans `tests/Diplo.Gui.Tests/Diplo.Gui.Tests.fsproj`, la cible `UseLibAvaloniaBase` (après `ResolvePackageAssets`) retire `Avalonia.Base` des `ResolvedCompileFileDefinitions` et la remplace par l'assembly `lib\net10.0\Avalonia.Base.dll` via `$(PkgAvalonia)` — exposé par la `PackageReference Include="Avalonia"` directe. Ne pas retirer cette référence ni `ExcludeAssets` : le swap ciblé d'`Avalonia.Base` seul préserve `Avalonia.dll` (AppBuilder, HeadlessApp).
+
+### Flaky connu (à ne pas « corriger » à la hâte)
+
+`tests/Diplo.Gui.Tests/OptionalBehaviorTests.fs` (~ligne 156) « VolumeTabViewModel CreateImage cree une image raw depuis le repertoire source » : intermittente en suite complète ou sous charge disque (timeout du `waitUntil` ≈ 5 s), **passe systématiquement en isolation et au re-run**. Ne pas rejouer/patch sur un seul échec — relancer le run concerné avant d'investiguer.
 
 ### Ports gRPC (Debug / Release)
 
@@ -87,6 +91,11 @@ Les ports des 3 services sont définis **une seule fois** dans `Diplo.Abstractio
 - **`IDisposable` + `new`** : F# exige `new Type(args)` quand `Type` implémente `IDisposable`.
 - **Paramètres optionnels** : `?` interdits hors des `member` F#.
 - **`let mutable`** dans les classes : utilise des `let`/`do` bindings pour accéder aux propriétés avec `member private`.
+- **`try ... with ... finally` combiné impossible** (FS0010) : imbriquer `try (try ... with :? OperationCanceledException -> ()) finally ...`.
+- **Pas de `do!` dans un `finally`** (corps synchrone) : pour disposer un `IAsyncEnumerator`, `try do! e.DisposeAsync().AsTask() with _ -> ()` — jamais `.AsTask().Wait(...)`.
+- **Protocole CTS (suivi de flux/journaux)** : annuler = sous `lock`, `Cancel()` puis champ ← `null` (jamais de `Dispose()` ici) ; disposer = uniquement le worker, dans son `finally`, sous le même verrou, avec garde d'identité (`if cts = monInstance`).
+- **`ObservableCollection` (Avalonia) sans `RemoveRange`** : journal incrémental borné via compteur `renderedLineCount` + suppression des N premières lignes (scan du premier `\n`), rebuild complet seulement si `Clear` externe.
+- **Debounce recherche (GUI)** : `DispatcherTimer` ~250 ms redémarré à chaque frappe (Stop/Start) sur `KeyDown` ; jamais de recherche synchrone dans le thread UI.
 
 ## Commandes
 

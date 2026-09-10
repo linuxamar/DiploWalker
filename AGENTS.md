@@ -4,6 +4,7 @@
 
 - .NET 10 (F# orientation)
 - Git LFS required: run `git lfs install` after clone
+- Validation: `./pipeline.ps1 -DoTests` (build + tests, ~3 min; see CLAUDE.md)
 
 ## Git conventions
 
