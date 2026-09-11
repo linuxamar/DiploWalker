@@ -85,9 +85,9 @@ La validation des chemins services passe par `SecurityValidation`, et tout éche
 
 ### Extraction d'archives (installateur)
 
-L'extraction des archives téléchargées (containerd, CNI) est faite entrée par entrée avec **validation anti zip-slip** : chaque chemin résultant est forcé à rester sous le dossier de destination (`Path.GetFullPath` + vérification de préfixe). Les téléchargements passent par un **HttpClient partagé** avec retry/backoff (pas de nouveau client par appel). Chaque artefact est vérifié contre son **SHA-256 embarqué** avant utilisation.
+L'extraction des archives téléchargées (containerd, CNI) est faite entrée par entrée avec **validation anti zip-slip** : chaque chemin résultant est forcé à rester sous le dossier de destination (`Path.GetFullPath` + vérification de préfixe). Les téléchargements passent par un **HttpClient partagé** avec retry/backoff (pas de nouveau client par appel). Chaque artefact est vérifié contre son **SHA-256 issu d'un manifeste signé** avant utilisation.
 
-> **État actuel** : la vérification des artefacts repose sur le SHA-256 embarqué. La vérification par **signature** (cosign/GPG) n'est pas encore implémentée — elle est nécessaire pour protéger contre une compromission au build.
+> **États** : les checksums sont centralisés dans `assets/artifacts.manifest`, signé en **RSA-4096/SHA-384** (PKCS#1 v1.5) par une clé privée **jamais versionnée** (hors bande, cf. `tools/sign-artifacts.ps1`). Le manifeste, la signature (base64) et la clé publique sont **embarqués** dans l'assembly (`ArtifactSigning.fs`). À l'installation, le manifeste est chargé une seule fois et sa signature vérifiée avec la clé publique embarquée : **tout échec de vérification lève une erreur (fail-closed)** — l'installation s'interrompt. Un build compromis ou une modification des checksums ne peut régénérer une signature valide sans la clé privée. Les trois assets signés sont forcés en fins de ligne LF (`.gitattributes`) : une conversion autocrlf casserait la vérification.
 
 ## Identifiants de registres (login/logout)
 
@@ -139,4 +139,4 @@ Les index L1/L2 des images disque (qcow2, qcow1, parallels) sont validés **avan
 - Utiliser des images de conteneurs signées et provenant de registries fiables.
 - La recherche et le pull d'images en ligne sont limités à une liste blanche de registres : docker.io, quay.io, mcr.microsoft.com, ghcr.io (`RegistrySearch.fs`).
 - Limiter les ressources des conteneurs en production pour éviter les dénis de service.
-- Ajouter la vérification par **signature** (cosign/GPG) des artefacts de l'installateur (remplace le SHA-256 seul, voir « Extraction d'archives »).
+- **Procédure de renouvellement des checksums des artefacts** : éditer `assets/artifacts.manifest` (fins de ligne LF), lancer `tools/sign-artifacts.ps1` (signe avec la clé privée hors bande, vérifie avec la clé publique, réécrit `artifacts.manifest.sig` en base64), puis commiter le manifeste et la signature. Si la paire de clés est régénérée, mettre à jour `assets/diplo-release.pub` ET garantir sa cohérence entre le dépôt et l'emplacement de la clé privée (une clé publique embarquée qui ne correspond plus à la clé de signature fait échouer `sign-artifacts.ps1`).

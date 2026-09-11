@@ -101,16 +101,9 @@ let downloadContainerdVersion = getMinContainerdVersion ()
 let cniPluginsVersion = "1.6.2"
 let winCniVersion = "0.3.1"
 
-let containerdChecksums =
-    Map.ofList
-        [ "1.6.36", "74EEC7B76EBFF2A68DD478413B1ED03D435E03A4DB3244F36E92C8B80AD90C71"
-          "1.7.27", "2C51135531ED9EEC3D414CC40E0BF1F0203ABBE48F449BE3CF04BB47F31C7FA5" ]
-
-let cniPluginsChecksum =
-    "7D1A7FBB0C8B272801E7E64CC1CAD6939E0E7AD0F52644EE9F8801D61DAD5849"
-
-let winCniChecksum =
-    "4F36EE6905ADA238CA2A9E1BFB8A1FB2912C2D88C4B6E5AF4C41A42DB70D7D68"
+/// Manifeste des checksums signé (RSA-4096/SHA-384) — vérifié une seule fois au
+/// démarrage. Lève dès le chargement si la signature est invalide (fail-closed).
+let artifactChecksums = ArtifactSigning.loadVerifiedManifest ()
 
 let containerdArchive =
     sprintf "containerd-%s-windows-amd64.tar.gz" downloadContainerdVersion
@@ -316,7 +309,7 @@ let installContainerd () =
 
         printfn "  [*] Téléchargement depuis GitHub..."
         do! downloadFile containerdUrl archivePath
-        let expectedChecksum = containerdChecksums |> Map.tryFind downloadContainerdVersion
+        let expectedChecksum = ArtifactSigning.lookupChecksum artifactChecksums containerdArchive
 
         try
             verifyChecksum archivePath expectedChecksum
@@ -356,7 +349,7 @@ let downloadCniPlugins () =
         do! downloadFile winCniUrl winCniTemp
 
         try
-            verifyChecksum winCniTemp (Some winCniChecksum)
+            verifyChecksum winCniTemp (ArtifactSigning.lookupChecksum artifactChecksums winCniArchive)
         with ex ->
             printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(winCniTemp)
@@ -380,7 +373,7 @@ let downloadCniPlugins () =
         do! downloadFile cniUrl cniTemp
 
         try
-            verifyChecksum cniTemp (Some cniPluginsChecksum)
+            verifyChecksum cniTemp (ArtifactSigning.lookupChecksum artifactChecksums cniArchive)
         with ex ->
             printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(cniTemp)

@@ -4,15 +4,15 @@ Mémoire de travail de session (à réécrire à chaque session). Les règles st
 
 ## Session en cours
 
-- **Date :** 2026-09-10
-- **Branche :** `dev` (synchronisée avec `origin/dev`, arbre propre)
-- **Objectif :** livraison historique — lots 1-4 livrés, tickets GitHub #1-#4 fermés.
-- **Dernier commit :** `7b7a2a5` (correction tests flaky + encodage UTF-8 pipeline).
+- **Date :** 2026-09-11
+- **Branche :** `dev`
+- **Objectif :** ticket C3 — intégrité des artefacts installateur : manifeste de checksums signé RSA-4096/SHA-384, clé privée hors bande, vérification fail-closed embarquée.
+- **Dernier commit avant C3 :** `7815e1b` (mise à jour du contexte de session après corrections flaky).
 
 ## État Git
 
 - `dev` → `main` : 12 commits à promouvoir (merge direct, pas de PR).
-- Dernier commit poussé : `7b7a2a5` (corrections flaky + pipeline).
+- C3 non commité : 6 fichiers modifiés + 4 nouveaux.
 
 ## Corrections livrées (commit 7b7a2a5)
 
@@ -23,8 +23,17 @@ Mémoire de travail de session (à réécrire à chaque session). Les règles st
 
 ## Reste à faire
 
-- **C3 (ticket #1) :** signature cosign/GPG des artefacts installateur non implémentée (SHA-256 seul) — candidat ticket de suivi.
 - **Promotion `dev` → `main`** : 12 commits à merger directement.
+
+## C3 — intégrité des artefacts (nouveau, commit en cours)
+
+- Checksums centralisés dans `src/Diplo.Installer/assets/artifacts.manifest`, signé **RSA-4096/SHA-384** (PKCS#1 v1.5) par une clé privée **hors bande** (`~/.diplo/diplo-release.key`, passphrase provisoire `diplo-temp` à migrer en coffre — jamais dans le dépôt).
+- Trois ressources embarquées dans l'assembly (LogicalNames `Diplo.Installer.assets.*`) : manifeste, signature (**base64**, décodée via `Convert.FromBase64String`), clé publique `diplo-release.pub`. Lecture via `typeof<AssemblyAnchor>.Assembly` (pas `GetExecutingAssembly`, fiable depuis les tests).
+- Vérification **fail-closed** dans `ArtifactSigning.loadVerifiedManifest` (levée dès chargement), appelée une fois au démarrage dans `Core.fs` (`artifactChecksums` remplace les 3 constantes codées en dur). `verifyChecksum` accepte `string option`, `None` → échec.
+- `.gitattributes` : les 3 assets signés sont forcés en `text eol=lf` (autocrlf=true casserait la signature). Manifeste vérifié LF-only (8 LF, 0 CRLF), `.sig` sur une seule ligne (684 octets).
+- `tools/sign-artifacts.ps1` : re-signature openssl + vérification croisée + écriture base64, la clé publique de contrôle dérive de `-KeyPath`.
+- Tests : `ArtifactSigningTests.fs` (10 tests : parsing, signature valide/altérée/autre clé, checksums dorés, lookup inconnu). Pipeline complet vert (`./pipeline.ps1 -DoTests`, ~6 min sur ce poste).
+- Renouvellement/manip clé : `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096` ; empreinte sha256 du `.pub` actuel `02:7F:8A:F3:95:5F:FD:9C:A6:D1:28:DC:FC:EE:9E:85:7F:7E:7A:5F:27:C8:F2:B5:C0:44:81:AE:40:D6:7F:81`.
 
 ## Connaissance tribale
 
