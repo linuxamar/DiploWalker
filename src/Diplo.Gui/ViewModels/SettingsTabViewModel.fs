@@ -102,3 +102,6 @@ type SettingsTabViewModel(outputPort: IOutputPort) as this =
 
     member _.SaveCommand: ICommand = saveCmd
     member _.ReloadCommand: ICommand = reloadCmd
+
+    interface IDisposable with
+        member _.Dispose() = ()

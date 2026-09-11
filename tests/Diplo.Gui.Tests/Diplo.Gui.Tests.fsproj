@@ -9,10 +9,17 @@
     <Compile Include="ViewModelBaseTests.fs" />
     <Compile Include="AvaloniaOutputPortTests.fs" />
     <Compile Include="TabViewModelTests.fs" />
+    <Compile Include="FakeStorageProvider.fs" />
     <Compile Include="OptionalBehaviorTests.fs" />
     <Compile Include="ClientInjectedBehaviorTests.fs" />
+    <Compile Include="ImagesTabViewModelTests.fs" />
+    <Compile Include="CatalogViewModelTests.fs" />
     <Compile Include="HeadlessApp.fs" />
     <Compile Include="HeadlessBehaviorTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,7 +32,31 @@
     </PackageReference>
     <PackageReference Include="FsUnit.xUnit"  />
     <PackageReference Include="Avalonia.Headless"  />
+    <!--
+      Le paquet Avalonia est référencé directement uniquement pour exposer la
+      propriété MSBuild $(PkgAvalonia) (chemin du cache NuGet), utilisée par la
+      cible UseLibAvaloniaBase juste en dessous.
+    -->
+    <PackageReference Include="Avalonia"  />
   </ItemGroup>
+
+  <!--
+    Contournement FS0366 : Avalonia fournit des références assemblies
+    (ref\net10.0) dont les métadonnées déclenchent une erreur fantôme
+    « Aucune implémentation pour 'IStorageItem.(... is -not- implementable
+    by user code ...)' » quand F# implémente les interfaces IStorageItem /
+    IStorageFile / IStorageFolder / IStorageProvider (cf. FakeStorageProvider.fs).
+    On remplace donc uniquement l'asset de compilation Avalonia.Base par son
+    assembly lib\net10.0, qui ne présente pas ce problème.
+  -->
+  <Target Name="UseLibAvaloniaBase" AfterTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <ResolvedCompileFileDefinitions Remove="@(ResolvedCompileFileDefinitions)" Condition="'%(ResolvedCompileFileDefinitions.Filename)' == 'Avalonia.Base'" />
+      <Reference Include="Avalonia.Base">
+        <HintPath>$(PkgAvalonia)\lib\net10.0\Avalonia.Base.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Diplo.Gui\Diplo.Gui.fsproj" />

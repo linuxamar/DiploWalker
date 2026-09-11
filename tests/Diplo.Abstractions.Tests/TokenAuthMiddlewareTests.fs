@@ -57,13 +57,13 @@ module TokenAuthMiddlewareTests =
             Path.Combine(Path.GetTempPath(), "diplo-auth-http-" + Guid.NewGuid().ToString("N"))
 
         Directory.CreateDirectory(dir) |> ignore
-        let previous = authTokenPath
-        authTokenPath <- Path.Combine(dir, "auth-token.json")
+        let previous = tokenPath ()
+        setTokenPath (Path.Combine(dir, "auth-token.json"))
 
         try
             f ()
         finally
-            authTokenPath <- previous
+            setTokenPath previous
             Directory.Delete(dir, true)
 
     let withTempToken (token: string) (f: unit -> unit) =

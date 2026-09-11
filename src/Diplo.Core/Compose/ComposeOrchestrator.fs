@@ -14,6 +14,10 @@ open YamlDotNet.RepresentationModel
 
 type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient) =
 
+    // H11 : un fichier compose démesuré ne doit pas être chargé en mémoire sans
+    // borne — limite arbitraire mais généreuse pour un projet compose légitime.
+    let maxComposeFileBytes = 10 * 1024 * 1024
+
     let containerClient =
         containerClient |> Option.defaultWith (fun () -> new ContainerClient() :> IContainerClient)
 
@@ -37,6 +41,20 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
         if not (File.Exists filePath) then
             raise (
                 RpcException(Status(StatusCode.NotFound, sprintf "Le fichier compose '%s' est introuvable" filePath))
+            )
+
+        // H11 : vérification avant lecture — File.ReadAllText chargerait la totalité
+        // du fichier en mémoire sans contrôle.
+        let fileInfo = FileInfo(filePath)
+
+        if fileInfo.Length > int64 maxComposeFileBytes then
+            raise (
+                RpcException(
+                    Status(
+                        StatusCode.InvalidArgument,
+                        sprintf "Le fichier compose '%s' dépasse la limite de 10 Mo" filePath
+                    )
+                )
             )
 
         let yaml = File.ReadAllText(filePath)
@@ -421,8 +439,9 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                 output.WriteSuccess(sprintf "  %s" response.Message)
         }
 
-    member this.Build(filePath: string) =
+    member this.Build(filePath: string, ?ct: CancellationToken) =
         task {
+            let ct = defaultArg ct CancellationToken.None
             let compose = this.ParseFile(filePath)
 
             output.WriteSuccess(
@@ -479,7 +498,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                         proc.Start() |> ignore
                         proc.BeginOutputReadLine()
                         proc.BeginErrorReadLine()
-                        do! proc.WaitForExitAsync()
+                        do! proc.WaitForExitAsync(ct)
 
                         if proc.ExitCode = 0 then
                             output.WriteSuccess(sprintf "  ✓ Image '%s' construite" svc.Image)
@@ -492,6 +511,6 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                         sprintf "  %s utilise une image existante (%s), téléchargement..." svc.Name svc.Image
                     )
 
-                    let! _ = containerClient.PullImageAsync(svc.Image)
+                    let! _ = containerClient.PullImageAsync(svc.Image, ct = ct)
                     output.WriteSuccess(sprintf "  ✓ Image '%s' disponible" svc.Image)
         }

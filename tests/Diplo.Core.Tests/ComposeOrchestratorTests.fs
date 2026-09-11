@@ -105,7 +105,7 @@ module ComposeOrchestratorTests =
 
             member _.InspectAsync(_id, ?_ct) = raise (NotImplementedException())
 
-            member _.ListAsync(?_all, ?_filters, ?_ct) =
+            member _.ListAsync(?_namespaceName, ?_all, ?_filters, ?_ct) =
                 Task.FromResult(
                     { ListContainersResponse.Containers = listed }
                 )
@@ -137,6 +137,7 @@ module ComposeOrchestratorTests =
             member _.InspectImageAsync(_ref, ?_namespaceName, ?_ct) = raise (NotImplementedException())
             member _.RemoveImageAsync(_ref, ?_namespaceName, ?_ct) = raise (NotImplementedException())
             member _.TagImageAsync(_source, _target, ?_namespaceName, ?_ct) = raise (NotImplementedException())
+            member _.SearchImagesAsync(_query, ?_registry, ?_limit, ?_ct) = raise (NotImplementedException())
 
             member _.PauseAsync(_id, ?_ct) = raise (NotImplementedException())
             member _.UnpauseAsync(_id, ?_ct) = raise (NotImplementedException())

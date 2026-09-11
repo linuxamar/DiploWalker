@@ -145,7 +145,8 @@ module ContainerIntegrationTests =
 
             member _.ResumeContainer(_ns, _id) = ()
 
-            member _.WaitForContainerExit(_ns, _id, _timeoutSeconds) = 0
+            member _.WaitForContainerExit(_ns, _id, _timeoutSeconds, _ct) =
+                System.Threading.Tasks.Task.FromResult(0)
 
             member _.UpdateContainer(_ns, _id, _mem, _cpu, _pids) = ()
 
@@ -166,7 +167,15 @@ module ContainerIntegrationTests =
         builder.Services.AddCodeFirstGrpc() |> ignore
         builder.Services.AddSingleton<IContainerdClient>(mock) |> ignore
         builder.Services.AddSingleton<IDiskMounter>(Diplo.Disk.DiskMounter()) |> ignore
-        builder.Services.AddSingleton<ContainerServiceImpl>() |> ignore
+        builder.Services.AddSingleton<System.Net.Http.HttpClient>(Diplo.Container.Services.RegistrySearch.sharedClient)
+        |> ignore
+        builder.Services.AddSingleton<ContainerServiceImpl>(fun sp ->
+            ContainerServiceImpl(
+                sp.GetRequiredService<IContainerdClient>(),
+                sp.GetRequiredService<IDiskMounter>(),
+                sp.GetRequiredService<System.Net.Http.HttpClient>()
+            ))
+        |> ignore
 
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(System.Net.IPAddress.Loopback, 0, fun lo -> lo.Protocols <- HttpProtocols.Http2))
@@ -375,7 +384,7 @@ module ContainerIntegrationTests =
 
             client.CreateContainer(createReq, CancellationToken.None).Result |> ignore
             client.CreateContainer(createReq, CancellationToken.None).Result |> ignore
-            let listReq: ListContainersRequest = { All = false; Filters = Dictionary() }
+            let listReq: ListContainersRequest = { All = false; NamespaceName = ""; Filters = Dictionary() }
             let listResult = client.ListContainers(listReq, CancellationToken.None).Result
             listResult.Containers.Count |> should equal 2)
 

@@ -426,6 +426,52 @@ type ContainerdClientTests() =
                 ()
 
     [<Fact>]
+    member _.``readUpTo retourne les lignes, applique since et tail, et remonte la watermark``() =
+        let dir =
+            Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
+
+        Directory.CreateDirectory dir |> ignore
+
+        try
+            ContainerLogs.setLogsDir dir
+
+            File.WriteAllText(
+                ContainerLogs.fileFor "c-1",
+                "2026-08-11T10:30:01Z line 1"
+                + Environment.NewLine
+                + "2026-08-11T10:30:02Z line 2"
+                + Environment.NewLine
+                + "2026-08-11T10:30:03Z line 3"
+            )
+
+            let lines, offset = ContainerLogs.readUpTo "c-1" 0 "" |> Result.defaultWith failwith
+
+            lines
+            |> should equal [| "2026-08-11T10:30:01Z line 1"
+                               "2026-08-11T10:30:02Z line 2"
+                               "2026-08-11T10:30:03Z line 3" |]
+
+            offset |> should equal (FileInfo(ContainerLogs.fileFor "c-1").Length)
+
+            let since =
+                ContainerLogs.readUpTo "c-1" 0 "2026-08-11T10:30:02Z" |> Result.defaultWith failwith |> fst
+
+            since |> should haveLength 2
+            since.[0] |> shouldContain "line 2"
+
+            let tailed = ContainerLogs.readUpTo "c-1" 1 "" |> Result.defaultWith failwith |> fst
+            tailed |> should equal [| "2026-08-11T10:30:03Z line 3" |]
+
+            ContainerLogs.fileLength "c-1" |> should equal (FileInfo(ContainerLogs.fileFor "c-1").Length)
+            ContainerLogs.fileLength "inconnu" |> should equal 0L
+            ContainerLogs.readUpTo "inconnu" 0 "" |> Result.defaultWith failwith |> fst |> should be Empty
+        finally
+            try
+                Directory.Delete(dir, true)
+            with _ ->
+                ()
+
+    [<Fact>]
     member _.``GetContainerLogsStream suit les nouvelles lignes jusqu'a la sortie du conteneur``() =
         let dir =
             Path.Combine(Path.GetTempPath(), "diplo-logs-" + Guid.NewGuid().ToString("N"))
@@ -513,6 +559,41 @@ type ContainerdClientTests() =
         (args |> String.concat " ") |> shouldContain "ls"
 
     [<Fact>]
+    member _.``StartExec rejette un identifiant de conteneur vide avant de lancer un processus``() =
+        let runner = createRunner ()
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        let stdin = new MemoryStream()
+        let stdout = new MemoryStream()
+        let stderr = new MemoryStream()
+
+        let ex =
+            Assert.Throws<RpcException>(fun () ->
+                client.StartExec("default", "", [| "echo"; "ok" |], stdin, stdout, stderr) |> ignore)
+
+        ex.StatusCode |> should equal StatusCode.InvalidArgument
+        runner.SecureCommands |> should be Empty
+
+    [<Fact>]
+    member _.``StartExec rejette une commande avec un argument vide avant de lancer un processus``() =
+        let runner = createRunner ()
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        let stdin = new MemoryStream()
+        let stdout = new MemoryStream()
+        let stderr = new MemoryStream()
+
+        let ex =
+            Assert.Throws<RpcException>(fun () ->
+                client.StartExec("default", "c-1", [| "echo"; "" |], stdin, stdout, stderr) |> ignore)
+
+        ex.StatusCode |> should equal StatusCode.InvalidArgument
+        ex.Status.Detail |> shouldContain "argument vide"
+        runner.SecureCommands |> should be Empty
+
+    [<Fact>]
     member _.``Version gere les erreurs ctr``() =
         let runner = createRunner ()
         runner.SetFail("ctr n'est pas installé")
@@ -524,21 +605,79 @@ type ContainerdClientTests() =
         result |> shouldContain "Version inconnue"
 
     [<Fact>]
-    member _.``PullImage sans identifiant n'ajoute pas --user``() =
+    member _.``PullImage sans compte enregistre leve AuthentificationRequise``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+
+        let stateFile =
+            System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "diplo-pull-noauth-" + System.Guid.NewGuid().ToString("N") + ".json"
+            )
+
+        try
+            RegistryAuth.setStateFile stateFile
+            let client =
+                ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+            let ex =
+                Assert.Throws<RpcException>(fun () -> client.PullImage("nginx:latest", None) |> ignore)
+
+            ex.StatusCode |> should equal StatusCode.InvalidArgument
+            ex.Status.Detail |> shouldContain "Authentification requise"
+            runner.SecureCommands |> should be Empty
+        finally
+            try
+                System.IO.File.Delete stateFile
+            with _ ->
+                ()
+
+    [<Fact>]
+    member _.``PullImage d'un registre non autorise leve InvalidArgument meme avec --user``() =
         let runner = createRunner ()
         runner.OnCommand("image pull", "resolved")
 
         let client =
             ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
-        let result = client.PullImage("nginx:latest", None)
-        result |> should equal "resolved"
+        let ex =
+            Assert.Throws<RpcException>(fun () ->
+                client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret") |> ignore)
 
-        let (_, args) =
-            runner.SecureCommands
-            |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
+        ex.StatusCode |> should equal StatusCode.InvalidArgument
+        ex.Status.Detail |> shouldContain "non autorisée"
+        ex.Status.Detail |> shouldContain "ghcr.io"
+        runner.SecureCommands |> should be Empty
 
-        (args |> String.concat " ") |> shouldNotContain "--user"
+    [<Fact>]
+    member _.``PullImage d'un registre non autorise leve InvalidArgument meme avec compte enregistre``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+
+        let stateFile =
+            System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "diplo-pull-" + System.Guid.NewGuid().ToString("N") + ".json"
+            )
+
+        try
+            RegistryAuth.setStateFile stateFile
+            RegistryAuth.add stateFile "myregistry.azurecr.io" "user" "pass"
+            let client =
+                ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+            let ex =
+                Assert.Throws<RpcException>(fun () ->
+                    client.PullImage("myregistry.azurecr.io/team/app:latest", None) |> ignore)
+
+            ex.StatusCode |> should equal StatusCode.InvalidArgument
+            ex.Status.Detail |> shouldContain "non autorisée"
+            runner.SecureCommands |> should be Empty
+        finally
+            try
+                System.IO.File.Delete stateFile
+            with _ ->
+                ()
 
     [<Fact>]
     member _.``PullImage avec --user inline utilise l'identifiant explicite``() =
@@ -548,19 +687,19 @@ type ContainerdClientTests() =
         let client =
             ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
-        let result =
-            client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret")
-
+        let result = client.PullImage("ghcr.io/team/app:latest", Some "inline:secret")
         result |> should equal "resolved"
 
-        // Identifiant EXPLICITE : repli historique sur argv (choix de l'utilisateur).
+        // H6 : l'identifiant EXPLICITE passe aussi par le hosts-dir du helper —
+        // plus aucun secret dans argv.
         let (_, args) =
             runner.SecureCommands
             |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
 
         let joined = args |> String.concat " "
-        joined |> shouldContain "--user"
-        joined |> shouldContain "inline:secret"
+        joined |> shouldContain "--hosts-dir"
+        joined |> shouldNotContain "--user"
+        joined |> shouldNotContain "inline:secret"
 
     [<Fact>]
     member _.``PullImage --user inline prime sur l'identifiant enregistre``() =
@@ -575,13 +714,12 @@ type ContainerdClientTests() =
 
         try
             RegistryAuth.setStateFile stateFile
-            RegistryAuth.add stateFile "myregistry.azurecr.io" "stored" "pass"
+            RegistryAuth.add stateFile "ghcr.io" "stored" "pass"
 
             let client =
                 ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
-            let result =
-                client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret")
+            let result = client.PullImage("ghcr.io/team/app:latest", Some "inline:secret")
 
             result |> should equal "resolved"
 
@@ -590,7 +728,8 @@ type ContainerdClientTests() =
                 |> List.find (fun (_, a) -> (a |> String.concat " ").Contains("image pull"))
 
             let joined = args |> String.concat " "
-            joined |> shouldContain "inline:secret"
+            joined |> shouldContain "--hosts-dir"
+            joined |> shouldNotContain "inline:secret"
             joined |> shouldNotContain "stored:pass"
         finally
             try
@@ -611,12 +750,12 @@ type ContainerdClientTests() =
 
         try
             RegistryAuth.setStateFile stateFile
-            RegistryAuth.add stateFile "myregistry.azurecr.io" "user" "secret"
+            RegistryAuth.add stateFile "ghcr.io" "user" "secret"
 
             let client =
                 ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
 
-            let result = client.PullImage("myregistry.azurecr.io/team/app:latest", None)
+            let result = client.PullImage("ghcr.io/team/app:latest", None)
             result |> should equal "resolved"
 
             let (_, args) =

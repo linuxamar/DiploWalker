@@ -1,0 +1,8 @@
+# Diplo Artifacts Checksum Manifest
+# Format: sha256  <filename>  <sha256hex>
+# Lignes commencant par # : commentaires (ignorés)
+# Renouvellement: re-générer ce fichier, re-signer avec tools/sign-artifacts.ps1
+sha256  containerd-1.7.27-windows-amd64.tar.gz  2C51135531ED9EEC3D414CC40E0BF1F0203ABBE48F449BE3CF04BB47F31C7FA5
+sha256  containerd-1.6.36-windows-amd64.tar.gz  74EEC7B76EBFF2A68DD478413B1ED03D435E03A4DB3244F36E92C8B80AD90C71
+sha256  cni-plugins-windows-amd64-1.6.2.tgz  7D1A7FBB0C8B272801E7E64CC1CAD6939E0E7AD0F52644EE9F8801D61DAD5849
+sha256  windows-container-networking-cni-amd64-v0.3.1.zip  4F36EE6905ADA238CA2A9E1BFB8A1FB2912C2D88C4B6E5AF4C41A42DB70D7D68

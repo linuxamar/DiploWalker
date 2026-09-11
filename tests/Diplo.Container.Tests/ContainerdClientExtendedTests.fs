@@ -383,37 +383,52 @@ type ContainerdClientExtendedTests() =
 
     [<Fact>]
     member _.``WaitForContainerExit retourne 0 quand le conteneur est STOPPED``() =
-        let runner = createRunner ()
-        runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 0 STOPPED")
-        let client = asClient runner
-        client.WaitForContainerExit("default", "c-1", 0) |> should equal 0
+        task {
+            let runner = createRunner ()
+            runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 0 STOPPED")
+            let client = asClient runner
+            let! code = client.WaitForContainerExit("default", "c-1", 0, System.Threading.CancellationToken.None)
+            code |> should equal 0
+        }
 
     [<Fact>]
     member _.``WaitForContainerExit retourne 0 quand le conteneur est DELETED``() =
-        let runner = createRunner ()
-        runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 0 DELETED")
-        let client = asClient runner
-        client.WaitForContainerExit("default", "c-1", 0) |> should equal 0
+        task {
+            let runner = createRunner ()
+            runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 0 DELETED")
+            let client = asClient runner
+            let! code = client.WaitForContainerExit("default", "c-1", 0, System.Threading.CancellationToken.None)
+            code |> should equal 0
+        }
 
     [<Fact>]
     member _.``WaitForContainerExit retourne 0 quand le conteneur est absent``() =
-        let runner = createRunner ()
-        runner.OnCommand("tasks list", "TASK PID STATUS\nother 0 STOPPED")
-        let client = asClient runner
-        client.WaitForContainerExit("default", "absent", 0) |> should equal 0
+        task {
+            let runner = createRunner ()
+            runner.OnCommand("tasks list", "TASK PID STATUS\nother 0 STOPPED")
+            let client = asClient runner
+            let! code = client.WaitForContainerExit("default", "absent", 0, System.Threading.CancellationToken.None)
+            code |> should equal 0
+        }
 
     [<Fact>]
     member _.``WaitForContainerExit retourne -1 au delai quand le conteneur tourne``() =
-        let runner = createRunner ()
-        runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 123 RUNNING")
-        let client = asClient runner
-        client.WaitForContainerExit("default", "c-1", 1) |> should equal -1
+        task {
+            let runner = createRunner ()
+            runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 123 RUNNING")
+            let client = asClient runner
+            let! code = client.WaitForContainerExit("default", "c-1", 1, System.Threading.CancellationToken.None)
+            code |> should equal -1
+        }
 
     [<Fact>]
     member _.``WaitForContainerExit ne traite pas PAUSED comme terminal``() =
-        let runner = createRunner ()
-        runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 123 PAUSED")
-        let client = asClient runner
-        // PAUSED n'est pas un état terminal : on attend la reprise, donc le
-        // délai est atteint et la fonction retourne -1.
-        client.WaitForContainerExit("default", "c-1", 1) |> should equal -1
+        task {
+            let runner = createRunner ()
+            runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 123 PAUSED")
+            let client = asClient runner
+            // PAUSED n'est pas un état terminal : on attend la reprise, donc le
+            // délai est atteint et la fonction retourne -1.
+            let! code = client.WaitForContainerExit("default", "c-1", 1, System.Threading.CancellationToken.None)
+            code |> should equal -1
+        }

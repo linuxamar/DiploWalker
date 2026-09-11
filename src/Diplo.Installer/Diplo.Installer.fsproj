@@ -8,8 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ArtifactSigning.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="assets\artifacts.manifest" LogicalName="Diplo.Installer.assets.artifacts.manifest" />
+    <EmbeddedResource Include="assets\artifacts.manifest.sig" LogicalName="Diplo.Installer.assets.artifacts.manifest.sig" />
+    <EmbeddedResource Include="assets\diplo-release.pub" LogicalName="Diplo.Installer.assets.diplo-release.pub" />
   </ItemGroup>
 
   <ItemGroup>

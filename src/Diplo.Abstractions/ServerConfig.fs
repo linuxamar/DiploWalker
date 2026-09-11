@@ -18,8 +18,12 @@ open Serilog
 open Serilog.Extensions.Hosting
 open Diplo.Abstractions.TokenAuthMiddleware
 
-/// Taille maximale des messages gRPC en octets (4 Mo).
-let private grpcMaxMessageSize = 4 * 1024 * 1024
+/// Taille maximale des messages gRPC en octets (64 Mo).
+///
+/// Doit rester alignée sur le client (GrpcClientFactory.MaxMessageSize) : les
+/// lectures/écritures de fichiers sont bornées à 50 Mo côté API (M14), un
+/// plafond serveur de 4 Mo les ferait échouer en ResourceExhausted.
+let private grpcMaxMessageSize = 64 * 1024 * 1024
 
 let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
     let grpcPort = config.GetValue<int>("ServiceSettings:GrpcPort")
@@ -134,6 +138,9 @@ let runGrpcHost
         |> ignore
 
         lifetime.ApplicationStopping.Register(fun () ->
+            // M9 : lâcher le Timer de purge du rate limiter (au lieu de laisser
+            // un Timer racine actif après l'arrêt).
+            TokenAuthMiddleware.disposePurge ()
             Log.Information("Service {ServiceName} arrêt en cours...", serviceName))
         |> ignore
 

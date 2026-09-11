@@ -180,6 +180,20 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                             msg
                         )
 
+                // M14 : borne de liste serveur (cf. ListContainers) — protège la
+                // réponse contre un inventaire démesuré.
+                if response.Networks.Count > ServiceGuards.MaxListItems then
+                    Log.Warning(
+                        "Liste des réseaux tronquée à {Limit} éléments (reçu {Count})",
+                        ServiceGuards.MaxListItems,
+                        response.Networks.Count
+                    )
+
+                    response.Networks.RemoveRange(
+                        ServiceGuards.MaxListItems,
+                        response.Networks.Count - ServiceGuards.MaxListItems
+                    )
+
                 return response
             }
 
@@ -327,7 +341,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                               request.NetnsPath ]
 
                         let code, stdout, stderr =
-                            ProcessExec.runWithResult resolvedPluginPath args (Some 60_000) (Some configJson)
+                            ProcessExec.runWithResult resolvedPluginPath args (Some 60_000) (Some configJson) None
 
                         let mutable ifname = ""
                         let mutable ipv4Addr = ""
@@ -351,7 +365,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     with
                     | :? RpcException as rpcEx -> return raise rpcEx
                     | ex ->
-                        Log.Error(ex, "Erreur lors de l'exécution du plugin CNI {PluginPath}", pluginPath)
+                        Log.Error(ex, "Erreur lors de l'exécution du plugin CNI {Plugin}", System.IO.Path.GetFileName(pluginPath))
 
                         return
                             { RunCniPluginResponse.Success = false

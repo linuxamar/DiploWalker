@@ -128,6 +128,7 @@ type CustomCniDriver() =
                                   sprintf "/proc/%s/ns/net" containerId ]
                                 None
                                 (Some configJson)
+                                None
 
                         // Symétrique au DEL : ignorer le code retour annoncerait un
                         // succès sans allocation IP réelle.
@@ -210,6 +211,7 @@ type CustomCniDriver() =
                                       targetId
                                       "--netns"
                                       sprintf "/proc/%s/ns/net" targetId ]
+                                    None
                                     None
                                     None
 

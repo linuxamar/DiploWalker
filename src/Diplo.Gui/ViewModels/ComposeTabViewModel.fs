@@ -7,6 +7,7 @@ open Avalonia.Threading
 open Diplo.Core.Clients
 open Diplo.Core.Compose
 open Diplo.Core.Output
+open Diplo.Gui.Services
 
 type ComposeServiceInfo =
     { Service: string
@@ -206,7 +207,7 @@ type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit 
                 let compose = orchestrator.ParseFile(this.ComposeFilePath)
                 let! response = composeClient.ListAsync(all = true)
 
-                Dispatcher.UIThread.Post(fun () ->
+                UiThread.Post(fun () ->
                     composeServices.Clear()
 
                     for c in response.Containers do

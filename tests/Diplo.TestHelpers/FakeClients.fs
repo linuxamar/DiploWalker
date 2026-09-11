@@ -55,6 +55,7 @@ type FakeContainerClient
         ?listImages: ListImagesResponse,
         ?inspectImage: InspectImageResponse,
         ?tagImage: TagImageResponse,
+        ?searchImages: SearchRegistryResponse,
         ?version: GetVersionResponse,
         ?namespaces: ListNamespacesResponse,
         ?top: TopContainerResponse,
@@ -115,6 +116,8 @@ type FakeContainerClient
               CreatedAt = ""
               Labels = Dictionary<string, string>() }
     let tagImageR = defaultArg tagImage { Source = ""; Target = ""; Message = "" }
+    let searchImagesR =
+        defaultArg searchImages { Results = List<RegistrySearchResult>(); Message = "" }
     let versionR = defaultArg version { Version = ""; Revision = ""; GoVersion = ""; Os = ""; Arch = "" }
     let namespacesR = defaultArg namespaces { Namespaces = List<string>() }
     let topR = defaultArg top { Processes = List<ProcessInfo>() }
@@ -159,6 +162,7 @@ type FakeContainerClient
     let mutable listImagesCalls = 0
     let mutable inspectImageCalls = 0
     let mutable tagImageCalls = 0
+    let mutable searchImagesCalls = 0
     let mutable versionCalls = 0
     let mutable namespacesCalls = 0
     let mutable topCalls = 0
@@ -192,6 +196,7 @@ type FakeContainerClient
     member _.ListImagesCalls = listImagesCalls
     member _.InspectImageCalls = inspectImageCalls
     member _.TagImageCalls = tagImageCalls
+    member _.SearchImagesCalls = searchImagesCalls
     member _.VersionCalls = versionCalls
     member _.NamespacesCalls = namespacesCalls
     member _.TopCalls = topCalls
@@ -237,7 +242,7 @@ type FakeContainerClient
             inspectCalls <- inspectCalls + 1
             Task.FromResult(inspectR)
 
-        member _.ListAsync(?_all, ?_filters, ?_ct) =
+        member _.ListAsync(?_namespaceName, ?_all, ?_filters, ?_ct) =
             listCalls <- listCalls + 1
             Task.FromResult(listR)
 
@@ -303,6 +308,10 @@ type FakeContainerClient
         member _.TagImageAsync(_source, _target, ?_namespaceName, ?_ct) =
             tagImageCalls <- tagImageCalls + 1
             Task.FromResult(tagImageR)
+
+        member _.SearchImagesAsync(_query, ?_registry, ?_limit, ?_ct) =
+            searchImagesCalls <- searchImagesCalls + 1
+            Task.FromResult(searchImagesR)
 
         member _.PauseAsync(_id, ?_ct) =
             pauseCalls <- pauseCalls + 1

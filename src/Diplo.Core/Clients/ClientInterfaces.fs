@@ -40,7 +40,8 @@ type IContainerClient =
     abstract member InspectAsync: id: string * ?ct: CancellationToken -> Task<InspectContainerResponse>
 
     abstract member ListAsync:
-        ?all: bool * ?filters: IDictionary<string, string> * ?ct: CancellationToken -> Task<ListContainersResponse>
+        ?namespaceName: string * ?all: bool * ?filters: IDictionary<string, string> * ?ct: CancellationToken ->
+            Task<ListContainersResponse>
 
     abstract member GetLogsStream:
         id: string * ?follow: bool * ?tail: int * ?since: string * ?ct: CancellationToken ->
@@ -82,6 +83,13 @@ type IContainerClient =
 
     abstract member TagImageAsync:
         source: string * target: string * ?namespaceName: string * ?ct: CancellationToken -> Task<TagImageResponse>
+
+    abstract member SearchImagesAsync:
+        query: string *
+        ?registry: string *
+        ?limit: int *
+        ?ct: CancellationToken ->
+            Task<SearchRegistryResponse>
 
     abstract member PauseAsync: id: string * ?ct: CancellationToken -> Task<PauseContainerResponse>
 

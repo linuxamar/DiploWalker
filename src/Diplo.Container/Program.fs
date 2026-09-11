@@ -1,3 +1,4 @@
+open System.Net.Http
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 open Diplo.Abstractions.Interfaces
@@ -22,5 +23,12 @@ let main args =
             |> ignore
 
             builder.Services.AddSingleton<IDiskMounter>(DiskMounter()) |> ignore
-            builder.Services.AddSingleton<ContainerServiceImpl>() |> ignore)
+            builder.Services.AddSingleton<HttpClient>(RegistrySearch.sharedClient) |> ignore
+            builder.Services.AddSingleton<ContainerServiceImpl>(fun sp ->
+                ContainerServiceImpl(
+                    sp.GetRequiredService<IContainerdClient>(),
+                    sp.GetRequiredService<IDiskMounter>(),
+                    sp.GetRequiredService<HttpClient>()
+                ))
+            |> ignore)
         (fun app -> app.MapGrpcService<ContainerServiceImpl>() |> ignore)

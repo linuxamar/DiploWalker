@@ -9,6 +9,7 @@ open System.Runtime.InteropServices
 open System.Security.Cryptography
 open System.Text.Json
 open System.Text.Json.Nodes
+open System.Threading.Tasks
 open Diplo.Abstractions
 
 // ─── Configuration ───────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ let services =
 // ─── Utilitaires ─────────────────────────────────────────────────────────
 
 let runProcess (exe: string) (args: string list) : int =
-    let code, stdout, stderr = ProcessExec.runWithResult exe args None None
+    let code, stdout, stderr = ProcessExec.runWithResult exe args None None None
 
     if stdout.Length > 0 then
         printfn "%s" stdout
@@ -100,16 +101,9 @@ let downloadContainerdVersion = getMinContainerdVersion ()
 let cniPluginsVersion = "1.6.2"
 let winCniVersion = "0.3.1"
 
-let containerdChecksums =
-    Map.ofList
-        [ "1.6.36", "74EEC7B76EBFF2A68DD478413B1ED03D435E03A4DB3244F36E92C8B80AD90C71"
-          "1.7.27", "2C51135531ED9EEC3D414CC40E0BF1F0203ABBE48F449BE3CF04BB47F31C7FA5" ]
-
-let cniPluginsChecksum =
-    "7D1A7FBB0C8B272801E7E64CC1CAD6939E0E7AD0F52644EE9F8801D61DAD5849"
-
-let winCniChecksum =
-    "4F36EE6905ADA238CA2A9E1BFB8A1FB2912C2D88C4B6E5AF4C41A42DB70D7D68"
+/// Manifeste des checksums signé (RSA-4096/SHA-384) — vérifié une seule fois au
+/// démarrage. Lève dès le chargement si la signature est invalide (fail-closed).
+let artifactChecksums = ArtifactSigning.loadVerifiedManifest ()
 
 let containerdArchive =
     sprintf "containerd-%s-windows-amd64.tar.gz" downloadContainerdVersion
@@ -120,16 +114,49 @@ let containerdUrl =
         downloadContainerdVersion
         containerdArchive
 
+/// HttpClient partagé (M16) : réutilisé entre les téléchargements au lieu d'un
+/// client jetable par appel (qui épuise les sockets). Timeout borné.
+let private downloader =
+    let client = new HttpClient()
+    client.Timeout <- TimeSpan.FromMinutes(10.0)
+    client
+
 let downloadFile (url: string) (dest: string) =
     task {
-        use client = new HttpClient()
-        client.Timeout <- TimeSpan.FromMinutes(10.0)
-        let! response = client.GetAsync(url)
-        response.EnsureSuccessStatusCode() |> ignore
-        use! stream = response.Content.ReadAsStreamAsync()
-        use fileStream = File.Create(dest)
-        do! stream.CopyToAsync(fileStream)
-        printfn "  [+] Téléchargé: %s" (Path.GetFileName(dest))
+        let mutable lastError: exn = null
+        let mutable ok = false
+        let mutable attempt = 1
+
+        // 3 tentatives au plus, avec backoff croissant : les téléchargements
+        // GitHub sont sujets à des coupures réseau transitoires.
+        while not ok && attempt <= 3 do
+            try
+                use! response = downloader.GetAsync(url)
+                response.EnsureSuccessStatusCode() |> ignore
+                use! stream = response.Content.ReadAsStreamAsync()
+                use fileStream = File.Create(dest)
+                do! stream.CopyToAsync(fileStream)
+                ok <- true
+                printfn "  [+] Téléchargé: %s" (Path.GetFileName(dest))
+            with ex ->
+                lastError <- ex
+
+                if attempt < 3 then
+                    let delaySeconds = attempt * 2
+
+                    printfn
+                        "  [!] Échec du téléchargement (tentative %d/3), nouvel essai dans %ds : %s"
+                        attempt
+                        delaySeconds
+                        ex.Message
+
+                    do! Task.Delay(TimeSpan.FromSeconds(float delaySeconds))
+
+                attempt <- attempt + 1
+
+        if not ok then
+            let message = if isNull lastError then "erreur inconnue" else lastError.Message
+            failwithf "Échec du téléchargement de %s après 3 tentatives : %s" url message
     }
 
 let computeSha256 (filePath: string) =
@@ -139,6 +166,22 @@ let computeSha256 (filePath: string) =
     sha.ComputeHash(stream)
     |> Array.map (fun b -> b.ToString("x2"))
     |> String.concat ""
+
+/// Confrontation à temps constant de deux condensats hexadécimaux, sans
+/// court-circuit selon la position de la première différence.
+let private fixedTimeEqualsHex (a: string) (b: string) =
+    if a.Length = 0 || a.Length <> b.Length || (a.Length % 2 <> 0) then
+        // Longueur (publique) différente : traiter comme non équivalents.
+        false
+    else
+        let mutable diff = 0
+        let mutable i = 0
+
+        while i < a.Length do
+            diff <- diff ||| (int (Char.ToLowerInvariant a.[i]) ^^^ int (Char.ToLowerInvariant b.[i]))
+            i <- i + 1
+
+        diff = 0
 
 let verifyChecksum (filePath: string) (expectedSha256: string option) =
     match expectedSha256 with
@@ -153,7 +196,7 @@ let verifyChecksum (filePath: string) (expectedSha256: string option) =
 
         let actual = computeSha256 filePath
 
-        if actual <> expected then
+        if not (fixedTimeEqualsHex actual expected) then
             failwithf
                 "Échec de la vérification d'intégrité de %s\n  Attendu: %s\n  Obtenu:  %s"
                 (Path.GetFileName(filePath))
@@ -179,24 +222,53 @@ let extractTarGz (archive: string) (destination: string) =
                 failwithf "Échec de l'extraction de %s (code %d)" archive exitCode
 
             let tempFull = Path.GetFullPath(tempDir)
+            let destFull = Path.GetFullPath(destination)
 
+            // Contenance stricte (M16) : la cible doit être STRICTEMENT sous la
+            // racine — un simple StartsWith accepterait un voisin « _tmp_extract_X2 »
+            // ou un chemin « sous » la racine par coïncidence de préfixe.
+            let isWithin (root: string) (candidate: string) =
+                let rootWithSep =
+                    Path.TrimEndingDirectorySeparator(root) + string Path.DirectorySeparatorChar
+
+                candidate.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase)
+
+            // Revalidation post-extraction : chaque entrée (fichier OU répertoire)
+            // doit rester sous le répertoire d'extraction temporaire.
             for file in Directory.GetFiles(tempFull, "*", SearchOption.AllDirectories) do
                 let fileFull = Path.GetFullPath(file)
 
-                if not (fileFull.StartsWith(tempFull, StringComparison.OrdinalIgnoreCase)) then
+                if not (isWithin tempFull fileFull) then
                     failwithf "Fichier extrait hors de la destination: %s" fileFull
 
+            for dir in Directory.GetDirectories(tempFull, "*", SearchOption.AllDirectories) do
+                let dirFull = Path.GetFullPath(dir)
+
+                if not (isWithin tempFull dirFull) then
+                    failwithf "Répertoire extrait hors de la destination: %s" dirFull
+
+            // Déplacement avec revalidation de la CIBLE : un relPath qui serait
+            // résolu hors de `destination` est rejeté avant tout accès fichier.
             for file in Directory.GetFiles(tempFull, "*", SearchOption.AllDirectories) do
-                let relPath = file.Substring(tempFull.Length).TrimStart(Path.DirectorySeparatorChar)
-                let destFile = Path.Combine(destination, relPath)
+                let fileFull = Path.GetFullPath(file)
+                let relPath = fileFull.Substring(tempFull.Length).TrimStart(Path.DirectorySeparatorChar)
+                let destFile = Path.GetFullPath(Path.Combine(destination, relPath))
+
+                if not (isWithin destFull destFile) then
+                    failwithf "Cible d'extraction hors de la destination: %s" destFile
+
                 Directory.CreateDirectory(Path.GetDirectoryName(destFile)) |> ignore
-                File.Move(file, destFile, overwrite = true)
+                File.Move(fileFull, destFile, overwrite = true)
 
             for dir in
                 Directory.GetDirectories(tempFull, "*", SearchOption.AllDirectories)
                 |> Array.sortDescending do
-                let relPath = dir.Substring(tempFull.Length).TrimStart(Path.DirectorySeparatorChar)
-                let destDir = Path.Combine(destination, relPath)
+                let dirFull = Path.GetFullPath(dir)
+                let relPath = dirFull.Substring(tempFull.Length).TrimStart(Path.DirectorySeparatorChar)
+                let destDir = Path.GetFullPath(Path.Combine(destination, relPath))
+
+                if not (isWithin destFull destDir) then
+                    failwithf "Cible d'extraction hors de la destination: %s" destDir
 
                 if Directory.Exists(destDir) && Directory.GetFileSystemEntries(destDir).Length = 0 then
                     Directory.Delete(destDir)
@@ -237,7 +309,7 @@ let installContainerd () =
 
         printfn "  [*] Téléchargement depuis GitHub..."
         do! downloadFile containerdUrl archivePath
-        let expectedChecksum = containerdChecksums |> Map.tryFind downloadContainerdVersion
+        let expectedChecksum = ArtifactSigning.lookupChecksum artifactChecksums containerdArchive
 
         try
             verifyChecksum archivePath expectedChecksum
@@ -277,7 +349,7 @@ let downloadCniPlugins () =
         do! downloadFile winCniUrl winCniTemp
 
         try
-            verifyChecksum winCniTemp (Some winCniChecksum)
+            verifyChecksum winCniTemp (ArtifactSigning.lookupChecksum artifactChecksums winCniArchive)
         with ex ->
             printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(winCniTemp)
@@ -301,7 +373,7 @@ let downloadCniPlugins () =
         do! downloadFile cniUrl cniTemp
 
         try
-            verifyChecksum cniTemp (Some cniPluginsChecksum)
+            verifyChecksum cniTemp (ArtifactSigning.lookupChecksum artifactChecksums cniArchive)
         with ex ->
             printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(cniTemp)
@@ -571,7 +643,7 @@ let createConfigFiles () =
 
     createCniConfig ()
 
-    let tokenPath = Diplo.Abstractions.AuthToken.authTokenPath
+    let tokenPath = Diplo.Abstractions.AuthToken.tokenPath ()
 
     if not (File.Exists(tokenPath)) then
         let token = Diplo.Abstractions.AuthToken.generateToken ()

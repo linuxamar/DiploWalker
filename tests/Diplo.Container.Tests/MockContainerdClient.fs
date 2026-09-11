@@ -180,8 +180,8 @@ type MockContainerdClient() =
         member _.ResumeContainer(_namespaceName, id) =
             pausedContainers <- pausedContainers |> Set.remove id
 
-        member _.WaitForContainerExit(_namespaceName, _id, _timeoutSeconds) =
-            if startedContainers |> Set.isEmpty then -1 else 0
+        member _.WaitForContainerExit(_namespaceName, _id, _timeoutSeconds, _ct) =
+            System.Threading.Tasks.Task.FromResult(if startedContainers |> Set.isEmpty then -1 else 0)
 
         member _.UpdateContainer(_namespaceName, id, _memoryLimit, _cpuShares, _pidLimit) =
             updatedContainers <- updatedContainers |> Set.add id

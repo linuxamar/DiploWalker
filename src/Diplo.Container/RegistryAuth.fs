@@ -39,6 +39,34 @@ module RegistryAuth =
     /// Chemin courant du fichier d'état des identifiants de registres.
     let stateFile () = !stateFileRef
 
+    /// Fichier de clé AES-GCM (hors Windows) : %LocalAppData%\Diplo\registry-key.bin.
+    let private keyFile () =
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Diplo",
+            "registry-key.bin"
+        )
+
+    /// Charge ou crée la clé par utilisateur. Sur les plateformes POSIX le fichier
+    /// est créé avec des droits 0600 ; sous Windows il hérite du profil utilisateur.
+    let private loadOrCreateKey () : byte array =
+        let path = keyFile ()
+        Directory.CreateDirectory(Path.GetDirectoryName path) |> ignore
+
+        if File.Exists path then
+            File.ReadAllBytes path
+        else
+            let key = RandomNumberGenerator.GetBytes(32)
+            File.WriteAllBytes(path, key)
+
+            if not (OperatingSystem.IsWindows()) then
+                try
+                    File.SetUnixFileMode(path, UnixFileMode.UserRead ||| UnixFileMode.UserWrite)
+                with _ ->
+                    ()
+
+            key
+
     let private protect (password: string) =
         if isNull password then
             invalidArg (nameof password) "Le mot de passe ne peut pas être null"
@@ -47,19 +75,52 @@ module RegistryAuth =
             let bytes = System.Text.Encoding.UTF8.GetBytes(password)
             Convert.ToBase64String(ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser))
         else
-            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(password))
+            // M7 : hors Windows, PAS de repli base64 en clair — chiffrement
+            // AES-GCM scellé par une clé par utilisateur (fichier à droits
+            // restreints, voir loadOrCreateKey).
+            let plain = System.Text.Encoding.UTF8.GetBytes(password)
+            let key = loadOrCreateKey ()
+            let nonce = RandomNumberGenerator.GetBytes(12)
+            let cipher = Array.zeroCreate<byte> plain.Length
+            let tag = Array.zeroCreate<byte> 16
+
+            use aes = new AesGcm(key, 16)
+            aes.Encrypt(nonce, plain, cipher, tag)
+
+            // format : base64(nonce | cipher | tag)
+            let blob = Array.append (Array.append nonce cipher) tag
+            Convert.ToBase64String blob
 
     let private unprotect (encoded: string) =
-        try
-            if OperatingSystem.IsWindows() then
+        if OperatingSystem.IsWindows() then
+            try
                 System.Text.Encoding.UTF8.GetString(
                     ProtectedData.Unprotect(Convert.FromBase64String(encoded), null, DataProtectionScope.CurrentUser)
                 )
-            else
-                System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded))
-        with ex ->
-            Log.Warning(ex, "Impossible de déchiffrer le mot de passe chiffré ( données potentiellement corrompues)")
-            ""
+            with ex ->
+                Log.Warning(ex, "Impossible de déchiffrer le mot de passe (données potentiellement corrompues)")
+                ""
+        else
+            try
+                let blob = Convert.FromBase64String(encoded)
+                let key = loadOrCreateKey ()
+
+                use aes = new AesGcm(key, 16)
+                let nonce = blob[.. 11]
+                let tag = blob[blob.Length - 16 ..]
+                let cipher = blob[12 .. blob.Length - 17]
+                let plain = Array.zeroCreate<byte> cipher.Length
+                aes.Decrypt(nonce, cipher, tag, plain)
+                System.Text.Encoding.UTF8.GetString(plain)
+            with ex ->
+                // Repli de compatibilité : anciens états hors Windows écrits en
+                // base64 clair. Lecture tolérée (le stockage, lui, n'est plus en
+                // clair) ; une nouvelle connexion réécrit l'entrée en AES-GCM.
+                try
+                    System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded))
+                with _ ->
+                    Log.Warning(ex, "Impossible de déchiffrer le mot de passe (données potentiellement corrompues)")
+                    ""
 
     /// Charge les identifiants persistés (Map registre -> identifiant).
     /// Retourne un état vide si le fichier est absent ou illisible.
@@ -245,3 +306,52 @@ try {
 
             File.WriteAllText(Path.Combine(hostDir, "hosts.toml"), toml)
             Some root
+
+    /// Prépare un hosts-dir temporaire pour des identifiants EXPLICITES
+    /// (option --user, au format « utilisateur:secret ») : H6 — les secrets ne
+    /// transitent plus par argv. Les identifiants sont persistés dans un état
+    /// jetable (DPAPI sous Windows) lu par un helper créé dans le même dossier.
+    /// Retourne None si l'argument n'est pas au format attendu.
+    let prepareHostsDirForCredentials (registry: string) (authArg: string) : string option =
+        match normalizeRegistryHost registry with
+        | "" ->
+            None
+        | serverUrl ->
+            // « user[:password] » : seul le dernier « : » sépare les deux.
+            match authArg.LastIndexOf(':') with
+            | sep when sep <= 0 || sep = authArg.Length - 1 ->
+                None
+            | sep ->
+                let username = authArg.Substring(0, sep)
+                let password = authArg.Substring(sep + 1)
+                let root = Path.Combine(Path.GetTempPath(), "diplo-hosts-" + Guid.NewGuid().ToString("N"))
+
+                let hostName = serverUrl.Substring("https://".Length)
+                let hostDir = Path.Combine(root, hostName)
+                Directory.CreateDirectory(hostDir) |> ignore
+
+                let stateFile = Path.Combine(root, "registry-auth.json")
+                save stateFile [ { Registry = registry; Username = username; EncryptedPassword = protect password } ]
+
+                // Copie du script helper partagé avec le fichier d'état pointé
+                // vers l'état jetable (chaîne littérale PS entre apostrophes :
+                // les backslashes n'y sont pas échappés).
+                let helperPs1 = Path.Combine(root, "diplo-cred-helper.ps1")
+
+                let script =
+                    helperScript.Replace("'Diplo\\registry-auth.json'", sprintf "'%s'" stateFile)
+
+                File.WriteAllText(helperPs1, script)
+
+                let shim = Path.Combine(root, "diplo-cred-helper.cmd")
+
+                File.WriteAllText(
+                    shim,
+                    "@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -File \"%~dp0diplo-cred-helper.ps1\" %*\r\n"
+                )
+
+                let toml =
+                    sprintf "[host.\"%s\"]\ncapabilities = [\"pull\", \"resolve\"]\nauth = '%s'\n" serverUrl shim
+
+                File.WriteAllText(Path.Combine(hostDir, "hosts.toml"), toml)
+                Some root

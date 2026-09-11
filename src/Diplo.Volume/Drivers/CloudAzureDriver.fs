@@ -56,7 +56,7 @@ type CloudAzureDriver(dataRoot: string) =
 
         // La clé transite par l'entrée standard, pas par la ligne de commande.
         let secret = opts |> Map.tryFind "storageKey"
-        ProcessExec.runUnit "net" ("use" :: args) (Some ProcessExec.MountTimeoutMs) secret
+        ProcessExec.runUnit "net" ("use" :: args) (Some ProcessExec.MountTimeoutMs) secret None
 
     override _.Unmount targetPath =
-        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some ProcessExec.MountTimeoutMs) None
+        ProcessExec.runUnit "net" [ "use"; targetPath; "/delete"; "/y" ] (Some ProcessExec.MountTimeoutMs) None None

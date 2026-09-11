@@ -4,6 +4,7 @@ open System
 open System.Collections.ObjectModel
 open System.Threading
 open Avalonia.Threading
+open Diplo.Core
 open Diplo.Core.Clients
 open Diplo.Core.Mounts
 open Diplo.Core.Output
@@ -22,23 +23,37 @@ type ImageInfo =
       Taille: string
       CrééLe: string }
 
+type CatalogRow =
+    { Ref: string
+      Note: string
+      AddedAt: string }
+
 type ContainerTabViewModel
     (
         outputPort: IOutputPort,
         ?logsSourceFactory: unit -> IContainerLogsSource,
-        ?containerClientFactory: unit -> IContainerClient
+        ?containerClientFactory: unit -> IContainerClient,
+        ?catalogPathProvider: unit -> string
     ) as this =
     inherit ViewModelBase()
 
     let logsSourceFactory =
         defaultArg logsSourceFactory (fun () -> new GrpcContainerLogsSource() :> IContainerLogsSource)
 
+    // Source de journaux créée UNE seule fois pour la durée de vie du ViewModel :
+    // un seul client gRPC partagé entre les clics (fini la recréation à chaque appel).
+    let logsSource = lazy (logsSourceFactory ())
+
     let containerClient =
         let factory = defaultArg containerClientFactory (fun () -> new ContainerClient() :> IContainerClient)
         factory ()
 
+    let catalogPathProvider =
+        defaultArg catalogPathProvider (fun () -> ImageCatalog.catalogPath ())
+
     let containers = ObservableCollection<ContainerInfo>()
     let images = ObservableCollection<ImageInfo>()
+    let catalogue = ObservableCollection<CatalogRow>()
 
     let mutable containerIdInput = ""
     let mutable containerNameInput = ""
@@ -51,6 +66,7 @@ type ContainerTabViewModel
     let mutable containerNewName = ""
     let mutable containerImageRef = ""
     let mutable containerImageTarget = ""
+    let mutable catalogNote = ""
     let mutable containerFollow = false
     let mutable containerTail = 100
     let mutable containerSince = ""
@@ -65,21 +81,30 @@ type ContainerTabViewModel
     let getSelectedContainer () = Volatile.Read(&selectedContainer)
     let setSelectedContainer v = Interlocked.Exchange(&selectedContainer, v) |> ignore
 
+    let logCtsGate = obj()
     let mutable logCts: CancellationTokenSource = null
 
+    // Annulation d'un suivi : le jeton est signalé puis détaché sous verrou.
+    // La disposition du CTS revient EXCLUSIVEMENT au worker qui l'a créé
+    // (finally), ce qui élimine tout double Cancel/Dispose concurrent.
     let cancelPreviousLogStream () =
-        if logCts <> null then
-            logCts.Cancel()
-            logCts.Dispose()
-            logCts <- null
+        lock logCtsGate (fun () ->
+            let cts = logCts
 
+            if not (isNull cts) then
+                cts.Cancel()
+                logCts <- null)
+
+    let eventsCtsGate = obj()
     let mutable eventsCts: CancellationTokenSource = null
 
     let cancelPreviousEventsStream () =
-        if eventsCts <> null then
-            eventsCts.Cancel()
-            eventsCts.Dispose()
-            eventsCts <- null
+        lock eventsCtsGate (fun () ->
+            let cts = eventsCts
+
+            if not (isNull cts) then
+                cts.Cancel()
+                eventsCts <- null)
 
     let listContainersCmd =
         RelayCommand(Action(fun () -> this.ListContainers() |> ignore))
@@ -111,6 +136,11 @@ type ContainerTabViewModel
     let inspectImageCmd = RelayCommand(Action(fun () -> this.InspectImage() |> ignore))
     let removeImageCmd = RelayCommand(Action(fun () -> this.RemoveImage() |> ignore))
     let tagImageCmd = RelayCommand(Action(fun () -> this.TagImage() |> ignore))
+
+    let listCatalogCmd = RelayCommand(Action(fun () -> this.ListCatalog() |> ignore))
+    let addToCatalogCmd = RelayCommand(Action(fun () -> this.AddToCatalog() |> ignore))
+    let updateCatalogCmd = RelayCommand(Action(fun () -> this.UpdateCatalog() |> ignore))
+    let removeFromCatalogCmd = RelayCommand(Action(fun () -> this.RemoveFromCatalog() |> ignore))
 
     let createContainerCmd =
         RelayCommand(Action(fun () -> this.CreateContainer() |> ignore))
@@ -301,6 +331,19 @@ type ContainerTabViewModel
     member _.InspectImageCommand = inspectImageCmd
     member _.RemoveImageCommand = removeImageCmd
     member _.TagImageCommand = tagImageCmd
+    member _.ListCatalogCommand = listCatalogCmd
+    member _.AddToCatalogCommand = addToCatalogCmd
+    member _.UpdateCatalogCommand = updateCatalogCmd
+    member _.RemoveFromCatalogCommand = removeFromCatalogCmd
+
+    member _.Catalogue = catalogue
+
+    member _.CatalogNote
+        with get () = catalogNote
+        and set v =
+            catalogNote <- v
+            this.OnPropertyChanged()
+
     member _.CreateContainerCommand = createContainerCmd
     member _.GetContainerLogsCommand = getContainerLogsCmd
     member _.StopFollowLogsCommand = stopFollowLogsCmd
@@ -322,7 +365,7 @@ type ContainerTabViewModel
             task {
                 let! response = containerClient.ListAsync(all = this.ContainerAll)
 
-                Dispatcher.UIThread.Post(fun () ->
+                UiThread.Post(fun () ->
                     containers.Clear()
 
                     for c in response.Containers do
@@ -502,7 +545,7 @@ type ContainerTabViewModel
 
                 let! response = containerClient.ListImagesAsync(?namespaceName = ns)
 
-                Dispatcher.UIThread.Post(fun () ->
+                UiThread.Post(fun () ->
                     images.Clear()
 
                     for img in response.Images do
@@ -580,6 +623,118 @@ type ContainerTabViewModel
                 )
             })
 
+    member private this.RefreshCatalogue() =
+        UiThread.Post(fun () ->
+            catalogue.Clear()
+
+            for e in ImageCatalog.load (catalogPathProvider ()) do
+                catalogue.Add
+                    { Ref = e.Ref
+                      Note = defaultArg e.Note ""
+                      AddedAt = e.AddedAt })
+
+    member private this.ListCatalog() =
+        Cmd.run outputPort (fun () ->
+            task {
+                let entries = ImageCatalog.load (catalogPathProvider ())
+                this.RefreshCatalogue()
+                outputPort.WriteSuccess(sprintf "%d image(s) au catalogue" (List.length entries))
+            })
+
+    member private this.AddToCatalog() =
+        Cmd.run outputPort (fun () ->
+            task {
+                if String.IsNullOrWhiteSpace(this.ContainerImageRef) then
+                    outputPort.WriteWarning("Une référence d'image est requise (champ Réf. image)")
+                else
+                    let! response = containerClient.PullImageAsync(image = this.ContainerImageRef)
+                    outputPort.WriteSuccess(sprintf "Image %s téléchargée - %s" this.ContainerImageRef response.Message)
+
+                    let note =
+                        if String.IsNullOrWhiteSpace(this.CatalogNote) then
+                            None
+                        else
+                            Some this.CatalogNote
+
+                    let path = catalogPathProvider ()
+
+                    if ImageCatalog.add path this.ContainerImageRef note then
+                        outputPort.WriteSuccess(sprintf "Image %s ajoutée au catalogue" this.ContainerImageRef)
+                    else
+                        outputPort.WriteWarning(sprintf "L'image %s est déjà au catalogue" this.ContainerImageRef)
+
+                    this.RefreshCatalogue()
+            })
+
+    member private this.UpdateCatalog() =
+        Cmd.run outputPort (fun () ->
+            task {
+                if String.IsNullOrWhiteSpace(this.ContainerImageRef) then
+                    outputPort.WriteWarning("Une référence d'image est requise (champ Réf. image)")
+                else
+                    let hasTarget = not (String.IsNullOrWhiteSpace(this.ContainerImageTarget))
+
+                    if hasTarget then
+                        let! response =
+                            containerClient.TagImageAsync(
+                                source = this.ContainerImageRef,
+                                target = this.ContainerImageTarget
+                            )
+
+                        outputPort.WriteSuccess(
+                            sprintf
+                                "Image %s étiquetée en %s - %s"
+                                this.ContainerImageRef
+                                this.ContainerImageTarget
+                                response.Message
+                        )
+
+                    let newRef =
+                        if hasTarget then
+                            Some this.ContainerImageTarget
+                        else
+                            None
+
+                    let note =
+                        if String.IsNullOrWhiteSpace(this.CatalogNote) then
+                            None
+                        else
+                            Some this.CatalogNote
+
+                    let path = catalogPathProvider ()
+
+                    if ImageCatalog.update path this.ContainerImageRef newRef note then
+                        outputPort.WriteSuccess(sprintf "Entrée %s mise à jour dans le catalogue" this.ContainerImageRef)
+                    else
+                        outputPort.WriteWarning(sprintf "L'image %s n'est pas au catalogue" this.ContainerImageRef)
+
+                    this.RefreshCatalogue()
+            })
+
+    member private this.RemoveFromCatalog() =
+        Cmd.run outputPort (fun () ->
+            task {
+                if String.IsNullOrWhiteSpace(this.ContainerImageRef) then
+                    outputPort.WriteWarning("Une référence d'image est requise (champ Réf. image)")
+                else
+                    let path = catalogPathProvider ()
+
+                    if not (ImageCatalog.load path |> List.exists (fun e -> e.Ref = this.ContainerImageRef)) then
+                        outputPort.WriteWarning(sprintf "L'image %s n'est pas au catalogue" this.ContainerImageRef)
+                    else
+                        let! response = containerClient.RemoveImageAsync(ref = this.ContainerImageRef)
+
+                        if response.Success then
+                            ImageCatalog.remove path this.ContainerImageRef |> ignore
+                            outputPort.WriteSuccess(
+                                sprintf "Image %s supprimée et retirée du catalogue" this.ContainerImageRef
+                            )
+                        else
+                            outputPort.WriteWarning(response.Message)
+
+                        this.RefreshCatalogue()
+            })
+
     member private this.CreateContainer() =
         Cmd.run outputPort (fun () ->
             task {
@@ -598,7 +753,7 @@ type ContainerTabViewModel
     member private this.GetContainerLogs() =
         Cmd.run outputPort (fun () ->
             task {
-                use source = logsSourceFactory ()
+                let source = logsSource.Value
 
                 if this.ContainerFollow then
                     cancelPreviousLogStream ()
@@ -640,12 +795,20 @@ type ContainerTabViewModel
                             if not cancelled then
                                 outputPort.WriteSuccess("Suivi des journaux terminé")
                         finally
-                            enumerator.DisposeAsync().AsTask() |> ignore
+                            try
+                                // M6 : pas de .Wait() bloquant — la disposition
+                                // est démarrée et se termine en arrière-plan.
+                                enumerator.DisposeAsync().AsTask() |> ignore
+                            with _ ->
+                                ()
                     finally
-                        if logCts = cts then
-                            logCts <- null
+                        // Le détachement du champ et la disposition se font sous
+                        // le même verrou que l'annulation : pas de double Dispose.
+                        lock logCtsGate (fun () ->
+                            if logCts = cts then
+                                logCts <- null
 
-                        cts.Dispose()
+                            cts.Dispose())
                 else
                     let! entries =
                         source.GetSnapshot(
@@ -688,7 +851,7 @@ type ContainerTabViewModel
         Cmd.run outputPort (fun () ->
             task {
                 if String.IsNullOrEmpty(this.RegistryInput) then
-                    outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                    outputPort.WriteError("Le registre est requis (ex. ghcr.io, docker.io, quay.io, mcr.microsoft.com)")
                 elif String.IsNullOrEmpty(this.RegistryUsernameInput) then
                     outputPort.WriteError("Le nom d'utilisateur est requis")
                 elif String.IsNullOrEmpty(this.RegistryPasswordInput) then
@@ -712,7 +875,7 @@ type ContainerTabViewModel
         Cmd.run outputPort (fun () ->
             task {
                 if String.IsNullOrEmpty(this.RegistryInput) then
-                    outputPort.WriteError("Le registre est requis (ex. myregistry.azurecr.io)")
+                    outputPort.WriteError("Le registre est requis (ex. ghcr.io, docker.io, quay.io, mcr.microsoft.com)")
                 else
                     let! response = containerClient.LogoutRegistryAsync(registry = this.RegistryInput)
 
@@ -854,20 +1017,30 @@ type ContainerTabViewModel
                         if not cancelled then
                             outputPort.WriteSuccess("Suivi des événements terminé")
                     finally
-                        enumerator.DisposeAsync().AsTask() |> ignore
+                        try
+                            // M6 : pas de .Wait() bloquant — la disposition
+                            // est démarrée et se termine en arrière-plan.
+                            enumerator.DisposeAsync().AsTask() |> ignore
+                        with _ ->
+                            ()
                 finally
-                    if eventsCts = cts then
-                        eventsCts <- null
+                    // Le détachement du champ et la disposition se font sous
+                    // le même verrou que l'annulation : pas de double Dispose.
+                    lock eventsCtsGate (fun () ->
+                        if eventsCts = cts then
+                            eventsCts <- null
 
-                    cts.Dispose()
+                        cts.Dispose())
             })
 
     interface IDisposable with
         member _.Dispose() =
+            // Annulation uniquement : chaque CTS est disposé une seule fois par
+            // le worker qui l'a créé (finally), annulation ou fin de flux.
+            cancelPreviousLogStream ()
+            cancelPreviousEventsStream ()
+
+            if logsSource.IsValueCreated then
+                (logsSource.Value :> IDisposable).Dispose()
+
             (containerClient :> IDisposable).Dispose()
-            if logCts <> null then
-                logCts.Cancel()
-                logCts.Dispose()
-            if eventsCts <> null then
-                eventsCts.Cancel()
-                eventsCts.Dispose()

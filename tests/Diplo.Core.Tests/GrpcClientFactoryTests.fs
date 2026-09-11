@@ -9,18 +9,20 @@ module GrpcClientFactoryTests =
 
     [<Fact>]
     let ``resolveAddress avec une adresse configuree cible cette adresse`` () =
-        use channel = GrpcClientFactory.resolveAddress (Some "http://localhost:7777") DiploPorts.Container
+        // M1 : les canaux sont mutualisés (cache statique) — ne pas les
+        // disposer ici, sinon les tests suivants retrouvent un canal fermé.
+        let channel = GrpcClientFactory.resolveAddress (Some "http://localhost:7777") DiploPorts.Container
         channel.Target |> should equal "localhost:7777"
 
     [<Fact>]
     let ``resolveAddress sans configuration cible le port par defaut du service`` () =
-        use conteneurs = GrpcClientFactory.resolveAddress None DiploPorts.Container
+        let conteneurs = GrpcClientFactory.resolveAddress None DiploPorts.Container
         conteneurs.Target |> should equal (sprintf "localhost:%d" DiploPorts.Container)
 
-        use volumes = GrpcClientFactory.resolveAddress None DiploPorts.Volume
+        let volumes = GrpcClientFactory.resolveAddress None DiploPorts.Volume
         volumes.Target |> should equal (sprintf "localhost:%d" DiploPorts.Volume)
 
-        use reseaux = GrpcClientFactory.resolveAddress None DiploPorts.Network
+        let reseaux = GrpcClientFactory.resolveAddress None DiploPorts.Network
         reseaux.Target |> should equal (sprintf "localhost:%d" DiploPorts.Network)
 
     [<Fact>]

@@ -190,6 +190,7 @@ module RegistryAuthTests =
               scriptPath ]
             (Some 30000)
             stdinLine
+            None
 
     /// Prépare la structure <racine>\Diplo\registry-auth.json attendue par le helper.
     let private withHelperState (test: string -> string -> unit) =

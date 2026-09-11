@@ -27,7 +27,7 @@ module Parallels =
     let virtualSize (h: Header) =
         int64 h.Cylinders * int64 h.Heads * int64 h.Sectors * int64 h.SectorSize
 
-    let private blockIndex (h: Header) (vOffset: int64) = int (vOffset / int64 h.BlockSize)
+    let private blockIndex64 (h: Header) (vOffset: int64) = vOffset / int64 h.BlockSize
 
     let private blockOffsetInSector (h: Header) (vOffset: int64) = vOffset % int64 h.BlockSize
 
@@ -65,6 +65,15 @@ module Parallels =
 
         if blockSize < 512 || blockSize > 8 * 1024 * 1024 || blockSize % sectorSize <> 0 then
             failwithf "Block size invalide : %d" blockSize
+
+        // Bornes de sécurité sur une image forgée : un nombre de blocs ouvert
+        // provoquerait des parcours énormes dans findFreeBlock, et une table L1
+        // débordante fausserait les index (voir blockIndex64).
+        if l1Size < 1 || l1Size > (1 <<< 24) then
+            failwithf "Table L1 Parallels invalide (l1_size = %d)" l1Size
+
+        if blocksCount < 0 || blocksCount > l1Size then
+            failwithf "Nombre de blocs Parallels invalide (blocks = %d, l1_size = %d)" blocksCount l1Size
 
         { Magic = magic
           Version = version
@@ -106,7 +115,7 @@ module Parallels =
                 Array.Clear(buf, bOff, remaining)
                 remaining <- 0
             else
-                let bIdx = blockIndex h vOff
+                let bIdx = blockIndex64 h vOff
                 let bOffInBlock = blockOffsetInSector h vOff
 
                 if bIdx >= h.L1Size then
@@ -133,7 +142,7 @@ module Parallels =
     let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) : Result<unit, string> =
         protect (fun () -> readBytesAtCore s h vOffset count buf bufOff)
 
-    let private findFreeBlock (s: Stream) (h: Header) : int =
+    let private findFreeBlock (s: Stream) (h: Header) : int64 =
         let mutable maxEnd = h.L1TableOffset + int64 h.L1Size * 4L
 
         for i in 0 .. h.BlocksCount - 1 do
@@ -149,7 +158,7 @@ module Parallels =
                 if blockEnd > maxEnd then
                     maxEnd <- blockEnd
 
-        int ((maxEnd + 511L) / 512L)
+        (maxEnd + 511L) / 512L
 
     let private writeBytesAtCore (s: Stream) (h: Header) (vOffset: int64) (data: byte[]) (dataOff: int) (count: int) =
         let vSize = virtualSize h
@@ -161,7 +170,7 @@ module Parallels =
             if vOff >= vSize then
                 failwith "Ecriture hors limites Parallels"
 
-            let bIdx = blockIndex h vOff
+            let bIdx = blockIndex64 h vOff
             let bOffInBlock = blockOffsetInSector h vOff
 
             if bIdx >= h.L1Size then
@@ -176,12 +185,18 @@ module Parallels =
 
             if blockOffset = 0L then
                 let freeBlock = findFreeBlock s h
+
+                // Format stocke l'offset de secteur sur 32 bits : refuser de
+                // déborder au-delà de 2 To plutôt que de corrompre la table L1.
+                if freeBlock > int64 UInt32.MaxValue then
+                    failwith "Image Parallels pleine : limite de 2 To dépassée"
+
                 let newOffset = freeBlock
                 s.Position <- l1Off
                 let newBuf = Array.zeroCreate<byte> 4
-                putLe32 newOffset newBuf 0
+                putLe32 (int newOffset) newBuf 0
                 s.Write(newBuf, 0, 4)
-                let fileOffset = int64 newOffset * 512L
+                let fileOffset = newOffset * 512L
                 let zeroBuf = Array.zeroCreate<byte> h.BlockSize
                 s.Position <- fileOffset
                 s.Write(zeroBuf, 0, h.BlockSize)

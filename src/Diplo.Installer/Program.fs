@@ -81,7 +81,7 @@ let uninstallAll () =
                 let! _ok = removeWindowsService serviceName
                 ()
 
-            let tokenPath = Diplo.Abstractions.AuthToken.authTokenPath
+            let tokenPath = Diplo.Abstractions.AuthToken.tokenPath ()
 
             if File.Exists(tokenPath) then
                 try

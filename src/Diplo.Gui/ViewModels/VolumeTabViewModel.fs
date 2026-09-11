@@ -10,6 +10,7 @@ open Diplo.Grpc
 open Diplo.Core.Output
 open Diplo.Grpc.Volume
 open Diplo.Disk
+open Diplo.Gui.Services
 
 type VolumeDisplayInfo =
     { Id: string
@@ -164,7 +165,7 @@ type VolumeTabViewModel(outputPort: IOutputPort, ?volumeClientFactory: unit -> I
             task {
                 let! response = volumeClient.ListAsync()
 
-                Dispatcher.UIThread.Post(fun () ->
+                UiThread.Post(fun () ->
                     volumes.Clear()
 
                     for v in response.Volumes do

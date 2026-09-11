@@ -341,7 +341,7 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
             validateNsId namespaceName id
             runCtr (nsArgs namespaceName [ "task"; "resume"; id ]) |> ignore
 
-        member _.WaitForContainerExit(namespaceName, id, timeoutSeconds) =
+        member _.WaitForContainerExit(namespaceName, id, timeoutSeconds, ct) =
             validateNsId namespaceName id
 
             let deadline =
@@ -367,19 +367,23 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     "unknown"
 
             let rec loop () =
-                let status = currentStatus ()
+                task {
+                    ct.ThrowIfCancellationRequested()
 
-                match status.ToUpperInvariant() with
-                // PAUSED n'est PAS un état terminal : attendre la reprise.
-                | "STOPPED"
-                | "DELETED"
-                | "UNKNOWN" -> 0
-                | _ ->
-                    match deadline with
-                    | Some d when DateTime.UtcNow >= d -> -1
+                    let status = currentStatus ()
+
+                    match status.ToUpperInvariant() with
+                    // PAUSED n'est PAS un état terminal : attendre la reprise.
+                    | "STOPPED"
+                    | "DELETED"
+                    | "UNKNOWN" -> return 0
                     | _ ->
-                        Thread.Sleep(1000)
-                        loop ()
+                        match deadline with
+                        | Some d when DateTime.UtcNow >= d -> return -1
+                        | _ ->
+                            do! Task.Delay(1000, ct)
+                            return! loop ()
+                }
 
             loop ()
 
@@ -676,46 +680,74 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
         member _.PullImage(image, userArg) =
             SecurityValidation.validateImage image
 
-            let registry =
-                // Premier segment SANS tag/port : « nginx:latest » est un tag,
-                // pas un hôte de registre.
-                let firstSegmentRaw = image.Split('/').[0]
+            let registry = RegistryProviders.hostOfImage image
 
-                let lastColon = firstSegmentRaw.LastIndexOf(':')
-
-                let firstSegment =
-                    if lastColon >= 0 then firstSegmentRaw.Substring(0, lastColon) else firstSegmentRaw
-
-                if
-                    firstSegment.Contains('.')
-                    || firstSegment.Contains(':')
-                    || firstSegment.Equals("localhost", StringComparison.OrdinalIgnoreCase)
-                then
-                    firstSegment
-                else
-                    "docker.io"
-
-            match userArg with
-            | Some explicit ->
-                // Identifiant EXPLICITE (option CLI --user) : repli historique
-                // sur argv, seul cas restant — l'utilisateur a choisi la voie
-                // directe et éphémère.
-                runCtr [ "image"; "pull"; "--user"; explicit; image ] |> fun o -> o.Trim()
+            match RegistryProviders.tryResolve registry with
             | None ->
-                // Identifiants STOCKÉS : passer par le helper de credentials —
-                // plus aucun secret dans argv.
-                match RegistryAuth.prepareHostsDir registry with
-                | Some hostsDir ->
-                    try
-                        runCtr [ "image"; "pull"; "--hosts-dir"; hostsDir; image ]
-                        |> fun o -> o.Trim()
-                    finally
+                // Liste blanche absolue : seule l'origine de l'image est
+                // examinée, un --user explicite ne la contourne jamais.
+                raise (
+                    RpcException(
+                        Status(
+                            StatusCode.InvalidArgument,
+                            sprintf
+                                "Source d'image non autorisée : '%s'. Fournisseurs pris en charge : %s"
+                                registry
+                                RegistryProviders.label
+                        )
+                    )
+                )
+            | Some canonical ->
+                match userArg with
+                | Some explicit ->
+                    // Identifiant EXPLICITE (option CLI --user) : H6 — le secret ne
+                    // transite plus par argv ; il est routé via un helper jetable
+                    // (hosts.toml) exactement comme les identifiants stockés.
+                    match RegistryAuth.prepareHostsDirForCredentials registry explicit with
+                    | Some hostsDir ->
                         try
-                            Directory.Delete(hostsDir, true)
-                        with ex ->
-                            Log.Debug(ex, "Nettoyage du hosts-dir temporaire impossible")
+                            runCtr [ "image"; "pull"; "--hosts-dir"; hostsDir; image ]
+                            |> fun o -> o.Trim()
+                        finally
+                            try
+                                Directory.Delete(hostsDir, true)
+                            with ex ->
+                                Log.Debug(ex, "Nettoyage du hosts-dir temporaire impossible")
+                    | None ->
+                        // Argument non au format « utilisateur:secret » : rien ne
+                        // peut être routé vers le helper — repli contraint.
+                        runCtr [ "image"; "pull"; "--user"; explicit; image ]
+                        |> fun o -> o.Trim()
                 | None ->
-                    runCtr [ "image"; "pull"; image ] |> fun o -> o.Trim()
+                    // Identifiants STOCKÉS : aucune extraction anonyme — les
+                    // fournisseurs autorisés exigent tous un compte enregistré.
+                    if not (Map.containsKey canonical (RegistryAuth.load (RegistryAuth.stateFile ()))) then
+                        raise (
+                            RpcException(
+                                Status(
+                                    StatusCode.InvalidArgument,
+                                    sprintf
+                                        "Authentification requise pour le registre '%s' : exécutez 'diplo container login %s --username <utilisateur> --password <jeton>' ou passez --user utilisateur:secret"
+                                        canonical
+                                        canonical
+                                )
+                            )
+                        )
+
+                    // Identifiants STOCKÉS : passer par le helper de credentials —
+                    // plus aucun secret dans argv.
+                    match RegistryAuth.prepareHostsDir canonical with
+                    | Some hostsDir ->
+                        try
+                            runCtr [ "image"; "pull"; "--hosts-dir"; hostsDir; image ]
+                            |> fun o -> o.Trim()
+                        finally
+                            try
+                                Directory.Delete(hostsDir, true)
+                            with ex ->
+                                Log.Debug(ex, "Nettoyage du hosts-dir temporaire impossible")
+                    | None ->
+                        runCtr [ "image"; "pull"; image ] |> fun o -> o.Trim()
 
         member _.Version() =
             try

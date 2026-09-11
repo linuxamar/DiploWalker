@@ -38,7 +38,9 @@ module Interfaces =
         abstract member ResumeContainer: namespaceName: string * id: string -> unit
         /// Attend la sortie du conteneur et retourne son code de sortie
         /// (0 si sorti, -1 en cas de timeout, 0 si déjà arrêté).
-        abstract member WaitForContainerExit: namespaceName: string * id: string * timeoutSeconds: int -> int
+        abstract member WaitForContainerExit:
+            namespaceName: string * id: string * timeoutSeconds: int * ct: System.Threading.CancellationToken ->
+                System.Threading.Tasks.Task<int>
 
         abstract member UpdateContainer:
             namespaceName: string * id: string * memoryLimit: int64 * cpuShares: int * pidLimit: int -> unit

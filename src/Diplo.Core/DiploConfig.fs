@@ -55,7 +55,10 @@ module DiploConfig =
             use doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 8))
             let root = doc.RootElement
             (getAddress root "container", getAddress root "volume", getAddress root "network")
-        with _ ->
+        with ex ->
+            // M15 : un JSON illisible n'est pas ignoré en silence — avertissement
+            // explicite, puis repli sur les valeurs par défaut.
+            Log.Warning(ex, "Fichier de configuration client mal formé (repli sur les valeurs par défaut)")
             (None, None, None)
 
     /// Extrait les métadonnées (namespace, logLevel) d'un fichier existant afin de les
@@ -70,7 +73,8 @@ module DiploConfig =
                 (getRaw root "container" "namespace", getTopLevel root "logLevel")
             else
                 (None, None)
-        with _ ->
+        with ex ->
+            Log.Warning(ex, "Impossible de lire les métadonnées du fichier de configuration {Path}", path)
             (None, None)
 
     /// Résout le chemin du fichier de configuration, par priorité :

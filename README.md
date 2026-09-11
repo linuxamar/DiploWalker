@@ -18,7 +18,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 ### Clients
 
-- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux et images disque (`disk create-image`)
+- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux, images disque (`disk create-image`) et recherche d'images en ligne
 - **GUI** : `Diplo.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
 - **Résilience** : les canaux gRPC (`DiploChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
 
@@ -28,7 +28,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit v4 (960 tests)
+- **Tests** : xUnit v4 (1 608 tests)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -360,9 +360,16 @@ Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (
 
 L'interface graphique Avalonia utilise un thème système par défaut avec des onglets organisés :
 
+**Onglet Images** :
+
+- **Toolbar** : Lister, Rechercher, Télécharger, Inspecter, Étiqueter, Supprimer, Nettoyer
+- **Champs** : Réf. (pull), User (pull), Espace, image source / image cible (étiqueter), Référence (inspecter/supprimer)
+- **DataGrid** (haut) : images locales (Référentiel, Tag, Taille, Créé le)
+- **Recherche en ligne** (bas) : résultats des catalogues (Registre, Référence, Étoiles, Description) avec bouton **Tirer la sélection** — déclenchée par la touche Entrée dans le champ de recherche (cf. « Recherche d'images en ligne »)
+
 **Onglet Conteneurs** — Vue splitée avec :
 
-- **Toolbar** en haut : Lister, Créer, Télécharger, Inspecter, Espaces, Version
+- **Toolbar** en haut : Lister, Créer, Télécharger, Inspecter, Espaces, Version, Nettoyer, Événements, Arrêter
 - **Champs** : ID, Nom, Image, User (pull), Espace, Timeout, Tous, Forcer
 - **DataGrid** (gauche) : liste des conteneurs avec sélection
 - **ContainerDetailUserControl** (droite) : panneau de détail pour le conteneur sélectionné
@@ -370,7 +377,7 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
     - Actions : Démarrer, Arrêter, Supprimer, Renommer, Processus, Métriques
     - Configuration : Nouveau nom, Montages
     - Journaux & Exec : Suivre, Lignes, Depuis, Commande
-- **Images** (Expander repliable en bas) : Liste/Inspecter/Supprimer/Étiqueter
+    - **Catalogue d'images** : liste locale persistante (`diplo-catalog.json`) avec Lister, Inscrire (pull), Mettre à jour (tag) et Retirer (rmi)
 
 **Onglet Volumes** — Liste + création d'images disque (sélection dossier/fichier, format)
 
@@ -380,19 +387,43 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
 
 **Onglet Paramètres** — Édition de `diplo.json` (adresses services, transport, namespace, logLevel)
 
+**Menu** — *Fichier* → **Exporter le journal…** (écrit les lignes horodatées du journal dans un fichier `.txt` choisi via le sélecteur de fichier), *Quitter* ; *Aide* → **À propos**
+
+## Recherche d'images en ligne
+
+La recherche d'images interroge les catalogues en ligne depuis le CLI (`diplo container image-search`) ou l'onglet **Images** de la GUI (champ de recherche validé par Entrée ; les résultats se tirent via « Tirer la sélection »). Elle est limitée aux **quatre registres autorisés** et ne nécessite **aucun identifiant** (catalogues publics) ; le pull d'un résultat utilise ensuite l'identifiant enregistré pour le registre concerné.
+
+| Registre | Mécanisme de recherche |
+| --- | --- |
+| **docker.io** | API de recherche publique de Docker Hub |
+| **quay.io** | API de recherche publique de Quay |
+| **mcr.microsoft.com** | Catalogue public `_catalog` (`/v2/_catalog`) téléchargé puis **filtré localement** : pas de requête serveur (le MCR ignore `?n=`), correspondance insensible à la casse sur le nom du référentiel, limite appliquée côté client |
+| **ghcr.io** | Aucune API de recherche publique → aucun résultat |
+
+Sans registre ciblé, les quatre fournisseurs sont interrogés dans l'ordre de la liste blanche (docker.io, quay.io, ghcr.io, mcr.microsoft.com). Un registre hors liste blanche est rejeté avec un avertissement et la recherche s'effectue alors sur tous les registres.
+
 ## Authentification aux registres
 
-Les identifiants des registres privés sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) dans `%ProgramData%\Diplo\registry-auth.json`. Ils ne transitent **jamais** par la ligne de commande de `ctr` : lors d'un `pull`, le service génère un **helper d'identification** conforme au protocole `docker-credential` (`%ProgramData%\Diplo\cred-helper\`) qui retourne les identifiants via stdin, et un répertoire hosts temporaire pointant vers ce helper (nettoyé en fin d'opération). Les identifiants sont automatiquement fournis à containerd pour l'image tirée (registres nommés ou `docker.io` redirigé vers `registry-1.docker.io`).
+Les extractions d'images (CLI, GUI) sont limitées à **quatre fournisseurs** : `ghcr.io`, `docker.io`, `quay.io` et `mcr.microsoft.com`. Des alias courts sont acceptés pour `login`/`logout` : `ghcr`, `dockerhub` (ou `docker`), `quay`, `mcr`. Toute autre source est refusée par le serveur, et **toute extraction anonyme est impossible** : un compte doit être enregistré pour le registre concerné (sauf `--user utilisateur:secret` sur la ligne de commande, qui prime sur l'identifiant enregistré).
+
+Les identifiants sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) dans `%ProgramData%\Diplo\registry-auth.json`. Ils ne transitent **jamais** par la ligne de commande de `ctr` : lors d'un `pull`, le service génère un **helper d'identification** conforme au protocole `docker-credential` (`%ProgramData%\Diplo\cred-helper\`) qui retourne les identifiants via stdin, et un répertoire hosts temporaire pointant vers ce helper (nettoyé en fin d'opération). Les identifiants sont automatiquement fournis à containerd pour l'image tirée (`docker.io` redirigé vers `registry-1.docker.io`).
+
+### Obtention des jetons par fournisseur
+
+- **ghcr.io** — GitHub Packages : nom d'utilisateur GitHub + *personal access token* (portée `read:packages`).
+- **docker.io** — Docker Hub : identifiant Docker Hub + *Access Token* généré dans les paramètres du compte.
+- **quay.io** — Red Hat Quay : identifiant du namespace (ou *robot account*) + jeton de l'utilisateur ou du robot.
+- **mcr.microsoft.com** — Microsoft Container Registry : identifiant Azure + jeton de registre.
 
 ### CLI
 
-``powershell
-diplo container login myregistry.azurecr.io --username user          # le mot de passe est demandé en mode masqué
-diplo container login myregistry.azurecr.io --username user --password secret
-diplo container logout myregistry.azurecr.io
-diplo container pull myregistry.azurecr.io/team/app:latest           # utilise l'identifiant enregistré
-diplo container pull myregistry.azurecr.io/team/app:latest --user inline:secret   # identifiant explicite (prime sur l'enregistré)
-``
+```powershell
+diplo container login ghcr.io --username user          # le mot de passe est demandé en mode masqué
+diplo container login ghcr --username user --password secret   # alias accepté
+diplo container logout ghcr                             # alias accepté
+diplo container pull ghcr.io/org/app:latest             # utilise l'identifiant enregistré
+diplo container pull ghcr.io/org/app:latest --user user:secret   # identifiant explicite (prime sur l'enregistré)
+```
 
 ### GUI
 
@@ -424,8 +455,15 @@ diplo container image-inspect <ref>
 diplo container image-remove <ref>
 diplo container image-tag <source> <cible>
 diplo container pull <ref> [--user <utilisateur>]
-diplo container login <registre> --username <u> [--password <p>]
+diplo container image-search <terme> [--registry <registre>] [--limit <n>]   # docker.io, quay.io, mcr.microsoft.com ; ghcr.io : aucun résultat (alias <registre> acceptés)
+diplo container login <registre> --username <u> [--password <p>]   # ghcr.io, docker.io, quay.io, mcr.microsoft.com (alias : ghcr, dockerhub, quay, mcr)
 diplo container logout <registre>
+
+# Catalogue d'images
+diplo container catalog-list [--catalog <fichier>]
+diplo container catalog-add <ref> [--note <texte>] [--no-pull] [--catalog <fichier>]
+diplo container catalog-update <ref> [--target <nouvelle_ref>] [--note <texte>] [--catalog <fichier>]
+diplo container catalog-delete <ref> [--no-docker] [--catalog <fichier>]
 
 # Volumes
 diplo volume list

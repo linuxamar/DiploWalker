@@ -4,7 +4,6 @@ open System
 open System.Collections.Generic
 open System.Threading
 open System.Windows.Input
-open Avalonia.Threading
 open Xunit
 open FsUnit.Xunit
 open Diplo.Core.Clients
@@ -15,19 +14,19 @@ open Diplo.Grpc.Volume
 open Diplo.TestHelpers
 
 // Tests des méthodes des ViewModels qui ne peuvent s'exécuter que sur un vrai
-// Dispatcher Avalonia : elles remplissent leurs collections via
-// Dispatcher.UIThread.Post. Le harnais headless (HeadlessRunner.setupHeadless)
-// initialise le Dispatcher sur le thread courant ; RunJobs traite ensuite les
-// rappels poster.
+// Dispatcher Avalonia : elles remplissent leurs collections via UiThread.Post.
+// Le harnais headless (HeadlessRunner.setupHeadless) possède un thread dédié
+// qui pompe le Dispatcher ; waitPump ne fait que poller les collections.
 
 let private waitPump (predicate: unit -> bool) =
     let sw = Diagnostics.Stopwatch.StartNew()
+    let mutable ok = predicate ()
 
-    while not (predicate ()) && sw.ElapsedMilliseconds < 3000L do
-        Dispatcher.UIThread.RunJobs()
+    while not ok && sw.ElapsedMilliseconds < 10000L do
         Thread.Sleep(10)
+        ok <- predicate ()
 
-    predicate ()
+    ok
 
 // ── ContainerTabViewModel ──────────────────────────────────────
 
@@ -76,6 +75,64 @@ let ``ListImages peuple la collection sur le dispatcher`` () =
     waitPump (fun () -> vm.Images.Count = 1) |> should equal true
     vm.Images.[0].Référentiel |> should equal "nginx"
     vm.Images.[0].Tag |> should equal "latest"
+
+// ── ImagesTabViewModel ─────────────────────────────────────────
+
+let private imagesVm (port: MockOutputPort) (fake: FakeContainerClient) =
+    new Diplo.Gui.ViewModels.ImagesTabViewModel(
+        port,
+        containerClientFactory = fun () -> fake :> IContainerClient
+    )
+
+[<Fact>]
+let ``ImagesTabViewModel ListImages peuple la collection sur le dispatcher`` () =
+    HeadlessRunner.setupHeadless ()
+    let port = MockOutputPort()
+
+    let img =
+        { Ref = "nginx"
+          Id = "sha256:1"
+          Repository = "library/nginx"
+          Tag = "latest"
+          Size = 2048L
+          CreatedAt = "2026-01-01" }
+
+    let fake = new FakeContainerClient(listImages = { Images = List<ImageInfo>([| img |]) })
+    let vm = imagesVm port fake
+    (vm.ListImagesCommand :> ICommand).Execute(null)
+    waitPump (fun () -> vm.Images.Count = 1) |> should equal true
+    vm.Images.[0].Ref |> should equal "nginx"
+    vm.Images.[0].RefComplet |> should equal "nginx:latest"
+    vm.Images.[0].Taille |> should equal "2048 octets"
+
+[<Fact>]
+let ``ImagesTabViewModel SearchImages peuple les resultats sur le dispatcher`` () =
+    HeadlessRunner.setupHeadless ()
+    let port = MockOutputPort()
+
+    let fake =
+        new FakeContainerClient(
+            searchImages =
+                { Results =
+                      List<RegistrySearchResult>(
+                          [|
+                              { Registry = "docker.io"
+                                Ref = "docker.io/nginx"
+                                Description = "Serveur web"
+                                Stars = 100 }
+                          |]
+                      )
+                  Message = "" }
+        )
+
+    let vm = imagesVm port fake
+    vm.ImageSearchInput <- "nginx"
+    (vm.SearchImagesCommand :> ICommand).Execute(null)
+    waitPump (fun () -> vm.SearchResults.Count = 1 && vm.SearchStatus.Contains("1 résultat(s)")) |> should equal true
+    vm.SearchResults.[0].Registre |> should equal "docker.io"
+    vm.SearchResults.[0].Ref |> should equal "docker.io/nginx"
+    vm.SearchResults.[0].Étoiles |> should equal "100"
+    Assert.Contains("1 résultat(s)", vm.SearchStatus)
 
 // ── VolumeTabViewModel ─────────────────────────────────────────
 
@@ -192,9 +249,10 @@ let private mainWindowPort (vm: Diplo.Gui.ViewModels.MainWindowViewModel) =
     vm.OutputPort :?> Diplo.Gui.Services.AvaloniaOutputPort
 
 [<Fact>]
-let ``MainWindow expose les cinq onglets non nuls`` () =
+let ``MainWindow expose les six onglets non nuls`` () =
     let vm = mainWindowVm ()
     vm.ContainerTab |> should not' (be Null)
+    vm.ImagesTab |> should not' (be Null)
     vm.VolumeTab |> should not' (be Null)
     vm.NetworkTab |> should not' (be Null)
     vm.ComposeTab |> should not' (be Null)
@@ -206,6 +264,9 @@ let ``MainWindow expose les onglets du bon type`` () =
 
     vm.ContainerTab
     |> should be instanceOfType<Diplo.Gui.ViewModels.ContainerTabViewModel>
+
+    vm.ImagesTab
+    |> should be instanceOfType<Diplo.Gui.ViewModels.ImagesTabViewModel>
 
     vm.VolumeTab
     |> should be instanceOfType<Diplo.Gui.ViewModels.VolumeTabViewModel>
@@ -266,13 +327,97 @@ let ``MainWindow AboutCommand écrit les deux lignes d'information`` () =
     let vm = mainWindowVm ()
     vm.AboutCommand.Execute(null)
 
-    waitPump (fun () -> (mainWindowPort vm).LogLines.Count >= 2)
+    waitPump (fun () ->
+        vm.LogOutput.Contains "Diplo — Gestion Docker"
+        && vm.LogOutput.Contains "Interface graphique Avalonia")
     |> should equal true
-
-    vm.LogOutput.Contains "Diplo — Gestion Docker" |> should equal true
-    vm.LogOutput.Contains "Interface graphique Avalonia" |> should equal true
 
 [<Fact>]
 let ``MainWindow QuitCommand est exposé`` () =
     let vm = mainWindowVm ()
     vm.QuitCommand |> should not' (be Null)
+
+[<Fact>]
+let ``MainWindow ExportLogCommand sans fournisseur de stockage ecrit un avertissement`` () =
+    let vm = mainWindowVm ()
+    vm.ExportLogCommand.Execute(null)
+
+    waitPump (fun () ->
+        (mainWindowPort vm).LogLines
+        |> Seq.exists (fun l -> l.Text.Contains "Fournisseur de stockage non disponible"))
+    |> should equal true
+
+[<Fact>]
+let ``MainWindow ExportLogCommand avec un picker annule reste silencieux`` () =
+    let vm = mainWindowVm ()
+    // Fake sans fichier retourné : SaveFilePickerAsync renvoie null.
+    vm.SetStorageProvider(new FakeStorageProvider())
+    vm.OutputPort.WriteLine("ligne avant export")
+    waitPump (fun () -> vm.LogOutput.Contains "ligne avant export") |> should equal true
+
+    vm.ExportLogCommand.Execute(null)
+
+    // Aucun succès ni erreur : l'annulation n'écrit rien.
+    waitPump (fun () ->
+        (mainWindowPort vm).LogLines
+        |> Seq.exists (fun l -> l.Text.Contains "Journal exporté"))
+    |> should equal false
+
+    waitPump (fun () ->
+        (mainWindowPort vm).LogLines
+        |> Seq.exists (fun l -> l.Text.Contains "Fournisseur de stockage non disponible"))
+    |> should equal false
+
+[<Fact>]
+let ``MainWindow ExportLogCommand avec un fournisseur écrit le journal dans le fichier choisi`` () =
+    let vm = mainWindowVm ()
+    vm.OutputPort.WriteLine("ligne un")
+    vm.OutputPort.WriteSuccess("ligne deux")
+    waitPump (fun () -> vm.LogOutput.Contains "ligne deux") |> should equal true
+
+    let dir = Diplo.TestHelpers.TestHelpers.createTempDir "journal-export-succes"
+    let target = System.IO.Path.Combine(dir, "journal.txt")
+
+    try
+        vm.SetStorageProvider(new FakeStorageProvider(saveFile = new FakeStorageFile(target)))
+        vm.ExportLogCommand.Execute(null)
+
+        waitPump (fun () ->
+            (mainWindowPort vm).LogLines
+            |> Seq.exists (fun l ->
+                l.Text.Contains "Journal exporté"
+                && l.Text.Contains "journal.txt"))
+        |> should equal true
+
+        System.IO.File.Exists target |> should equal true
+        let content = System.IO.File.ReadAllLines target
+        content.Length |> should equal 2
+        content.[0].Contains "ligne un" |> should equal true
+        content.[1].Contains "ligne deux" |> should equal true
+    finally
+        Diplo.TestHelpers.TestHelpers.cleanupDir dir
+
+[<Fact>]
+let ``MainWindow ExportJournalTo ecrit les lignes du journal dans un fichier`` () =
+    let vm = mainWindowVm ()
+    vm.OutputPort.WriteLine("première ligne")
+    vm.OutputPort.WriteSuccess("seconde ligne")
+    waitPump (fun () -> vm.LogOutput.Contains "seconde ligne") |> should equal true
+
+    let dir = Diplo.TestHelpers.TestHelpers.createTempDir "journal-export"
+    let path = System.IO.Path.Combine(dir, "journal.txt")
+
+    try
+        let count = vm.ExportJournalTo(path) |> Async.AwaitTask |> Async.RunSynchronously
+        count |> should equal 2
+
+        let content = System.IO.File.ReadAllLines path
+        content.Length |> should equal 2
+        content.[0].Contains "première ligne" |> should equal true
+        content.[1].Contains "seconde ligne" |> should equal true
+
+        content
+        |> Array.forall (fun l -> l.Contains "[")
+        |> should equal true
+    finally
+        Diplo.TestHelpers.TestHelpers.cleanupDir dir

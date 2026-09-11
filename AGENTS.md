@@ -4,6 +4,7 @@
 
 - .NET 10 (F# orientation)
 - Git LFS required: run `git lfs install` after clone
+- Validation: `./pipeline.ps1 -DoTests` (build + tests, ~3 min; see CLAUDE.md)
 
 ## Git conventions
 
@@ -18,3 +19,4 @@
 ## Extended context
 
 - See `CLAUDE.md` for full repository conventions and background
+- `CONTEXT.md` holds session state — read it at session start

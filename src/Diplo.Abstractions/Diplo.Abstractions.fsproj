@@ -34,6 +34,7 @@
     <Compile Include="TokenInterceptor.fs" />
     <Compile Include="ServerConfig.fs" />
     <Compile Include="NetworkConfig.fs" />
+    <Compile Include="RegistryProviders.fs" />
   </ItemGroup>
 
 </Project>

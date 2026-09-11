@@ -3,8 +3,22 @@ namespace Diplo.Gui.Services
 open System
 open System.Collections.ObjectModel
 open System.Threading
+open Avalonia
 open Avalonia.Threading
 open Diplo.Core.Output
+
+/// Acheminement des actions devant s'exécuter sur le thread UI.
+type UiThread =
+
+    /// Exécute l'action sur le thread UI du Dispatcher quand une application
+    /// Avalonia est initialisée ; sinon l'exécute immédiatement sur le thread
+    /// courant. Évite ainsi de créer le Dispatcher dans les tests non-headless
+    /// qui exercent les ViewModels hors de tout contexte Avalonia.
+    static member Post(action: unit -> unit) =
+        if isNull Application.Current then
+            action ()
+        else
+            Dispatcher.UIThread.Post(action)
 
 type LogLevel =
     | Info
@@ -28,7 +42,7 @@ type AvaloniaOutputPort() =
         if SynchronizationContext.Current <> null then
             action ()
         else
-            Dispatcher.UIThread.Post(action)
+            UiThread.Post(action)
 
     member _.LogLines = logLines
     member _.TableColumns = tableColumns

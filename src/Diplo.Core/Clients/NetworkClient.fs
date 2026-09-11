@@ -18,11 +18,12 @@ type NetworkClient(channel: GrpcChannel, ownsChannel: bool) as this =
 
     new(port: int) =
         let ch = DiploChannel.forNetwork port
-        new NetworkClient(ch, true)
+        // Canal mutualisé (M1) : non possédé, sa disposition ne ferme pas le canal partagé.
+        new NetworkClient(ch, false)
 
     new() =
         match DiploConfig.networkAddress () with
-        | Some address -> new NetworkClient(DiploChannel.forAddress address, true)
+        | Some address -> new NetworkClient(DiploChannel.forAddress address, false)
         | None -> new NetworkClient(DiploPorts.Network)
 
     member _.CreateAsync

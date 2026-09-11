@@ -19,13 +19,13 @@ module AuthTokenTests =
                 Path.Combine(Path.GetTempPath(), "diplo-auth-" + Guid.NewGuid().ToString("N"))
 
             Directory.CreateDirectory(dir) |> ignore
-            let previous = authTokenPath
-            authTokenPath <- Path.Combine(dir, "auth-token.json")
+            let previous = tokenPath ()
+            setTokenPath (Path.Combine(dir, "auth-token.json"))
 
             try
                 f ()
             finally
-                authTokenPath <- previous
+                setTokenPath previous
                 Directory.Delete(dir, true)
 
         [<Fact>]
@@ -79,7 +79,7 @@ module AuthTokenTests =
                     { Token = token
                       ExpiresAt = DateTime.UtcNow.AddHours(-1.0) }
 
-                File.WriteAllText(authTokenPath, JsonSerializer.Serialize(expired))
+                File.WriteAllText(tokenPath (), JsonSerializer.Serialize(expired))
                 verifyToken token |> should equal false)
 
         [<Fact>]
@@ -87,7 +87,7 @@ module AuthTokenTests =
             withTempPath (fun () ->
                 let token = generateToken ()
                 saveToken token
-                File.Exists(authTokenPath) |> should equal true
+                File.Exists(tokenPath ()) |> should equal true
                 verifyToken token |> should equal true)
 
         [<Fact>]

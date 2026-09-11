@@ -236,6 +236,11 @@ module GrpcTestHost =
                 lastTagImage <- Some request
                 Task.FromResult({ TagImageResponse.Source = request.Source; Target = request.Target; Message = "Réétiquetée" })
 
+            member _.SearchRegistry(request, _ct) =
+                Task.FromResult(
+                    { SearchRegistryResponse.Results = List<RegistrySearchResult>(); Message = "" }
+                )
+
             member _.PauseContainer(_request, _ct) = raise (NotImplementedException())
             member _.UnpauseContainer(_request, _ct) = raise (NotImplementedException())
             member _.WaitContainer(_request, _ct) = raise (NotImplementedException())

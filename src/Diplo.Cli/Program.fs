@@ -1,11 +1,15 @@
 open System
 open System.Reflection
+open System.Net.Http
 open Diplo.Cli
 open Diplo.Cli.Container
+open Diplo.Core.Output
 open Diplo.Cli.Volume
 open Diplo.Cli.Network
 open Diplo.Cli.Compose
 open Diplo.Cli.Disk
+open Diplo.Cli.Catalog
+open Grpc.Core
 open Spectre.Console.Cli
 
 let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) =
@@ -14,11 +18,32 @@ let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) 
     |> fun mi -> mi.MakeGenericMethod(t).Invoke(c, [| name |])
     |> ignore
 
+/// Handler global : les erreurs de transport (gRPC / HTTP) remontées jusque
+/// là sont rapportées proprement au lieu d'une exception non gérée. Une
+/// annulation volontaire (Ctrl+C) sort avec le code 0.
+let private handleException (output: IOutputPort) (ex: exn) : int =
+    match ex with
+    | :? RpcException as rex when rex.StatusCode = StatusCode.Cancelled -> 0
+    | :? RpcException as rex ->
+        output.WriteError(sprintf "Erreur gRPC : %s" rex.Status.Detail)
+        1
+    | :? HttpRequestException as hex ->
+        output.WriteError(sprintf "Erreur réseau : %s" (if String.IsNullOrWhiteSpace hex.Message then "connexion au service refusée" else hex.Message))
+        1
+    | _ -> raise ex
+
 [<EntryPoint>]
 let main argv =
     let app = CommandApp(TypeRegistrar())
 
     app.Configure(fun (config: IConfigurator) ->
+        config.SetExceptionHandler(
+            Func<Exception, ITypeResolver, int>(fun ex resolver ->
+                let output = resolver.Resolve(typeof<IOutputPort>) :?> IOutputPort
+                handleException output ex
+            )
+        )
+        |> ignore
 
         config.AddBranch(
             "container",
@@ -43,6 +68,7 @@ let main argv =
                 addCmd c "image-inspect" typeof<ImageInspectCommand>
                 addCmd c "image-remove" typeof<ImageRemoveCommand>
                 addCmd c "image-tag" typeof<ImageTagCommand>
+                addCmd c "image-search" typeof<ImageSearchCommand>
                 addCmd c "pause" typeof<PauseContainerCommand>
                 addCmd c "unpause" typeof<UnpauseContainerCommand>
                 addCmd c "wait" typeof<WaitContainerCommand>
@@ -54,7 +80,11 @@ let main argv =
                 addCmd c "image-export" typeof<ImageExportCommand>
                 addCmd c "image-import" typeof<ImageImportCommand>
                 addCmd c "read-file" typeof<ReadFileCommand>
-                addCmd c "write-file" typeof<WriteFileCommand>)
+                addCmd c "write-file" typeof<WriteFileCommand>
+                addCmd c "catalog-list" typeof<CatalogListCommand>
+                addCmd c "catalog-add" typeof<CatalogAddCommand>
+                addCmd c "catalog-update" typeof<CatalogUpdateCommand>
+                addCmd c "catalog-delete" typeof<CatalogDeleteCommand>)
         )
         |> ignore
 

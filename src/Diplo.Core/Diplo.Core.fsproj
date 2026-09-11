@@ -7,6 +7,7 @@
   <ItemGroup>
     <Compile Include="Output\IOutputPort.fs" />
     <Compile Include="DiploConfig.fs" />
+    <Compile Include="ImageCatalog.fs" />
     <Compile Include="Mounts\MountParser.fs" />
     <Compile Include="CommandLine.fs" />
     <Compile Include="Connection\GrpcClientFactory.fs" />
