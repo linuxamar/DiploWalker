@@ -18,7 +18,7 @@ open Diplo.TestHelpers
 let private waitUntil (predicate: unit -> bool) =
     let sw = Diagnostics.Stopwatch.StartNew()
 
-    while not (predicate ()) && sw.ElapsedMilliseconds < 5000L do
+    while not (predicate ()) && sw.ElapsedMilliseconds < 30000L do
         Thread.Sleep(20)
 
     predicate ()

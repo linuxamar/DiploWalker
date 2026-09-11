@@ -1,4 +1,4 @@
-﻿# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 #  pipeline.ps1  –  Build, tests et publication self-contained (Release)
 # ---------------------------------------------------------------------------
 #  Structure de sortie :
@@ -36,6 +36,17 @@ param(
 #   (aucun flag)         → rien, affiche l'aide
 
 $ErrorActionPreference = "Stop"
+
+# Encodage UTF-8 de la sortie console : les accents français (é, è, ✓, ═…)
+# restent lisibles dans Windows Terminal et les journaux capturés,
+# quelle que soit la page de codes OEM (CP850/CP437) par défaut.
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    [Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
+    $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+} catch {
+    # Console redirigée ou encodage non modifiable : on continue tel quel.
+}
 
 if (-not $DoTests -and -not $DoPublish -and -not $Clean -and -not $Restore) {
     Write-Host "Usage : .\pipeline.ps1 [-Clean] [-Restore] [-DoTests] [-DoPublish] [-Platform x64|x86]" -ForegroundColor Yellow

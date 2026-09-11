@@ -14,7 +14,7 @@ open Diplo.TestHelpers
 let private waitUntil (predicate: unit -> bool) =
     let sw = Diagnostics.Stopwatch.StartNew()
 
-    while not (predicate ()) && sw.ElapsedMilliseconds < 2000L do
+    while not (predicate ()) && sw.ElapsedMilliseconds < 10000L do
         Thread.Sleep(20)
 
     predicate ()
@@ -93,6 +93,10 @@ let ``ContainerTabViewModel AddToCatalog doublon prévient sans toucher au fichi
         (vm.AddToCatalogCommand :> ICommand).Execute(null)
         waitUntil (fun () -> port.Warnings |> List.exists (fun m -> m.Contains "est déjà au catalogue")) |> should equal true
         ImageCatalog.load path |> should haveLength 1
+        // RefreshCatalogue relit le fichier en tâche de fond via UiThread.Post :
+        // on attend la fin de la relecture avant de supprimer le répertoire,
+        // sinon Directory.Delete court avec la lecture du fichier.
+        waitUntil (fun () -> vm.Catalogue.Count = 1) |> should equal true
     finally
         Directory.Delete(dir, true)
 

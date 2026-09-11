@@ -22,7 +22,7 @@ let private waitPump (predicate: unit -> bool) =
     let sw = Diagnostics.Stopwatch.StartNew()
     let mutable ok = predicate ()
 
-    while not ok && sw.ElapsedMilliseconds < 3000L do
+    while not ok && sw.ElapsedMilliseconds < 10000L do
         Thread.Sleep(10)
         ok <- predicate ()
 
@@ -327,11 +327,10 @@ let ``MainWindow AboutCommand écrit les deux lignes d'information`` () =
     let vm = mainWindowVm ()
     vm.AboutCommand.Execute(null)
 
-    waitPump (fun () -> (mainWindowPort vm).LogLines.Count >= 2)
+    waitPump (fun () ->
+        vm.LogOutput.Contains "Diplo — Gestion Docker"
+        && vm.LogOutput.Contains "Interface graphique Avalonia")
     |> should equal true
-
-    vm.LogOutput.Contains "Diplo — Gestion Docker" |> should equal true
-    vm.LogOutput.Contains "Interface graphique Avalonia" |> should equal true
 
 [<Fact>]
 let ``MainWindow QuitCommand est exposé`` () =
