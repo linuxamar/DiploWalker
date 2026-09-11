@@ -27,11 +27,11 @@ Mémoire de travail de session (à réécrire à chaque session). Les règles st
 
 ## C3 — intégrité des artefacts (nouveau, commit en cours)
 
-- Checksums centralisés dans `src/Diplo.Installer/assets/artifacts.manifest`, signé **RSA-4096/SHA-384** (PKCS#1 v1.5) par une clé privée **hors bande** (`~/.diplo/diplo-release.key`, passphrase provisoire `diplo-temp` à migrer en coffre — jamais dans le dépôt).
+- Checksums centralisés dans `src/Diplo.Installer/assets/artifacts.manifest`, signé **RSA-4096/SHA-384** (PKCS#1 v1.5) par une clé privée **hors bande** (`~/.diplo/diplo-release.key`, chiffrée **AES-256-CBC** — PKCS#8 `ENCRYPTED PRIVATE KEY` — jamais dans le dépôt). La passphrase est transmise à l'outil via `-Passphrase` ou `$env:DIPLO_KEY_PASSPHRASE`.
 - Trois ressources embarquées dans l'assembly (LogicalNames `Diplo.Installer.assets.*`) : manifeste, signature (**base64**, décodée via `Convert.FromBase64String`), clé publique `diplo-release.pub`. Lecture via `typeof<AssemblyAnchor>.Assembly` (pas `GetExecutingAssembly`, fiable depuis les tests).
 - Vérification **fail-closed** dans `ArtifactSigning.loadVerifiedManifest` (levée dès chargement), appelée une fois au démarrage dans `Core.fs` (`artifactChecksums` remplace les 3 constantes codées en dur). `verifyChecksum` accepte `string option`, `None` → échec.
 - `.gitattributes` : les 3 assets signés sont forcés en `text eol=lf` (autocrlf=true casserait la signature). Manifeste vérifié LF-only (8 LF, 0 CRLF), `.sig` sur une seule ligne (684 octets).
-- `tools/sign-artifacts.ps1` : re-signature openssl + vérification croisée + écriture base64, la clé publique de contrôle dérive de `-KeyPath`.
+- `tools/sign-artifacts.ps1` : re-signature openssl + vérification croisée + écriture base64, la clé publique de contrôle dérive de `-KeyPath` (ou `.pub` dans le dépôt), et la passphrase est lue en priorité depuis `-Passphrase`, sinon `$env:DIPLO_KEY_PASSPHRASE`, sinon pas de passphrase (clé non chiffrée). La signature est **déterministe** (PKCS#1 v1.5 / SHA-384) : re-signer le même manifeste avec la même clé régénère exactement le même `.sig` — un diff après re-signature signale une clé ou un manifeste différent.
 - Tests : `ArtifactSigningTests.fs` (10 tests : parsing, signature valide/altérée/autre clé, checksums dorés, lookup inconnu). Pipeline complet vert (`./pipeline.ps1 -DoTests`, ~6 min sur ce poste).
 - Renouvellement/manip clé : `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096` ; empreinte sha256 du `.pub` actuel `02:7F:8A:F3:95:5F:FD:9C:A6:D1:28:DC:FC:EE:9E:85:7F:7E:7A:5F:27:C8:F2:B5:C0:44:81:AE:40:D6:7F:81`.
 

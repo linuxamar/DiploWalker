@@ -4,7 +4,13 @@
 # artifacts.manifest et l'enregistre en base64 dans artifacts.manifest.sig.
 #
 # Prérequis : openssl dans le PATH. La clé privée n'est JAMAIS stockée dans le
-# dépôt — elle vit hors bande (emplacement par défaut : $env:USERPROFILE\.diplo).
+# dépôt — elle vit hors bande, chiffrée en AES-256-CBC (emplacement par défaut :
+# $env:USERPROFILE\.diplo\diplo-release.key).
+#
+# Passphrase : le script cherche le passphrase dans cet ordre :
+#   1. Paramètre -Passphrase (texte clair ou SecureString)
+#   2. Variable d'environnement DIPLO_KEY_PASSPHRASE
+#   3. Si la clé n'est pas chiffrée, aucune passphrase n'est requise
 #
 # Renouvellement des checksums :
 #   1. Mettre à jour assets/artifacts.manifest (garder les fins de ligne LF).
@@ -14,11 +20,13 @@
 #
 # Exemples :
 #   .\tools\sign-artifacts.ps1
+#   $env:DIPLO_KEY_PASSPHRASE = Read-Host -AsSecureString "Passphrase" ; .\tools\sign-artifacts.ps1
 #   .\tools\sign-artifacts.ps1 -ManifestPath .\assets\artifacts.manifest -KeyPath D:\secrets\diplo-signing.key
 
 param(
     [string]$ManifestPath = (Join-Path $PSScriptRoot "..\src\Diplo.Installer\assets\artifacts.manifest"),
-    [string]$KeyPath = (Join-Path $env:USERPROFILE ".diplo\diplo-release.key")
+    [string]$KeyPath = (Join-Path $env:USERPROFILE ".diplo\diplo-release.key"),
+    [System.Security.SecureString]$Passphrase
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,21 +37,36 @@ function Resolve-OpenSsl {
     $cmd.Source
 }
 
+function Resolve-Passin {
+    if ($Passphrase -ne $null) {
+        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Passphrase)
+        $plain = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        return "pass:$plain"
+    }
+    if ($env:DIPLO_KEY_PASSPHRASE) { return "pass:$($env:DIPLO_KEY_PASSPHRASE)" }
+    return $null
+}
+
 $manifest = [System.IO.Path]::GetFullPath($ManifestPath)
 $key = [System.IO.Path]::GetFullPath($KeyPath)
-$signaturePath = [System.IO.Path]::ChangeExtension($manifest, ".sig")
+$signaturePath = "$manifest.sig"
 $pub = [System.IO.Path]::ChangeExtension($key, ".pub")
 
 if (-not (Test-Path $manifest)) { throw "Manifeste introuvable : $manifest" }
 if (-not (Test-Path $key)) { throw "Clé privée introuvable : $key (générer via : openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out <chemin>.key)." }
 
 $openssl = Resolve-OpenSsl
-
+$passin = Resolve-Passin
 $temp = [System.IO.Path]::GetTempFileName()
 try {
+    $dgstArgs = @("dgst", "-sha384", "-sign", $key, "-out", $temp, "--", $manifest)
+    if ($passin) {
+        $dgstArgs = @("dgst", "-sha384", "-passin", $passin, "-sign", $key, "-out", $temp, "--", $manifest)
+    }
     # Signature binaire (octets exacts du manifeste, aucune conversion de fins de ligne)
-    & $openssl dgst -sha384 -sign $key -out $temp $manifest
-    if ($LASTEXITCODE -ne 0) { throw "Signature échouée (openssl)." }
+    & $openssl @dgstArgs
+    if ($LASTEXITCODE -ne 0) { throw "Signature échouée (openssl). Vérifiez la passphrase avec : openssl pkey -in $key -passin pass:<votre_passphrase>" }
 
     # Vérification croisée avant d'écrire
     if (Test-Path $pub) {
