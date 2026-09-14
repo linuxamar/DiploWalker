@@ -281,13 +281,16 @@ let extractTarGz (archive: string) (destination: string) =
 
 let extractZip (archive: string) (destination: string) =
     let destFull = Path.GetFullPath(destination)
+    let destFullWithSep =
+        if destFull.EndsWith(Path.DirectorySeparatorChar) then destFull
+        else destFull + string Path.DirectorySeparatorChar
     use archiveStream = File.OpenRead(archive)
     use zipArchive = new ZipArchive(archiveStream, ZipArchiveMode.Read)
 
     for entry in zipArchive.Entries do
         let entryPath = Path.GetFullPath(Path.Combine(destFull, entry.FullName))
 
-        if not (entryPath.StartsWith(destFull, StringComparison.OrdinalIgnoreCase)) then
+        if entryPath <> destFull && not (entryPath.StartsWith(destFullWithSep, StringComparison.OrdinalIgnoreCase)) then
             failwithf "Zip Slip détecté — chemin non autorisé: %s" entry.FullName
 
     ZipFile.ExtractToDirectory(archive, destination)

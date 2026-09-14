@@ -758,7 +758,8 @@ type ContainerTabViewModel
                 if this.ContainerFollow then
                     cancelPreviousLogStream ()
                     let cts = new CancellationTokenSource()
-                    logCts <- cts
+
+                    lock logCtsGate (fun () -> logCts <- cts)
 
                     try
                         let stream =
@@ -798,7 +799,15 @@ type ContainerTabViewModel
                             try
                                 // M6 : pas de .Wait() bloquant — la disposition
                                 // est démarrée et se termine en arrière-plan.
-                                enumerator.DisposeAsync().AsTask() |> ignore
+                                // La continuation observe les erreurs : aucune
+                                // exception de tâche non observée.
+                                async {
+                                    try
+                                        do! enumerator.DisposeAsync().AsTask() |> Async.AwaitTask
+                                    with _ ->
+                                        ()
+                                }
+                                |> Async.Start
                             with _ ->
                                 ()
                     finally
@@ -981,7 +990,8 @@ type ContainerTabViewModel
             task {
                 cancelPreviousEventsStream ()
                 let cts = new CancellationTokenSource()
-                eventsCts <- cts
+
+                lock eventsCtsGate (fun () -> eventsCts <- cts)
 
                 try
                     let stream = containerClient.WatchEventsStream(cts.Token)
@@ -1020,7 +1030,15 @@ type ContainerTabViewModel
                         try
                             // M6 : pas de .Wait() bloquant — la disposition
                             // est démarrée et se termine en arrière-plan.
-                            enumerator.DisposeAsync().AsTask() |> ignore
+                            // La continuation observe les erreurs : aucune
+                            // exception de tâche non observée.
+                            async {
+                                try
+                                    do! enumerator.DisposeAsync().AsTask() |> Async.AwaitTask
+                                with _ ->
+                                    ()
+                            }
+                            |> Async.Start
                         with _ ->
                             ()
                 finally

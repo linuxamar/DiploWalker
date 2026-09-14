@@ -1,6 +1,7 @@
 namespace Diplo.Gui.ViewModels
 
 open System
+open System.Collections.Specialized
 open System.IO
 open System.Threading.Tasks
 open System.Windows.Input
@@ -72,11 +73,14 @@ type MainWindowViewModel() as this =
             for _ in 1 .. excess do
                 outputPort.LogLines.RemoveAt(0)
 
-    do
-        outputPort.LogLines.CollectionChanged.Add(fun _ ->
+    let logLinesChanged =
+        NotifyCollectionChangedEventHandler(fun _ _ ->
             UiThread.Post(fun () ->
                 updateLog ()
                 trimLogLines ()))
+
+    do
+        outputPort.LogLines.CollectionChanged.AddHandler logLinesChanged
 
     member _.OutputPort = outputPort :> IOutputPort
     member _.LogOutput = logOutputCache
@@ -154,6 +158,7 @@ type MainWindowViewModel() as this =
 
     interface IDisposable with
         member _.Dispose() =
+            outputPort.LogLines.CollectionChanged.RemoveHandler logLinesChanged
             (containerTab :> IDisposable).Dispose()
             (imagesTab :> IDisposable).Dispose()
             (volumeTab :> IDisposable).Dispose()
