@@ -1,4 +1,4 @@
-# ---------------------------------------------------------------------------
+﻿# ---------------------------------------------------------------------------
 #  regenerate-leaves.ps1 – Certificats de signature de code par projet
 # ---------------------------------------------------------------------------
 #  Génère, pour chaque projet de la solution Diplo, un certificat de signature

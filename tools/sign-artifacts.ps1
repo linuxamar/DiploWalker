@@ -1,4 +1,4 @@
-# Signe le manifeste des checksums des artefacts (C3).
+﻿# Signe le manifeste des checksums des artefacts (C3).
 #
 # Génère une signature détachée RSA-4096/SHA-384 (PKCS#1 v1.5) du fichier
 # artifacts.manifest et l'enregistre en base64 dans artifacts.manifest.sig.

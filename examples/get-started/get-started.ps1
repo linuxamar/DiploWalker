@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Exemple « Get Started » — Installation de Diplo et déploiement d'un conteneur.
 
