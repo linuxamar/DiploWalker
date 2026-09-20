@@ -171,20 +171,24 @@ type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit 
             })
 
     member private this.ValidateComposeFile() =
-        Cmd.runSync outputPort (fun () ->
-            composeEditor.Validate()
+        // Validation asynchrone : le parsing s'exécute sur un worker, la
+        // collection d'erreurs est publiée sur le thread UI par le modèle.
+        Cmd.run outputPort (fun () ->
+            task {
+                let! computed = composeEditor.ValidateAsync()
 
-            if composeEditor.Errors.Count = 0 then
-                outputPort.WriteSuccess("Aucune erreur détectée")
-            else
-                for err in composeEditor.Errors do
-                    let prefix =
-                        if err.Sévérité = "erreur" then
-                            "ERREUR"
-                        else
-                            "AVERTISSEMENT"
+                match computed with
+                | [] -> outputPort.WriteSuccess("Aucune erreur détectée")
+                | errs ->
+                    for err in errs do
+                        let prefix =
+                            if err.Sévérité = "erreur" then
+                                "ERREUR"
+                            else
+                                "AVERTISSEMENT"
 
-                    outputPort.WriteError(sprintf "[%s] Ligne %d : %s" prefix err.Ligne err.Message))
+                        outputPort.WriteError(sprintf "[%s] Ligne %d : %s" prefix err.Ligne err.Message)
+            })
 
     member private this.ComposeUp() =
         Cmd.run outputPort (fun () ->
@@ -207,30 +211,35 @@ type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit 
                 let compose = orchestrator.ParseFile(this.ComposeFilePath)
                 let! response = composeClient.ListAsync(all = true)
 
+                // Filtrage et projection sur le worker, sans toucher aux
+                // collections liées à l'UI (aucune mutation hors UI).
+                let filtered =
+                    response.Containers
+                    |> Seq.filter (fun c ->
+                        c.Labels
+                        |> Seq.exists (fun kv -> kv.Key = composeProjectLabel && kv.Value = compose.ProjectName))
+                    |> Seq.map (fun c ->
+                        let service =
+                            c.Labels
+                            |> Seq.tryFind (fun kv -> kv.Key = composeServiceLabel)
+                            |> Option.map (fun kv -> kv.Value)
+                            |> Option.defaultValue "-"
+
+                        { Service = service
+                          Conteneur = c.Name
+                          Image = c.Image
+                          État = c.State.ToString()
+                          Projet = compose.ProjectName })
+                    |> Seq.toList
+
+                // Publication pure : la logique reste sur le worker.
                 UiThread.Post(fun () ->
                     composeServices.Clear()
 
-                    for c in response.Containers do
-                        let hasProject =
-                            c.Labels
-                            |> Seq.exists (fun kv -> kv.Key = composeProjectLabel && kv.Value = compose.ProjectName)
+                    for info in filtered do
+                        composeServices.Add(info))
 
-                        if hasProject then
-                            let service =
-                                c.Labels
-                                |> Seq.tryFind (fun kv -> kv.Key = composeServiceLabel)
-                                |> Option.map (fun kv -> kv.Value)
-                                |> Option.defaultValue "-"
-
-                            composeServices.Add(
-                                { Service = service
-                                  Conteneur = c.Name
-                                  Image = c.Image
-                                  État = c.State.ToString()
-                                  Projet = compose.ProjectName }
-                            ))
-
-                outputPort.WriteSuccess(sprintf "%d conteneur(s) compose trouvé(s)" composeServices.Count)
+                outputPort.WriteSuccess(sprintf "%d conteneur(s) compose trouvé(s)" filtered.Length)
             })
 
     member private this.ComposeLogs() =

@@ -1,4 +1,4 @@
-namespace Diplo.Gui.ViewModels
+﻿namespace Diplo.Gui.ViewModels
 
 open System
 open System.Collections.Generic
@@ -65,15 +65,9 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
     let searchCtsGate = obj()
     let mutable searchCts: CancellationTokenSource = null
 
-    // Une nouvelle recherche annule celle en cours : le jeton est signalé puis
-    // détaché sous verrou ; la disposition revient au worker qui l'a créé.
-    let cancelPreviousSearch () =
-        lock searchCtsGate (fun () ->
-            let cts = searchCts
-
-            if not (isNull cts) then
-                cts.Cancel()
-                searchCts <- null)
+    // Une nouvelle recherche annule celle en cours : l'annulation et
+    // l'enregistrement de la nouvelle source se font sous le même verrou ;
+    // la disposition revient aux workers qui ont créé le CTS (finally).
 
     let listImagesCmd = RelayCommand(Action(fun () -> this.ListImages() |> ignore))
     let pullImageCmd = RelayCommand(Action(fun () -> this.PullImage() |> ignore))
@@ -211,9 +205,17 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
     member this.SearchImages() =
         Cmd.run outputPort (fun () ->
             task {
-                cancelPreviousSearch ()
                 let cts = new CancellationTokenSource()
-                searchCts <- cts
+
+                // Annulation de la recherche précédente puis enregistrement de la
+                // nouvelle source sous le même verrou : pas de course entre
+                // détachement et assignation, pas de double Cancel/Dispose.
+                lock searchCtsGate (fun () ->
+                    let previous = searchCts
+                    searchCts <- cts
+
+                    if not (isNull previous) then
+                        previous.Cancel())
 
                 let query = this.ImageSearchInput.Trim()
 
@@ -363,5 +365,4 @@ type ImagesTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit -
 
     interface IDisposable with
         member _.Dispose() =
-            cancelPreviousSearch ()
             (containerClient :> IDisposable).Dispose()

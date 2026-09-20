@@ -1,4 +1,4 @@
-﻿namespace Diplo.Container.Clients
+namespace Diplo.Container.Clients
 
 open System
 open System.Collections.Generic
@@ -583,15 +583,34 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                 psi.RedirectStandardError <- true
                 psi.UseShellExecute <- false
                 psi.CreateNoWindow <- true
-                let proc = Process.Start(psi)
+                use proc = Process.Start(psi)
 
+                // Pumps de flux : lecture/écriture dans des tâches afin de ne pas
+                // bloquer le thread d'appel. Chaque pump est borné (voir les WaitAll
+                // ci-dessous) et tolérant à l'arrêt brutal (Kill) : une interruption
+                // de pipe est observée et journalisée, jamais laissée comme
+                // exception de tâche non observée.
                 let pumpIn =
                     Task.Run(fun () ->
-                        stdin.CopyTo(proc.StandardInput.BaseStream)
-                        proc.StandardInput.Close())
+                        try
+                            stdin.CopyTo(proc.StandardInput.BaseStream)
+                            proc.StandardInput.Close()
+                        with ex ->
+                            Log.Debug(ex, "Copie d'entrée vers ctr exec interrompue {ContainerId}", id))
 
-                let pumpOut = Task.Run(fun () -> proc.StandardOutput.BaseStream.CopyTo(stdout))
-                let pumpErr = Task.Run(fun () -> proc.StandardError.BaseStream.CopyTo(stderr))
+                let pumpOut =
+                    Task.Run(fun () ->
+                        try
+                            proc.StandardOutput.BaseStream.CopyTo(stdout)
+                        with ex ->
+                            Log.Debug(ex, "Copie de sortie de ctr exec interrompue {ContainerId}", id))
+
+                let pumpErr =
+                    Task.Run(fun () ->
+                        try
+                            proc.StandardError.BaseStream.CopyTo(stderr)
+                        with ex ->
+                            Log.Debug(ex, "Copie d'erreur de ctr exec interrompue {ContainerId}", id))
                 let exited = proc.WaitForExit(600_000)
 
                 if not exited then
@@ -604,13 +623,11 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                     with ex ->
                         Log.Warning(ex, "Impossible de tuer le processus ctr exec pour {ContainerId}", id)
 
+                    // Borne d'attente : les pumps terminent naturellement une fois
+                    // les pipes fermés par le processus tué ; on n'attend pas plus
+                    // de 5 s (le dispose du Process via `use` libère les flux).
                     try
                         Task.WaitAll([| pumpOut; pumpErr; pumpIn |], 5_000) |> ignore
-                    with _ ->
-                        ()
-
-                    try
-                        proc.Dispose()
                     with _ ->
                         ()
 
@@ -715,9 +732,19 @@ type ContainerdClient(runner: IProcessRunner, ?logPollIntervalMs: int, ?ctrPath:
                                 Log.Debug(ex, "Nettoyage du hosts-dir temporaire impossible")
                     | None ->
                         // Argument non au format « utilisateur:secret » : rien ne
-                        // peut être routé vers le helper — repli contraint.
-                        runCtr [ "image"; "pull"; "--user"; explicit; image ]
-                        |> fun o -> o.Trim()
+                        // peut être routé vers le helper de credentials. Refus
+                        // catégorique — un secret ne transite jamais par argv (H6).
+                        raise (
+                            RpcException(
+                                Status(
+                                    StatusCode.InvalidArgument,
+                                    sprintf
+                                        "Argument --user invalide pour le registre '%s' : le format 'utilisateur:secret' est requis (ou exécutez 'diplo container login %s --username <utilisateur> --password <jeton>' pour enregistrer l'identifiant)"
+                                        canonical
+                                        canonical
+                                )
+                            )
+                        )
                 | None ->
                     // Identifiants STOCKÉS : aucune extraction anonyme — les
                     // fournisseurs autorisés exigent tous un compte enregistré.

@@ -82,17 +82,7 @@ type MainWindowViewModel() as this =
     do
         outputPort.LogLines.CollectionChanged.AddHandler logLinesChanged
 
-    member _.OutputPort = outputPort :> IOutputPort
-    member _.LogOutput = logOutputCache
-
-    member _.ContainerTab = containerTab
-    member _.ImagesTab = imagesTab
-    member _.VolumeTab = volumeTab
-    member _.NetworkTab = networkTab
-    member _.ComposeTab = composeTab
-    member _.SettingsTab = settingsTab
-
-    member _.QuitCommand: ICommand =
+    let quitCommand =
         RelayCommand(
             Action(fun () ->
                 match Application.Current with
@@ -103,7 +93,7 @@ type MainWindowViewModel() as this =
                     | _ -> ())
         )
 
-    member _.AboutCommand: ICommand =
+    let aboutCommand =
         RelayCommand(
             Action(fun () ->
                 (outputPort :> IOutputPort).WriteLine("Diplo — Gestion Docker")
@@ -112,10 +102,24 @@ type MainWindowViewModel() as this =
                     .WriteLine("Interface graphique Avalonia pour la gestion de conteneurs, volumes et réseaux."))
         )
 
+    let exportLogCommand = RelayCommand(Action(fun () -> this.ExportLog() |> ignore))
+
+    member _.OutputPort = outputPort :> IOutputPort
+    member _.LogOutput = logOutputCache
+
+    member _.ContainerTab = containerTab
+    member _.ImagesTab = imagesTab
+    member _.VolumeTab = volumeTab
+    member _.NetworkTab = networkTab
+    member _.ComposeTab = composeTab
+    member _.SettingsTab = settingsTab
+
+    member _.QuitCommand: ICommand = quitCommand
+    member _.AboutCommand: ICommand = aboutCommand
+
     member _.SetStorageProvider(sp: IStorageProvider) = storageProvider <- sp
 
-    member _.ExportLogCommand: ICommand =
-        RelayCommand(Action(fun () -> this.ExportLog() |> ignore))
+    member _.ExportLogCommand: ICommand = exportLogCommand
 
     /// Écrit l'état actuel du journal (lignes horodatées) dans le fichier donné.
     /// Séparée du sélecteur de fichier pour être testable hors interface.

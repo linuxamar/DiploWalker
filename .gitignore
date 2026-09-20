@@ -97,3 +97,5 @@ certificates/**/*.pfx
 
 # Node.js
 node_modules/
+
+.fake

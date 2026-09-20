@@ -7,6 +7,12 @@ open System.Text
 /// la CLI et l'interface graphique pour `exec` sur un conteneur.
 module CommandLine =
 
+    /// Découpe une ligne en arguments. Règles :
+    /// - un guillemet ouvre/ferme une section entre guillemets (les espaces y
+    ///   sont préservés) ;
+    /// - `""` à l'intérieur d'une section représente un guillemet littéral
+    ///   (aller-retour avec `join`) ;
+    /// - des guillemets non équilibrés lèvent `ArgumentException`.
     let split (line: string) : string list =
         if isNull line then
             []
@@ -14,15 +20,29 @@ module CommandLine =
             let tokens = ResizeArray<string>()
             let current = StringBuilder()
             let mutable inQuotes = false
+            let mutable i = 0
 
-            for c in line do
-                match c with
-                | '"' -> inQuotes <- not inQuotes
+            while i < line.Length do
+                match line[i] with
+                | '"' when inQuotes && i + 1 < line.Length && line[i + 1] = '"' ->
+                    // Guillemet échappé : `""` devient `"` (voir `join`).
+                    current.Append('"') |> ignore
+                    i <- i + 2
+                | '"' ->
+                    inQuotes <- not inQuotes
+                    i <- i + 1
                 | ' ' when not inQuotes ->
                     if current.Length > 0 then
                         tokens.Add(current.ToString())
                         current.Clear() |> ignore
-                | c -> current.Append(c) |> ignore
+
+                    i <- i + 1
+                | c ->
+                    current.Append(c) |> ignore
+                    i <- i + 1
+
+            if inQuotes then
+                raise (System.ArgumentException("Guillemets non équilibrés dans la commande", "line"))
 
             if current.Length > 0 then
                 tokens.Add(current.ToString())

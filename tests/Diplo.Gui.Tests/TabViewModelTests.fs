@@ -107,8 +107,6 @@ let ``ContainerTabViewModel expose les commandes ICommand`` () =
     vm.InspectImageCommand |> should not' (be Null)
     vm.RemoveImageCommand |> should not' (be Null)
     vm.TagImageCommand |> should not' (be Null)
-    vm.RegistryLoginCommand |> should not' (be Null)
-    vm.RegistryLogoutCommand |> should not' (be Null)
     vm.PauseContainerCommand |> should not' (be Null)
     vm.UnpauseContainerCommand |> should not' (be Null)
     vm.WaitContainerCommand |> should not' (be Null)
@@ -143,27 +141,6 @@ let ``ContainerTabViewModel user pull declenche PropertyChanged`` () =
     vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
     vm.ContainerImageUser <- "inline:secret"
     changed |> should contain "ContainerImageUser"
-
-[<Fact>]
-let ``ContainerTabViewModel registres etat initial`` () =
-    let port = MockOutputPort()
-    let vm = new ContainerTabViewModel(port)
-    vm.RegistryInput |> should equal ""
-    vm.RegistryUsernameInput |> should equal ""
-    vm.RegistryPasswordInput |> should equal ""
-
-[<Fact>]
-let ``ContainerTabViewModel proprietes registres declenchent PropertyChanged`` () =
-    let port = MockOutputPort()
-    let vm = new ContainerTabViewModel(port)
-    let mutable changed = []
-    vm.PropertyChanged.Add(fun e -> changed <- e.PropertyName :: changed)
-    vm.RegistryInput <- "myregistry.azurecr.io"
-    vm.RegistryUsernameInput <- "user"
-    vm.RegistryPasswordInput <- "secret"
-    changed |> should contain "RegistryInput"
-    changed |> should contain "RegistryUsernameInput"
-    changed |> should contain "RegistryPasswordInput"
 
 [<Fact>]
 let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =

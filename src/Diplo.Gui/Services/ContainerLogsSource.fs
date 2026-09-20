@@ -32,6 +32,7 @@ type GrpcContainerLogsSource() =
 
     interface IDisposable with
         member _.Dispose() =
-            if not disposed then
-                disposed <- true
+            // Disposition idempotente et atomique : une seule exécution même
+            // sous concurrence (Interlocked.Exchange), pas de double Dispose.
+            if Interlocked.Exchange(&disposed, true) = false then
                 (client :> IDisposable).Dispose()

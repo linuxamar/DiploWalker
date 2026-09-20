@@ -1,4 +1,4 @@
-namespace Diplo.Gui.ViewModels
+﻿namespace Diplo.Gui.ViewModels
 
 open System
 open System.Collections.ObjectModel
@@ -72,9 +72,6 @@ type ContainerTabViewModel
     let mutable containerSince = ""
     let mutable containerExecCommand = ""
     let mutable containerMounts = ""
-    let mutable registryInput = ""
-    let mutable registryUsernameInput = ""
-    let mutable registryPasswordInput = ""
 
     let mutable selectedContainer: ContainerInfo = Unchecked.defaultof<ContainerInfo>
 
@@ -160,12 +157,6 @@ type ContainerTabViewModel
 
     let listNamespacesCmd =
         RelayCommand(Action(fun () -> this.ListNamespaces() |> ignore))
-
-    let registryLoginCmd =
-        RelayCommand(Action(fun () -> this.RegistryLogin() |> ignore))
-
-    let registryLogoutCmd =
-        RelayCommand(Action(fun () -> this.RegistryLogout() |> ignore))
 
     let pauseContainerCmd =
         RelayCommand(Action(fun () -> this.PauseContainer() |> ignore))
@@ -299,24 +290,6 @@ type ContainerTabViewModel
             containerMounts <- v
             this.OnPropertyChanged()
 
-    member _.RegistryInput
-        with get () = registryInput
-        and set v =
-            registryInput <- v
-            this.OnPropertyChanged()
-
-    member _.RegistryUsernameInput
-        with get () = registryUsernameInput
-        and set v =
-            registryUsernameInput <- v
-            this.OnPropertyChanged()
-
-    member _.RegistryPasswordInput
-        with get () = registryPasswordInput
-        and set v =
-            registryPasswordInput <- v
-            this.OnPropertyChanged()
-
     member _.ListContainersCommand = listContainersCmd
     member _.InspectContainerCommand = inspectContainerCmd
     member _.StartContainerCommand = startContainerCmd
@@ -349,8 +322,6 @@ type ContainerTabViewModel
     member _.StopFollowLogsCommand = stopFollowLogsCmd
     member _.ExecInContainerCommand = execInContainerCmd
     member _.ListNamespacesCommand = listNamespacesCmd
-    member _.RegistryLoginCommand = registryLoginCmd
-    member _.RegistryLogoutCommand = registryLogoutCmd
     member _.PauseContainerCommand = pauseContainerCmd
     member _.UnpauseContainerCommand = unpauseContainerCmd
     member _.WaitContainerCommand = waitContainerCmd
@@ -623,21 +594,27 @@ type ContainerTabViewModel
                 )
             })
 
-    member private this.RefreshCatalogue() =
+    member private this.RefreshCatalogue(?entries: ImageCatalog.CatalogEntry list) =
+        let loaded =
+            match entries with
+            | Some e -> e
+            | None -> ImageCatalog.load (catalogPathProvider ())
+
         UiThread.Post(fun () ->
             catalogue.Clear()
 
-            for e in ImageCatalog.load (catalogPathProvider ()) do
-                catalogue.Add
+            for e in loaded do
+                catalogue.Add(
                     { Ref = e.Ref
                       Note = defaultArg e.Note ""
-                      AddedAt = e.AddedAt })
+                      AddedAt = e.AddedAt }
+                ))
 
     member private this.ListCatalog() =
         Cmd.run outputPort (fun () ->
             task {
                 let entries = ImageCatalog.load (catalogPathProvider ())
-                this.RefreshCatalogue()
+                this.RefreshCatalogue(entries = entries)
                 outputPort.WriteSuccess(sprintf "%d image(s) au catalogue" (List.length entries))
             })
 
@@ -799,15 +776,18 @@ type ContainerTabViewModel
                             try
                                 // M6 : pas de .Wait() bloquant — la disposition
                                 // est démarrée et se termine en arrière-plan.
-                                // La continuation observe les erreurs : aucune
-                                // exception de tâche non observée.
-                                async {
-                                    try
-                                        do! enumerator.DisposeAsync().AsTask() |> Async.AwaitTask
-                                    with _ ->
-                                        ()
-                                }
-                                |> Async.Start
+                                // Task.Run observe l'échec éventuel : aucune
+                                // UnobservedTaskException (M7).
+                                System.Threading.Tasks.Task.Run(
+                                    System.Func<System.Threading.Tasks.Task>(fun () ->
+                                        task {
+                                            try
+                                                do! enumerator.DisposeAsync().AsTask()
+                                            with _ ->
+                                                ()
+                                        })
+                                )
+                                |> ignore
                             with _ ->
                                 ()
                     finally
@@ -854,44 +834,6 @@ type ContainerTabViewModel
                 let! response = containerClient.ListNamespacesAsync()
                 let nsList = String.Join(", ", response.Namespaces)
                 outputPort.WriteSuccess(sprintf "Namespaces: %s" nsList)
-            })
-
-    member private this.RegistryLogin() =
-        Cmd.run outputPort (fun () ->
-            task {
-                if String.IsNullOrEmpty(this.RegistryInput) then
-                    outputPort.WriteError("Le registre est requis (ex. ghcr.io, docker.io, quay.io, mcr.microsoft.com)")
-                elif String.IsNullOrEmpty(this.RegistryUsernameInput) then
-                    outputPort.WriteError("Le nom d'utilisateur est requis")
-                elif String.IsNullOrEmpty(this.RegistryPasswordInput) then
-                    outputPort.WriteError("Le mot de passe est requis")
-                else
-                    let! response =
-                        containerClient.LoginRegistryAsync(
-                            registry = this.RegistryInput,
-                            username = this.RegistryUsernameInput,
-                            password = this.RegistryPasswordInput
-                        )
-
-                    if response.Success then
-                        outputPort.WriteSuccess(response.Message)
-                        this.RegistryPasswordInput <- ""
-                    else
-                        outputPort.WriteError(response.Message)
-            })
-
-    member private this.RegistryLogout() =
-        Cmd.run outputPort (fun () ->
-            task {
-                if String.IsNullOrEmpty(this.RegistryInput) then
-                    outputPort.WriteError("Le registre est requis (ex. ghcr.io, docker.io, quay.io, mcr.microsoft.com)")
-                else
-                    let! response = containerClient.LogoutRegistryAsync(registry = this.RegistryInput)
-
-                    if response.Success then
-                        outputPort.WriteSuccess(response.Message)
-                    else
-                        outputPort.WriteError(response.Message)
             })
 
     member private this.PauseContainer() =
@@ -1030,15 +972,18 @@ type ContainerTabViewModel
                         try
                             // M6 : pas de .Wait() bloquant — la disposition
                             // est démarrée et se termine en arrière-plan.
-                            // La continuation observe les erreurs : aucune
-                            // exception de tâche non observée.
-                            async {
-                                try
-                                    do! enumerator.DisposeAsync().AsTask() |> Async.AwaitTask
-                                with _ ->
-                                    ()
-                            }
-                            |> Async.Start
+                            // Task.Run observe l'échec éventuel : aucune
+                            // UnobservedTaskException (M7).
+                            System.Threading.Tasks.Task.Run(
+                                System.Func<System.Threading.Tasks.Task>(fun () ->
+                                    (task {
+                                        try
+                                            do! enumerator.DisposeAsync().AsTask()
+                                        with _ ->
+                                            ()
+                                    } :> System.Threading.Tasks.Task))
+                            )
+                            |> ignore
                         with _ ->
                             ()
                 finally

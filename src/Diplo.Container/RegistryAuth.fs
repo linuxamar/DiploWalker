@@ -11,7 +11,8 @@ open Diplo.Abstractions
 
 /// Persistance des identifiants de registres de conteneurs (login/logout).
 /// Le mot de passe est chiffré avec DPAPI (portée utilisateur courant) sous
-/// Windows ; ailleurs, un repli base64 est utilisé (sans chiffrement).
+/// Windows ; ailleurs, il est scellé en AES-GCM avec une clé par utilisateur
+/// (fichier à droits restreints, voir SECURITY.md).
 module RegistryAuth =
 
     /// Identifiant d'un registre tel que persisté dans le fichier d'état.

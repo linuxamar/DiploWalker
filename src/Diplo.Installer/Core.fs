@@ -215,23 +215,40 @@ let extractTarGz (archive: string) (destination: string) =
 
         Directory.CreateDirectory(tempDir) |> ignore
 
+        let tempFull = Path.GetFullPath(tempDir)
+
+        // Contenance stricte (M16) : la cible doit être STRICTEMENT sous la
+        // racine — un simple StartsWith accepterait un voisin « _tmp_extract_X2 »
+        // ou un chemin « sous » la racine par coïncidence de préfixe.
+        let isWithin (root: string) (candidate: string) =
+            let rootWithSep =
+                Path.TrimEndingDirectorySeparator(root) + string Path.DirectorySeparatorChar
+
+            candidate.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase)
+
         try
+            // Pré-énumération (M11) : on liste le contenu de l'archive AVANT
+            // toute extraction. Chaque entrée doit rester sous le répertoire de
+            // staging — un « .. », un chemin enraciné ou une lettre de lecteur
+            // est rejeté sans rien extraire. L'entrée racine (« . ») est admise.
+            let listCode, listOut, _ = ProcessExec.runWithResult "tar" [ "tzf"; archive ] None None None
+
+            if listCode <> 0 then
+                failwithf "Échec de la lecture de %s (code %d)" archive listCode
+
+            for entry in
+                listOut.Split([| '\r'; '\n' |], StringSplitOptions.RemoveEmptyEntries) do
+                let entryFull = Path.GetFullPath(Path.Combine(tempFull, entry))
+
+                if entryFull <> tempFull && not (isWithin tempFull entryFull) then
+                    failwithf "Entrée d'archive hors de la destination: %s" entry
+
             let exitCode = runCommandWithArgs "tar" [ "xzf"; archive; "-C"; tempDir ]
 
             if exitCode <> 0 then
                 failwithf "Échec de l'extraction de %s (code %d)" archive exitCode
 
-            let tempFull = Path.GetFullPath(tempDir)
             let destFull = Path.GetFullPath(destination)
-
-            // Contenance stricte (M16) : la cible doit être STRICTEMENT sous la
-            // racine — un simple StartsWith accepterait un voisin « _tmp_extract_X2 »
-            // ou un chemin « sous » la racine par coïncidence de préfixe.
-            let isWithin (root: string) (candidate: string) =
-                let rootWithSep =
-                    Path.TrimEndingDirectorySeparator(root) + string Path.DirectorySeparatorChar
-
-                candidate.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase)
 
             // Revalidation post-extraction : chaque entrée (fichier OU répertoire)
             // doit rester sous le répertoire d'extraction temporaire.
