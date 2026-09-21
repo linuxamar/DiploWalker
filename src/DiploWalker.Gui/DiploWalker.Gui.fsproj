@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ApplicationIcon>DiploWalker.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="ViewModels\ViewModelBase.fs" />
+    <Compile Include="ViewModels\CommandHelpers.fs" />
+    <Compile Include="Services\AvaloniaOutputPort.fs" />
+    <Compile Include="Services\ContainerLogsSource.fs" />
+    <Compile Include="ViewModels\ContainerTabViewModel.fs" />
+    <Compile Include="ViewModels\ImagesTabViewModel.fs" />
+    <Compile Include="ViewModels\VolumeTabViewModel.fs" />
+    <Compile Include="ViewModels\NetworkTabViewModel.fs" />
+    <Compile Include="ViewModels\ComposeEditorViewModel.fs" />
+    <Compile Include="ViewModels\ComposeTabViewModel.fs" />
+    <Compile Include="ViewModels\SettingsTabViewModel.fs" />
+    <Compile Include="ViewModels\MainWindowViewModel.fs" />
+    <EmbeddedResource Include="Views\MainWindow.axaml" LogicalName="DiploWalker.Gui.Views.MainWindow.axaml" />
+    <Compile Include="Views\MainWindow.axaml.fs" />
+    <EmbeddedResource Include="UserControls\ContainerDetailUserControl.axaml" LogicalName="DiploWalker.Gui.UserControls.ContainerDetailUserControl.axaml" />
+    <Compile Include="UserControls\ContainerDetailUserControl.axaml.fs" />
+    <EmbeddedResource Include="App.axaml" LogicalName="DiploWalker.Gui.App.axaml" />
+    <EmbeddedResource Include="DiploWalker.ico" LogicalName="DiploWalker.Gui.DiploWalker.ico" />
+    <Compile Include="App.axaml.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia"  />
+    <PackageReference Include="Avalonia.Desktop"  />
+    <PackageReference Include="Avalonia.Themes.Fluent"  />
+    <PackageReference Include="Avalonia.Controls.DataGrid"  />
+    <PackageReference Include="Avalonia.AvaloniaEdit"  />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader"  />
+    <PackageReference Include="AvaloniaEdit.TextMate"  />
+    <PackageReference Include="FSharp.Core"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DiploWalker.Core\DiploWalker.Core.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Disk\DiploWalker.Disk.fsproj" />
+  </ItemGroup>
+
+</Project>
+

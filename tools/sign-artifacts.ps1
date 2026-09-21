@@ -24,7 +24,7 @@
 #   .\tools\sign-artifacts.ps1 -ManifestPath .\assets\artifacts.manifest -KeyPath D:\secrets\diplo-signing.key
 
 param(
-    [string]$ManifestPath = (Join-Path $PSScriptRoot "..\src\Diplo.Installer\assets\artifacts.manifest"),
+    [string]$ManifestPath = (Join-Path $PSScriptRoot "..\src\DiploWalker.Installer\assets\artifacts.manifest"),
     [string]$KeyPath = (Join-Path $env:USERPROFILE ".diplo\diplo-release.key"),
     [System.Security.SecureString]$Passphrase
 )

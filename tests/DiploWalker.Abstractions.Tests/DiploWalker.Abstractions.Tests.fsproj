@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="AuthTokenTests.fs" />
+    <Compile Include="TokenInterceptorTests.fs" />
+    <Compile Include="TokenAuthMiddlewareTests.fs" />
+    <Compile Include="SecurityValidationTests.fs" />
+    <Compile Include="ServiceGuardsTests.fs" />
+    <Compile Include="CachedConfigTests.fs" />
+    <Compile Include="JsonHelpersTests.fs" />
+    <Compile Include="DiploWalkerJsonTests.fs" />
+    <Compile Include="ProcessExecTests.fs" />
+    <Compile Include="NetworkConfigTests.fs" />
+    <Compile Include="RegistryProvidersTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"  />
+    <PackageReference Include="FSharp.Core"  />
+    <PackageReference Include="xunit.v3"  />
+    <PackageReference Include="xunit.runner.visualstudio" >
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="FsUnit.xUnit"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+  </ItemGroup>
+
+</Project>
+
+

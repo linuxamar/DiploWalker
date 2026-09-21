@@ -1,0 +1,39 @@
+﻿namespace DiploWalker.Gui.Services
+
+open System
+open System.Collections.Generic
+open System.Threading
+open System.Threading.Tasks
+open DiploWalker.Core.Clients
+open DiploWalker.Grpc.Container
+
+/// Lecture abstraite des journaux d'un conteneur : permet de tester le
+/// ViewModel sans serveur gRPC (le flux est simulÃ© par un faux).
+type IContainerLogsSource =
+    inherit IDisposable
+
+    abstract GetStream:
+        id: string * follow: bool * tail: int * since: string * ct: CancellationToken ->
+            IAsyncEnumerable<ContainerLogEntry>
+
+    abstract GetSnapshot: id: string * tail: int * since: string * ct: CancellationToken -> Task<seq<ContainerLogEntry>>
+
+/// ImplÃ©mentation par dÃ©faut reposant sur le client gRPC rÃ©el.
+type GrpcContainerLogsSource() =
+    let client = new ContainerClient()
+    let mutable disposed = false
+
+    interface IContainerLogsSource with
+        member _.GetStream(id, follow, tail, since, ct) =
+            client.GetLogsStream(id, follow = follow, tail = tail, since = since, ct = ct)
+
+        member _.GetSnapshot(id, tail, since, ct) =
+            task { return! client.GetLogs(id, tail = tail, since = since, ct = ct) }
+
+    interface IDisposable with
+        member _.Dispose() =
+            // Disposition idempotente et atomique : une seule exÃ©cution mÃªme
+            // sous concurrence (Interlocked.Exchange), pas de double Dispose.
+            if Interlocked.Exchange(&disposed, true) = false then
+                (client :> IDisposable).Dispose()
+

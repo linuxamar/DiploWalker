@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="VolumeIntegrationTests.fs" />
+    <Compile Include="ContainerIntegrationTests.fs" />
+    <Compile Include="NetworkIntegrationTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="FSharp.Core" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="FsUnit.xUnit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiploWalker.Grpc\DiploWalker.Grpc.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Core\DiploWalker.Core.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Volume\DiploWalker.Volume.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Container\DiploWalker.Container.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Network\DiploWalker.Network.fsproj" />
+    <ProjectReference Include="..\..\tests\DiploWalker.TestHelpers\DiploWalker.TestHelpers.fsproj" />
+  </ItemGroup>
+
+</Project>
+

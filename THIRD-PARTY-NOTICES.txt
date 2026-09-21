@@ -1,10 +1,10 @@
-Notices de licences des dépendances tierces du projet Diplo
+﻿Notices de licences des dÃ©pendances tierces du projet Diplo
 =========================================================
 
-Ce fichier liste les licences de toutes les dépendances NuGet utilisées
-dans le projet Diplo. Généré le 2026-08-24.
+Ce fichier liste les licences de toutes les dÃ©pendances NuGet utilisÃ©es
+dans le projet DiploWalker. GÃ©nÃ©rÃ© le 2026-08-24.
 
-Licences résumées
+Licences rÃ©sumÃ©es
 -----------------
   MIT                  : 22 paquets
   Apache-2.0           : 13 paquets
@@ -12,9 +12,9 @@ Licences résumées
   LGPL-3.0-or-later    :  1 paquet
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 Licence MIT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
 Paquets :
   Avalonia 12.1.1
@@ -63,9 +63,9 @@ Texte de la licence :
   OTHER DEALINGS IN THE SOFTWARE.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 Licence Apache-2.0
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
 Paquets :
   Grpc.AspNetCore.HealthChecks 2.83.0
@@ -173,9 +173,9 @@ Texte de la licence :
   END OF APACHE LICENSE 2.0 TERMS AND CONDITIONS
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 Licence BSD-3-Clause
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
 Paquet :
   Google.Protobuf 3.36.0
@@ -211,16 +211,16 @@ Texte de la licence :
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 Licence LGPL-3.0-or-later
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
 Paquet :
   Hawkynt.FileFormats.FileSystems 1.0.0.776
 
   ATTENTION : Licence copyleft. Voir les obligations ci-dessous.
 
-Texte de la licence (résumé) :
+Texte de la licence (rÃ©sumÃ©) :
 
   GNU LESSER GENERAL PUBLIC LICENSE
   Version 3, 29 June 2007
@@ -265,33 +265,33 @@ Texte de la licence (résumé) :
   Lesser General Public License from time to time.
 
 Obligations pour Diplo (LGPL-3.0) :
-  - Si Hawkynt est distribué en tant que DLL statiquement liée :
-    fournir le code source de Hawkynt ou une offre écrite.
-  - Si Hawkynt est distribué en tant que DLL dynamiquement liée :
-    aucune obligation de modifier le code source de Diplo.
-  - La licence LGPL-3.0 doit être incluse dans la distribution.
+  - Si Hawkynt est distribuÃ© en tant que DLL statiquement liÃ©e :
+    fournir le code source de Hawkynt ou une offre Ã©crite.
+  - Si Hawkynt est distribuÃ© en tant que DLL dynamiquement liÃ©e :
+    aucune obligation de modifier le code source de DiploWalker.
+  - La licence LGPL-3.0 doit Ãªtre incluse dans la distribution.
   - Le code source de Hawkynt doit rester disponible.
 
-  Texte intégral : https://www.gnu.org/licenses/lgpl-3.0.html
+  Texte intÃ©gral : https://www.gnu.org/licenses/lgpl-3.0.html
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 Licence Apache-2.0 (FsUnit.xUnit)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
 Paquet :
   FsUnit.xUnit 7.1.1
 
-  Note : Ce paquet utilise l'ancien élément <licenseUrl> (deprecated)
+  Note : Ce paquet utilise l'ancien Ã©lÃ©ment <licenseUrl> (deprecated)
   pointant vers https://raw.githubusercontent.com/fsprojects/FsUnit/master/license.txt
-  La licence réelle est Apache-2.0.
+  La licence rÃ©elle est Apache-2.0.
 
 Texte de la licence : voir section Apache-2.0 ci-dessus.
 
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 Licences de Microsoft (MIT)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
 Paquets :
   System.Security.Cryptography.Pkcs 10.0.11
@@ -302,5 +302,6 @@ Paquets :
   Microsoft.Extensions.Hosting.WindowsServices 10.0.11
   Microsoft.NET.Test.Sdk 18.9.0
 
-Ces paquets sont distribués sous licence MIT par Microsoft.
+Ces paquets sont distribuÃ©s sous licence MIT par Microsoft.
   Voir : https://licenses.nuget.org/MIT
+

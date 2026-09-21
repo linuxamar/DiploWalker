@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="SpectreOutputPort.fs" />
+    <Compile Include="TypeRegistrar.fs" />
+    <Compile Include="CtrlCHandler.fs" />
+    <Compile Include="ContainerCommands.fs" />
+    <Compile Include="VolumeCommands.fs" />
+    <Compile Include="NetworkCommands.fs" />
+    <Compile Include="StatusCommand.fs" />
+    <Compile Include="ConfigCommands.fs" />
+    <Compile Include="DiskCommands.fs" />
+    <Compile Include="ComposeCommands.fs" />
+    <Compile Include="CatalogCommands.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console"  />
+    <PackageReference Include="FSharp.Core"  />
+    <PackageReference Include="Spectre.Console.Cli"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DiploWalker.Core\DiploWalker.Core.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Disk\DiploWalker.Disk.fsproj" />
+  </ItemGroup>
+
+</Project>
+

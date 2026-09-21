@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="MockContainerdClient.fs" />
+    <Compile Include="MockProcessRunner.fs" />
+    <Compile Include="DriverMappingsTests.fs" />
+    <Compile Include="MessageSerializationTests.fs" />
+    <Compile Include="ContainerdClientTests.fs" />
+    <Compile Include="ContainerdClientExtendedTests.fs" />
+    <Compile Include="RegistryAuthTests.fs" />
+    <Compile Include="ContainerServiceImplTests.fs" />
+    <Compile Include="RegistrySearchTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"  />
+    <PackageReference Include="FSharp.Core"  />
+    <PackageReference Include="xunit.v3"  />
+    <PackageReference Include="xunit.runner.visualstudio" >
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="FsUnit.xUnit"  />
+    <PackageReference Include="Grpc.Core.Testing"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Container\DiploWalker.Container.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Grpc\DiploWalker.Grpc.fsproj" />
+  </ItemGroup>
+
+</Project>
+

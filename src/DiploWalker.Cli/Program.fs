@@ -1,0 +1,152 @@
+﻿open System
+open System.Reflection
+open System.Net.Http
+open DiploWalker.Cli
+open DiploWalker.Cli.Container
+open DiploWalker.Core.Output
+open DiploWalker.Cli.Volume
+open DiploWalker.Cli.Network
+open DiploWalker.Cli.Compose
+open DiploWalker.Cli.Disk
+open DiploWalker.Cli.Catalog
+open Grpc.Core
+open Spectre.Console.Cli
+
+let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) =
+    typeof<IConfigurator<CommandSettings>>.GetTypeInfo().DeclaredMethods
+    |> Seq.find (fun m -> m.Name = "AddCommand" && m.GetParameters().Length = 1 && m.IsGenericMethod)
+    |> fun mi -> mi.MakeGenericMethod(t).Invoke(c, [| name |])
+    |> ignore
+
+/// Handler global : les erreurs de transport (gRPC / HTTP) remontÃ©es jusque
+/// lÃ  sont rapportÃ©es proprement au lieu d'une exception non gÃ©rÃ©e. Une
+/// annulation volontaire (Ctrl+C) sort avec le code 0.
+let private handleException (output: IOutputPort) (ex: exn) : int =
+    match ex with
+    | :? RpcException as rex when rex.StatusCode = StatusCode.Cancelled -> 0
+    | :? RpcException as rex ->
+        output.WriteError(sprintf "Erreur gRPC : %s" rex.Status.Detail)
+        1
+    | :? HttpRequestException as hex ->
+        output.WriteError(sprintf "Erreur rÃ©seau : %s" (if String.IsNullOrWhiteSpace hex.Message then "connexion au service refusÃ©e" else hex.Message))
+        1
+    | _ -> raise ex
+
+[<EntryPoint>]
+let main argv =
+    let app = CommandApp(TypeRegistrar())
+
+    app.Configure(fun (config: IConfigurator) ->
+        config.SetExceptionHandler(
+            Func<Exception, ITypeResolver, int>(fun ex resolver ->
+                let output = resolver.Resolve(typeof<IOutputPort>) :?> IOutputPort
+                handleException output ex
+            )
+        )
+        |> ignore
+
+        config.AddBranch(
+            "container",
+            Action<IConfigurator<CommandSettings>>(fun c ->
+                addCmd c "list" typeof<ListCommand>
+                addCmd c "inspect" typeof<InspectContainerCommand>
+                addCmd c "start" typeof<StartContainerCommand>
+                addCmd c "stop" typeof<StopContainerCommand>
+                addCmd c "delete" typeof<DeleteContainerCommand>
+                addCmd c "pull" typeof<PullImageCommand>
+                addCmd c "login" typeof<RegistryLoginCommand>
+                addCmd c "logout" typeof<RegistryLogoutCommand>
+                addCmd c "create" typeof<CreateContainerCommand>
+                addCmd c "logs" typeof<LogsContainerCommand>
+                addCmd c "exec" typeof<ExecContainerCommand>
+                addCmd c "namespaces" typeof<NamespacesCommand>
+                addCmd c "version" typeof<VersionCommand>
+                addCmd c "rename" typeof<RenameContainerCommand>
+                addCmd c "top" typeof<TopContainerCommand>
+                addCmd c "stats" typeof<StatsContainerCommand>
+                addCmd c "image-list" typeof<ImageListCommand>
+                addCmd c "image-inspect" typeof<ImageInspectCommand>
+                addCmd c "image-remove" typeof<ImageRemoveCommand>
+                addCmd c "image-tag" typeof<ImageTagCommand>
+                addCmd c "image-search" typeof<ImageSearchCommand>
+                addCmd c "pause" typeof<PauseContainerCommand>
+                addCmd c "unpause" typeof<UnpauseContainerCommand>
+                addCmd c "wait" typeof<WaitContainerCommand>
+                addCmd c "prune" typeof<PruneContainersCommand>
+                addCmd c "events" typeof<ContainerEventsCommand>
+                addCmd c "stats-stream" typeof<StatsStreamCommand>
+                addCmd c "image-prune" typeof<ImagePruneCommand>
+                addCmd c "image-commit" typeof<ImageCommitCommand>
+                addCmd c "image-export" typeof<ImageExportCommand>
+                addCmd c "image-import" typeof<ImageImportCommand>
+                addCmd c "read-file" typeof<ReadFileCommand>
+                addCmd c "write-file" typeof<WriteFileCommand>
+                addCmd c "catalog-list" typeof<CatalogListCommand>
+                addCmd c "catalog-add" typeof<CatalogAddCommand>
+                addCmd c "catalog-update" typeof<CatalogUpdateCommand>
+                addCmd c "catalog-delete" typeof<CatalogDeleteCommand>)
+        )
+        |> ignore
+
+        config.AddBranch(
+            "volume",
+            Action<IConfigurator<CommandSettings>>(fun c ->
+                addCmd c "list" typeof<ListVolumesCommand>
+                addCmd c "inspect" typeof<InspectVolumeCommand>
+                addCmd c "create" typeof<CreateVolumeCommand>
+                addCmd c "remove" typeof<RemoveVolumeCommand>
+                addCmd c "mount" typeof<MountVolumeCommand>
+                addCmd c "unmount" typeof<UnmountVolumeCommand>
+                addCmd c "prune" typeof<PruneVolumesCommand>)
+        )
+        |> ignore
+
+        config.AddBranch(
+            "network",
+            Action<IConfigurator<CommandSettings>>(fun c ->
+                addCmd c "list" typeof<ListNetworksCommand>
+                addCmd c "inspect" typeof<InspectNetworkCommand>
+                addCmd c "create" typeof<CreateNetworkCommand>
+                addCmd c "remove" typeof<RemoveNetworkCommand>
+                addCmd c "connect" typeof<ConnectCommand>
+                addCmd c "disconnect" typeof<DisconnectCommand>
+                addCmd c "run-cni-plugin" typeof<RunCniPluginCommand>
+                addCmd c "prune" typeof<PruneNetworksCommand>)
+        )
+        |> ignore
+
+        config.AddBranch(
+            "status",
+            Action<IConfigurator<CommandSettings>>(fun c -> addCmd c "check" typeof<StatusCommand>)
+        )
+        |> ignore
+
+        config.AddBranch(
+            "config",
+            Action<IConfigurator<CommandSettings>>(fun c -> addCmd c "init" typeof<InitConfigCommand>)
+        )
+        |> ignore
+
+        config.AddBranch(
+            "compose",
+            Action<IConfigurator<CommandSettings>>(fun c ->
+                addCmd c "up" typeof<ComposeUpCommand>
+                addCmd c "down" typeof<ComposeDownCommand>
+                addCmd c "ps" typeof<ComposePsCommand>
+                addCmd c "logs" typeof<ComposeLogsCommand>
+                addCmd c "pull" typeof<ComposePullCommand>
+                addCmd c "build" typeof<ComposeBuildCommand>)
+        )
+        |> ignore
+
+        config.AddBranch(
+            "disk",
+            Action<IConfigurator<CommandSettings>>(fun c -> addCmd c "create-image" typeof<CreateImageCommand>)
+        )
+        |> ignore)
+    |> ignore
+
+    // Propager le code retour de Spectre : l'ignorer faisait toujours sortir
+    // le processus en 0, cassant toute chaÃ®ne scriptÃ©e (&&, CI, planificateur).
+    app.Run(argv)
+

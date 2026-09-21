@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Grpc.AspNetCore.HealthChecks"  />
+    <PackageReference Include="FSharp.Core"  />
+    <PackageReference Include="Serilog"  />
+    <PackageReference Include="Grpc.Core.Api"  />
+    <PackageReference Include="Serilog.Extensions.Hosting"  />
+    <PackageReference Include="Serilog.Sinks.Console"  />
+    <PackageReference Include="Serilog.Sinks.EventLog"  />
+    <PackageReference Include="Serilog.Sinks.File"  />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="DiploWalkerPorts.fs" />
+    <Compile Include="Interfaces.fs" />
+    <Compile Include="Security.fs" />
+    <Compile Include="ServiceGuards.fs" />
+    <Compile Include="ProcessExec.fs" />
+    <Compile Include="AtomicFile.fs" />
+    <Compile Include="CachedConfig.fs" />
+    <Compile Include="JsonHelpers.fs" />
+    <Compile Include="DiploWalkerJson.fs" />
+    <Compile Include="AuthToken.fs" />
+    <Compile Include="TokenAuthMiddleware.fs" />
+    <Compile Include="TokenInterceptor.fs" />
+    <Compile Include="ServerConfig.fs" />
+    <Compile Include="NetworkConfig.fs" />
+    <Compile Include="RegistryProviders.fs" />
+  </ItemGroup>
+
+</Project>

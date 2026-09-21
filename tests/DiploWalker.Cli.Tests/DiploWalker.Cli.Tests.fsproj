@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="CommandSettingsTests.fs" />
+    <Compile Include="ExitCodeTests.fs" />
+    <Compile Include="ExitCodeCoverageTests.fs" />
+    <Compile Include="SuccessPathTests.fs" />
+    <Compile Include="CommandCoverageTests.fs" />
+    <Compile Include="CatalogCommandTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"  />
+    <PackageReference Include="FSharp.Core"  />
+    <PackageReference Include="xunit.v3"  />
+    <PackageReference Include="xunit.runner.visualstudio" >
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="FsUnit.xUnit"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiploWalker.Cli\DiploWalker.Cli.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Core\DiploWalker.Core.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Grpc\DiploWalker.Grpc.fsproj" />
+    <ProjectReference Include="..\DiploWalker.TestHelpers\DiploWalker.TestHelpers.fsproj" />
+  </ItemGroup>
+
+</Project>
+

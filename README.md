@@ -8,18 +8,18 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 | Service             | Port | Description                                                                                                |
 | ------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
-| **Diplo.Container** | 5001 / 6001 | Cycle de vie des conteneurs via containerd — création, démarrage, arrêt, suppression et montage de volumes |
-| **Diplo.Volume**    | 5002 / 6002 | Gestion des volumes persistants                                                                            |
-| **Diplo.Network**   | 5003 / 6003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge)                                                 |
+| **DiploWalker.Container** | 5001 / 6001 | Cycle de vie des conteneurs via containerd — création, démarrage, arrêt, suppression et montage de volumes |
+| **DiploWalker.Volume**    | 5002 / 6002 | Gestion des volumes persistants                                                                            |
+| **DiploWalker.Network**   | 5003 / 6003 | Gestion des réseaux de conteneurs (NAT, overlay, l2bridge)                                                 |
 
-| **Diplo.Installer** | —    | Installation et configuration de l'ensemble du système                                                     |
+| **DiploWalker.Installer** | —    | Installation et configuration de l'ensemble du système                                                     |
 
 > **Ports Debug / Release** : en configuration **Debug**, les services écoutent sur 5001-5003 ; en **Release** (+ installation via l'installateur), sur **6001-6003**. Les deux plages permettent une exécution simultanée. Les named pipes (`diplo-container`, `diplo-volume`, `diplo-network`) sont identiques dans les deux configurations.
 
 ### Clients
 
-- **CLI** : `Diplo.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux, images disque (`disk create-image`) et recherche d'images en ligne
-- **GUI** : `Diplo.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
+- **CLI** : `DiploWalker.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux, images disque (`disk create-image`) et recherche d'images en ligne
+- **GUI** : `DiploWalker.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
 - **Résilience** : les canaux gRPC (`DiploChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
 
 ## Stack technique
@@ -84,7 +84,7 @@ Le choix de l'image de base Windows est crucial pour le fonctionnement de Diplo 
 ### Installation automatique
 
 ``powershell
-Diplo.Installer.exe install
+DiploWalker.Installer.exe install
 ``
 
 L'installateur effectue automatiquement :
@@ -95,7 +95,7 @@ L'installateur effectue automatiquement :
 4. Installation des plugins CNI standards (bridge, host-local, portmap)
 5. Génération de la configuration containerd (`config.toml`)
 6. Création de la configuration CNI par défaut (réseau NAT `172.20.0.0/16`)
-7. Création des services Windows (Diplo.Container, Diplo.Volume, Diplo.Network)
+7. Création des services Windows (DiploWalker.Container, DiploWalker.Volume, DiploWalker.Network)
 8. Import des certificats PKI racine et intermédiaires dans les magasins de certificats de la machine
 
 #### Certificats PKI
@@ -143,37 +143,37 @@ Paramètres notables : `-ExternalNetAdapter` (réseau DHCP), `-ContainerBaseImag
 > `C:\Program Files\nerdctl` et enregistre containerd comme service Windows,
 > mais **ne crée pas** les services Diplo ni leur configuration. Pour une
 > installation Diplo complète (services + `config.toml` Diplo), privilégiez
-> `Diplo.Installer.exe install`.
+> `DiploWalker.Installer.exe install`.
 
 ### Commandes
 
 ``powershell
-Diplo.Installer.exe install      # Installation complète
-Diplo.Installer.exe uninstall    # Suppression des services
-Diplo.Installer.exe status       # État des services
+DiploWalker.Installer.exe install      # Installation complète
+DiploWalker.Installer.exe uninstall    # Suppression des services
+DiploWalker.Installer.exe status       # État des services
 ``
 
 ### Démarrage des services
 
 ``powershell
-sc.exe start "Diplo.Container"
-sc.exe start "Diplo.Volume"
-sc.exe start "Diplo.Network"
+sc.exe start "DiploWalker.Container"
+sc.exe start "DiploWalker.Volume"
+sc.exe start "DiploWalker.Network"
 ``
 
-### Configuration du client (diplo.json)
+### Configuration du client (DiploWalker.json)
 
-Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `diplo.json`. Le fichier est cherché par priorité :
+Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `DiploWalker.json`. Le fichier est cherché par priorité :
 
-1. `%DIPLO_CONFIG_HOME%\diplo.json` si la variable d'environnement est définie (recommandé pour la GUI et les installations : chemin stable, indépendant du répertoire courant) ;
-2. `diplo.json` dans le répertoire courant.
+1. `%DIPLO_CONFIG_HOME%\DiploWalker.json` si la variable d'environnement est définie (recommandé pour la GUI et les installations : chemin stable, indépendant du répertoire courant) ;
+2. `DiploWalker.json` dans le répertoire courant.
 
 S'il est absent ou mal formé, les clients retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003` en Debug, `localhost:6001`/`6002`/`6003` en Release).
 
 ``powershell
-diplo config init                       # génère diplo.json avec le transport TCP par défaut
-diplo config init --transport pipe      # génère diplo.json avec des adresses par named pipes
-diplo config init --path C:\etc\diplo.json --transport pipe
+diplo config init                       # génère DiploWalker.json avec le transport TCP par défaut
+diplo config init --transport pipe      # génère DiploWalker.json avec des adresses par named pipes
+diplo config init --path C:\etc\DiploWalker.json --transport pipe
 ``
 
 ``json
@@ -191,7 +191,7 @@ diplo config init --path C:\etc\diplo.json --transport pipe
 - `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
 - `pipe` : adresses `http://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplo-container`, `diplo-volume`, `diplo-network`).
 - Les adresses `http://pipe:/...` sont validées (hôte local uniquement, nom de tube sans `\` ni `..`).
-- La GUI propose un onglet **Paramètres** pour éditer ces adresses (écriture de `diplo.json`, champs `namespace` et `logLevel` conservés) ; la configuration est appliquée dès les opérations suivantes, sans redémarrage.
+- La GUI propose un onglet **Paramètres** pour éditer ces adresses (écriture de `DiploWalker.json`, champs `namespace` et `logLevel` conservés) ; la configuration est appliquée dès les opérations suivantes, sans redémarrage.
 
 ## Développement
 
@@ -217,30 +217,30 @@ Options disponibles :
 ``
 Diplo/
 ├── src/
-│   ├── Diplo.Abstractions/     # Interfaces, validation, sécurité, modules mutualisés
+│   ├── DiploWalker.Abstractions/     # Interfaces, validation, sécurité, modules mutualisés
 │   │   ├── JsonHelpers.fs      # Extraction typée de propriétés JSON
-│   │   ├── DiploJson.fs        # Options sérialisation centralisées
+│   │   ├── DiploWalkerJson.fs        # Options sérialisation centralisées
 │   │   ├── ProcessExec.fs      # Exécution processus + PowerShell
 │   │   ├── ServiceGuards.fs    # Guards de validation d'entrée
 │   │   ├── CachedConfig.fs     # Cache générique avec invalidation
 │   │   ├── Security.fs         # Validation d'entrée, anti-injection
 │   │   ├── ServerConfig.fs     # Configuration Kestrel / named pipes
-│   │   └── DiploPorts.fs       # Ports gRPC partagés (#if DEBUG 5001-5003 / Release 6001-6003)
-│   ├── Diplo.Container/        # Service gRPC de gestion des conteneurs
-│   ├── Diplo.Volume/           # Service gRPC de gestion des volumes
-│   ├── Diplo.Network/          # Service gRPC de gestion des réseaux
-│   ├── Diplo.Installer/        # Outil d'installation Windows
-│   ├── Diplo.Grpc/             # Types messages, services gRPC, DriverMappings
-│   ├── Diplo.Contracts/        # Types partagés entre services
-│   ├── Diplo.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
-│   ├── Diplo.Disk/             # Montage et création d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels, iso)
+│   │   └── DiploWalkerPorts.fs       # Ports gRPC partagés (#if DEBUG 5001-5003 / Release 6001-6003)
+│   ├── DiploWalker.Container/        # Service gRPC de gestion des conteneurs
+│   ├── DiploWalker.Volume/           # Service gRPC de gestion des volumes
+│   ├── DiploWalker.Network/          # Service gRPC de gestion des réseaux
+│   ├── DiploWalker.Installer/        # Outil d'installation Windows
+│   ├── DiploWalker.Grpc/             # Types messages, services gRPC, DriverMappings
+│   ├── DiploWalker.Contracts/        # Types partagés entre services
+│   ├── DiploWalker.Core/             # Clients gRPC, GrpcClientFactory, DiploConfig
+│   ├── DiploWalker.Disk/             # Montage et création d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels, iso)
 │   │   ├── BinaryIo.fs         # Lecture/écriture binaire + helper `protect`
 │   │   ├── DiscFsHelper.fs     # Fonctions DiscUtils partagées + `realFrom` (anti-traversal)
 │   │   ├── RawImageStream.fs   # Classe de base Stream des pilotes maison (Qcow1/Qcow2/Parallels)
 │   │   ├── Qcow1Fs.fs / Qcow2.fs / ParallelsFs.fs / VdiFs.fs / DmgFs.fs / FsImage.fs
 │   │   ├── IsoFs.fs            # Parseur ISO9660/UDF + générateur ISO9660 niveau 1
-│   ├── Diplo.Cli/              # Client CLI (Spectre.Console)
-│   ├── Diplo.Gui/              # Interface graphique Avalonia
+│   ├── DiploWalker.Cli/              # Client CLI (Spectre.Console)
+│   ├── DiploWalker.Gui/              # Interface graphique Avalonia
 │   │   ├── Views/MainWindow.axaml(.fs)
 │   │   ├── UserControls/ContainerDetailUserControl.axaml(.fs)
 │   │   ├── ViewModels/
@@ -248,17 +248,17 @@ Diplo/
 │   │   ├── App.axaml(.fs)
 │   │   └── Program.fs
 ├── tests/
-│   ├── Diplo.Abstractions.Tests/
-│   ├── Diplo.Cli.Tests/
-│   ├── Diplo.Container.Tests/
-│   ├── Diplo.Core.Tests/
-│   ├── Diplo.Disk.Tests/
-│   ├── Diplo.Gui.Tests/
-│   ├── Diplo.Installer.Tests/
-│   ├── Diplo.Integration.Tests/
-│   ├── Diplo.Network.Tests/
-│   ├── Diplo.TestHelpers/
-│   └── Diplo.Volume.Tests/
+│   ├── DiploWalker.Abstractions.Tests/
+│   ├── DiploWalker.Cli.Tests/
+│   ├── DiploWalker.Container.Tests/
+│   ├── DiploWalker.Core.Tests/
+│   ├── DiploWalker.Disk.Tests/
+│   ├── DiploWalker.Gui.Tests/
+│   ├── DiploWalker.Installer.Tests/
+│   ├── DiploWalker.Integration.Tests/
+│   ├── DiploWalker.Network.Tests/
+│   ├── DiploWalker.TestHelpers/
+│   └── DiploWalker.Volume.Tests/
 ├── pipeline.ps1                # Pipeline de build et déploiement
 └── README.md
 ``
@@ -286,7 +286,7 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 
 ## Montage de volumes et d'images disque
 
-À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** gérées par `Diplo.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
+À la création, un conteneur peut monter des volumes persistants, sous forme de **répertoires de l'hôte** ou d'**images disque** gérées par `DiploWalker.Disk`. Le montage se fait en bind (`rbind`), en lecture-écriture par défaut.
 
 | Format        | Extension(s)                   | R/W           | Moteur                                       |
 | ------------- | ------------------------------ | ------------- | -------------------------------------------- |
@@ -385,7 +385,7 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
 
 **Onglet Compose** — Éditeur YAML avec colorisation syntaxique (AvalonEdit + TextMate) et validation temps réel
 
-**Onglet Paramètres** — Édition de `diplo.json` (adresses services, transport, namespace, logLevel)
+**Onglet Paramètres** — Édition de `DiploWalker.json` (adresses services, transport, namespace, logLevel)
 
 **Menu** — *Fichier* → **Exporter le journal…** (écrit les lignes horodatées du journal dans un fichier `.txt` choisi via le sélecteur de fichier), *Quitter* ; *Aide* → **À propos**
 
@@ -539,3 +539,5 @@ Le montage réel des images disque et la communication gRPC ont été validés e
 - Les logs sont capturés par le service dans `%ProgramData%\Diplo\logs\<id>.log` et relus par `container logs --follow`.
 
 Résultats validés : montage bind R/W bidirectionnel, `container logs --follow` en streaming, named pipes et TCP, suppression idempotente (`delete -f`), et write-back d'images disque.
+
+
