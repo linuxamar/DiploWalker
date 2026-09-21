@@ -1,4 +1,4 @@
-!include "MUI2.nsh"
+﻿!include "MUI2.nsh"
 !include "WinVer.nsh"
 !include "LogicLib.nsh"
 
@@ -20,6 +20,14 @@ SetCompress off
 
 !ifndef PLATFORM
   !define PLATFORM "x64"
+!endif
+
+!ifndef SETUP_ROOT
+  !define SETUP_ROOT "..\setup"
+!endif
+
+!ifndef REPO_ROOT
+  !define REPO_ROOT "${SETUP_ROOT}\.."
 !endif
 
 !define REG_KEY_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
@@ -47,8 +55,8 @@ BrandingText "Diplo"
 
 ; ── Interface MUI ───────────────────────────────────────────────────────────
 !define MUI_ABORTWARNING
-!define MUI_ICON "${PUBLISH_ROOT}\..\..\..\setup\Diplo.ico"
-!define MUI_UNICON "${PUBLISH_ROOT}\..\..\..\setup\Diplo.ico"
+!define MUI_ICON "${SETUP_ROOT}\DiploWalker.ico"
+!define MUI_UNICON "${SETUP_ROOT}\DiploWalker.ico"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE"
@@ -229,28 +237,28 @@ FunctionEnd
 Section "Diplo.GUI" SecGui
   SectionIn RO
   SetOutPath "$INSTDIR\Diplo.Gui"
-  File /r /x "*.pdb" "${PUBLISH_ROOT}\Diplo.Gui\*.*"
+  File /r /x "*.pdb" "${PUBLISH_ROOT}\DiploWalker.Gui\*.*"
 
-  CreateShortCut "$DESKTOP\Diplo GUI.lnk"                "$INSTDIR\Diplo.Gui\Diplo.Gui.exe"
+  CreateShortCut "$DESKTOP\Diplo GUI.lnk"                "$INSTDIR\Diplo.Gui\DiploWalker.Gui.exe"
   CreateDirectory  "$SMPROGRAMS\${APP_NAME}"
-  CreateShortCut "$SMPROGRAMS\${APP_NAME}\Diplo GUI.lnk" "$INSTDIR\Diplo.Gui\Diplo.Gui.exe"
+  CreateShortCut "$SMPROGRAMS\${APP_NAME}\Diplo GUI.lnk" "$INSTDIR\Diplo.Gui\DiploWalker.Gui.exe"
 SectionEnd
 
 Section "Diplo.CLI" SecCli
   SectionIn RO
   SetOutPath "$INSTDIR\Diplo.Cli"
-  File /r /x "*.pdb" "${PUBLISH_ROOT}\Diplo.Cli\*.*"
+  File /r /x "*.pdb" "${PUBLISH_ROOT}\DiploWalker.Cli\*.*"
 
   Push "$INSTDIR\Diplo.Cli"
   Call AddToPath
 
-  CreateShortCut "$SMPROGRAMS\${APP_NAME}\Diplo CLI (cmd).lnk" "%windir%\system32\cmd.exe" "/K $INSTDIR\Diplo.Cli\Diplo.Cli.exe --help"
+  CreateShortCut "$SMPROGRAMS\${APP_NAME}\Diplo CLI (cmd).lnk" "%windir%\system32\cmd.exe" "/K $INSTDIR\Diplo.Cli\DiploWalker.Cli.exe --help"
 SectionEnd
 
 Section "Diplo.Installer" SecInst
   SectionIn RO
   SetOutPath "$INSTDIR\Diplo.Installer"
-  File /r /x "*.pdb" "${PUBLISH_ROOT}\Diplo.Installer\*.*"
+  File /r /x "*.pdb" "${PUBLISH_ROOT}\DiploWalker.Installer\*.*"
 SectionEnd
 
 Section -Additional
@@ -273,11 +281,11 @@ SectionEnd
 
 Section -Certificates
   SetOutPath "$INSTDIR\certificates"
-  File "${PUBLISH_ROOT}\..\..\..\certificates\root-ca\certs\root-ca.crt.pem"
-  File "${PUBLISH_ROOT}\..\..\..\certificates\authentification\certs\authentification.crt.pem"
-  File "${PUBLISH_ROOT}\..\..\..\certificates\codesigning\certs\codesigning.crt.pem"
-  File "${PUBLISH_ROOT}\..\..\..\certificates\system\certs\system.crt.pem"
-  File "${PUBLISH_ROOT}\..\..\..\setup\manage-certificates.ps1"
+  File "${REPO_ROOT}\certificates\root-ca\certs\root-ca.crt.pem"
+  File "${REPO_ROOT}\certificates\authentification\certs\authentification.crt.pem"
+  File "${REPO_ROOT}\certificates\codesigning\certs\codesigning.crt.pem"
+  File "${REPO_ROOT}\certificates\system\certs\system.crt.pem"
+  File "${SETUP_ROOT}\manage-certificates.ps1"
 
   nsExec::ExecToStack '"${POWERSHELL_EXE}" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\certificates\manage-certificates.ps1"'
   Pop $0
