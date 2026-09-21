@@ -1,4 +1,4 @@
-namespace Diplo.Core.Clients
+﻿namespace Diplo.Core.Clients
 
 open System
 open System.Collections.Generic
@@ -13,6 +13,15 @@ open ProtoBuf.Grpc.Client
 
 type VolumeClient(channel: GrpcChannel, ownsChannel: bool) as this =
     inherit GrpcClientBase(channel, ownsChannel)
+
+    do
+        if isNull channel then
+            nullArg (nameof channel)
+
+        try
+            channel.State |> ignore
+        with :? ObjectDisposedException ->
+            raise (ObjectDisposedException(nameof channel, "Le canal gRPC a été disposé avant son utilisation. Recréez un client via la factory partagée."))
 
     let client = channel.CreateGrpcService<IVolumeService>()
 

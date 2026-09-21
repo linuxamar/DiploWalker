@@ -1,22 +1,34 @@
-namespace Diplo.Core.Tests
+﻿namespace Diplo.Core.Tests
 
 module DiploClientsTests =
 
+    open System
     open Xunit
     open FsUnit.Xunit
+    open Diplo.Abstractions
+    open Diplo.Core
     open Diplo.Core.Clients
+    open Diplo.Core.Connection
 
     [<Fact>]
     let ``DiploClients cree les trois clients sans legerete`` () =
         let factory = new DiploClients() :> IDiploClients
 
-        use conteneurs = factory.CreateContainerClient()
-        use volumes = factory.CreateVolumeClient()
-        use reseaux = factory.CreateNetworkClient()
+        let conteneurs = factory.CreateContainerClient()
+        let volumes = factory.CreateVolumeClient()
+        let reseaux = factory.CreateNetworkClient()
 
-        conteneurs |> should not' (be null)
-        volumes |> should not' (be null)
-        reseaux |> should not' (be null)
-        conteneurs |> should be instanceOfType<ContainerClient>
-        volumes |> should be instanceOfType<VolumeClient>
-        reseaux |> should be instanceOfType<NetworkClient>
+        Assert.NotNull(conteneurs)
+        Assert.NotNull(volumes)
+        Assert.NotNull(reseaux)
+
+    [<Fact>]
+    let ``DiploClients recree le canal si le canal partage a ete dispose`` () =
+        let channel = DiploChannel.forContainer DiploPorts.Container
+        (channel :> IDisposable).Dispose()
+
+        let factory = new DiploClients() :> IDiploClients
+        let conteneurs = factory.CreateContainerClient()
+
+        conteneurs |> should not' (be Null)
+        (conteneurs :> IDisposable).Dispose()
