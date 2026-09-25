@@ -26,10 +26,11 @@ module DiscFsHelperTests =
         result.StartsWith(Path.DirectorySeparatorChar.ToString()) |> should equal false
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``toRealRel normalise les doubles slashes`` () =
         let result = DiscFsHelper.toRealRel "a//b///c"
         result.Contains "//" |> should equal false
+        result.Contains (string Path.DirectorySeparatorChar + string Path.DirectorySeparatorChar)
+        |> should equal false
 
     [<Fact>]
     let ``toRealRel gere les noms simples`` () =
@@ -90,23 +91,23 @@ module DiscFsHelperTests =
             TestImage.cleanupDir root
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``realFrom rejette un chemin enracine Windows`` () =
         let root = TestImage.createTempDir ()
 
         try
-            (fun () -> DiscFsHelper.realFrom root "C:\\Windows\\System32" |> ignore)
+            (fun () -> DiscFsHelper.realFrom root @"C:\Windows\System32" |> ignore)
             |> should throw typeof<ArgumentException>
         finally
             TestImage.cleanupDir root
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``realFrom rejette un chemin avec drive letter Windows`` () =
         let root = TestImage.createTempDir ()
 
         try
-            (fun () -> DiscFsHelper.realFrom root "C:\\Windows\\System32" |> ignore)
+            // Slash avant : la detection de la lettre de lecteur ne doit pas
+            // dependre du separateur employe dans l'image.
+            (fun () -> DiscFsHelper.realFrom root "D:/data/image.iso" |> ignore)
             |> should throw typeof<ArgumentException>
         finally
             TestImage.cleanupDir root

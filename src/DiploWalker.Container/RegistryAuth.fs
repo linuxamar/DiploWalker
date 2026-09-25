@@ -23,14 +23,7 @@ module RegistryAuth =
 
     let private stateFileName = "registry-auth.json"
 
-    let private defaultStateFile () =
-        let baseDir =
-            let programData =
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)
-
-            Path.Combine(programData, "Diplo")
-
-        Path.Combine(baseDir, stateFileName)
+    let private defaultStateFile () = Path.Combine(AppPaths.dataRoot (), stateFileName)
 
     /// Chemin du fichier d'Ã©tat (par dÃ©faut : %ProgramData%\Diplo\registry-auth.json).
     let private stateFileRef = ref (defaultStateFile ())
@@ -42,13 +35,10 @@ module RegistryAuth =
     /// Chemin courant du fichier d'Ã©tat des identifiants de registres.
     let stateFile () = !stateFileRef
 
-    /// Fichier de clÃ© AES-GCM (hors Windows) : %LocalAppData%\Diplo\registry-key.bin.
-    let private keyFile () =
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Diplo",
-            "registry-key.bin"
-        )
+    /// Fichier de clÃ© AES-GCM (hors Windows), sous la racine par utilisateur
+    /// (`AppPaths.userRoot`) : `%LocalAppData%\Diplo\registry-key.bin` sous
+    /// Windows, `$XDG_DATA_HOME/Diplo/registry-key.bin` ailleurs.
+    let private keyFile () = Path.Combine(AppPaths.userRoot (), "registry-key.bin")
 
     /// Charge ou crÃ©e la clÃ© par utilisateur. Sur les plateformes POSIX le fichier
     /// est crÃ©Ã© avec des droits 0600 ; sous Windows il hÃ©rite du profil utilisateur.
@@ -207,12 +197,7 @@ module RegistryAuth =
 
     /// RÃ©pertoire du helper : chemin SANS espace (C:\ProgramData\Diplo\...),
     /// requis car containerd exÃ©cute la valeur Â« auth Â» telle quelle.
-    let helperDir () =
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "Diplo",
-            "cred-helper"
-        )
+    let helperDir () = AppPaths.dataDir "cred-helper"
 
     let private helperScript =
         """$ErrorActionPreference = 'Stop'

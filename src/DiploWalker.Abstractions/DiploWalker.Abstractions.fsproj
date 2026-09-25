@@ -22,6 +22,7 @@
   <ItemGroup>
     <Compile Include="DiploWalkerPorts.fs" />
     <Compile Include="Interfaces.fs" />
+    <Compile Include="AppPaths.fs" />
     <Compile Include="Security.fs" />
     <Compile Include="ServiceGuards.fs" />
     <Compile Include="ProcessExec.fs" />

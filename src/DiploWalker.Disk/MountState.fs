@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Text.Json
 open Serilog
+open DiploWalker.Abstractions
 
 /// Persistance de l'Ã©tat des volumes montÃ©s par conteneur : permet de
 /// restaurer le write-back aprÃ¨s un redÃ©marrage du service sans rÃ©-extraire
@@ -22,14 +23,7 @@ module MountState =
     // MÃªme racine que DiskMounter.stagingRoot() : calculÃ©e localement pour
     // Ã©viter une dÃ©pendance croisÃ©e entre les deux modules.
     let stateFile () =
-        let baseDir =
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "Diplo",
-                "volumes"
-            )
-
-        Path.Combine(baseDir, "mounted-state.json")
+        Path.Combine(AppPaths.dataDir "volumes", "mounted-state.json")
 
     /// Verrou global : les handlers gRPC appellent persistMounts en parallÃ¨le ;
     /// sans sÃ©rialisation, deux sauvegardes concurrentes s'Ã©crasent et des

@@ -8,6 +8,11 @@ module SecurityValidationTests =
     open FsUnit.Xunit
     open DiploWalker.Abstractions.SecurityValidation
 
+    /// Chemin absolu local, quelle que soit la plateforme :
+    /// `C:\stack\compose.yml` sous Windows, `/stack/compose.yml` ailleurs.
+    let private absolutePath (segment1: string) (segment2: string) =
+        IO.Path.Combine(IO.Path.GetPathRoot(IO.Path.GetTempPath()), segment1, segment2)
+
     // â”€â”€ validateCommand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [<Fact>]
@@ -315,7 +320,6 @@ module SecurityValidationTests =
         validatePath "data/file.txt" "/tmp" "test"
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``validatePath qui sort du rÃ©pertoire de base lÃ¨ve une exception`` () =
         let baseDir =
             IO.Path.Combine(IO.Path.GetTempPath(), "diplo-test-" + Guid.NewGuid().ToString("N"))
@@ -323,7 +327,7 @@ module SecurityValidationTests =
         IO.Directory.CreateDirectory(baseDir) |> ignore
 
         try
-            (fun () -> validatePath @"C:\Windows\System32\cmd.exe" baseDir "test")
+            (fun () -> validatePath (absolutePath "etc" "diplo-escape.txt") baseDir "test")
             |> should throw typeof<Exception>
         finally
             IO.Directory.Delete(baseDir, true)
@@ -336,14 +340,9 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateCniPluginPath avec chemin dans rÃ©pertoire autorisÃ© retourne le chemin rÃ©solu`` () =
-        let allowedDir =
-            IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "containerd",
-                "cni",
-                "bin"
-            )
-
+        // Premier repertoire de la liste blanche : plugin installe par la
+        // plateforme (containerd sous Windows, /opt/cni/bin ailleurs).
+        let allowedDir = List.head allowedCniPluginDirs
         let path = IO.Path.Combine(allowedDir, "bridge.exe")
         let result = validateCniPluginPath path
         result |> should not' (be NullOrEmptyString)
@@ -353,9 +352,8 @@ module SecurityValidationTests =
         Assert.Throws<RpcException>(fun () -> validateCniPluginPath @"C:\malicious\path\plugin.exe" |> ignore)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``validateCniPluginPath avec opt cni bin est valide`` () =
-        let path = @"C:\opt\cni\bin\bridge.exe"
+        let path = IO.Path.Combine(List.head allowedCniPluginDirs, "bridge.exe")
         let result = validateCniPluginPath path
         result |> should not' (be NullOrEmptyString)
 
@@ -447,14 +445,12 @@ module SecurityValidationTests =
     // â”€â”€ validateFilePath (fichiers de configuration compose) â”€â”€â”€â”€â”€â”€â”€â”€
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``validateFilePath accepte un chemin absolu yaml`` () =
-        validateFilePath @"C:\stack\docker-compose.yaml" "Le fichier"
+        validateFilePath (absolutePath "stack" "docker-compose.yaml") "Le fichier"
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``validateFilePath accepte l'extension yml`` () =
-        validateFilePath @"C:\stack\compose.yml" "Le fichier"
+        validateFilePath (absolutePath "stack" "compose.yml") "Le fichier"
 
     [<Fact>]
     let ``validateFilePath rejette un chemin relatif`` () =
@@ -477,7 +473,7 @@ module SecurityValidationTests =
 
     [<Fact>]
     let ``validateFilePath rejette une extension non yaml`` () =
-        (fun () -> validateFilePath @"C:\stack\config.json" "Le fichier")
+        (fun () -> validateFilePath (absolutePath "stack" "config.json") "Le fichier")
         |> should throw typeof<RpcException>
 
     [<Fact>]

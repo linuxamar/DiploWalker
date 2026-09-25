@@ -8,7 +8,7 @@ open System.Security.Principal
 open System.Text.Json
 open Serilog
 
-let authTokenDir = @"C:\ProgramData\Diplo"
+let authTokenDir = AppPaths.dataRoot ()
 
 let private defaultTokenPath = Path.Combine(authTokenDir, "auth-token.json")
 
@@ -48,29 +48,42 @@ let saveToken (token: string) =
     let tmpPath = tokenPath () + "." + Guid.NewGuid().ToString("N") + ".tmp"
 
     try
-        // CrÃ©er le fichier VIDE d'abord, resserrer l'ACL, puis Ã©crire le contenu :
-        // WriteAllText crÃ©erait le fichier avec les ACL hÃ©ritÃ©es permissives de
-        // C:\ProgramData\Diplo (lecture BUILTIN\Users) â€” fenÃªtre d'exposition.
+        // Créer le fichier VIDE d'abord, resserrer les droits, puis écrire le
+        // contenu : WriteAllText créerait le fichier avec les droits hérités
+        // permissifs de la racine de données (lecture par tous les comptes) —
+        // fenêtre d'exposition.
         do
             use fs =
-                new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None)
+                if OperatingSystem.IsWindows() then
+                    new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None)
+                else
+                    // 0600 dès la création : le jeton n'est jamais lisible par
+                    // les autres comptes, même le temps de l'écriture.
+                    let options = FileStreamOptions()
+                    options.Mode <- FileMode.Create
+                    options.Access <- FileAccess.Write
+                    options.Share <- FileShare.None
+                    options.UnixCreateMode <- UnixFileMode.UserRead ||| UnixFileMode.UserWrite
+                    new FileStream(tmpPath, options)
 
             ()
 
-        let fileInfo = new FileInfo(tmpPath)
-        let acl = fileInfo.GetAccessControl()
-        acl.SetAccessRuleProtection(true, false)
+        if OperatingSystem.IsWindows() then
+            let fileInfo = new FileInfo(tmpPath)
+            let acl = fileInfo.GetAccessControl()
+            acl.SetAccessRuleProtection(true, false)
 
-        // WindowsIdentity dÃ©tient un handle de token : Ã  disposer.
-        do
-            use currentUser = WindowsIdentity.GetCurrent()
+            // WindowsIdentity détient un handle de token : à disposer.
+            do
+                use currentUser = WindowsIdentity.GetCurrent()
 
-            let rule =
-                FileSystemAccessRule(currentUser.User, FileSystemRights.FullControl, AccessControlType.Allow)
+                let rule =
+                    FileSystemAccessRule(currentUser.User, FileSystemRights.FullControl, AccessControlType.Allow)
 
-            acl.AddAccessRule(rule)
+                acl.AddAccessRule(rule)
 
-        fileInfo.SetAccessControl(acl)
+            fileInfo.SetAccessControl(acl)
+
         File.WriteAllText(tmpPath, json)
 
         try

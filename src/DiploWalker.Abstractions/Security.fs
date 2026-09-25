@@ -52,19 +52,25 @@ module SecurityValidation =
     let private dangerousEnvPatterns =
         [| "%PATH%"; "%SYSTEMROOT%"; "%WINDIR%"; "%TEMP%"; "%TMP%" |]
 
-    /// Répertoires autorisés pour les plugins CNI.
-    let private allowedCniPluginDirs =
-        [ Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "containerd", "cni", "bin")
-          Path.Combine(
-              Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-              "containerd",
-              "cni",
-              "bin",
-              "opt",
-              "cni",
-              "bin"
-          )
-          @"C:\opt\cni\bin" ]
+    /// Répertoires autorisés pour les plugins CNI, selon la plateforme.
+    /// Windows : le plugin installé par le paquet containerd (C:\opt\cni\bin)
+    /// et celui de %ProgramFiles%. Unix : les emplacements conventionnels
+    /// /opt/cni/bin et /usr/lib/cni.
+    let allowedCniPluginDirs =
+        let programFiles =
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
+
+        let programFilesCni =
+            if String.IsNullOrWhiteSpace programFiles then
+                []
+            else
+                [ Path.Combine(programFiles, "containerd", "cni", "bin") ]
+
+        if OperatingSystem.IsWindows() then
+            programFilesCni
+            @ [ Path.Combine("C:", "opt", "cni", "bin") ]
+        else
+            [ "/opt/cni/bin"; "/usr/lib/cni"; "/usr/libexec/cni" ]
 
     /// Vérifie qu'une valeur correspond au motif d'identifiant.
     let validateId (value: string) (label: string) =
@@ -655,11 +661,19 @@ module SecurityValidation =
             )
 
     /// Répertoires de base autorisés pour les volumes (immutable snapshot pattern).
+    /// La racine des données de l'application est toujours acceptée ; sous
+    /// Windows, %ProgramData%\Diplo et le répertoire du programme aussi.
     let private defaultAllowedVolumeDirs =
-        [ Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Diplo")
-          @"C:\ProgramData\Diplo"
-          Path.GetTempPath() ]
-        |> List.map Path.GetFullPath
+        let dirs =
+            [ AppPaths.dataRoot ()
+              Path.GetTempPath() ]
+            @ (if OperatingSystem.IsWindows() then
+                   [ @"C:\ProgramData\Diplo"
+                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Diplo") ]
+               else
+                   [])
+
+        dirs |> List.filter (fun d -> not (String.IsNullOrWhiteSpace d)) |> List.map Path.GetFullPath
 
     /// Cellule de ref contenant l'ensemble immuable des répertoires autorisés (thread-safe via copy-on-write).
     let private allowedVolumeBaseDirsRef = ref (defaultAllowedVolumeDirs |> Set.ofList)

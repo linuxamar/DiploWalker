@@ -2,6 +2,7 @@
 
 open System
 open System.IO
+open DiploWalker.Abstractions
 
 /// Gestion des journaux des conteneurs capturÃ©s au dÃ©marrage.
 /// containerd v2 a supprimÃ© 'ctr task logs' : les logs sont donc capturÃ©s
@@ -9,8 +10,7 @@ open System.IO
 /// le conteneur est dÃ©marrÃ© en mode dÃ©tachÃ©, puis relus par GetContainerLogs.
 module ContainerLogs =
 
-    let private logsDirRef =
-        ref (Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Diplo", "logs"))
+    let private logsDirRef = ref (Path.Combine(AppPaths.dataRoot (), "logs"))
 
     /// Remplace le rÃ©pertoire des journaux (utile pour les tests).
     let setLogsDir (dir: string) =

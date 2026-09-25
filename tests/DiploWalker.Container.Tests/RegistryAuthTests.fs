@@ -116,7 +116,6 @@ module RegistryAuthTests =
         RegistryAuth.prepareHostsDir "localvolume" |> should equal None
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``prepareHostsDir genere hosts.toml deleguant au helper`` () =
         match RegistryAuth.prepareHostsDir "myregistry.azurecr.io" with
         | None -> failwith "prepareHostsDir aurait dÃ» rÃ©ussir"
@@ -136,7 +135,6 @@ module RegistryAuthTests =
                     ()
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``prepareHostsDir utilise l'endpoint canonique de docker.io comme repertoire`` () =
         match RegistryAuth.prepareHostsDir "docker.io" with
         | None -> failwith "prepareHostsDir aurait dÃ» rÃ©ussir"
@@ -151,7 +149,6 @@ module RegistryAuthTests =
                     ()
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``ensureHelper est idempotent (meme contenu apres double appel)`` () =
         let cmdPath1 = RegistryAuth.ensureHelper ()
         let ps1Path = Path.Combine(Path.GetDirectoryName cmdPath1, "diplo-cred-helper.ps1")
@@ -180,8 +177,23 @@ module RegistryAuthTests =
 
         File.WriteAllText(scriptPath, redirected)
 
+        // PowerShell 7 est portable : installe par le MSI sous Windows
+        // (`pwsh.exe`), dans le PATH ailleurs. Le script du helper n'utilise
+        // que des cmdlets standard, il s'execute donc sur les deux systemes.
+        // Sous Windows on retombe sur `powershell` (5.1) si PowerShell 7 est
+        // absent du poste.
         let pwsh7 = @"C:\Program Files\PowerShell\7\pwsh.exe"
-        let exe = if File.Exists pwsh7 then pwsh7 else "powershell"
+
+        let exe =
+            if OperatingSystem.IsWindows() && File.Exists pwsh7 then
+                pwsh7
+            elif OperatingSystem.IsWindows() then
+                if File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PowerShell", "7", "pwsh.exe")) then
+                    "pwsh"
+                else
+                    "powershell"
+            else
+                "pwsh"
 
         ProcessExec.runWithResult
             exe
@@ -212,6 +224,8 @@ module RegistryAuthTests =
                 ()
 
     [<Fact>]
+    // Le helper est un artefact Windows : lanceur diplo-cred-helper.cmd et
+    // dechiffrement DPAPI (System.Security / ProtectedData) dans le script.
     [<Trait("Platform", "Windows")>]
     let ``le helper repond Username et Secret pour le registre demande`` () =
         withHelperState (fun root statePath ->
@@ -230,6 +244,8 @@ module RegistryAuthTests =
             json.GetProperty("Secret").GetString() |> should equal "s3cret!")
 
     [<Fact>]
+    // Le helper est un artefact Windows : lanceur diplo-cred-helper.cmd et
+    // dechiffrement DPAPI (System.Security / ProtectedData) dans le script.
     [<Trait("Platform", "Windows")>]
     let ``le helper echoue sans sortie pour un registre inconnu`` () =
         withHelperState (fun root statePath ->
@@ -241,6 +257,8 @@ module RegistryAuthTests =
             stdout.Trim() |> should equal "")
 
     [<Fact>]
+    // Le helper est un artefact Windows : lanceur diplo-cred-helper.cmd et
+    // dechiffrement DPAPI (System.Security / ProtectedData) dans le script.
     [<Trait("Platform", "Windows")>]
     let ``le helper repond pour docker.io via son endpoint canonique`` () =
         withHelperState (fun root statePath ->

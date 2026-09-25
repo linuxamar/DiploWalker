@@ -148,6 +148,8 @@ module VolumeIntegrationTests =
             stopApp app dataRoot
 
     [<Fact>]
+    // Le transport utilise ici est un named pipe Windows ; sur Unix l'adresse
+    // equivalente est un socket de domaine, non couvert par ce test.
     [<Trait("Platform", "Windows")>]
     let ``CreateVolume via named pipe fonctionne de bout en bout`` () =
         let pipeName = "diplo-volume-test-" + Guid.NewGuid().ToString("N")

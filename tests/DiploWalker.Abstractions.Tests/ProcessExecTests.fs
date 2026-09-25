@@ -15,59 +15,81 @@ module ProcessExecTests =
         Directory.CreateDirectory(dir) |> ignore
         dir
 
-    let private cmd (args: string list) =
-        ProcessExec.runWithResult "cmd.exe" ([ "/c" ] @ args) None None None
+    /// Interpreteur de commandes de la plateforme : `cmd.exe /c` sous Windows,
+    /// `sh -c` ailleurs. Les tests restent identiques sur les deux systemes.
+    let private shellExe =
+        if OperatingSystem.IsWindows() then
+            "cmd.exe"
+        else
+            "sh"
+
+    let private shellCFlag =
+        if OperatingSystem.IsWindows() then
+            "/c"
+        else
+            "-c"
+
+    /// Execute une ligne de commande via l'interpreteur de la plateforme.
+    let private shell (commandLine: string) =
+        ProcessExec.runWithResult shellExe [ shellCFlag; commandLine ] None None None
+
+    /// Commande qui dure plus longtemps que le delai de 500 ms des tests de timeout.
+    let private slowCommand =
+        if OperatingSystem.IsWindows() then
+            "ping -n 6 127.0.0.1 > nul"
+        else
+            "sleep 5"
+
+    /// Commande qui recopie l'entree standard sur la sortie standard.
+    let private echoStdinCommand =
+        if OperatingSystem.IsWindows() then
+            "more"
+        else
+            "cat"
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``runWithResult capture la sortie standard`` () =
-        let code, stdout, stderr = cmd [ "echo"; "hello" ]
+        let code, stdout, stderr = shell "echo hello"
         code |> should equal 0
         stdout.Contains("hello") |> should equal true
         stderr |> should equal ""
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``runWithResult capture la sortie d'erreur sans bloquer`` () =
-        let code, stdout, stderr = cmd [ "echo"; "err"; "1>&2" ]
+        let code, stdout, stderr = shell "echo err 1>&2"
         code |> should equal 0
         stderr.Contains("err") |> should equal true
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``runWithResult retourne le code de sortie non nul`` () =
-        let code, _, _ = cmd [ "exit"; "3" ]
+        let code, _, _ = shell "exit 3"
         code |> should equal 3
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``run retourne la sortie standard en cas de succes`` () =
-        (ProcessExec.run "cmd.exe" [ "/c"; "echo"; "ok" ] None None None).Contains("ok")
+        (ProcessExec.run shellExe [ shellCFlag; "echo ok" ] None None None).Contains("ok")
         |> should equal true
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``run leve une exception si le processus echoue`` () =
-        (fun () -> ProcessExec.run "cmd.exe" [ "/c"; "exit"; "3" ] None None None |> ignore)
+        (fun () -> ProcessExec.run shellExe [ shellCFlag; "exit 3" ] None None None |> ignore)
         |> should throw typeof<InvalidOperationException>
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``runWithResult tue le processus en cas de depassement du delai`` () =
         let stopwatch = Diagnostics.Stopwatch.StartNew()
 
         (fun () ->
-            ProcessExec.runWithResult "cmd.exe" [ "/c"; "ping"; "-n"; "5"; "127.0.0.1" ] (Some 500) None None
+            ProcessExec.runWithResult shellExe [ shellCFlag; slowCommand ] (Some 500) None None
             |> ignore)
         |> should throw typeof<TimeoutException>
 
         stopwatch.ElapsedMilliseconds |> should be (lessThan 10_000L)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``runWithResult transmet l'entree standard au processus`` () =
         let code, stdout, _ =
-            ProcessExec.runWithResult "cmd.exe" [ "/c"; "more" ] None (Some "hello-stdin") None
+            ProcessExec.runWithResult shellExe [ shellCFlag; echoStdinCommand ] None (Some "hello-stdin") None
 
         code |> should equal 0
         stdout.Contains("hello-stdin") |> should equal true
@@ -108,21 +130,18 @@ module ProcessExecTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``runUnit retourne unit sans erreur si le processus reussit`` () =
-        let result = ProcessExec.runUnit "cmd.exe" [ "/c"; "echo"; "ok" ] None None None
+        let result = ProcessExec.runUnit shellExe [ shellCFlag; "echo ok" ] None None None
         result |> should equal ()
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``runUnit leve une exception si le processus echoue`` () =
-        (fun () -> ProcessExec.runUnit "cmd.exe" [ "/c"; "exit"; "1" ] None None None)
+        (fun () -> ProcessExec.runUnit shellExe [ shellCFlag; "exit 1" ] None None None)
         |> should throw typeof<InvalidOperationException>
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``runUnit leve une exception en cas de timeout`` () =
-        (fun () -> ProcessExec.runUnit "cmd.exe" [ "/c"; "ping"; "-n"; "5"; "127.0.0.1" ] (Some 500) None None)
+        (fun () -> ProcessExec.runUnit shellExe [ shellCFlag; slowCommand ] (Some 500) None None)
         |> should throw typeof<TimeoutException>
 
     [<Fact>]

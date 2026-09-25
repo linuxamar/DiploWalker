@@ -236,7 +236,6 @@ module ContainerIntegrationTests =
             sw.Flush()
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``CreateContainer via gRPC retourne l'ID`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -264,7 +263,6 @@ module ContainerIntegrationTests =
             String.IsNullOrEmpty(result.CreatedAt) |> should equal false)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``CreateContainer puis StartContainer via gRPC`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -293,7 +291,6 @@ module ContainerIntegrationTests =
             startResult.Message |> should equal "Conteneur dÃ©marrÃ©")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``CreateContainer avec montage d'un repertoire via gRPC`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -333,7 +330,6 @@ module ContainerIntegrationTests =
                 TestHelpers.cleanupDir mountDir)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``InspectContainer via gRPC retourne les infos`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -365,7 +361,6 @@ module ContainerIntegrationTests =
             inspectResult.Image |> should equal "test:latest")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``ListContainers via gRPC`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -394,7 +389,6 @@ module ContainerIntegrationTests =
             listResult.Containers.Count |> should equal 2)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``ListNamespaces via gRPC`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -404,7 +398,6 @@ module ContainerIntegrationTests =
             result.Namespaces |> should contain "default")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``GetVersion via gRPC`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -414,7 +407,6 @@ module ContainerIntegrationTests =
             result.Version |> should equal "1.0.0-test")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``CreateContainer sans nom genere un id automatiquement`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -440,7 +432,6 @@ module ContainerIntegrationTests =
             String.IsNullOrEmpty(result.Id) |> should equal false)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``DeleteContainer via gRPC`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -468,7 +459,6 @@ module ContainerIntegrationTests =
             deleteResult.Success |> should equal true)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``StopContainer via gRPC`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -501,7 +491,6 @@ module ContainerIntegrationTests =
             stopResult.Message |> should equal "Conteneur arrÃªtÃ©")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``CreateContainer avec image vide via gRPC lance exception`` () =
         withContainerApp (fun address ->
             use channel = DiploWalkerChannel.forAddress address
@@ -530,7 +519,6 @@ module ContainerIntegrationTests =
             ex.InnerException.Message |> should haveSubstring "L'image du conteneur")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``CreateContainer avec une image disque montee via gRPC puis DeleteContainer reecrit l'image`` () =
         withContainerAppMock (fun address mock ->
             let root = TestHelpers.createTempDir "image"

@@ -6,6 +6,7 @@ module MountStateTests =
     open System.IO
     open Xunit
     open FsUnit.Xunit
+    open DiploWalker.Abstractions
     open DiploWalker.Disk
 
     let private run (f: string -> unit) =
@@ -102,8 +103,11 @@ module MountStateTests =
     // â”€â”€ stateFile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [<Fact>]
-    let ``stateFile retourne un chemin dans ProgramData`` () =
+    let ``stateFile retourne un chemin dans la racine des donnees`` () =
         let path = MountState.stateFile ()
-        path.Contains("Diplo") |> should equal true
+
+        path.StartsWith(AppPaths.dataRoot (), StringComparison.Ordinal)
+        |> should equal true
+
         path.EndsWith("mounted-state.json") |> should equal true
 

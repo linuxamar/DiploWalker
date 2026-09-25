@@ -46,7 +46,6 @@ module AuthTokenTests =
             t1 |> should not' (equal t2)
 
         [<Fact>]
-        [<Trait("Platform", "Windows")>]
         let ``verifyToken avec le meme token retourne true`` () =
             withTempPath (fun () ->
                 let token = generateToken ()
@@ -54,7 +53,6 @@ module AuthTokenTests =
                 verifyToken token |> should equal true)
 
         [<Fact>]
-        [<Trait("Platform", "Windows")>]
         let ``verifyToken avec un token different retourne false`` () =
             withTempPath (fun () ->
                 let token = generateToken ()
@@ -66,7 +64,6 @@ module AuthTokenTests =
             withTempPath (fun () -> verifyToken (generateToken ()) |> should equal false)
 
         [<Fact>]
-        [<Trait("Platform", "Windows")>]
         let ``verifyToken avec token vide retourne false`` () =
             withTempPath (fun () ->
                 let token = generateToken ()
@@ -86,7 +83,6 @@ module AuthTokenTests =
                 verifyToken token |> should equal false)
 
         [<Fact>]
-        [<Trait("Platform", "Windows")>]
         let ``saveToken ecrit un fichier dont verifyToken accepte le token`` () =
             withTempPath (fun () ->
                 let token = generateToken ()
@@ -95,7 +91,6 @@ module AuthTokenTests =
                 verifyToken token |> should equal true)
 
         [<Fact>]
-        [<Trait("Platform", "Windows")>]
         let ``rotateToken genere un nouveau token et invalide l'ancien`` () =
             withTempPath (fun () ->
                 let token = generateToken ()

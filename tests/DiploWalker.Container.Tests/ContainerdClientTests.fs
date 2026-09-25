@@ -738,7 +738,6 @@ type ContainerdClientTests() =
                 ()
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     member _.``PullImage avec identifiant enregistre passe par le helper sans secret dans argv``() =
         let runner = createRunner ()
         runner.OnCommand("image pull", "resolved")
@@ -794,7 +793,6 @@ type ContainerdClientTests() =
         runner.SecureCommands |> should be Empty
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     member _.``PullImage de Docker Hub prepare un hosts-dir pour docker.io``() =
         let runner = createRunner ()
         runner.OnCommand("image pull", "resolved")
@@ -851,7 +849,6 @@ type ContainerdClientTests() =
         RegistryAuth.normalizeRegistryHost input |> should equal expected
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     member _.``prepareHostsDir genere un hosts.toml delegant au helper``() =
         let dir =
             RegistryAuth.prepareHostsDir "myregistry.azurecr.io"

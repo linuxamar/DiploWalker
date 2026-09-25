@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    Redirige `AppPaths.dataRoot` (variable d'environnement DIPLO_DATA_ROOT)
+    vers un répertoire temporaire pour tous les projets de test, via une
+    fixture d'assembly xUnit exécutée avant le premier test.
+
+    Le fichier est ajouté en fin de compilation (Directory.Build.targets est
+    importé après le corps du projet) : il ne référence que BCL et xUnit, et ne
+    dépend donc d'aucun projet de la solution. Aucun impact sur les projets de
+    production.
+  -->
+
+  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <Compile Include="$(MSBuildThisFileDirectory)TestDataRoot.fs" />
+  </ItemGroup>
+
+</Project>

@@ -2,6 +2,7 @@
 
 open System
 open System.IO
+open System.Text
 open DiscUtils
 
 /// OpÃ©rations communes sur les systÃ¨mes de fichiers DiscUtils (extraction,
@@ -17,7 +18,34 @@ module DiscFsHelper =
 
     /// Nettoie un chemin interne au FS image en sÃ©parateur hÃ´te.
     let toRealRel (fsPath: string) =
-        fsPath.TrimStart('\\', '/').Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar)
+        let isSeparator (c: char) = c = '\\' || c = '/'
+        let buffer = StringBuilder(fsPath.Length)
+        let mutable lastWasSeparator = false
+
+        for c in fsPath.TrimStart('\\', '/') do
+            if isSeparator c then
+                // Les séparateurs consécutifs sont réduits à un seul : les noms
+                // internes aux images contiennent fréquemment « a//b » ou des
+                // séparateurs mélangés.
+                if not lastWasSeparator then
+                    buffer.Append(Path.DirectorySeparatorChar) |> ignore
+            else
+                buffer.Append c |> ignore
+
+            lastWasSeparator <- isSeparator c
+
+        buffer.ToString()
+
+    /// Vrai si un chemin brut porte une lettre de lecteur Windows (« C:\x »,
+    /// « C:/x »). Les adaptateurs lisent des images créées sur d'autres
+    /// systèmes : sur un hôte Unix `Path.IsPathRooted` considère un tel chemin
+    /// comme relatif, il faut donc le détecter explicitement pour ne jamais le
+    /// confondre avec un chemin relatif confinable dans le staging.
+    let hasWindowsDriveLetter (fsPath: string) =
+        fsPath.Length >= 3
+        && Char.IsLetter fsPath[0]
+        && fsPath[1] = ':'
+        && (fsPath[2] = '\\' || fsPath[2] = '/')
 
     /// Convertit un chemin INTERNE au systÃ¨me de fichiers image en chemin hÃ´te,
     /// confinÃ© Ã  `realRoot`. LÃ¨ve une exception en cas de nom enracinÃ©, de
@@ -26,10 +54,12 @@ module DiscFsHelper =
         let rel = toRealRel fsPath
 
         let rooted =
-            try
-                Path.IsPathRooted(rel)
-            with _ ->
-                true
+            hasWindowsDriveLetter fsPath
+            ||
+            (try
+                 Path.IsPathRooted(rel)
+             with _ ->
+                 true)
 
         let hasTraversal =
             rel.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)

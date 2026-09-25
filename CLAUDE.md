@@ -108,10 +108,22 @@ dotnet build DiploWalker.slnx                       # Build complÃ¨te
 
 > **Attention** : `dotnet test --nologo` casse la dÃ©couverte de tests avec le runner MTP (0 test exÃ©cutÃ©, code de sortie 5). Ne pas utiliser `--nologo`.
 >
-> **Tests dépendants de Windows** : les tests qui s'appuient sur `cmd.exe`, PowerShell,
-> `C:\ProgramData`, les tubes nommés ou le montage d'images portent l'attribut
-> `[<Trait("Platform", "Windows")>]`. Sur les autres systèmes, `pipeline.ps1` les exclut avec
+> **Tests dépendants de Windows** : `[<Trait("Platform", "Windows")>]` est réservé aux
+> dépendances Windows irréductibles. Sur les autres systèmes, `pipeline.ps1` les exclut avec
 > `--filter-not-trait "Platform=Windows"` ; sous Windows, toute la suite est exécutée.
+>
+> Il n'en reste que **4**, tous justifiés dans le code :
+> - `RegistryAuthTests` (3) : le helper de credentials est un artefact Windows
+>   (lanceur `diplo-cred-helper.cmd`, déchiffrement DPAPI dans le script) ;
+> - `VolumeIntegrationTests` (1) : named pipe Windows, sans équivalent Unix.
+>
+> Tout le reste doit être portable : chemins construits avec `Path.Combine` /
+> `Path.GetPathRoot` plutôt qu'en dur, exécution via l'interpréteur de la plateforme
+> (`sh -c` ou `cmd.exe /c`), casse respectée dans les assertions. La racine des
+> données partagées passe par `AppPaths` (`src/DiploWalker.Abstractions/AppPaths.fs`)
+> et vaut `%ProgramData%\Diplo` sous Windows, `$XDG_DATA_HOME/Diplo` ailleurs ; elle est
+> redirigée vers un répertoire temporaire pour tous les projets de test via
+> `tests/TestDataRoot.fs` (fixture d'assembly xUnit).
 
 ## Environnement opencode
 

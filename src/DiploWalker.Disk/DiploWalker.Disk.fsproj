@@ -28,4 +28,8 @@
     <PackageReference Include="Serilog" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+  </ItemGroup>
+
 </Project>

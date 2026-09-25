@@ -236,7 +236,6 @@ module SuccessPathTests =
         output.Successes |> should not' (be Empty)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``run-cni-plugin en succÃ¨s retourne 0 et affiche l'interface`` () =
         let output = MockOutputPort()
 
@@ -266,10 +265,10 @@ module SuccessPathTests =
             run
                 (RunCniPluginCommand(output, clients))
                 (RunCniPluginSettings(
-                    PluginPath = "C:\\plugins\\x.exe",
+                    PluginPath = Path.Combine(Path.GetPathRoot(Path.GetTempPath()), "plugins", "x"),
                     CniCommand = "ADD",
                     ContainerId = "c",
-                    NetnsPath = "C:\\ns\\1"
+                    NetnsPath = "/proc/1/ns/net"
                 ))
 
         code |> should equal 0
@@ -278,7 +277,6 @@ module SuccessPathTests =
         output.Lines |> should contain (sprintf "  IPv4      : %s" "10.0.0.2")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``run-cni-plugin en Ã©chec retourne 1 et Ã©crit l'erreur`` () =
         let output = MockOutputPort()
 
@@ -308,10 +306,10 @@ module SuccessPathTests =
             run
                 (RunCniPluginCommand(output, clients))
                 (RunCniPluginSettings(
-                    PluginPath = "C:\\plugins\\x.exe",
+                    PluginPath = Path.Combine(Path.GetPathRoot(Path.GetTempPath()), "plugins", "x"),
                     CniCommand = "ADD",
                     ContainerId = "c",
-                    NetnsPath = "C:\\ns\\1"
+                    NetnsPath = "/proc/1/ns/net"
                 ))
 
         code |> should equal 1

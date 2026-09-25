@@ -3,6 +3,7 @@
 open System
 open System.IO
 open Serilog
+open DiploWalker.Abstractions
 
 /// Volume montÃ© pour un conteneur : chemin hÃ´te Ã  bind-mounter dans le
 /// conteneur (`ctr --mount type=bind,src=...`) et action de libÃ©ration.
@@ -32,12 +33,7 @@ type IDiskMounter =
 ///    fichier via le pilote maison (aucune conversion, aucun VHD).
 module DiskMounter =
 
-    let stagingRoot () =
-        let baseDir =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Diplo", "volumes")
-
-        Directory.CreateDirectory baseDir |> ignore
-        baseDir
+    let stagingRoot () = AppPaths.dataDir "volumes"
 
     /// Supprime les dossiers de staging orphelins (GUID) plus anciens que
     /// `maxAge`. Un staging est orphelin quand le service a crashÃ© entre

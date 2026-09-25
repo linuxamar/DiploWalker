@@ -18,10 +18,9 @@ module FsImageTests =
             TestImage.cleanupDir root
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``extract recupere les fichiers et les repertoires de l'image`` () =
         run (fun root img ->
-            TestImage.createFat img [ "hello.txt", "Bonjour Diplo"; @"dossier\sub.txt", "sous" ]
+            TestImage.createFat img [ "hello.txt", "Bonjour Diplo"; "dossier/sub.txt", "sous" ]
             let staging = Path.Combine(root, "staging")
             let n = FsImage.extract img staging false |> Result.defaultWith failwith
             n |> should equal 2
@@ -60,10 +59,9 @@ module FsImageTests =
             File.Exists(Path.Combine(re, "b.txt")) |> should equal true)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``writeBack vide la corbeille des repertoires supprimes du staging`` () =
         run (fun root img ->
-            TestImage.createFat img [ @"dossier\a.txt", "a" ]
+            TestImage.createFat img [ "dossier/a.txt", "a" ]
             let staging = Path.Combine(root, "staging")
             FsImage.extract img staging false |> Result.defaultWith failwith |> ignore
             Directory.Delete(Path.Combine(staging, "dossier"), true)
@@ -101,7 +99,7 @@ module FsImageTests =
 
     let private sourceContents =
         [ "fichier.txt", "contenu du fichier"
-          @"sous\dossier\fichier2.txt", "deuxieme fichier" ]
+          "sous/dossier/fichier2.txt", "deuxieme fichier" ]
 
     let private writeSourceDir (src: string) =
         for (rel, content) in sourceContents do
@@ -113,7 +111,6 @@ module FsImageTests =
             File.WriteAllText(Path.Combine(src, rel), content)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``create genere un fichier VHD existant et lisible`` () =
         runCreate (fun _ src dest ->
             writeSourceDir src
@@ -130,7 +127,6 @@ module FsImageTests =
             |> should equal "deuxieme fichier")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``create genere un fichier VHDX et lisible`` () =
         runCreate (fun _ src dest ->
             let destVhdx = Path.ChangeExtension(dest, ".vhdx")
@@ -145,7 +141,6 @@ module FsImageTests =
             |> should equal "contenu du fichier")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``create genere un fichier VMDK et lisible`` () =
         runCreate (fun _ src dest ->
             let destVmdk = Path.ChangeExtension(dest, ".vmdk")
@@ -160,7 +155,6 @@ module FsImageTests =
             |> should equal "contenu du fichier")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``create genere un fichier VDI et lisible`` () =
         runCreate (fun _ src dest ->
             let destVdi = Path.ChangeExtension(dest, ".vdi")
@@ -175,7 +169,6 @@ module FsImageTests =
             |> should equal "contenu du fichier")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``create genere un fichier Raw et lisible`` () =
         runCreate (fun _ src dest ->
             let destRaw = Path.ChangeExtension(dest, ".img")
@@ -190,7 +183,6 @@ module FsImageTests =
             |> should equal "contenu du fichier")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``create genere un fichier ISO9660 et lisible`` () =
         runCreate (fun _ src dest ->
             let destIso = Path.ChangeExtension(dest, ".iso")
@@ -205,7 +197,7 @@ module FsImageTests =
             File.ReadAllText(Path.Combine(re, "FICHIER.TXT"))
             |> should equal "contenu du fichier"
 
-            File.ReadAllText(Path.Combine(re, "sous", "dossier", "FICHIER2.TXT"))
+            File.ReadAllText(Path.Combine(re, "SOUS", "DOSSIER", "FICHIER2.TXT"))
             |> should equal "deuxieme fichier")
 
     [<Fact>]
@@ -231,7 +223,6 @@ module FsImageTests =
             |> function Error _ -> () | Ok p -> failwithf "Expected Error but got Ok %s" p)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``create cree le repertoire parent du fichier de destination`` () =
         runCreate (fun _ src dest ->
             let nestedDest =

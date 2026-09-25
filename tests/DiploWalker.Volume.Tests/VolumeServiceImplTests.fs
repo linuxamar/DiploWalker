@@ -387,14 +387,13 @@ module VolumeServiceImplTests =
         ex.InnerException.Message |> should haveSubstring "Le chemin cible"
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``MountVolume avec chemin non autorise lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
 
         let req =
             { Id = "vol123"
-              TargetPath = @"C:\Windows\System32\evil"
+              TargetPath = Path.Combine(Path.GetPathRoot(Path.GetTempPath()), "system32", "evil")
               Options = Dictionary<string, string>() }
 
         let ex =

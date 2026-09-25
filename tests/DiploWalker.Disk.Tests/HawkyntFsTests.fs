@@ -105,10 +105,9 @@ module HawkyntFsTests =
             File.ReadAllText(Path.Combine(re, "ajout.txt")) |> should equal "ajout")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``FsImage extract/writeBack round-trip FAT est coherent`` () =
         run (fun root img ->
-            TestImage.createFat img [ "a.txt", "alpha"; @"d\b.txt", "beta" ]
+            TestImage.createFat img [ "a.txt", "alpha"; "d/b.txt", "beta" ]
             let staging = Path.Combine(root, "staging")
             let n1 = FsImage.extract img staging false |> Result.defaultWith failwith
             n1 |> should equal 2

@@ -29,7 +29,6 @@ module DiskMounterTests =
             vol.Dispose())
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``mount sur une image expose son contenu et reecrit a la liberation`` () =
         run (fun root img ->
             TestImage.createFat img [ "hello.txt", "v1" ]
@@ -42,7 +41,6 @@ module DiskMounterTests =
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2")
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``mount en lecture seule ne reecrit pas l'image a la liberation`` () =
         run (fun root img ->
             TestImage.createFat img [ "hello.txt", "v1" ]
@@ -88,7 +86,6 @@ module DiskMounterTests =
             Directory.Exists src |> should equal true)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``rehydrate restaure le write-back sans re-extraire l'image`` () =
         run (fun root img ->
             TestImage.createFat img [ "hello.txt", "v1" ]
@@ -117,7 +114,6 @@ module DiskMounterTests =
             Directory.Exists src |> should equal true)
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``rehydrate d'un staging disparu est sans effet`` () =
         run (fun root img ->
             TestImage.createFat img [ "hello.txt", "v1" ]
@@ -155,7 +151,6 @@ module DiskMounterTests =
     // â”€â”€ pruneStaleStaging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``pruneStaleStaging supprime les dossiers orphelins anciens`` () =
         let staging = DiskMounter.stagingRoot ()
 
@@ -176,7 +171,6 @@ module DiskMounterTests =
                     with _ -> ()
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``pruneStaleStaging conserve les dossiers recents`` () =
         let staging = DiskMounter.stagingRoot ()
 
@@ -194,7 +188,6 @@ module DiskMounterTests =
                     with _ -> ()
 
     [<Fact>]
-    [<Trait("Platform", "Windows")>]
     let ``pruneStaleStaging ne supprime pas les dossiers non-GUID`` () =
         let staging = DiskMounter.stagingRoot ()
 
