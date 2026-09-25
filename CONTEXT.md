@@ -13,7 +13,7 @@ MÃ©moire de travail de session (Ã  rÃ©Ã©crire Ã  chaque session). Les 
 
 - `dev` et `main` sont au mÃªme commit (`87c45a2`), tout est poussÃ© : **0 commit Ã  promouvoir**.
 - Historique de promotion : `main` porte un commit de fusion par campagne, et `dev` est ensuite recalÃ© dessus en fast-forward â d'oÃ¹ les nombreux commits de fusion accumulation sur `main`. Ne pas y lire du travail perdu : `git diff dev main` est lindicateur fiable, pas `rev-list --count`.
-- L'Ã©cart de contenu entre `main` et `dev` Ã  la promotion venousait de `Directory.Packages.props` : main garde l'entrÃ©e `TextMateSharp.Grammars` 2.0.4, qu'aucun `.fsproj` ne rÃ©fÃ©rence (orpheline, probablement laissÃ©e par la campagne Ã©diteur Compose/YAML). Ã confirmer avant de la retirer.
+- L'Ã©cart de contenu entre `main` et `dev` Ã  la promotion venait de `Directory.Packages.props` : main Ã©pinglait `TextMateSharp.Grammars` 2.0.4 alors qu'aucun `PackageReference` ne le demande â€” `MainWindow.axaml.fs` l'utilise via `AvaloniaEdit.TextMate`, qui l'amÃ¨ne en transitif. EntrÃ©e retirÃ©e : le code compile et les 173 tests GUI passent sur la 2.0.3 transitive.
 
 ## PortabilitÃ© Linux (livrÃ© et promu)
 
@@ -30,7 +30,6 @@ MÃ©moire de travail de session (Ã  rÃ©Ã©crire Ã  chaque session). Les 
 ## Reste Ã  faire
 
 - **Test named pipe** : `VolumeIntegrationTests.CreateVolume via named pipe fonctionne de bout en bout` reste taguÃ© Windows. Il exerce `ListenNamedPipe` / `NamedPipeClientStream`, un transport que la production n'utilise que sous Windows ; le porter supposerait un socket de domaine Unix que le code n'exerce pas. DÃ©cision Ã  prendre : garder ce test de fonctionnalitÃ© Windows, ou ajouter un Ã©quivalent `ListenUnixSocket` Ã  but de couverture.
-- **EntrÃ©e `TextMateSharp.Grammars`** dans `Directory.Packages.props` : orpheline sur `main`, Ã  confirmer ou retirer.
 - **PrÃ©requis `pwsh`** : le dÃ©ploiement cible Windows Server (prÃ©requis du `README.md`), oÃ¹ `powershell` 5.1 est toujours prÃ©sent et `ensureHelperRuntime` est sans effet. `pwsh` ne concerne que les hÃ´tes Linux (dÃ©veloppement, CI) ; ne pas l'ajouter aux prÃ©requis d'installation Windows.
 - **Mojibake** : `CONTEXT.md`, `SECURITY.md` et les `.fs` contiennent du texte doublement encodÃ© (UTF-8 relu en Latin-1). Conserver la convention existante dans les Ã©ditions ciblÃ©es plutÃ´t que de tout rÃ©encoder. Un script de rÃ©Ã©criture de ce fichier applique le mÃªme doublement au texte rÃ©digÃ© : c'est ainsi que le fichier reste homogÃ¨ne.
 
