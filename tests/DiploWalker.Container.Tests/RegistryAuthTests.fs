@@ -109,6 +109,34 @@ module RegistryAuthTests =
         RegistryAuth.normalizeRegistryHost "http://reg.example.com"
         |> should equal "https://reg.example.com"
 
+    [<Fact>]
+    let ``tryFindOnPath trouve un executable present dans le PATH`` () =
+        // Le lanceur Unix du helper execute pwsh : il doit etre trouvable.
+        RegistryAuth.tryFindOnPath (if OperatingSystem.IsWindows() then "cmd" else "pwsh")
+        |> Option.isSome
+        |> should equal true
+
+    [<Fact>]
+    let ``tryFindOnPath ignore un nom absent du PATH`` () =
+        RegistryAuth.tryFindOnPath "diplo-outil-inexistant-9f2c" |> should equal None
+
+    [<Fact>]
+    let ``tryFindOnPath ignore les entrees vides du PATH`` () =
+        // Une entree vide vaut "." pour un shell POSIX ; on l'ecarte plutot,
+        // resoudre le helper depuis le repertoire courant serait une fuite.
+        // Le nom cherche doit rester trouvable malgre les entrees vides.
+        let saved = Environment.GetEnvironmentVariable "PATH"
+
+        try
+            Environment.SetEnvironmentVariable("PATH", "::" + saved + "::")
+
+            RegistryAuth.tryFindOnPath
+                (if OperatingSystem.IsWindows() then "cmd" else "pwsh")
+            |> Option.isSome
+            |> should equal true
+        finally
+            Environment.SetEnvironmentVariable("PATH", saved)
+
     // â”€â”€ prepareHostsDir / ensureHelper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [<Fact>]

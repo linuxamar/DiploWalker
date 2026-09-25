@@ -6,6 +6,7 @@ open System.Security.AccessControl
 open System.Security.Cryptography
 open System.Security.Principal
 open System.Text.Json
+open Grpc.Core
 open Serilog
 open DiploWalker.Abstractions
 
@@ -321,6 +322,58 @@ try {
     /// chemin figÃ© dans le lanceur.
     let ensureHelper () : string = writeHelperTo (helperDir ()) "" ""
 
+    /// Recherche un exÃ©cutable dans le PATH sans le lancer. Sous Unix, un
+    /// fichier sans bit d'exÃ©cution est ignorÃ© : le shell refuserait de
+    /// l'invoquer, et PATH peut contenir des rÃ©pertoires sans accÃ¨s.
+    let tryFindOnPath (name: string) : string option =
+        let isUsable (path: string) =
+            if not (File.Exists path) then
+                false
+            elif OperatingSystem.IsWindows() then
+                true
+            else
+                try
+                    // Le shell exige le bit d'exÃ©cution pour au moins un
+                    // porteur : on suit cette rÃ¨gle plutÃ¶t que root uniquement.
+                    let anyExecute =
+                        UnixFileMode.UserExecute
+                        ||| UnixFileMode.GroupExecute
+                        ||| UnixFileMode.OtherExecute
+
+                    (File.GetUnixFileMode path &&& anyExecute) <> UnixFileMode.None
+                with _ ->
+                    false
+
+        match Environment.GetEnvironmentVariable "PATH" with
+        | null
+        | "" ->
+            None
+        | path ->
+            path.Split(Path.PathSeparator)
+            |> Seq.filter (fun dir -> not (String.IsNullOrWhiteSpace dir))
+            |> Seq.map (fun dir -> Path.Combine(dir, name))
+            |> Seq.tryFind isUsable
+
+    /// Le helper de credentials est un script PowerShell : `powershell` sous
+    /// Windows (toujours prÃ©sent), `pwsh` ailleurs. Sans cet interprÃ©teur, le
+    /// lanceur installÃ© par [`writeHelperTo`](writeHelperTo) echoue et
+    /// containerd ne remonte qu'un refus d'authentification opaque : on vÃ©rifie
+    /// donc la prÃ©sence de l'exÃ©cutable avant de construire le hosts-dir.
+    let ensureHelperRuntime () =
+        if not (OperatingSystem.IsWindows()) then
+            match tryFindOnPath "pwsh" with
+            | Some _ ->
+                ()
+            | None ->
+                raise (
+                    RpcException(
+                        Status(
+                            StatusCode.FailedPrecondition,
+                            "Les registres authentifiÃ©s exigent PowerShell 7 (pwsh) sur cette plateforme : le helper de credentials est un script PowerShell exÃ©cutÃ© par containerd. Installez-le (dnf install powershell, apt install powershell ou snap install powershell --classic) puis rÃ©essayez."
+                        )
+                    )
+                )
+
     /// Normalise une chaÃ®ne de registre en URL de serveur utilisable comme clÃ©
     /// hosts.toml. docker.io est mappÃ© sur son endpoint canonique. Retourne ""
     /// si la chaÃ®ne n'est pas un hÃ´te exploitable (ex. bibliothÃ¨que locale).
@@ -354,6 +407,8 @@ try {
         | "" ->
             None
         | serverUrl ->
+            ensureHelperRuntime ()
+
             let root =
                 Path.Combine(Path.GetTempPath(), "diplo-hosts-" + Guid.NewGuid().ToString("N"))
 
@@ -385,6 +440,8 @@ try {
             | sep when sep <= 0 || sep = authArg.Length - 1 ->
                 None
             | sep ->
+                ensureHelperRuntime ()
+
                 let username = authArg.Substring(0, sep)
                 let password = authArg.Substring(sep + 1)
                 let root = Path.Combine(Path.GetTempPath(), "diplo-hosts-" + Guid.NewGuid().ToString("N"))
