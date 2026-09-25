@@ -315,6 +315,7 @@ module SecurityValidationTests =
         validatePath "data/file.txt" "/tmp" "test"
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``validatePath qui sort du rÃ©pertoire de base lÃ¨ve une exception`` () =
         let baseDir =
             IO.Path.Combine(IO.Path.GetTempPath(), "diplo-test-" + Guid.NewGuid().ToString("N"))
@@ -352,6 +353,7 @@ module SecurityValidationTests =
         Assert.Throws<RpcException>(fun () -> validateCniPluginPath @"C:\malicious\path\plugin.exe" |> ignore)
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``validateCniPluginPath avec opt cni bin est valide`` () =
         let path = @"C:\opt\cni\bin\bridge.exe"
         let result = validateCniPluginPath path
@@ -445,10 +447,12 @@ module SecurityValidationTests =
     // â”€â”€ validateFilePath (fichiers de configuration compose) â”€â”€â”€â”€â”€â”€â”€â”€
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``validateFilePath accepte un chemin absolu yaml`` () =
         validateFilePath @"C:\stack\docker-compose.yaml" "Le fichier"
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``validateFilePath accepte l'extension yml`` () =
         validateFilePath @"C:\stack\compose.yml" "Le fichier"
 

@@ -55,9 +55,9 @@
     <NuGetAuditMode>all</NuGetAuditMode>
   </PropertyGroup>
 
-  <PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <!--
-      Strong-name signing : toutes les assemblies Diplo sont signÃ©es avec la clÃ© eng/DiploWalker.snk.
+      Strong-name signing : sous Windows, toutes les assemblies Diplo sont signées avec la clé eng/DiploWalker.snk.
     -->
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)eng\DiploWalker.snk</AssemblyOriginatorKeyFile>

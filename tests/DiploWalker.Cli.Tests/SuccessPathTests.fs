@@ -236,6 +236,7 @@ module SuccessPathTests =
         output.Successes |> should not' (be Empty)
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``run-cni-plugin en succÃ¨s retourne 0 et affiche l'interface`` () =
         let output = MockOutputPort()
 
@@ -277,6 +278,7 @@ module SuccessPathTests =
         output.Lines |> should contain (sprintf "  IPv4      : %s" "10.0.0.2")
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``run-cni-plugin en Ã©chec retourne 1 et Ã©crit l'erreur`` () =
         let output = MockOutputPort()
 

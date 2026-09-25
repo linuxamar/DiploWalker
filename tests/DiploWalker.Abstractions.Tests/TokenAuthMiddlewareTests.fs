@@ -84,6 +84,7 @@ module TokenAuthMiddlewareTests =
             ctx.Response.StatusCode |> should equal 401)
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``middleware avec token correct laisse passer la requete`` () =
         withTempPath (fun () ->
             let token = generateToken ()
@@ -99,6 +100,7 @@ module TokenAuthMiddlewareTests =
                 ctx.Response.StatusCode |> should equal 200))
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``middleware sans header Authorization retourne 401`` () =
         withTempPath (fun () ->
             let token = generateToken ()
@@ -113,6 +115,7 @@ module TokenAuthMiddlewareTests =
                 ctx.Response.StatusCode |> should equal 401))
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``middleware avec mauvais token retourne 401`` () =
         withTempPath (fun () ->
             let token = generateToken ()
@@ -129,6 +132,7 @@ module TokenAuthMiddlewareTests =
                 ctx.Response.StatusCode |> should equal 401))
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``middleware avec format Authorization invalide retourne 401`` () =
         withTempPath (fun () ->
             let token = generateToken ()
@@ -147,6 +151,7 @@ module TokenAuthMiddlewareTests =
                 ctx.Response.StatusCode |> should equal 401))
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``middleware avec header vide retourne 401`` () =
         withTempPath (fun () ->
             let token = generateToken ()

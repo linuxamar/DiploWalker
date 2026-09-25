@@ -174,6 +174,7 @@ module Qcow2Tests =
             mid |> Array.forall ((=) 0x5Auy) |> should equal true)
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``extract lit une image qcow2 reelle`` () =
         run (fun root img ->
             TestImage.createQcow2 img [ "hello.txt", "Bonjour"; @"dossier\sub.txt", "sous" ]
@@ -213,6 +214,7 @@ module Qcow2Tests =
             File.Exists(Path.Combine(re, "b.txt")) |> should equal true)
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``mount d'une image qcow2 reecrit a la liberation`` () =
         run (fun root img ->
             TestImage.createQcow2 img [ "hello.txt", "v1" ]
@@ -225,6 +227,7 @@ module Qcow2Tests =
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2")
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``mount d'une image qcow2 en lecture seule ne reecrit pas a la liberation`` () =
         run (fun root img ->
             TestImage.createQcow2 img [ "hello.txt", "v1" ]
@@ -262,6 +265,7 @@ module Qcow2Tests =
     // â”€â”€ refus et limites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``une image qcow2 avec fichier de sauvegarde est refusee`` () =
         run (fun root img ->
             TestImage.createQcow2 img []
@@ -270,6 +274,7 @@ module Qcow2Tests =
             ex.Message |> should haveSubstring "fichier de sauvegarde")
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``une image qcow2 chiffree est refusee`` () =
         run (fun root img ->
             TestImage.createQcow2 img []
@@ -278,6 +283,7 @@ module Qcow2Tests =
             ex.Message |> should haveSubstring "chiffrÃ©es")
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``une image qcow2 v3 avec fichier de donnees externe est refusee`` () =
         run (fun root img ->
             TestImage.createQcow2 img []

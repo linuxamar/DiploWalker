@@ -107,6 +107,11 @@ dotnet build DiploWalker.slnx                       # Build complÃ¨te
 ```
 
 > **Attention** : `dotnet test --nologo` casse la dÃ©couverte de tests avec le runner MTP (0 test exÃ©cutÃ©, code de sortie 5). Ne pas utiliser `--nologo`.
+>
+> **Tests dépendants de Windows** : les tests qui s'appuient sur `cmd.exe`, PowerShell,
+> `C:\ProgramData`, les tubes nommés ou le montage d'images portent l'attribut
+> `[<Trait("Platform", "Windows")>]`. Sur les autres systèmes, `pipeline.ps1` les exclut avec
+> `--filter-not-trait "Platform=Windows"` ; sous Windows, toute la suite est exécutée.
 
 ## Environnement opencode
 

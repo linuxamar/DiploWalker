@@ -148,6 +148,7 @@ module VolumeIntegrationTests =
             stopApp app dataRoot
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``CreateVolume via named pipe fonctionne de bout en bout`` () =
         let pipeName = "diplo-volume-test-" + Guid.NewGuid().ToString("N")
         let app, dataRoot = startPipeApp pipeName

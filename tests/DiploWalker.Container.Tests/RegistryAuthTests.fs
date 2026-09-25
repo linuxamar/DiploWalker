@@ -116,6 +116,7 @@ module RegistryAuthTests =
         RegistryAuth.prepareHostsDir "localvolume" |> should equal None
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``prepareHostsDir genere hosts.toml deleguant au helper`` () =
         match RegistryAuth.prepareHostsDir "myregistry.azurecr.io" with
         | None -> failwith "prepareHostsDir aurait dÃ» rÃ©ussir"
@@ -135,6 +136,7 @@ module RegistryAuthTests =
                     ()
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``prepareHostsDir utilise l'endpoint canonique de docker.io comme repertoire`` () =
         match RegistryAuth.prepareHostsDir "docker.io" with
         | None -> failwith "prepareHostsDir aurait dÃ» rÃ©ussir"
@@ -149,6 +151,7 @@ module RegistryAuthTests =
                     ()
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``ensureHelper est idempotent (meme contenu apres double appel)`` () =
         let cmdPath1 = RegistryAuth.ensureHelper ()
         let ps1Path = Path.Combine(Path.GetDirectoryName cmdPath1, "diplo-cred-helper.ps1")
@@ -209,6 +212,7 @@ module RegistryAuthTests =
                 ()
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``le helper repond Username et Secret pour le registre demande`` () =
         withHelperState (fun root statePath ->
             // Guillemets et backslash dans l'utilisateur : vÃ©rifie l'Ã©chappement JSON.
@@ -226,6 +230,7 @@ module RegistryAuthTests =
             json.GetProperty("Secret").GetString() |> should equal "s3cret!")
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``le helper echoue sans sortie pour un registre inconnu`` () =
         withHelperState (fun root statePath ->
             RegistryAuth.add statePath "known.example.com" "user" "pass"
@@ -236,6 +241,7 @@ module RegistryAuthTests =
             stdout.Trim() |> should equal "")
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``le helper repond pour docker.io via son endpoint canonique`` () =
         withHelperState (fun root statePath ->
             RegistryAuth.add statePath "docker.io" "hubuser" "hubpass"

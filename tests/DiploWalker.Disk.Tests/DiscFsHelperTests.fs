@@ -26,6 +26,7 @@ module DiscFsHelperTests =
         result.StartsWith(Path.DirectorySeparatorChar.ToString()) |> should equal false
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``toRealRel normalise les doubles slashes`` () =
         let result = DiscFsHelper.toRealRel "a//b///c"
         result.Contains "//" |> should equal false
@@ -89,6 +90,7 @@ module DiscFsHelperTests =
             TestImage.cleanupDir root
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``realFrom rejette un chemin enracine Windows`` () =
         let root = TestImage.createTempDir ()
 
@@ -99,6 +101,7 @@ module DiscFsHelperTests =
             TestImage.cleanupDir root
 
     [<Fact>]
+    [<Trait("Platform", "Windows")>]
     let ``realFrom rejette un chemin avec drive letter Windows`` () =
         let root = TestImage.createTempDir ()
 
