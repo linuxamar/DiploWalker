@@ -112,10 +112,12 @@ dotnet build DiploWalker.slnx                       # Build complÃ¨te
 > dépendances Windows irréductibles. Sur les autres systèmes, `pipeline.ps1` les exclut avec
 > `--filter-not-trait "Platform=Windows"` ; sous Windows, toute la suite est exécutée.
 >
-> Il n'en reste que **4**, tous justifiés dans le code :
-> - `RegistryAuthTests` (3) : le helper de credentials est un artefact Windows
->   (lanceur `diplo-cred-helper.cmd`, déchiffrement DPAPI dans le script) ;
-> - `VolumeIntegrationTests` (1) : named pipe Windows, sans équivalent Unix.
+> Il n'en reste qu'**un** : `VolumeIntegrationTests`, le named pipe Windows, sans
+> équivalent Unix. Le helper de credentials est portable : un même script PowerShell
+> déchiffre en DPAPI sous Windows et en AES-GCM ailleurs, via le lanceur installé dans
+> le répertoire de données (`.cmd` sous Windows, `sh` ailleurs) que containerd exécute
+> d'après `hosts.toml`. Sous Unix, PowerShell 7 (`pwsh`) doit être présent sur l'hôte,
+> et les tests du helper l'exécutent réellement.
 >
 > Tout le reste doit être portable : chemins construits avec `Path.Combine` /
 > `Path.GetPathRoot` plutôt qu'en dur, exécution via l'interpréteur de la plateforme

@@ -98,6 +98,8 @@ Les mots de passe de registres sont chiffrÃ©s au repos :
 
 Lors des opÃ©rations `pull`/`push` avec authentification, les identifiants sont rÃ©solus via **`hosts.toml`/credential helper** y compris en mode `--user` explicite : le mot de passe ne transite **jamais** par la ligne de commande (invisible dans la liste des processus).
 
+Le helper est un script PowerShell **unique** et portable, installÃ© dans `<racine>/cred-helper/` avec un lanceur adaptÃ© Ã  la plateforme (`diplo-cred-helper.cmd` sous Windows, `diplo-cred-helper` en `sh` ailleurs) â€” c'est ce lanceur que containerd exÃ©cute. Il se limite Ã  transmettre au script les chemins du fichier d'Ã©tat et de la clÃ©, puis le script dÃ©chiffre : DPAPI sous Windows, AES-GCM ailleurs. Sous Unix, le lanceur est posÃ© en `0755` et l'hÃ´te doit disposer de PowerShell 7 (`pwsh`). Ni l'Ã©tat ni la clÃ© ne transitent par la ligne de commande.
+
 ## Limites de conteneurs
 
 Les ressources des conteneurs (mÃ©moire, CPU, PID) sont transmises Ã  containerd via un spec OCI gÃ©nÃ©rÃ© dynamiquement. Les limites sont appliquÃ©es au niveau du kernel Windows :

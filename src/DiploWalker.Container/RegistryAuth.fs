@@ -38,7 +38,7 @@ module RegistryAuth =
     /// Fichier de clÃ© AES-GCM (hors Windows), sous la racine par utilisateur
     /// (`AppPaths.userRoot`) : `%LocalAppData%\Diplo\registry-key.bin` sous
     /// Windows, `$XDG_DATA_HOME/Diplo/registry-key.bin` ailleurs.
-    let private keyFile () = Path.Combine(AppPaths.userRoot (), "registry-key.bin")
+    let keyFile () = Path.Combine(AppPaths.userRoot (), "registry-key.bin")
 
     /// Charge ou crÃ©e la clÃ© par utilisateur. Sur les plateformes POSIX le fichier
     /// est crÃ©Ã© avec des droits 0600 ; sous Windows il hÃ©rite du profil utilisateur.
@@ -199,23 +199,53 @@ module RegistryAuth =
     /// requis car containerd exÃ©cute la valeur Â« auth Â» telle quelle.
     let helperDir () = AppPaths.dataDir "cred-helper"
 
+    /// Script PowerShell du helper de credentials. Portable : le dechiffrement
+    /// utilise DPAPI sous Windows et l AES-GCM (meme format que `protect`) ailleurs.
+    /// Les chemins du fichier d'etat et de la cle sont fournis par le lanceur via
+    /// l'environnement ; a defaut ils sont deduits de l'emplacement du script.
     let private helperScript =
         """$ErrorActionPreference = 'Stop'
 try {
-  Add-Type -AssemblyName System.Security | Out-Null
   $serverUrl = [Console]::In.ReadLine()
   if (-not $serverUrl) { exit 1 }
   $target = ([Uri]$serverUrl).Authority.ToLowerInvariant()
-  $statePath = Join-Path $env:ProgramData 'Diplo\registry-auth.json'
-  if (-not (Test-Path $statePath)) { exit 1 }
+
+  # Repertoire du helper : un niveau au-dessus pour un helper partage,
+  # le script lui-meme pour un helper jetable.
+  $base = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+  $statePath = $env:DIPLO_REGISTRY_AUTH_STATE
+  if (-not $statePath) { $statePath = [IO.Path]::GetFullPath([IO.Path]::Combine($base, '..', 'registry-auth.json')) }
+  if (-not [IO.File]::Exists($statePath)) { exit 1 }
+
   $list = Get-Content $statePath -Raw | ConvertFrom-Json
   foreach ($e in @($list)) {
     $r = ('' + $e.registry).ToLowerInvariant() -replace '^[a-z]+://', '' -replace '/.*$', ''
     if ($r -eq $target -or $target.EndsWith($r)) {
-      $bytes = [Convert]::FromBase64String($e.encryptedPassword)
-      $plain = [Text.Encoding]::UTF8.GetString(
-                 [Security.Cryptography.ProtectedData]::Unprotect(
-                   $bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser))
+      $blob = [Convert]::FromBase64String($e.encryptedPassword)
+      $plain = $null
+
+      # PlatformID existe sur .NET Framework (PowerShell 5.1) comme sur .NET
+      # Core/5+ (PowerShell 7) : seule alternative portable a $IsWindows.
+      if ([Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+        Add-Type -AssemblyName System.Security | Out-Null
+        $plain = [Text.Encoding]::UTF8.GetString(
+                   [Security.Cryptography.ProtectedData]::Unprotect(
+                     $blob, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser))
+      } else {
+        # AES-GCM, format de `protect` : base64(nonce | cipher | tag)
+        # avec nonce 12 octets et tag 16 octets.
+        $keyPath = $env:DIPLO_REGISTRY_KEY_FILE
+        if (-not $keyPath) { $keyPath = [IO.Path]::GetFullPath([IO.Path]::Combine($base, '..', 'registry-key.bin')) }
+        $key = [IO.File]::ReadAllBytes($keyPath)
+        $nonce = [byte[]]($blob[0..11])
+        $tag = [byte[]]($blob[($blob.Length - 16)..($blob.Length - 1)])
+        $cipher = [byte[]]($blob[12..($blob.Length - 17)])
+        $out = [byte[]]::new($cipher.Length)
+        $aes = [Security.Cryptography.AesGcm]::new($key, 16)
+        $aes.Decrypt($nonce, $cipher, $tag, $out)
+        $plain = [Text.Encoding]::UTF8.GetString($out)
+      }
+
       $obj = @{ Username = ('' + $e.username); Secret = $plain }
       [Console]::Out.Write(($obj | ConvertTo-Json -Compress))
       exit 0
@@ -224,16 +254,22 @@ try {
   exit 1
 } catch { exit 1 }"""
 
-    /// Texte du script PowerShell du helper. ExposÃ© en lecture pour les tests :
-    /// ceux-ci en instancient une copie avec le chemin du fichier d'Ã©tat
-    /// redirigÃ© vers un rÃ©pertoire temporaire, sans toucher au vrai
-    /// %ProgramData%\Diplo\registry-auth.json.
-    let helperScriptText () : string = helperScript
+    /// Nom du lanceur rÃ©fÃ©rencÃ© dans hosts.toml.
+    let private launcherName =
+        if OperatingSystem.IsWindows() then
+            "diplo-cred-helper.cmd"
+        else
+            "diplo-cred-helper"
 
-    /// Ã‰crit (idempotent) le shim .cmd + le script PowerShell du helper et
-    /// retourne le chemin du shim Ã  rÃ©fÃ©rencer depuis hosts.toml.
-    let ensureHelper () : string =
-        let dir = helperDir ()
+    /// Ã‰crit (idempotent) dans `dir` une copie du script PowerShell et un
+    /// lanceur de la plateforme, et retourne le chemin du lanceur.
+    ///
+    /// containerd exÃ©cute la valeur Â« auth Â» de hosts.toml telle quelle, sans
+    /// argument : le lanceur est donc indispensable. Il se contente de
+    /// transmettre les chemins du fichier d'Ã©tat et de la clÃ© de chiffrement,
+    /// puis d'exÃ©cuter le script. Sous Unix il doit Ãªtre exÃ©cutable (droits
+    /// 0755) et PowerShell 7 (`pwsh`) doit Ãªtre installÃ© sur l'hÃ´te.
+    let writeHelperTo (dir: string) (statePath: string) (keyPath: string) : string =
         Directory.CreateDirectory dir |> ignore
 
         let ps1Path = Path.Combine(dir, "diplo-cred-helper.ps1")
@@ -241,15 +277,49 @@ try {
         if not (File.Exists ps1Path) || (File.ReadAllText ps1Path) <> helperScript then
             File.WriteAllText(ps1Path, helperScript)
 
-        let cmdPath = Path.Combine(dir, "diplo-cred-helper.cmd")
+        // Chemin vide : le script retrouve le fichier par rapport a son propre
+        // emplacement (helper partage, pose dans <racine>/cred-helper).
+        let export (name: string) (value: string) =
+            if String.IsNullOrEmpty value then
+                ""
+            elif OperatingSystem.IsWindows() then
+                // `set "VAR=..."` : le chemin peut contenir des espaces.
+                sprintf "set \"%s=%s\"\r\n" name value
+            else
+                // Apostrophes : le chemin n'est pas interprete par le shell.
+                sprintf "export %s='%s'\n" name value
 
-        let shim =
-            "@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -File \"%~dp0diplo-cred-helper.ps1\" %*\r\n"
+        let exports =
+            export "DIPLO_REGISTRY_AUTH_STATE" statePath + export "DIPLO_REGISTRY_KEY_FILE" keyPath
 
-        if not (File.Exists cmdPath) || (File.ReadAllText cmdPath) <> shim then
-            File.WriteAllText(cmdPath, shim)
+        let launcher =
+            if OperatingSystem.IsWindows() then
+                sprintf
+                    "@echo off\r\n%spowershell -NoProfile -ExecutionPolicy Bypass -File \"%%~dp0diplo-cred-helper.ps1\" %%*\r\n"
+                    exports
+            else
+                sprintf
+                    "#!/bin/sh\n%sexec pwsh -NoProfile -File \"$(dirname \"$0\")/diplo-cred-helper.ps1\" \"$@\"\n"
+                    exports
 
-        cmdPath
+        let launcherPath = Path.Combine(dir, launcherName)
+
+        if not (File.Exists launcherPath) || (File.ReadAllText launcherPath) <> launcher then
+            File.WriteAllText(launcherPath, launcher)
+
+        if not (OperatingSystem.IsWindows()) then
+            File.SetUnixFileMode(
+                launcherPath,
+                UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute
+            )
+
+        launcherPath
+
+    /// Helper partagÃ©, installÃ© dans le rÃ©pertoire de donnÃ©es : le lanceur
+    /// retournÃ© est celui Ã  rÃ©fÃ©rencer depuis hosts.toml. Le script retrouve
+    /// l'Ã©tat et la clÃ© par rapport Ã  lui-mÃªme (`<racine>/cred-helper/..`), sans
+    /// chemin figÃ© dans le lanceur.
+    let ensureHelper () : string = writeHelperTo (helperDir ()) "" ""
 
     /// Normalise une chaÃ®ne de registre en URL de serveur utilisable comme clÃ©
     /// hosts.toml. docker.io est mappÃ© sur son endpoint canonique. Retourne ""
@@ -302,7 +372,8 @@ try {
     /// PrÃ©pare un hosts-dir temporaire pour des identifiants EXPLICITES
     /// (option --user, au format Â« utilisateur:secret Â») : H6 â€” les secrets ne
     /// transitent plus par argv. Les identifiants sont persistÃ©s dans un Ã©tat
-    /// jetable (DPAPI sous Windows) lu par un helper crÃ©Ã© dans le mÃªme dossier.
+    /// jetable (chiffrÃ© comme `RegistryAuth.protect`) lu par un helper crÃ©Ã©
+    /// dans le mÃªme dossier.
     /// Retourne None si l'argument n'est pas au format attendu.
     let prepareHostsDirForCredentials (registry: string) (authArg: string) : string option =
         match normalizeRegistryHost registry with
@@ -325,22 +396,10 @@ try {
                 let stateFile = Path.Combine(root, "registry-auth.json")
                 save stateFile [ { Registry = registry; Username = username; EncryptedPassword = protect password } ]
 
-                // Copie du script helper partagÃ© avec le fichier d'Ã©tat pointÃ©
-                // vers l'Ã©tat jetable (chaÃ®ne littÃ©rale PS entre apostrophes :
-                // les backslashes n'y sont pas Ã©chappÃ©s).
-                let helperPs1 = Path.Combine(root, "diplo-cred-helper.ps1")
-
-                let script =
-                    helperScript.Replace("'Diplo\\registry-auth.json'", sprintf "'%s'" stateFile)
-
-                File.WriteAllText(helperPs1, script)
-
-                let shim = Path.Combine(root, "diplo-cred-helper.cmd")
-
-                File.WriteAllText(
-                    shim,
-                    "@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -File \"%~dp0diplo-cred-helper.ps1\" %*\r\n"
-                )
+                // Helper jetable : copie du script et lanceur pointant sur
+                // l'etat de ce pull (le lanceur exporte les chemins, le script
+                // n'a donc pas besoin d'etre reecrit).
+                let shim = writeHelperTo root stateFile (keyFile ())
 
                 let toml =
                     sprintf "[host.\"%s\"]\ncapabilities = [\"pull\", \"resolve\"]\nauth = '%s'\n" serverUrl shim

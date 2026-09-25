@@ -127,7 +127,13 @@ module RegistryAuthTests =
                 toml |> shouldContain "[host.\"https://myregistry.azurecr.io\"]"
                 toml |> shouldContain "capabilities = [\"pull\", \"resolve\"]"
                 toml |> shouldContain "auth = '"
-                toml |> shouldContain "diplo-cred-helper.cmd"
+                // Lanceur de la plateforme : .cmd sous Windows, script sh ailleurs.
+                toml
+                |> shouldContain
+                    (if OperatingSystem.IsWindows() then
+                         "diplo-cred-helper.cmd"
+                     else
+                         "diplo-cred-helper")
             finally
                 try
                     Directory.Delete(root, true)
@@ -162,50 +168,28 @@ module RegistryAuthTests =
 
     // â”€â”€ Script du helper (protocole docker-credential) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //
-    // Le vrai script lit %ProgramData%\Diplo\registry-auth.json : les tests
-    // exÃ©cutent une copie dont ce chemin est redirigÃ© vers un rÃ©pertoire
-    // temporaire â€” jamais le fichier rÃ©el.
+    // Le vrai script lit le fichier d'Ã©tat et la clÃ© de chiffrement indiquÃ©s
+    // par le lanceur : les tests lancent un helper jetable produit par
+    // `RegistryAuth.writeHelperTo` et pointÃ© sur un Ã©tat temporaire, jamais sur
+    // le vrai fichier. Le lanceur de la plateforme est exÃ©cutÃ© tel quel, comme
+    // le ferait containerd d'aprÃ¨s `hosts.toml`.
+    //
+    // Le mÃªme script PowerShell sert sous les deux plateformes (DPAPI sous
+    // Windows, AES-GCM ailleurs) : nÃ©cessite PowerShell 7 (`pwsh`) dans le PATH
+    // sous Unix.
+    /// ExÃ©cute un lanceur dÃ©jÃ† installÃ© en lui envoyant l'URL du serveur sur
+    /// stdin (protocole docker-credential) et lit sa sortie standard.
+    let private runLauncher (launcher: string) (stdinLine: string option) =
+        if OperatingSystem.IsWindows() then
+            ProcessExec.runWithResult "cmd.exe" [ "/c"; launcher ] (Some 30000) stdinLine None
+        else
+            ProcessExec.runWithResult launcher [] (Some 30000) stdinLine None
 
-    /// ExÃ©cute une copie du script helper avec l'Ã©tat redirigÃ© vers root :
-    /// le script lit <root>\Diplo\registry-auth.json (structure ProgramData simulÃ©e).
-    let private runHelperScript (root: string) (stdinLine: string option) =
-        let scriptPath = Path.Combine(root, "helper-under-test.ps1")
+    let private runHelperScript (root: string) (statePath: string) (stdinLine: string option) =
+        let launcher =
+            RegistryAuth.writeHelperTo (Path.Combine(root, "helper")) statePath (RegistryAuth.keyFile ())
 
-        let redirected =
-            (RegistryAuth.helperScriptText ())
-                .Replace("$" + "env:ProgramData", sprintf "'%s'" root)
-
-        File.WriteAllText(scriptPath, redirected)
-
-        // PowerShell 7 est portable : installe par le MSI sous Windows
-        // (`pwsh.exe`), dans le PATH ailleurs. Le script du helper n'utilise
-        // que des cmdlets standard, il s'execute donc sur les deux systemes.
-        // Sous Windows on retombe sur `powershell` (5.1) si PowerShell 7 est
-        // absent du poste.
-        let pwsh7 = @"C:\Program Files\PowerShell\7\pwsh.exe"
-
-        let exe =
-            if OperatingSystem.IsWindows() && File.Exists pwsh7 then
-                pwsh7
-            elif OperatingSystem.IsWindows() then
-                if File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PowerShell", "7", "pwsh.exe")) then
-                    "pwsh"
-                else
-                    "powershell"
-            else
-                "pwsh"
-
-        ProcessExec.runWithResult
-            exe
-            [ "-NoProfile"
-              "-NoLogo"
-              "-ExecutionPolicy"
-              "Bypass"
-              "-File"
-              scriptPath ]
-            (Some 30000)
-            stdinLine
-            None
+        runLauncher launcher stdinLine
 
     /// PrÃ©pare la structure <racine>\Diplo\registry-auth.json attendue par le helper.
     let private withHelperState (test: string -> string -> unit) =
@@ -224,15 +208,12 @@ module RegistryAuthTests =
                 ()
 
     [<Fact>]
-    // Le helper est un artefact Windows : lanceur diplo-cred-helper.cmd et
-    // dechiffrement DPAPI (System.Security / ProtectedData) dans le script.
-    [<Trait("Platform", "Windows")>]
     let ``le helper repond Username et Secret pour le registre demande`` () =
         withHelperState (fun root statePath ->
             // Guillemets et backslash dans l'utilisateur : vÃ©rifie l'Ã©chappement JSON.
             RegistryAuth.add statePath "myregistry.azurecr.io" "us\"er\\x" "s3cret!"
 
-            let (code, stdout, _) = runHelperScript root (Some "https://myregistry.azurecr.io/v1/")
+            let (code, stdout, _) = runHelperScript root statePath (Some "https://myregistry.azurecr.io/v1/")
 
             code |> should equal 0
 
@@ -244,27 +225,21 @@ module RegistryAuthTests =
             json.GetProperty("Secret").GetString() |> should equal "s3cret!")
 
     [<Fact>]
-    // Le helper est un artefact Windows : lanceur diplo-cred-helper.cmd et
-    // dechiffrement DPAPI (System.Security / ProtectedData) dans le script.
-    [<Trait("Platform", "Windows")>]
     let ``le helper echoue sans sortie pour un registre inconnu`` () =
         withHelperState (fun root statePath ->
             RegistryAuth.add statePath "known.example.com" "user" "pass"
 
-            let (code, stdout, _) = runHelperScript root (Some "https://nothere.tld/v1/")
+            let (code, stdout, _) = runHelperScript root statePath (Some "https://nothere.tld/v1/")
 
             Assert.NotEqual(0, code)
             stdout.Trim() |> should equal "")
 
     [<Fact>]
-    // Le helper est un artefact Windows : lanceur diplo-cred-helper.cmd et
-    // dechiffrement DPAPI (System.Security / ProtectedData) dans le script.
-    [<Trait("Platform", "Windows")>]
     let ``le helper repond pour docker.io via son endpoint canonique`` () =
         withHelperState (fun root statePath ->
             RegistryAuth.add statePath "docker.io" "hubuser" "hubpass"
 
-            let (code, stdout, _) = runHelperScript root (Some "https://registry-1.docker.io/v1/")
+            let (code, stdout, _) = runHelperScript root statePath (Some "https://registry-1.docker.io/v1/")
 
             code |> should equal 0
 
@@ -272,4 +247,28 @@ module RegistryAuthTests =
 
             json.GetProperty("Username").GetString() |> should equal "hubuser"
             json.GetProperty("Secret").GetString() |> should equal "hubpass")
+
+    /// Helper partagÃ©, comme installÃ© par `ensureHelper` : ni le lanceur ni
+    /// l'environnement ne transportent de chemin, le script dÃ©couvre son fichier
+    /// d'Ã©tat et sa clÃ© de chiffrement par rapport Ã  son propre emplacement
+    /// (`<racine>/cred-helper/..`).
+    [<Fact>]
+    let ``le helper partage retrouve son etat et sa cle sans chemin fourni`` () =
+        withHelperState (fun root statePath ->
+            // Le helper partage vit dans <root>/cred-helper : son etat et sa
+            // cle sont donc directement sous <root> (le script les decouvre
+            // un niveau au-dessus), et non dans <root>/Diplo.
+            let sharedState = Path.Combine(root, "registry-auth.json")
+            File.Copy(RegistryAuth.keyFile (), Path.Combine(root, "registry-key.bin"), true)
+            RegistryAuth.add sharedState "shared.example.com" "shareduser" "sharedpass"
+
+            let launcher = RegistryAuth.writeHelperTo (Path.Combine(root, "cred-helper")) "" ""
+            let (code, stdout, _) = runLauncher launcher (Some "https://shared.example.com/v1/")
+
+            code |> should equal 0
+
+            let json = JsonSerializer.Deserialize<JsonElement>(json = stdout)
+
+            json.GetProperty("Username").GetString() |> should equal "shareduser"
+            json.GetProperty("Secret").GetString() |> should equal "sharedpass")
 
