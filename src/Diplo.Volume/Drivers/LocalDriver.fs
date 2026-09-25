@@ -62,14 +62,24 @@ type LocalVolumeDriver(dataRoot: string) =
     /// sous-répertoires et en écrasant les fichiers existants. Utilisé à la fois
     /// pour matérialiser un volume lors du montage et pour resynchroniser le
     /// montage vers le volume au démontage.
-    let rec copyDirectoryTree (source: string) (target: string) =
-        Directory.CreateDirectory(target) |> ignore
+    /// Les points de reparse (junctions, liens symboliques) sont ignorés : en
+    /// recopier le contenu pourrait créer des cycles ou dupliquer des données
+    /// hors du volume. Un ensemble `visited` garde la trace des répertoires déjà
+    /// copiés : toute boucle restante est interrompue sans récursion infinie.
+    let rec copyDirectoryTree (source: string) (target: string) (visited: System.Collections.Generic.HashSet<string>) =
+        if visited.Add(Path.GetFullPath source) then
+            Directory.CreateDirectory(target) |> ignore
 
-        for file in Directory.GetFiles(source) do
-            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), true)
+            for file in Directory.GetFiles(source) do
+                File.Copy(file, Path.Combine(target, Path.GetFileName(file)), true)
 
-        for subdir in Directory.GetDirectories(source) do
-            copyDirectoryTree subdir (Path.Combine(target, Path.GetFileName(subdir)))
+            for subdir in Directory.GetDirectories(source) do
+                let attrs = File.GetAttributes(subdir)
+
+                if (attrs &&& FileAttributes.ReparsePoint) <> enum 0 then
+                    () // junction ou lien symbolique : on ne recopie pas derrière
+                else
+                    copyDirectoryTree subdir (Path.Combine(target, Path.GetFileName(subdir))) visited
 
     member _.CreateVolume(name: string, driverOpts: Map<string, string>, labels: Map<string, string>) =
         let id = generateId ()
@@ -215,7 +225,7 @@ type LocalVolumeDriver(dataRoot: string) =
                 Directory.CreateDirectory(mountDir) |> ignore
 
                 if Directory.Exists(src) then
-                    copyDirectoryTree src mountDir
+                    copyDirectoryTree src mountDir (System.Collections.Generic.HashSet<string>())
 
                 (true, mountDir)
             with ex ->
@@ -245,7 +255,7 @@ type LocalVolumeDriver(dataRoot: string) =
                 // que le conteneur a écrit entre Mount et Unmount.
                 if Directory.Exists(src) then
                     try
-                        copyDirectoryTree mountDir src
+                        copyDirectoryTree mountDir src (System.Collections.Generic.HashSet<string>())
                     with ex ->
                         // Synchronisation échouée : conserver le montage pour ne
                         // pas perdre les données, et signaler l'échec.

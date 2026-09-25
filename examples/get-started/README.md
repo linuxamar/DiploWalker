@@ -19,11 +19,11 @@ conteneur déployé. Un script PowerShell automatisé est également fourni.
 L'installeur NSIS (`Diplo-Setup-1.0.0-x64.exe`) installe automatiquement :
 
 - **containerd** avec plugins CNI (réseau nat, bridge, overlay)
-- **Diplo.Container** — service gRPC port 5001 (Debug) / 6001 (Release)
-- **Diplo.Volume** — service gRPC port 5002 (Debug) / 6002 (Release)
-- **Diplo.Network** — service gRPC port 5003 (Debug) / 6003 (Release)
-- **Diplo.CLI** — ajouté au PATH système
-- **Diplo.GUI** — raccourci bureau et menu Démarrer
+- **DiploWalker.Container** — service gRPC port 5001 (Debug) / 6001 (Release)
+- **DiploWalker.Volume** — service gRPC port 5002 (Debug) / 6002 (Release)
+- **DiploWalker.Network** — service gRPC port 5003 (Debug) / 6003 (Release)
+- **DiploWalker.CLI** — ajouté au PATH système
+- **DiploWalker.GUI** — raccourci bureau et menu Démarrer
 - **Certificats PKI** — racine et intermédiaires dans les magasins Windows
 
 ``powershell
@@ -45,9 +45,9 @@ Sortie attendue :
 
 ``
 === Statut des services Diplo ===
-  Diplo.Container     [Running     ] port 5001 (Debug) / 6001 (Release)
-  Diplo.Volume        [Running     ] port 5002 (Debug) / 6002 (Release)
-  Diplo.Network       [Running     ] port 5003 (Debug) / 6003 (Release)
+  DiploWalker.Container     [Running     ] port 5001 (Debug) / 6001 (Release)
+  DiploWalker.Volume        [Running     ] port 5002 (Debug) / 6002 (Release)
+  DiploWalker.Network       [Running     ] port 5003 (Debug) / 6003 (Release)
 ``
 
 ### Étape 3 — Démarrer les services
@@ -56,9 +56,9 @@ Les services sont installés en démarrage automatique. Si besoin :
 
 ``powershell
 # Démarrer chaque service
-sc.exe start "Diplo.Container"
-sc.exe start "Diplo.Volume"
-sc.exe start "Diplo.Network"
+sc.exe start "DiploWalker.Container"
+sc.exe start "DiploWalker.Volume"
+sc.exe start "DiploWalker.Network"
 ``
 
 ### Étape 4 — Télécharger l'image ServerCode
@@ -141,7 +141,7 @@ Le script effectue :
 
 ## Interface graphique
 
-Lancez `Diplo.Gui.exe` pour accéder à l'interface graphique Avalonia qui
+Lancez `DiploWalker.Gui.exe` pour accéder à l'interface graphique Avalonia qui
 propose :
 
 - Liste des conteneurs avec état en temps réel
@@ -156,7 +156,7 @@ propose :
 
 #### « L'installation nécessite les droits administrateur »
 
-L'installeur et `Diplo.Installer.exe` nécessitent les droits administrateur
+L'installeur et `DiploWalker.Installer.exe` nécessitent les droits administrateur
 pour créer les services Windows et modifier le PATH.
 
 ``powershell
@@ -205,17 +205,17 @@ Get-Content "$env:ProgramFiles\Diplo\logs\diplo-volume-*.log" -Tail 50
 Get-Content "$env:ProgramFiles\Diplo\logs\diplo-network-*.log" -Tail 50
 
 # 3. Vérifier les logs Windows Event Log
-Get-EventLog -LogName "Diplo.Container" -Newest 20 -EntryType Error
-Get-EventLog -LogName "Diplo.Volume" -Newest 20 -EntryType Error
-Get-EventLog -LogName "Diplo.Network" -Newest 20 -EntryType Error
+Get-EventLog -LogName "DiploWalker.Container" -Newest 20 -EntryType Error
+Get-EventLog -LogName "DiploWalker.Volume" -Newest 20 -EntryType Error
+Get-EventLog -LogName "DiploWalker.Network" -Newest 20 -EntryType Error
 
 # 4. Vérifier que containerd est installé
 & "$env:ProgramFiles\Diplo\containerd\containerd.exe" --version
 
 # 5. Redémarrer un service
-sc.exe stop "Diplo.Container"
+sc.exe stop "DiploWalker.Container"
 Start-Sleep -Seconds 3
-sc.exe start "Diplo.Container"
+sc.exe start "DiploWalker.Container"
 ``
 
 #### « Le service a échoué au démarrage » (Erreur 1053/1067)
@@ -276,7 +276,7 @@ La validation de sécurité impose que les connexions gRPC pointent vers
 
 ``powershell
 # Vérifier la configuration de connexion
-Get-Content "$env:ProgramFiles\Diplo\Diplo.Container\appsettings.json"
+Get-Content "$env:ProgramFiles\Diplo\DiploWalker.Container\appsettings.json"
 
 # Les adresses autorisées sont :
 #   http://localhost:5001 (Debug) | http://localhost:6001 (Release)
@@ -295,9 +295,9 @@ Get-Content "C:\ProgramData\Diplo\auth-token.json"
 
 # Régénérer le token (nécessite un redémarrage des services)
 Remove-Item "C:\ProgramData\Diplo\auth-token.json"
-sc.exe restart "Diplo.Container"
-sc.exe restart "Diplo.Volume"
-sc.exe restart "Diplo.Network"
+sc.exe restart "DiploWalker.Container"
+sc.exe restart "DiploWalker.Volume"
+sc.exe restart "DiploWalker.Network"
 ``
 
 #### « Le nom du pipe est invalide »
@@ -469,7 +469,7 @@ Format-Hex -Path <CHEMIN> -Count 64
 
 ``powershell
 # Lancer en mode console pour voir les erreurs
-& "$env:ProgramFiles\Diplo\Diplo.Gui\Diplo.Gui.exe" 2>&1
+& "$env:ProgramFiles\Diplo\DiploWalker.Gui\DiploWalker.Gui.exe" 2>&1
 ``
 
 #### Les onglets sont vides
@@ -527,7 +527,7 @@ Get-ChildItem "$env:ProgramFiles\Diplo\logs\diplo-*.log" |
     }
 
 # 4. Configuration
-Get-Content "$env:ProgramFiles\Diplo\Diplo.Container\appsettings.json"
+Get-Content "$env:ProgramFiles\Diplo\DiploWalker.Container\appsettings.json"
 
 # 5. Informations système
 [System.Environment]::OSVersion.Version
@@ -535,3 +535,4 @@ dotnet --list-runtimes
 ``
 
 Envoyez ces informations avec une description détaillée du problème.
+

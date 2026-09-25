@@ -1,6 +1,7 @@
 namespace Diplo.Gui.ViewModels
 
 open System
+open System.Collections.Specialized
 open System.IO
 open System.Threading.Tasks
 open System.Windows.Input
@@ -72,11 +73,36 @@ type MainWindowViewModel() as this =
             for _ in 1 .. excess do
                 outputPort.LogLines.RemoveAt(0)
 
-    do
-        outputPort.LogLines.CollectionChanged.Add(fun _ ->
+    let logLinesChanged =
+        NotifyCollectionChangedEventHandler(fun _ _ ->
             UiThread.Post(fun () ->
                 updateLog ()
                 trimLogLines ()))
+
+    do
+        outputPort.LogLines.CollectionChanged.AddHandler logLinesChanged
+
+    let quitCommand =
+        RelayCommand(
+            Action(fun () ->
+                match Application.Current with
+                | null -> ()
+                | app ->
+                    match app.ApplicationLifetime with
+                    | :? IClassicDesktopStyleApplicationLifetime as desktop -> desktop.Shutdown(0)
+                    | _ -> ())
+        )
+
+    let aboutCommand =
+        RelayCommand(
+            Action(fun () ->
+                (outputPort :> IOutputPort).WriteLine("Diplo — Gestion Docker")
+
+                (outputPort :> IOutputPort)
+                    .WriteLine("Interface graphique Avalonia pour la gestion de conteneurs, volumes et réseaux."))
+        )
+
+    let exportLogCommand = RelayCommand(Action(fun () -> this.ExportLog() |> ignore))
 
     member _.OutputPort = outputPort :> IOutputPort
     member _.LogOutput = logOutputCache
@@ -88,30 +114,12 @@ type MainWindowViewModel() as this =
     member _.ComposeTab = composeTab
     member _.SettingsTab = settingsTab
 
-    member _.QuitCommand: ICommand =
-        RelayCommand(
-            Action(fun () ->
-                match Application.Current with
-                | null -> ()
-                | app ->
-                    match app.ApplicationLifetime with
-                    | :? IClassicDesktopStyleApplicationLifetime as desktop -> desktop.Shutdown(0)
-                    | _ -> ())
-        )
-
-    member _.AboutCommand: ICommand =
-        RelayCommand(
-            Action(fun () ->
-                (outputPort :> IOutputPort).WriteLine("Diplo — Gestion Docker")
-
-                (outputPort :> IOutputPort)
-                    .WriteLine("Interface graphique Avalonia pour la gestion de conteneurs, volumes et réseaux."))
-        )
+    member _.QuitCommand: ICommand = quitCommand
+    member _.AboutCommand: ICommand = aboutCommand
 
     member _.SetStorageProvider(sp: IStorageProvider) = storageProvider <- sp
 
-    member _.ExportLogCommand: ICommand =
-        RelayCommand(Action(fun () -> this.ExportLog() |> ignore))
+    member _.ExportLogCommand: ICommand = exportLogCommand
 
     /// Écrit l'état actuel du journal (lignes horodatées) dans le fichier donné.
     /// Séparée du sélecteur de fichier pour être testable hors interface.
@@ -154,6 +162,7 @@ type MainWindowViewModel() as this =
 
     interface IDisposable with
         member _.Dispose() =
+            outputPort.LogLines.CollectionChanged.RemoveHandler logLinesChanged
             (containerTab :> IDisposable).Dispose()
             (imagesTab :> IDisposable).Dispose()
             (volumeTab :> IDisposable).Dispose()

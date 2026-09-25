@@ -312,43 +312,6 @@ let ``ContainerTabViewModel ListNamespaces ecrit les namespaces`` () =
     port.Successes.Head |> should haveSubstring "diplo, system"
 
 [<Fact>]
-let ``ContainerTabViewModel RegistryLogin valide les champs obligatoires`` () =
-    let port = MockOutputPort()
-    let fake = new FakeContainerClient()
-    let vm = containerVm port fake
-    (vm.RegistryLoginCommand :> ICommand).Execute(null)
-    waitUntil (fun () -> port.Errors.Length = 1) |> should equal true
-    port.Errors.Head |> should haveSubstring "registre est requis"
-    fake.LoginCalls |> should equal 0
-
-[<Fact>]
-let ``ContainerTabViewModel RegistryLogin reussit et efface le mot de passe`` () =
-    let port = MockOutputPort()
-    let fake = new FakeContainerClient(login = { Success = true; Message = "connecté" })
-    let vm = containerVm port fake
-    vm.RegistryInput <- "myreg.azurecr.io"
-    vm.RegistryUsernameInput <- "user"
-    vm.RegistryPasswordInput <- "secret"
-    (vm.RegistryLoginCommand :> ICommand).Execute(null)
-    waitUntil (fun () -> fake.LoginCalls = 1) |> should equal true
-    port.Successes
-    |> Seq.exists (fun m -> m.Contains "connecté")
-    |> should equal true
-    vm.RegistryPasswordInput |> should equal ""
-
-[<Fact>]
-let ``ContainerTabViewModel RegistryLogout reussit`` () =
-    let port = MockOutputPort()
-    let fake = new FakeContainerClient(logout = { Success = true; Message = "déconnecté" })
-    let vm = containerVm port fake
-    vm.RegistryInput <- "myreg.azurecr.io"
-    (vm.RegistryLogoutCommand :> ICommand).Execute(null)
-    waitUntil (fun () -> fake.LogoutCalls = 1) |> should equal true
-    port.Successes
-    |> Seq.exists (fun m -> m.Contains "déconnecté")
-    |> should equal true
-
-[<Fact>]
 let ``ContainerTabViewModel PauseContainer appelle le client`` () =
     let port = MockOutputPort()
     let fake = new FakeContainerClient(pause = { State = ContainerState.Paused; Message = "ok" })

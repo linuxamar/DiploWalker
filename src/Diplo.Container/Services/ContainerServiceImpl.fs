@@ -108,26 +108,37 @@ module private ContainerStreaming =
         override _.Seek(_, _) = raise (NotSupportedException())
 
         override _.Read(buffer: byte[], offset: int, count: int) : int =
-            // Chemin synchrone (client StartExec) : on le fait tourner sur un
-            // thread de pool via le cœur asynchrone pour ne jamais bloquer le
-            // SynchronizationContext du caller (H2), puis on attend le résultat
-            // ici sans capturer le contexte.
-            let work: Func<Task<int>> =
-                Func<Task<int>>(fun () ->
-                    readIntoCore buffer offset count System.Threading.CancellationToken.None)
+            if SynchronizationContext.Current = null then
+                // Aucun contexte applicatif (thread gRPC) : exécution directe du
+                // cœur asynchrone, sans saut de thread inutile.
+                (readIntoCore buffer offset count System.Threading.CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult()
+            else
+                // Chemin synchrone (client StartExec) : on le fait tourner sur un
+                // thread de pool via le cœur asynchrone pour ne jamais bloquer le
+                // SynchronizationContext du caller (H2), puis on attend le résultat
+                // ici sans capturer le contexte.
+                let work: Func<Task<int>> =
+                    Func<Task<int>>(fun () ->
+                        readIntoCore buffer offset count System.Threading.CancellationToken.None)
 
-            Task.Run<int>(work).GetAwaiter().GetResult()
+                Task.Run<int>(work).GetAwaiter().GetResult()
 
         override _.Write(buffer: byte[], offset: int, count: int) =
             if count > 0 then
                 let chunk = Array.sub buffer offset count
 
-                // Attente sur un thread de pool pour ne jamais bloquer le
-                // SynchronizationContext du caller, sans perdre de données.
-                let work: Func<Task> =
-                    Func<Task>(fun () -> writer.WriteAsync(chunk).AsTask())
+                if SynchronizationContext.Current = null then
+                    // Aucun contexte applicatif : écriture directe, sans saut de thread.
+                    writer.WriteAsync(chunk).AsTask().GetAwaiter().GetResult()
+                else
+                    // Attente sur un thread de pool pour ne jamais bloquer le
+                    // SynchronizationContext du caller, sans perdre de données.
+                    let work: Func<Task> =
+                        Func<Task>(fun () -> writer.WriteAsync(chunk).AsTask())
 
-                Task.Run(work).GetAwaiter().GetResult()
+                    Task.Run(work).GetAwaiter().GetResult()
 
         override _.ReadAsync(buffer, offset, count, ct) =
             readIntoCore buffer offset count ct

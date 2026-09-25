@@ -65,18 +65,24 @@ if (-not $DoTests -and -not $DoPublish -and -not $Clean -and -not $Restore) {
 # --- Configuration --------------------------------------------------------
 
 $Projects = @(
-    "Diplo.Container",
-    "Diplo.Volume",
-    "Diplo.Network",
-    "Diplo.Installer",
-    "Diplo.Abstractions",
-    "Diplo.Contracts",
-    "Diplo.Grpc",
-    "Diplo.Cli",
-    "Diplo.Gui"
+    "DiploWalker.Container",
+    "DiploWalker.Volume",
+    "DiploWalker.Network",
+    "DiploWalker.Installer",
+    "DiploWalker.Abstractions",
+    "DiploWalker.Contracts",
+    "DiploWalker.Grpc",
+    "DiploWalker.Cli",
+    "DiploWalker.Gui"
 )
 
 $Platforms = if ($Platform) { @($Platform) } else { @("x64", "x86") }
+
+# Hôte d'exécution : la signature forte F# et une partie de la suite de tests
+# dépendent de Windows. `$env:OS` vaut "Windows_NT" sur tous les hôtes Windows
+# (Windows PowerShell comme PowerShell 7) et n'est pas défini ailleurs.
+$onWindows    = $env:OS -eq "Windows_NT"
+$hostPlatform = if ($onWindows) { "Windows" } else { "Unix" }
 
 $PublishRoot = Join-Path (Join-Path $PSScriptRoot "publish") "WindowsServices"
 
@@ -92,7 +98,7 @@ function Publish-Project {
     $outputDir   = Join-Path (Join-Path $PublishRoot $Plat) $ProjectName
 
     if (-not (Test-Path $projectPath)) {
-        # fallback .csproj (Diplo.Grpc ou futurs projets C#)
+        # fallback .csproj (DiploWalker.Grpc ou futurs projets C#)
         $projectPath = Join-Path (Join-Path (Join-Path $PSScriptRoot "src") $ProjectName) "$ProjectName.csproj"
     }
 
@@ -138,16 +144,16 @@ $runTests   = $DoTests.IsPresent
 $runPublish = $DoPublish.IsPresent
 
 $testProjects = @(
-    "Diplo.Abstractions.Tests",
-    "Diplo.Container.Tests",
-    "Diplo.Volume.Tests",
-    "Diplo.Network.Tests",
-    "Diplo.Core.Tests",
-    "Diplo.Installer.Tests",
-    "Diplo.Disk.Tests",
-    "Diplo.Cli.Tests",
-    "Diplo.Gui.Tests",
-    "Diplo.Integration.Tests"
+    "DiploWalker.Abstractions.Tests",
+    "DiploWalker.Container.Tests",
+    "DiploWalker.Volume.Tests",
+    "DiploWalker.Network.Tests",
+    "DiploWalker.Core.Tests",
+    "DiploWalker.Installer.Tests",
+    "DiploWalker.Disk.Tests",
+    "DiploWalker.Cli.Tests",
+    "DiploWalker.Gui.Tests",
+    "DiploWalker.Integration.Tests"
 )
 
 $totalSteps = 0
@@ -189,9 +195,9 @@ if ($Restore) {
     Write-Host ""
     Write-Host "═══ Restauration NuGet ═══" -ForegroundColor Cyan
     Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Restauration NuGet..." -PercentComplete (($currentStep / $totalSteps) * 100)
-    $solutionPath = Join-Path $PSScriptRoot "Diplo.slnx"
+    $solutionPath = Join-Path $PSScriptRoot "DiploWalker.slnx"
     if (-not (Test-Path $solutionPath)) {
-        $solutionPath = Join-Path $PSScriptRoot "Diplo.sln"
+        $solutionPath = Join-Path $PSScriptRoot "DiploWalker.sln"
     }
     dotnet restore $solutionPath
     if ($LASTEXITCODE -ne 0) {
@@ -220,9 +226,9 @@ if ($runTests) {
     # entière rend `-DoTests` autonome dans n'importe quelle console.
     if (-not $Restore) {
         Write-Host "  ▸ Restauration NuGet de la solution..." -ForegroundColor Yellow
-        $solutionForTests = Join-Path $PSScriptRoot "Diplo.slnx"
+        $solutionForTests = Join-Path $PSScriptRoot "DiploWalker.slnx"
         if (-not (Test-Path $solutionForTests)) {
-            $solutionForTests = Join-Path $PSScriptRoot "Diplo.sln"
+            $solutionForTests = Join-Path $PSScriptRoot "DiploWalker.sln"
         }
         dotnet restore $solutionForTests
         if ($LASTEXITCODE -ne 0) {
@@ -255,7 +261,21 @@ if ($runTests) {
         $safeName = $test -replace '[^A-Za-z0-9._-]', '_'
         $projectLog = Join-Path $testLogRoot "$safeName.log"
         New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
-        dotnet test --project $testPath --configuration Release --no-restore *>&1 | Tee-Object -FilePath $projectLog -ErrorAction SilentlyContinue
+
+        # Certains tests ne s'appuient que sur des comportements Windows :
+        # cmd.exe, PowerShell, C:\ProgramData, tubes nommés, images disque
+        # montées... Ils portent le trait « Platform=Windows » et sont
+        # exclus sur les autres systèmes, où ils échoueraient. Sur Windows
+        # toute la suite est exécutée.
+        $testArgs = @("--project", $testPath, "--configuration", "Release", "--no-restore")
+        if ($onWindows) {
+            Write-Host "    Plateforme Windows : toute la suite est exécutée." -ForegroundColor DarkGray
+        } else {
+            $testArgs += @("--filter-not-trait", "Platform=Windows")
+            Write-Host "    Plateforme $hostPlatform : tests « Platform=Windows » exclus." -ForegroundColor DarkGray
+        }
+
+        dotnet test @testArgs *>&1 | Tee-Object -FilePath $projectLog -ErrorAction SilentlyContinue
         $testExitCode = $LASTEXITCODE
         if ($testExitCode -ne 0) {
             Write-Host "  ✗ Échec des tests : $test — détails dans $projectLog" -ForegroundColor Red
@@ -319,3 +339,4 @@ Write-Host ""
 Write-Host "══════════════════════════════════════" -ForegroundColor Green
 Write-Host " Diplo terminé en $($timer.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
 Write-Host "══════════════════════════════════════" -ForegroundColor Green
+

@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="NoneDriverTests.fs" />
+    <Compile Include="PodDriverTests.fs" />
+    <Compile Include="CustomCniDriverTests.fs" />
+    <Compile Include="BridgeDriverTests.fs" />
+    <Compile Include="CniParsingTests.fs" />
+    <Compile Include="MockNetworkDriver.fs" />
+    <Compile Include="NetworkServiceImplTests.fs" />
+    <Compile Include="NetworkConfigTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"  />
+    <PackageReference Include="FSharp.Core"  />
+    <PackageReference Include="xunit.v3"  />
+    <PackageReference Include="FsUnit.xUnit"  />
+    <PackageReference Include="Grpc.Core.Testing"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Network\DiploWalker.Network.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Grpc\DiploWalker.Grpc.fsproj" />
+  </ItemGroup>
+
+</Project>
+

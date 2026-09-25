@@ -474,18 +474,27 @@ module Qcow2 =
                     failwith "Aucun espace libre contigu pour la table L1 (limite du pilote MVP)"
 
                 let copyCount = min h.L1Size newL1Size
-                let entryBytes = copyCount * 8
+                let entryBytes = int64 copyCount * 8L
 
-                if entryBytes > 0 then
+                if entryBytes > 0L then
+                    if entryBytes > int64 Int32.MaxValue then
+                        failwith "Table L1 trop grande pour l'allocation mémoire (limite du pilote MVP)"
+
+                    let entryBytes = int entryBytes
                     let buffer = Array.zeroCreate<byte> entryBytes
                     readAt s h.L1TableOffset buffer 0 entryBytes
                     s.Position <- offset
                     s.Write(buffer, 0, entryBytes)
 
-                let totalBytes = newClusters * h.ClusterSize
+                let totalBytes = int64 newClusters * int64 h.ClusterSize
 
                 if totalBytes > entryBytes then
-                    let zeros = Array.zeroCreate<byte> (totalBytes - entryBytes)
+                    let remaining = totalBytes - entryBytes
+
+                    if remaining > int64 Int32.MaxValue then
+                        failwith "Table L1 trop grande pour l'allocation mémoire (limite du pilote MVP)"
+
+                    let zeros = Array.zeroCreate<byte> (int remaining)
                     s.Write(zeros, 0, zeros.Length)
 
                 s.Flush()

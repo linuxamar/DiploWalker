@@ -28,7 +28,7 @@ $ErrorActionPreference = "Stop"
 
 $SetupExe   = Join-Path $PSScriptRoot "..\..\Diplo-Setup-1.0.0-x64.exe"
 $DiploDir   = "$env:ProgramFiles\Diplo"
-$CliExe     = Join-Path $DiploDir "Diplo.Cli\Diplo.Cli.exe"
+$CliExe     = Join-Path $DiploDir "DiploWalker.Cli\DiploWalker.Cli.exe"
 $ImageName  = "ServerCode"
 $ContainerName = "mon-serveur"
 
@@ -132,7 +132,7 @@ if (Test-Path $CliExe) {
 
 Write-Step "3/5" "Démarrage des services Diplo"
 
-$services = @("Diplo.Container", "Diplo.Volume", "Diplo.Network")
+$services = @("DiploWalker.Container", "DiploWalker.Volume", "DiploWalker.Network")
 
 foreach ($svcName in $services) {
     $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
@@ -233,5 +233,6 @@ Write-Host "    diplo container exec $ContainerName cmd # Exécuter une commande
 Write-Host "    diplo container stop $ContainerName     # Arrêter le conteneur"
 Write-Host "    diplo container stats $ContainerName    # Métriques en temps réel"
 Write-Host ""
-Write-Host "  GUI : lancez Diplo.Gui.exe pour l'interface graphique" -ForegroundColor Cyan
+Write-Host "  GUI : lancez DiploWalker.Gui.exe pour l'interface graphique" -ForegroundColor Cyan
 Write-Host ""
+

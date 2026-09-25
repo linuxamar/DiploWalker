@@ -479,20 +479,33 @@ module SecurityValidation =
                 )
             )
 
+        let resolveFinal (p: string) =
+            let fi = new FileInfo(p)
+
+            if fi.Exists then
+                try
+                    match fi.ResolveLinkTarget(true) with
+                    | null -> fi.FullName
+                    | target -> target.FullName
+                with _ ->
+                    fi.FullName
+            else
+                let di = new DirectoryInfo(p)
+
+                if di.Exists then
+                    try
+                        match di.ResolveLinkTarget(true) with
+                        | null -> di.FullName
+                        | target -> target.FullName
+                    with _ ->
+                        di.FullName
+                else
+                    Path.GetFullPath(p)
+
         let resolvedPath =
             try
                 let combined = Path.Combine(baseDir, path)
-                let fi = new FileInfo(combined)
-
-                if fi.Exists then
-                    fi.FullName
-                else
-                    let di = new DirectoryInfo(combined)
-
-                    if di.Exists then
-                        di.FullName
-                    else
-                        Path.GetFullPath(combined)
+                resolveFinal combined
             with _ ->
                 Path.GetFullPath(Path.Combine(baseDir, path))
 

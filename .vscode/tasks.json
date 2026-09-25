@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "DiploWalker : exécuter tous les tests",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "--solution",
+        "${workspaceFolder}/DiploWalker.slnx"
+      ],
+      "problemMatcher": [],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "DiploWalker : tester la GUI",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "--project",
+        "${workspaceFolder}/tests/DiploWalker.Gui.Tests/DiploWalker.Gui.Tests.fsproj"
+      ],
+      "problemMatcher": [],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    }
+  ]
+}

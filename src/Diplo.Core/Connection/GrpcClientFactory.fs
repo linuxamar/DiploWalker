@@ -1,4 +1,4 @@
-namespace Diplo.Core.Connection
+﻿namespace Diplo.Core.Connection
 
 open System
 open System.Collections.Concurrent
@@ -116,6 +116,13 @@ module GrpcClientFactory =
         options.HttpHandler <- handler
         GrpcChannel.ForAddress(address, options)
 
+    let private isUsable (channel: GrpcChannel) =
+        try
+            channel.CreateCallInvoker() |> ignore
+            true
+        with :? ObjectDisposedException ->
+            false
+
     let private create (address: string) =
         // INVARIANT DE SÉCURITÉ : validateGrpcAddress restreint l'hôte à
         // localhost/pipe. Les callCredentials partent en clair sur un canal
@@ -130,31 +137,22 @@ module GrpcClientFactory =
             else
                 "tcp://" + uri.Authority
 
-        let cacheHit, cached = channelCache.TryGetValue key
+        let fresh =
+            if isPipeAddress uri then
+                createPipeChannel (uri.PathAndQuery.TrimStart('/'))
+            else
+                createTcpChannel address
 
-        // M1 : si le canal a été disposé par un client possessif (test ou ancien
-        // code), l'accès à .State lèvera ObjectDisposedException — il faut
-        // l'éviter pour créer un neuf proprement.
-        let isUsable =
-            cacheHit
-            &&
-            try
-                cached.State <> ConnectivityState.Shutdown
-            with :? ObjectDisposedException -> false
+        let mutable cached = Unchecked.defaultof<GrpcChannel>
 
-        if isUsable then
-            cached
-        else
-            if cacheHit then
+        if channelCache.TryGetValue(key, &cached) then
+            if isUsable cached then
+                cached
+            else
                 let mutable discarded = Unchecked.defaultof<GrpcChannel>
                 channelCache.TryRemove(key, &discarded) |> ignore
-
-            let fresh =
-                if isPipeAddress uri then
-                    createPipeChannel (uri.PathAndQuery.TrimStart('/'))
-                else
-                    createTcpChannel address
-
+                channelCache.GetOrAdd(key, fresh)
+        else
             channelCache.GetOrAdd(key, fresh)
 
     let forContainer (port: int) = create $"http://localhost:{port}"

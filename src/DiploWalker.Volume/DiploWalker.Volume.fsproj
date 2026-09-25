@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Drivers\RemoteVolumeStore.fs" />
+    <Compile Include="Drivers\VolumeDriverRegistry.fs" />
+    <Compile Include="Drivers\LocalDriver.fs" />
+    <Compile Include="Drivers\RemoteDriverBase.fs" />
+    <Compile Include="Drivers\NfsDriver.fs" />
+    <Compile Include="Drivers\SmbDriver.fs" />
+    <Compile Include="Drivers\CloudAzureDriver.fs" />
+    <Compile Include="Drivers\CloudAwsDriver.fs" />
+    <Compile Include="Drivers\CloudGcpDriver.fs" />
+    <Compile Include="Drivers\IsoDriver.fs" />
+    <Compile Include="Services\VolumeServiceImpl.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="protobuf-net.Grpc.AspNetCore" />
+    <PackageReference Include="FSharp.Core" />
+    <PackageReference Include="Grpc.Core.Api" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DiploWalker.Contracts\DiploWalker.Contracts.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Grpc\DiploWalker.Grpc.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Disk\DiploWalker.Disk.fsproj" />
+  </ItemGroup>
+</Project>
+

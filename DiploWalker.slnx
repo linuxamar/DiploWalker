@@ -1,0 +1,78 @@
+﻿<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/DiploWalker.Abstractions/DiploWalker.Abstractions.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Container/DiploWalker.Container.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Network/DiploWalker.Network.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Volume/DiploWalker.Volume.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Gui/DiploWalker.Gui.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Installer/DiploWalker.Installer.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Grpc/DiploWalker.Grpc.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Core/DiploWalker.Core.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Disk/DiploWalker.Disk.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Cli/DiploWalker.Cli.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/DiploWalker.Contracts/DiploWalker.Contracts.fsproj">
+      <Platform Project="x64" />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DiploWalker.Abstractions.Tests/DiploWalker.Abstractions.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Cli.Tests/DiploWalker.Cli.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Container.Tests/DiploWalker.Container.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Core.Tests/DiploWalker.Core.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Disk.Tests/DiploWalker.Disk.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Network.Tests/DiploWalker.Network.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Volume.Tests/DiploWalker.Volume.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Gui.Tests/DiploWalker.Gui.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Installer.Tests/DiploWalker.Installer.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.Integration.Tests/DiploWalker.Integration.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="tests/DiploWalker.TestHelpers/DiploWalker.TestHelpers.fsproj">
+      <Platform Project="x64" />
+    </Project>
+  </Folder>
+</Solution>
+
+

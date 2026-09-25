@@ -2,14 +2,17 @@ namespace Diplo.Container
 
 open System
 open System.IO
+open System.Security.AccessControl
 open System.Security.Cryptography
+open System.Security.Principal
 open System.Text.Json
 open Serilog
 open Diplo.Abstractions
 
 /// Persistance des identifiants de registres de conteneurs (login/logout).
 /// Le mot de passe est chiffré avec DPAPI (portée utilisateur courant) sous
-/// Windows ; ailleurs, un repli base64 est utilisé (sans chiffrement).
+/// Windows ; ailleurs, il est scellé en AES-GCM avec une clé par utilisateur
+/// (fichier à droits restreints, voir SECURITY.md).
 module RegistryAuth =
 
     /// Identifiant d'un registre tel que persisté dans le fichier d'état.
@@ -59,7 +62,17 @@ module RegistryAuth =
             let key = RandomNumberGenerator.GetBytes(32)
             File.WriteAllBytes(path, key)
 
-            if not (OperatingSystem.IsWindows()) then
+            if OperatingSystem.IsWindows() then
+                try
+                    let fs = FileSecurity()
+                    fs.SetAccessRuleProtection(true, false)
+                    let sid = WindowsIdentity.GetCurrent().User
+                    fs.AddAccessRule(FileSystemAccessRule(sid, FileSystemRights.FullControl, AccessControlType.Allow))
+                    let fi = new FileInfo(path)
+                    fi.SetAccessControl(fs)
+                with _ ->
+                    ()
+            else
                 try
                     File.SetUnixFileMode(path, UnixFileMode.UserRead ||| UnixFileMode.UserWrite)
                 with _ ->
@@ -93,13 +106,9 @@ module RegistryAuth =
 
     let private unprotect (encoded: string) =
         if OperatingSystem.IsWindows() then
-            try
-                System.Text.Encoding.UTF8.GetString(
-                    ProtectedData.Unprotect(Convert.FromBase64String(encoded), null, DataProtectionScope.CurrentUser)
-                )
-            with ex ->
-                Log.Warning(ex, "Impossible de déchiffrer le mot de passe (données potentiellement corrompues)")
-                ""
+            System.Text.Encoding.UTF8.GetString(
+                ProtectedData.Unprotect(Convert.FromBase64String(encoded), null, DataProtectionScope.CurrentUser)
+            )
         else
             try
                 let blob = Convert.FromBase64String(encoded)
@@ -112,15 +121,14 @@ module RegistryAuth =
                 let plain = Array.zeroCreate<byte> cipher.Length
                 aes.Decrypt(nonce, cipher, tag, plain)
                 System.Text.Encoding.UTF8.GetString(plain)
-            with ex ->
+            with _ ->
                 // Repli de compatibilité : anciens états hors Windows écrits en
                 // base64 clair. Lecture tolérée (le stockage, lui, n'est plus en
                 // clair) ; une nouvelle connexion réécrit l'entrée en AES-GCM.
                 try
                     System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded))
                 with _ ->
-                    Log.Warning(ex, "Impossible de déchiffrer le mot de passe (données potentiellement corrompues)")
-                    ""
+                    failwith "Impossible de déchiffrer le mot de passe (données corrompues)"
 
     /// Charge les identifiants persistés (Map registre -> identifiant).
     /// Retourne un état vide si le fichier est absent ou illisible.
@@ -223,9 +231,8 @@ try {
       $plain = [Text.Encoding]::UTF8.GetString(
                  [Security.Cryptography.ProtectedData]::Unprotect(
                    $bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser))
-      $escU = ('' + $e.username).Replace('\', '\\').Replace('"', '\"')
-      $escP = $plain.Replace('\', '\\').Replace('"', '\"')
-      [Console]::Out.Write('{"Username":"' + $escU + '","Secret":"' + $escP + '"}')
+      $obj = @{ Username = ('' + $e.username); Secret = $plain }
+      [Console]::Out.Write(($obj | ConvertTo-Json -Compress))
       exit 0
     }
   }

@@ -11,7 +11,7 @@
 #  Usage :
 #    .\certificates\codesigning\leaves\regenerate-leaves.ps1          # tous les projets
 #    .\certificates\codesigning\leaves\regenerate-leaves.ps1 -Force   # régénère les clés
-#    ... -Projects "Diplo.Cli,Diplo.Gui"                              # sous-ensemble
+#    ... -Projects "DiploWalker.Cli,DiploWalker.Gui"                              # sous-ensemble
 # ---------------------------------------------------------------------------
 
 [CmdletBinding()]
@@ -34,9 +34,9 @@ if (-not (Test-Path $openssl)) {
     $openssl = $cmd.Source
 }
 
-# --- Projets de la solution (parsing de Diplo.slnx) -------------------------
-$slnx = Join-Path $repoRoot "Diplo.slnx"
-if (-not (Test-Path $slnx)) { throw "Diplo.slnx introuvable : $slnx" }
+# --- Projets de la solution (parsing de DiploWalker.slnx) -------------------------
+$slnx = Join-Path $repoRoot "DiploWalker.slnx"
+if (-not (Test-Path $slnx)) { throw "DiploWalker.slnx introuvable : $slnx" }
 $xml = [xml](Get-Content $slnx)
 
 $names = @()
@@ -140,3 +140,4 @@ foreach ($name in $names) {
 Write-Host ""
 Write-Host "Certificats de signature de code générés dans $leavesDir" -ForegroundColor Green
 Write-Host "Les binaires seront signés automatiquement à la compilation (Directory.Build.targets)." -ForegroundColor Green
+

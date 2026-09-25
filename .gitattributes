@@ -42,6 +42,6 @@
 # --- Assets signés (C3): fins de ligne LF obligatoires.
 # La signature RSA-4096/SHA-384 couvre les octets exacts de ces fichiers ;
 # toute conversion autocrlf casserait la vérification côté installateur. ---
-src/Diplo.Installer/assets/artifacts.manifest      text eol=lf
-src/Diplo.Installer/assets/artifacts.manifest.sig  text eol=lf
-src/Diplo.Installer/assets/diplo-release.pub       text eol=lf
+src/DiploWalker.Installer/assets/artifacts.manifest      text eol=lf
+src/DiploWalker.Installer/assets/artifacts.manifest.sig  text eol=lf
+src/DiploWalker.Installer/assets/DiploWalker-release.pub text eol=lf

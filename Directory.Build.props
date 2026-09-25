@@ -1,16 +1,16 @@
-<Project>
+﻿<Project>
 
   <PropertyGroup>
     <Version>1.0.0</Version>
     <!--
       Traitement des avertissements du compilateur en erreurs : toute
-      nouvelle alerte fait échouer le build (qualité maintenue par le CI).
+      nouvelle alerte fait Ã©chouer le build (qualitÃ© maintenue par le CI).
     -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!--
-      Désactive la référence implicite FSharp.Core du SDK .NET 10.
-      La version est pinnée via CentralPackageTransitivePinningEnabled
-      dans Directory.Packages.props (évite le conflit MSB3277 entre
+      DÃ©sactive la rÃ©fÃ©rence implicite FSharp.Core du SDK .NET 10.
+      La version est pinnÃ©e via CentralPackageTransitivePinningEnabled
+      dans Directory.Packages.props (Ã©vite le conflit MSB3277 entre
       la version SDK et la version NuGet 10.1.400).
     -->
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
@@ -18,9 +18,9 @@
 
   <PropertyGroup>
     <!--
-      Plateformes autorisées : x64 ou x86 exclusivement.
-      AnyCPU est interdit — les binaires Diplo ciblent containerd/WSL2 nativement.
-      Par défaut x64 ; override avec -p:Platform=x86
+      Plateformes autorisÃ©es : x64 ou x86 exclusivement.
+      AnyCPU est interdit â€” les binaires Diplo ciblent containerd/WSL2 nativement.
+      Par dÃ©faut x64 ; override avec -p:Platform=x86
     -->
     <Platforms>x64;x86</Platforms>
     <Platform>x64</Platform>
@@ -29,9 +29,9 @@
 
   <PropertyGroup>
     <!--
-      Analyseurs de code Microsoft — activés pour tous les projets.
-      Level=latest   : dernière version des règles Roslyn.
-      Mode=Recommended : règle par défaut recommandée (pas trop strict).
+      Analyseurs de code Microsoft â€” activÃ©s pour tous les projets.
+      Level=latest   : derniÃ¨re version des rÃ¨gles Roslyn.
+      Mode=Recommended : rÃ¨gle par dÃ©faut recommandÃ©e (pas trop strict).
     -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
@@ -39,36 +39,36 @@
 
   <PropertyGroup>
     <!--
-      HighEntropyVA — layout virtuel à haute entropie (ASLR 64-bit).
-      Sécurise les binaires contre les attaques de type buffer overflow.
+      HighEntropyVA â€” layout virtuel Ã  haute entropie (ASLR 64-bit).
+      SÃ©curise les binaires contre les attaques de type buffer overflow.
     -->
     <HighEntropyVA>true</HighEntropyVA>
   </PropertyGroup>
 
   <PropertyGroup>
     <!--
-      Audit NuGet : activé pour détecter les vulnérabilités des dépendances
-      transitives (CVE connues). Mode=all : analyse des dépendances directes
+      Audit NuGet : activÃ© pour dÃ©tecter les vulnÃ©rabilitÃ©s des dÃ©pendances
+      transitives (CVE connues). Mode=all : analyse des dÃ©pendances directes
       et transitives.
     -->
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
   </PropertyGroup>
 
-  <PropertyGroup>
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <!--
-      Strong-name signing : toutes les assemblies Diplo sont signées avec la clé eng/Diplo.snk.
+      Strong-name signing : sous Windows, toutes les assemblies Diplo sont signées avec la clé eng/DiploWalker.snk.
     -->
     <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)eng\Diplo.snk</AssemblyOriginatorKeyFile>
-    <KeyFile>$(MSBuildThisFileDirectory)eng\Diplo.snk</KeyFile>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)eng\DiploWalker.snk</AssemblyOriginatorKeyFile>
+    <KeyFile>$(MSBuildThisFileDirectory)eng\DiploWalker.snk</KeyFile>
   </PropertyGroup>
 
   <ItemGroup>
     <!--
       Les paquets framework (FSharp.Core, Cryptography.Pkcs, Cryptography.Xml)
-      ne nécessitent plus de PackageReference explicite — les versions sont
-      pinnées au niveau transitive via CentralPackageTransitivePinningEnabled
+      ne nÃ©cessitent plus de PackageReference explicite â€” les versions sont
+      pinnÃ©es au niveau transitive via CentralPackageTransitivePinningEnabled
       dans Directory.Packages.props (corrige NU1510).
     -->
   </ItemGroup>
@@ -79,3 +79,4 @@
   </PropertyGroup>
 
 </Project>
+

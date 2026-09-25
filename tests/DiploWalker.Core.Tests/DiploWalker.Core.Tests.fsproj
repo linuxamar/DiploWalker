@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="DiploWalkerChannelTests.fs" />
+    <Compile Include="DiploWalkerConfigTests.fs" />
+    <Compile Include="ImageCatalogTests.fs" />
+    <Compile Include="GrpcTestHost.fs" />
+    <Compile Include="ContainerClientTests.fs" />
+    <Compile Include="VolumeClientTests.fs" />
+    <Compile Include="NetworkClientTests.fs" />
+    <Compile Include="ComposeTests.fs" />
+    <Compile Include="ComposeOrchestratorTests.fs" />
+    <Compile Include="MountParserTests.fs" />
+    <Compile Include="CommandLineTests.fs" />
+    <Compile Include="GrpcClientFactoryTests.fs" />
+    <Compile Include="DiploWalkerClientsTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"  />
+    <PackageReference Include="FSharp.Core"  />
+    <PackageReference Include="xunit.v3"  />
+    <PackageReference Include="FsUnit.xUnit"  />
+    <PackageReference Include="Grpc.Core.Testing"  />
+    <PackageReference Include="Grpc.Net.Client"  />
+    <PackageReference Include="protobuf-net.Grpc.AspNetCore"  />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Core\DiploWalker.Core.fsproj" />
+    <ProjectReference Include="..\..\src\DiploWalker.Grpc\DiploWalker.Grpc.fsproj" />
+    <ProjectReference Include="..\..\tests\DiploWalker.TestHelpers\DiploWalker.TestHelpers.fsproj" />
+  </ItemGroup>
+
+</Project>
+

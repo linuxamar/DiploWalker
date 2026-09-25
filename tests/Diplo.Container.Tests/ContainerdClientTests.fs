@@ -775,6 +775,24 @@ type ContainerdClientTests() =
                 ()
 
     [<Fact>]
+    member _.``PullImage refuse --user sans le format utilisateur:secret (pas de repli argv)``() =
+        let runner = createRunner ()
+        runner.OnCommand("image pull", "resolved")
+
+        let client =
+            ContainerdClient(runner) :> Diplo.Abstractions.Interfaces.IContainerdClient
+
+        let ex =
+            Assert.Throws<RpcException>(fun () ->
+                client.PullImage("ghcr.io/team/app:latest", Some "identifiant") |> ignore)
+
+        ex.StatusCode |> should equal StatusCode.InvalidArgument
+        ex.Status.Detail |> shouldContain "utilisateur:secret"
+
+        // Refus catégorique : aucune commande ctr n'est exécutée, aucun --user en argv.
+        runner.SecureCommands |> should be Empty
+
+    [<Fact>]
     member _.``PullImage de Docker Hub prepare un hosts-dir pour docker.io``() =
         let runner = createRunner ()
         runner.OnCommand("image pull", "resolved")
@@ -814,6 +832,10 @@ type ContainerdClientTests() =
 
             (after.Length - before.Length) |> should equal 0
         finally
+            try
+                System.IO.File.Delete stateFile
+            with _ ->
+                ()
             try
                 System.IO.File.Delete stateFile
             with _ ->

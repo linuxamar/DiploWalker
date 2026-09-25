@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Plugins\PowerShellHelper.fs" />
+    <Compile Include="Plugins\INetworkDriver.fs" />
+    <Compile Include="Plugins\CniParsing.fs" />
+    <Compile Include="Plugins\BridgeDriver.fs" />
+    <Compile Include="Plugins\CustomCniDriver.fs" />
+    <Compile Include="Plugins\NoneDriver.fs" />
+    <Compile Include="Plugins\PodDriver.fs" />
+    <Compile Include="Services\NetworkServiceImpl.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="protobuf-net.Grpc.AspNetCore" />
+    <PackageReference Include="FSharp.Core" />
+    <PackageReference Include="Grpc.Core.Api" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DiploWalker.Contracts\DiploWalker.Contracts.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Grpc\DiploWalker.Grpc.fsproj" />
+  </ItemGroup>
+</Project>
+

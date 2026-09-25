@@ -38,8 +38,8 @@ if (-not $PublishRoot) {
 }
 $PublishRoot = Resolve-Path $PublishRoot
 
-if (-not (Test-Path "$PublishRoot\Diplo.Gui\Diplo.Gui.exe")) {
-    Write-Warning "Diplo.Gui.exe introuvable dans $PublishRoot\Diplo.Gui\"
+if (-not (Test-Path "$PublishRoot\DiploWalker.Gui\DiploWalker.Gui.exe")) {
+    Write-Warning "DiploWalker.Gui.exe introuvable dans $PublishRoot\DiploWalker.Gui\"
     Write-Host   "Exécutez d'abord : .\pipeline.ps1 -DoPublish -Platform $Platform" -ForegroundColor Yellow
     exit 1
 }
@@ -57,11 +57,13 @@ $outFile   = Join-Path $repoRoot "Diplo-Setup-$Version-$Platform.exe"
 
 $defineVersion   = "-DAPP_VERSION=$Version"
 $definePlatform  = "-DPLATFORM=$Platform"
-$definePublish   = "-DPUBLISH_ROOT=$PublishRoot"
+$definePublish   = "-DPUBLISH_ROOT=$($PublishRoot.ToString())"
+$defineSetupRoot = "-DSETUP_ROOT=$($setupDir.ToString())"
+$defineRepoRoot  = "-DREPO_ROOT=$($repoRoot.ToString())"
 
 Push-Location $setupDir
 try {
-    & $makensis.Source $defineVersion $definePlatform $definePublish $nsiFile
+    & $makensis.Source $defineVersion $definePlatform $definePublish $defineSetupRoot $defineRepoRoot $nsiFile
 
     if ($LASTEXITCODE -ne 0) {
         throw "makensis a échoué (code $LASTEXITCODE)."
@@ -109,8 +111,8 @@ if ($Sign) {
                 $signArgs += "/p", $SignPassword
             }
         } else {
-            # Par défaut : la feuille de signature de code du projet Diplo.Installer.
-            $defaultPfx = Join-Path $repoRoot "certificates\codesigning\leaves\Diplo.Installer\Diplo.Installer.pfx"
+            # Par défaut : la feuille de signature de code du projet DiploWalker.Installer.
+            $defaultPfx = Join-Path $repoRoot "certificates\codesigning\leaves\DiploWalker.Installer\DiploWalker.Installer.pfx"
             if (Test-Path $defaultPfx) {
                 $signArgs += "/f", $defaultPfx
             } else {
@@ -135,3 +137,4 @@ if ($Sign) {
 
 Write-Host ""
 Write-Host "  ✓ Installateur créé : $outFile" -ForegroundColor Green
+
