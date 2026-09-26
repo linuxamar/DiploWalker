@@ -1,13 +1,13 @@
-# Configuration du certificat de signature de code du projet Diplo.Network.Tests.
+# Configuration du certificat de signature de code du projet DiploWalker.Network.Tests.
 # Parent : l'intermédiaire "CodeSigning" (certificates/codesigning/).
 # Clé RSA 8192 bits, usage étendu : codeSigning.
 #
 # Exemples :
-#   openssl req -new -config openssl.cnf -key Diplo.Network.Tests.key.pem -out Diplo.Network.Tests.csr.pem
+#   openssl req -new -config openssl.cnf -key DiploWalker.Network.Tests.key.pem -out DiploWalker.Network.Tests.csr.pem
 #   # Signature par CodeSigning (exécutée depuis codesigning/)
 #   openssl ca -config ../openssl.cnf -extensions leaf_cert -batch -notext 
-#              -in ../leaves/Diplo.Network.Tests/Diplo.Network.Tests.csr.pem 
-#              -out ../leaves/Diplo.Network.Tests/Diplo.Network.Tests.crt.pem
+#              -in ../leaves/DiploWalker.Network.Tests/DiploWalker.Network.Tests.csr.pem 
+#              -out ../leaves/DiploWalker.Network.Tests/DiploWalker.Network.Tests.crt.pem
 
 [ req ]
 default_bits       = 8192
@@ -21,7 +21,7 @@ req_extensions     = v3_req
 countryName            = FR
 organizationName       = Diplo
 organizationalUnitName = Diplo Signature de code
-commonName             = Diplo.Network.Tests
+commonName             = DiploWalker.Network.Tests
 
 # Extensions demandées dans la CSR : recopiées dans le certificat grâce à
 # copy_extensions = copy dans la configuration de l'autorité signataire.

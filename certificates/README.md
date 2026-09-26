@@ -235,6 +235,24 @@ En .NET, charger le certificat privé depuis le PFX ou le magasin, puis utiliser
 
 ## Régénération complète
 
+### Via le script d'amorçage (recommandé)
+
+```powershell
+# Toute la PKI : racine, intermédiaires, feuilles système et feuilles de signature
+.\certificates\regenerate-pki.ps1 -Force
+
+# Autorités seules, sans toucher aux 22 feuilles de signature de code
+.\certificates\regenerate-pki.ps1 -SkipProjectLeaves -Force
+```
+
+Le script détecte `openssl.exe` dans le `PATH`, puis dans les installations Git
+standard et Git Scoop (`-OpenSSLPath` pour forcer un chemin). Sans `-Force`, il
+refuse de révoquer un certificat existant. Les `.crt.pem` et `db/serial` sont
+versionnés, la régénération les modifie donc ; les clés privées et les `.pfx` sont
+ignorés par Git et doivent être régénérés sur chaque poste.
+
+### Procédure manuelle
+
 1. Effacer le contenu de `certificates/` (ou d'un sous-répertoire).
 2. Suivre l'ordre ci-dessous, en exécutant chaque commande depuis le répertoire
    de l'autorité concernée (le config contient les chemins relatifs) :
