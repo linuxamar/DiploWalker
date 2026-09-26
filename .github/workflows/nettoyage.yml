@@ -1,0 +1,31 @@
+name: Nettoyage automatique des Workflows
+
+on:
+  schedule:
+    # S'exécute automatiquement le 1er de chaque mois à minuit (format Cron)
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    # Permet aussi de déclencher le nettoyage manuellement depuis l'onglet Actions
+
+jobs:
+  nettoyer:
+    runs-on: ubuntu-latest
+
+    # Étape cruciale : donner explicitement le droit d'écrire/supprimer les actions
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: Supprimer les anciennes exécutions
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+          # OPTIONS DE CONFIGURATION :
+          # Conserver uniquement les résultats des 30 derniers jours
+          retain_days: 30
+
+          # Garder au minimum les 6 exécutions les plus récentes (sécurité)
+          keep_minimum_runs: 6
