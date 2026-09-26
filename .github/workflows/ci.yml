@@ -22,7 +22,10 @@ jobs:
         run: dotnet restore DiploWalker.slnx
       - name: Tests (10 projets, Release)
         shell: pwsh
-        run: ./pipeline.ps1 -DoTests -Restore
+        # -NoSignTests : ce job n'a pas la clé git-crypt, et les PFX versionnés
+        # sont donc chiffrés. Sans ce drapeau, signtool tente de les charger et
+        # le build échoue. La signature n'apporte rien aux tests.
+        run: ./pipeline.ps1 -DoTests -Restore -NoSignTests
 
   release:
     name: Publication (tag v*)
@@ -62,7 +65,10 @@ jobs:
         run: dotnet restore DiploWalker.slnx
       - name: Tests
         shell: pwsh
-        run: ./pipeline.ps1 -DoTests -Restore
+        # -NoSignTests : la clé est disponible ici (déchiffrement ci-dessus),
+        # mais signer les binaires de test n'apporte rien et ne fait que
+        # ralentir. La publication qui suit reste signée.
+        run: ./pipeline.ps1 -DoTests -Restore -NoSignTests
       - name: Publication self-contained (x64 + x86) + setup NSIS
         shell: pwsh
         run: ./pipeline.ps1 -DoPublish

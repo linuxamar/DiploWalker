@@ -10,6 +10,7 @@
 #    .\pipeline.ps1 -Restore         # restaure les packages NuGet en 1er
 #    .\pipeline.ps1 -Clean           # supprime bin/ obj/ avant publication
 #    .\pipeline.ps1 -DoTests         # lance uniquement les tests
+#    .\pipeline.ps1 -DoTests -NoSignTests   # tests sans signer les binaires
 #    .\pipeline.ps1 -DoPublish       # publie uniquement (sans tests)
 #    .\pipeline.ps1 -DoPublish -SignCert C:\certs\code.pfx -SignPassword "***"
 #    .\pipeline.ps1 -DoPublish -SignThumbprint <SHA1-du-certificat>
@@ -28,7 +29,8 @@ param(
     [string]$SignPassword,
     [string]$SignThumbprint,
     [string]$TimestampUrl,
-    [string]$TestLogDir
+    [string]$TestLogDir,
+    [switch]$NoSignTests
 )
 
 # -DoTests et -DoPublish peuvent être combinés :
@@ -223,6 +225,9 @@ if ($Restore) {
 if ($runTests) {
     Write-Host "═══ Tests unitaires ═══" -ForegroundColor Cyan
 
+    # Signature désactivée pendant les tests (-NoSignTests) : voir la
+    # construction de $testArgs plus bas.
+
     # Libère les verrous de fichiers de sortie (obj/bin) détenus par les
     # serveurs MSBuild / compilateur laissés par des exécutions précédentes.
     # Sans cela, `dotnet test` peut échouer en cascade sur une collision de
@@ -280,6 +285,16 @@ if ($runTests) {
         # exclus sur les autres systèmes, où ils échoueraient. Sur Windows
         # toute la suite est exécutée.
         $testArgs = @("--project", $testPath, "--configuration", "Release", "--no-restore")
+        # -NoSignTests : aucun test n'examine la signature Authenticode d'un
+        # binaire compilé (ArtifactSigningTests forge ses clés RSA en mémoire),
+        # donc signer les DLL de test n'apporte rien. Pire, cela fait échouer le
+        # build d'un runner CI : les PFX sont versionnés, donc présents, et
+        # signtool tente de charger du ciphertext git-crypt, qu'il refuse.
+        # La signature de la publication reste inchangée : -p: n'est posé que
+        # sur la commande `dotnet test`, jamais sur `dotnet publish`.
+        if ($NoSignTests) {
+            $testArgs += "-p:DiploSignOutputAfterBuild=false"
+        }
         if ($onWindows) {
             Write-Host "    Plateforme Windows : toute la suite est exécutée." -ForegroundColor DarkGray
         } else {
