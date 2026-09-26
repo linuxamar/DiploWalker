@@ -27,7 +27,7 @@ module VolumeServiceImplTests =
         svc, mock
 
     /// Instancie un service avec deux drivers distincts (Local et Smb) pour
-    /// vÃ©rifier le routage via l'option driverOpts["driver"].
+    /// vérifier le routage via l'option driverOpts["driver"].
     let createDualDriverService () =
         let mockLocal = MockVolumeDriver()
         let mockSmb = MockVolumeDriver()
@@ -105,7 +105,7 @@ module VolumeServiceImplTests =
         let req = { Id = createResult.Id; Force = false }
         let result = (svc :> IVolumeService).RemoveVolume(req, ctx).Result
         result.Success |> should equal true
-        result.Message |> should equal "Volume supprimÃ©"
+        result.Message |> should equal "Volume supprimé"
 
     [<Fact>]
     let ``RemoveVolume sur volume inexistant retourne success false`` () =
@@ -204,7 +204,7 @@ module VolumeServiceImplTests =
         let result = (svc :> IVolumeService).MountVolume(req, ctx).Result
         result.State |> should equal MountState.Mounted
         String.IsNullOrEmpty(result.Mountpoint) |> should equal false
-        result.Message |> should equal "Volume montÃ©"
+        result.Message |> should equal "Volume monté"
 
     [<Fact>]
     let ``UnmountVolume retourne MountState Unmounted`` () =
@@ -235,7 +235,7 @@ module VolumeServiceImplTests =
         result.State |> should equal MountState.Unmounted
         result.Message |> should equal "Démonté"
 
-    // --- SÃ©curitÃ© : CreateVolume ---
+    // --- Sécurité : CreateVolume ---
     [<Fact>]
     let ``CreateVolume avec nom injection lance exception`` () =
         let svc, _ = createService ()
@@ -253,7 +253,7 @@ module VolumeServiceImplTests =
         ex.InnerException.Message |> should haveSubstring "Le nom du volume"
 
     [<Fact>]
-    let ``CreateVolume avec label clÃ© invalide lance exception`` () =
+    let ``CreateVolume avec label clé invalide lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
 
@@ -288,7 +288,7 @@ module VolumeServiceImplTests =
 
         ex.InnerException.Message |> should haveSubstring "La valeur du label"
 
-    // --- SÃ©curitÃ© : RemoveVolume ---
+    // --- Sécurité : RemoveVolume ---
     [<Fact>]
     let ``RemoveVolume avec id vide lance RpcException`` () =
         let svc, _ = createService ()
@@ -312,7 +312,7 @@ module VolumeServiceImplTests =
 
         ex.InnerException.Message |> should haveSubstring "L'identifiant du volume"
 
-    // --- SÃ©curitÃ© : InspectVolume ---
+    // --- Sécurité : InspectVolume ---
     [<Fact>]
     let ``InspectVolume avec id vide lance RpcException`` () =
         let svc, _ = createService ()
@@ -338,7 +338,7 @@ module VolumeServiceImplTests =
 
         ex.InnerException.Message |> should haveSubstring "L'identifiant du volume"
 
-    // --- SÃ©curitÃ© : MountVolume ---
+    // --- Sécurité : MountVolume ---
     [<Fact>]
     let ``MountVolume avec id vide lance RpcException`` () =
         let svc, _ = createService ()
@@ -401,7 +401,7 @@ module VolumeServiceImplTests =
 
         ex.InnerException.Message |> should haveSubstring "Le chemin cible"
 
-    // --- SÃ©curitÃ© : UnmountVolume ---
+    // --- Sécurité : UnmountVolume ---
     [<Fact>]
     let ``UnmountVolume avec id vide lance RpcException`` () =
         let svc, _ = createService ()
@@ -455,7 +455,7 @@ module VolumeServiceImplTests =
         let result = (svc :> IVolumeService).PruneVolumes(req, ctx).Result
         result.Count |> should equal 0
         result.VolumesDeleted.Count |> should equal 0
-        result.Message |> should equal "0 volume(s) supprimÃ©(s)"
+        result.Message |> should equal "0 volume(s) supprimé(s)"
 
     [<Fact>]
     let ``PruneVolumes retourne les ids supprimes`` () =
@@ -469,7 +469,7 @@ module VolumeServiceImplTests =
         result.VolumesDeleted |> should contain "vol-1"
         result.VolumesDeleted |> should contain "vol-2"
         result.VolumesDeleted |> should contain "vol-3"
-        result.Message |> should equal "3 volume(s) supprimÃ©(s)"
+        result.Message |> should equal "3 volume(s) supprimé(s)"
 
     // --- Routage via driverOpts["driver"] ---
     [<Fact>]
@@ -486,7 +486,7 @@ module VolumeServiceImplTests =
         req.DriverOpts.Add("driver", "smb")
         let result = (svc :> IVolumeService).CreateVolume(req, ctx).Result
         result.Driver |> should equal StorageDriverType.Smb
-        // Le volume a Ã©tÃ© crÃ©Ã© sur le driver Smb, pas sur Local.
+        // Le volume a été créé sur le driver Smb, pas sur Local.
         mockLocal.Volumes.Count |> should equal 0
         mockSmb.Volumes.Count |> should equal 1
 
@@ -512,7 +512,7 @@ module VolumeServiceImplTests =
         let svc, _ = createService ()
         let ctx = createCtx ()
 
-        // Aucun volume n'existe : le driver Ã©choue, le service renvoie Error.
+        // Aucun volume n'existe : le driver échoue, le service renvoie Error.
         let req: MountVolumeRequest =
             { Id = "volume-inexistant"
               TargetPath = Path.Combine(Path.GetTempPath(), "diplo-mount-err")
@@ -523,7 +523,7 @@ module VolumeServiceImplTests =
         result.Mountpoint |> should equal ""
         result.Message |> should equal "Volume introuvable ou erreur de montage"
 
-    // --- Marche en erreur : introuvable cÃ´tÃ© CreateVolume ---
+    // --- Marche en erreur : introuvable côté CreateVolume ---
     [<Fact>]
     let ``CreateVolume avec driver non enregistre leve RpcException NotFound`` () =
         let svc, _ = createService ()

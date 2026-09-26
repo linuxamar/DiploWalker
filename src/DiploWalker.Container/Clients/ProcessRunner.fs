@@ -3,7 +3,7 @@
 open DiploWalker.Abstractions
 open DiploWalker.Abstractions.Interfaces
 
-/// ExÃ©cuteur rÃ©el de processus (ctr CLI)
+/// Exécuteur réel de processus (ctr CLI)
 type ProcessRunner(?timeoutMs: int) =
 
     let timeout = defaultArg timeoutMs 60_000

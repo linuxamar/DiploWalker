@@ -104,7 +104,7 @@ type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit 
             })
 
     member private this.OpenComposeFile() =
-        // Cmd.run : la tÃ¢che est attendue et ses exceptions journalisÃ©es â€” un
+        // Cmd.run : la tâche est attendue et ses exceptions journalisées — un
         // fire-and-forget avalait silencieusement les erreurs du picker.
         Cmd.run outputPort (fun () ->
             task {
@@ -124,7 +124,7 @@ type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit 
 
                     if files.Count > 0 then
                         let path = files.[0].Path.LocalPath
-                        // Le setter de ComposeFilePath recharge dÃ©jÃ  le contenu.
+                        // Le setter de ComposeFilePath recharge déjà le contenu.
                         this.ComposeFilePath <- path
                         outputPort.WriteSuccess(sprintf "Fichier ouvert : %s" path)
             })
@@ -136,9 +136,9 @@ type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit 
                     composeEditor.Save()
                     outputPort.WriteSuccess(sprintf "Fichier enregistré : %s" composeEditor.FilePath)
                 else
-                    // Â« Enregistrer sous Â» rÃ©el : Ã©crire le buffer ACTUEL vers le
+                    // « Enregistrer sous » réel : écrire le buffer ACTUEL vers le
                     // chemin choisi. Repasser par OpenComposeFile rechargerait le
-                    // contenu depuis le disque et dÃ©truirait les modifications.
+                    // contenu depuis le disque et détruirait les modifications.
                     if isNull storageProvider then
                         outputPort.WriteWarning("Fournisseur de stockage non disponible")
                     else
@@ -166,8 +166,8 @@ type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit 
             })
 
     member private this.ValidateComposeFile() =
-        // Validation asynchrone : le parsing s'exÃ©cute sur un worker, la
-        // collection d'erreurs est publiÃ©e sur le thread UI par le modÃ¨le.
+        // Validation asynchrone : le parsing s'exécute sur un worker, la
+        // collection d'erreurs est publiée sur le thread UI par le modèle.
         Cmd.run outputPort (fun () ->
             task {
                 let! computed = composeEditor.ValidateAsync()
@@ -207,7 +207,7 @@ type ComposeTabViewModel(outputPort: IOutputPort, ?containerClientFactory: unit 
                 let! response = composeClient.ListAsync(all = true)
 
                 // Filtrage et projection sur le worker, sans toucher aux
-                // collections liÃ©es Ã  l'UI (aucune mutation hors UI).
+                // collections liées à l'UI (aucune mutation hors UI).
                 let filtered =
                     response.Containers
                     |> Seq.filter (fun c ->

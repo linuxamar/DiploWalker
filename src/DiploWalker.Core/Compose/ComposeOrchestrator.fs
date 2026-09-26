@@ -14,8 +14,8 @@ open YamlDotNet.RepresentationModel
 
 type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient) =
 
-    // H11 : un fichier compose dÃ©mesurÃ© ne doit pas Ãªtre chargÃ© en mÃ©moire sans
-    // borne â€” limite arbitraire mais gÃ©nÃ©reuse pour un projet compose lÃ©gitime.
+    // H11 : un fichier compose démesuré ne doit pas être chargé en mémoire sans
+    // borne — limite arbitraire mais généreuse pour un projet compose légitime.
     let maxComposeFileBytes = 10 * 1024 * 1024
 
     let containerClient =
@@ -43,8 +43,8 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                 RpcException(Status(StatusCode.NotFound, sprintf "Le fichier compose '%s' est introuvable" filePath))
             )
 
-        // H11 : vÃ©rification avant lecture â€” File.ReadAllText chargerait la totalitÃ©
-        // du fichier en mÃ©moire sans contrÃ´le.
+        // H11 : vérification avant lecture — File.ReadAllText chargerait la totalité
+        // du fichier en mémoire sans contrôle.
         let fileInfo = FileInfo(filePath)
 
         if fileInfo.Length > int64 maxComposeFileBytes then
@@ -52,7 +52,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                 RpcException(
                     Status(
                         StatusCode.InvalidArgument,
-                        sprintf "Le fichier compose '%s' dÃ©passe la limite de 10 Mo" filePath
+                        sprintf "Le fichier compose '%s' dépasse la limite de 10 Mo" filePath
                     )
                 )
             )
@@ -62,7 +62,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
         let doc = YamlStream()
         doc.Load(stream)
 
-        // Document vide ou uniquement des commentaires : rejet explicite plutÃ´t
+        // Document vide ou uniquement des commentaires : rejet explicite plutôt
         // qu'un ArgumentOutOfRangeException brut.
         if doc.Documents.Count = 0 then
             raise (
@@ -77,7 +77,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
             | _ ->
                 raise (
                     RpcException(
-                        Status(StatusCode.InvalidArgument, "La racine du fichier compose doit Ãªtre un mapping YAML")
+                        Status(StatusCode.InvalidArgument, "La racine du fichier compose doit être un mapping YAML")
                     )
                 )
 
@@ -107,7 +107,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                                 RpcException(
                                     Status(
                                         StatusCode.InvalidArgument,
-                                        sprintf "Le service '%s' doit Ãªtre un mapping YAML" name
+                                        sprintf "Le service '%s' doit être un mapping YAML" name
                                     )
                                 )
                             )
@@ -172,7 +172,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                                         Status(
                                             StatusCode.InvalidArgument,
                                             sprintf
-                                                "Le service '%s' contient des entrÃ©es 'ports' invalides : %s"
+                                                "Le service '%s' contient des entrées 'ports' invalides : %s"
                                                 name
                                                 (String.Join(", ", rejected))
                                         )
@@ -249,7 +249,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                     let containerName = buildContainerName compose.ProjectName svc.Name 0
 
                     // Labels Diplo en DERNIER : ils priment sur les labels
-                    // utilisateur et ne peuvent pas Ãªtre dÃ©tournÃ©s par le compose.
+                    // utilisateur et ne peuvent pas être détournés par le compose.
                     let allLabels = ResizeArray<string * string>()
 
                     for kv in svc.Labels do
@@ -263,8 +263,8 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                     let env =
                         svc.Environment |> List.map (fun e -> e.Key, e.Value) |> dict
 
-                    // Transmettre les volumes ET les ports dÃ©clarÃ©s : les ignorer
-                    // produirait un dÃ©ploiement non conforme sans aucun avertissement.
+                    // Transmettre les volumes ET les ports déclarés : les ignorer
+                    // produirait un déploiement non conforme sans aucun avertissement.
                     let mounts =
                         match svc.Volumes with
                         | [] -> None
@@ -307,17 +307,17 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                     output.WriteSuccess(sprintf "  Conteneur %s démarré" response.Name)
                     created <- created + 1
                 with ex ->
-                    // TolÃ©rance aux Ã©checs partiels : continuer les autres services
-                    // puis restituer un bilan honnÃªte.
+                    // Tolérance aux échecs partiels : continuer les autres services
+                    // puis restituer un bilan honnête.
                     failures <- failures + 1
-                    output.WriteError(sprintf "  Service '%s' en Ã©chec : %s" svc.Name ex.Message)
+                    output.WriteError(sprintf "  Service '%s' en échec : %s" svc.Name ex.Message)
 
             if failures > 0 then
                 output.WriteWarning(
-                    sprintf "Projet '%s' partiellement dÃ©marrÃ© (%d OK, %d Ã©chec(s))" compose.ProjectName created failures
+                    sprintf "Projet '%s' partiellement démarré (%d OK, %d échec(s))" compose.ProjectName created failures
                 )
             else
-                output.WriteSuccess(sprintf "Projet '%s' dÃ©marrÃ© (%d conteneur(s))" compose.ProjectName created)
+                output.WriteSuccess(sprintf "Projet '%s' démarré (%d conteneur(s))" compose.ProjectName created)
         }
 
     member this.Down(filePath: string, ?ct: CancellationToken) =
@@ -343,21 +343,21 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
 
                         output.WriteSuccess(sprintf "  Conteneur %s arrêté et supprimé" c.Name)
                     with ex ->
-                        // Un Ã©chec sur un conteneur n'interrompt pas le nettoyage
+                        // Un échec sur un conteneur n'interrompt pas le nettoyage
                         // des autres conteneurs du projet.
                         failures <- failures + 1
-                        output.WriteError(sprintf "  Conteneur %s : Ã©chec de l'arrÃªt (%s)" c.Name ex.Message)
+                        output.WriteError(sprintf "  Conteneur %s : échec de l'arrêt (%s)" c.Name ex.Message)
 
             if failures > 0 then
                 output.WriteWarning(
                     sprintf
-                        "Projet '%s' partiellement arrÃªtÃ© (%d OK, %d Ã©chec(s))"
+                        "Projet '%s' partiellement arrêté (%d OK, %d échec(s))"
                         compose.ProjectName
                         stopped
                         failures
                 )
             else
-                output.WriteSuccess(sprintf "Projet '%s' arrÃªtÃ© (%d conteneur(s))" compose.ProjectName stopped)
+                output.WriteSuccess(sprintf "Projet '%s' arrêté (%d conteneur(s))" compose.ProjectName stopped)
         }
 
     member this.Ps(filePath: string, ?ct: CancellationToken) =
@@ -378,7 +378,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
             else
                 output.WriteTable(
                     projectContainers,
-                    [| "Service"; "Conteneur"; "Image"; "Ã‰tat"; "ID" |],
+                    [| "Service"; "Conteneur"; "Image"; "État"; "ID" |],
                     fun c ->
                         let service =
                             c.Labels
@@ -420,7 +420,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
             let compose = this.ParseFile(filePath)
 
             // Les services en build n'ont pas d'image dans un registre : leur
-            // nom est synthÃ©tique et le pull Ã©chouerait avec une erreur obscure.
+            // nom est synthétique et le pull échouerait avec une erreur obscure.
             let images =
                 compose.Services
                 |> List.filter (fun s -> s.Build.IsNone)
@@ -468,7 +468,7 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                             sprintf "  Dockerfile introuvable dans '%s' pour le service '%s'" resolvedPath svc.Name
                         )
                     else
-                        output.WriteSuccess(sprintf "  Construction de %s â†’ %s..." svc.Name svc.Image)
+                        output.WriteSuccess(sprintf "  Construction de %s → %s..." svc.Name svc.Image)
 
                         let psi =
                             ProcessStartInfo(
@@ -501,17 +501,17 @@ type ComposeOrchestrator(output: IOutputPort, ?containerClient: IContainerClient
                         do! proc.WaitForExitAsync(ct)
 
                         if proc.ExitCode = 0 then
-                            output.WriteSuccess(sprintf "  âœ“ Image '%s' construite" svc.Image)
+                            output.WriteSuccess(sprintf "  ✓ Image '%s' construite" svc.Image)
                         else
                             output.WriteError(
-                                sprintf "  âœ— Ã‰chec de la construction de '%s' (code %d)" svc.Image proc.ExitCode
+                                sprintf "  ✗ Échec de la construction de '%s' (code %d)" svc.Image proc.ExitCode
                             )
                 | None ->
                     output.WriteLine(
-                        sprintf "  %s utilise une image existante (%s), tÃ©lÃ©chargement..." svc.Name svc.Image
+                        sprintf "  %s utilise une image existante (%s), téléchargement..." svc.Name svc.Image
                     )
 
                     let! _ = containerClient.PullImageAsync(svc.Image, ct = ct)
-                    output.WriteSuccess(sprintf "  âœ“ Image '%s' disponible" svc.Image)
+                    output.WriteSuccess(sprintf "  ✓ Image '%s' disponible" svc.Image)
         }
 

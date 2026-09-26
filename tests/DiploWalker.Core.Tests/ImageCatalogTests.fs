@@ -8,10 +8,10 @@ module ImageCatalogTests =
     open FsUnit.Xunit
     open DiploWalker.Core
 
-    // â”€â”€ catalogPath â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── catalogPath ────────────────────────────────────────────────
 
     [<Fact>]
-    let ``catalogPath sans variable d'environnement pointe vers diplo-catalog.json du rÃ©pertoire courant`` () =
+    let ``catalogPath sans variable d'environnement pointe vers diplo-catalog.json du répertoire courant`` () =
         let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
         Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", null)
 
@@ -32,7 +32,7 @@ module ImageCatalogTests =
         finally
             Environment.SetEnvironmentVariable("DIPLO_CONFIG_HOME", old)
 
-    // â”€â”€ load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── load ───────────────────────────────────────────────────────
 
     let private tempDir () =
         let dir =
@@ -53,7 +53,7 @@ module ImageCatalogTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``load avec fichier malformÃ© renvoie un catalogue vide (repli)`` () =
+    let ``load avec fichier malformé renvoie un catalogue vide (repli)`` () =
         let dir = tempDir ()
         let path = catalogPath dir
         File.WriteAllText(path, "{ pas du json ]")
@@ -64,7 +64,7 @@ module ImageCatalogTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``load relit une entrÃ©e Ã©crite par add`` () =
+    let ``load relit une entrée écrite par add`` () =
         let dir = tempDir ()
         let path = catalogPath dir
         ImageCatalog.add path "nginx:latest" (Some "image web") |> should equal true
@@ -78,10 +78,10 @@ module ImageCatalogTests =
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€ add â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── add ────────────────────────────────────────────────────────
 
     [<Fact>]
-    let ``add refuse le doublon et laisse le catalogue inchangÃ©`` () =
+    let ``add refuse le doublon et laisse le catalogue inchangé`` () =
         let dir = tempDir ()
         let path = catalogPath dir
         ImageCatalog.add path "alpine:3.19" None |> should equal true
@@ -104,10 +104,10 @@ module ImageCatalogTests =
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€ update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── update ─────────────────────────────────────────────────────
 
     [<Fact>]
-    let ``update met Ã  jour la note et le nom de l'entrÃ©e`` () =
+    let ``update met à jour la note et le nom de l'entrée`` () =
         let dir = tempDir ()
         let path = catalogPath dir
         ImageCatalog.add path "alpine:3.19" (Some "ancienne") |> ignore
@@ -123,19 +123,19 @@ module ImageCatalogTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``update prÃ©serve la note quand elle n'est pas fournie`` () =
+    let ``update préserve la note quand elle n'est pas fournie`` () =
         let dir = tempDir ()
         let path = catalogPath dir
-        ImageCatalog.add path "alpine:3.19" (Some "gardÃ©e") |> ignore
+        ImageCatalog.add path "alpine:3.19" (Some "gardée") |> ignore
 
         try
             ImageCatalog.update path "alpine:3.19" None None |> should equal true
-            ImageCatalog.load path |> List.head |> fun e -> e.Note |> should equal (Some "gardÃ©e")
+            ImageCatalog.load path |> List.head |> fun e -> e.Note |> should equal (Some "gardée")
         finally
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``update d'une rÃ©fÃ©rence absente renvoie false`` () =
+    let ``update d'une référence absente renvoie false`` () =
         let dir = tempDir ()
         let path = catalogPath dir
 
@@ -144,10 +144,10 @@ module ImageCatalogTests =
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€ remove â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── remove ─────────────────────────────────────────────────────
 
     [<Fact>]
-    let ``remove retire l'entrÃ©e existante et renvoie true`` () =
+    let ``remove retire l'entrée existante et renvoie true`` () =
         let dir = tempDir ()
         let path = catalogPath dir
         ImageCatalog.add path "nginx:latest" None |> ignore
@@ -159,7 +159,7 @@ module ImageCatalogTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``remove d'une rÃ©fÃ©rence absente renvoie false`` () =
+    let ``remove d'une référence absente renvoie false`` () =
         let dir = tempDir ()
         let path = catalogPath dir
 
@@ -168,10 +168,10 @@ module ImageCatalogTests =
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€ save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── save ───────────────────────────────────────────────────────
 
     [<Fact>]
-    let ``save crÃ©e le rÃ©pertoire parent manquant`` () =
+    let ``save crée le répertoire parent manquant`` () =
         let dir = tempDir ()
 
         try

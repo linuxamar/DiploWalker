@@ -191,7 +191,7 @@ module LocalDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ RemoveVolume montÃ© â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── RemoveVolume monté ───────────────────────────────────────
 
     [<Fact>]
     let ``RemoveVolume sans force sur volume monte leve FailedPrecondition`` () =
@@ -221,7 +221,7 @@ module LocalDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ ListVolumes filtres â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── ListVolumes filtres ──────────────────────────────────────
 
     [<Fact>]
     let ``ListVolumes filtre par nom (insensible a la casse)`` () =
@@ -296,7 +296,7 @@ module LocalDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ CreateVolume/MountVolume avec chemin externe (path) â”€â”€â”€â”€â”€â”€
+    // ── CreateVolume/MountVolume avec chemin externe (path) ──────
 
     [<Fact>]
     let ``CreateVolume avec option path pointe sur le repertoire externe`` () =
@@ -309,7 +309,7 @@ module LocalDriverTests =
             let (id, mountpoint) = driver.CreateVolume("path-vol", Map.ofList [ "path", external ], Map.empty)
             mountpoint |> should equal external
             Directory.Exists(external) |> should equal true
-            // Le _data interne n'est pas crÃ©Ã© pour un volume rÃ©fÃ©rencÃ©.
+            // Le _data interne n'est pas créé pour un volume référencé.
             let (_, mountDir) = driver.MountVolume(id, "target", "")
             Directory.Exists(mountDir) |> should equal true
         finally
@@ -331,7 +331,7 @@ module LocalDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ PruneVolumes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── PruneVolumes ─────────────────────────────────────────────
 
     [<Fact>]
     let ``PruneVolumes supprime les volumes non montes et ignore les montes`` () =

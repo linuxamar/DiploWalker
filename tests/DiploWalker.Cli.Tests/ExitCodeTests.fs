@@ -15,7 +15,7 @@ module ExitCodeTests =
         let command = cmd :> ICommand<'T>
         command.ExecuteAsync(Unchecked.defaultof<CommandContext>, settings, CancellationToken.None).Result
 
-    // â”€â”€â”€ Conteneurs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Conteneurs ───────────────────────────────────────────────────
     open DiploWalker.Cli.Container
 
     [<Fact>]
@@ -81,7 +81,7 @@ module ExitCodeTests =
 
         code |> should equal 1
 
-    // â”€â”€â”€ Volumes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Volumes ──────────────────────────────────────────────────────
     open DiploWalker.Cli.Volume
 
     [<Fact>]
@@ -128,7 +128,7 @@ module ExitCodeTests =
 
         code |> should equal 1
 
-    // â”€â”€â”€ RÃ©seaux â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Réseaux ──────────────────────────────────────────────────────
     open DiploWalker.Cli.Network
 
     [<Fact>]
@@ -214,7 +214,7 @@ module ExitCodeTests =
 
         code |> should equal 1
 
-    // â”€â”€â”€ Disk â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Disk ─────────────────────────────────────────────────────────
     open DiploWalker.Cli.Disk
 
     [<Fact>]
@@ -247,7 +247,7 @@ module ExitCodeTests =
         code |> should equal 1
         output.Errors |> should not' (be Empty)
 
-    // â”€â”€â”€ Volume inspect / mount / unmount â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Volume inspect / mount / unmount ─────────────────────────────
     open DiploWalker.Cli.Volume
 
     [<Fact>]
@@ -277,7 +277,7 @@ module ExitCodeTests =
         code |> should equal 1
         output.Errors |> should not' (be Empty)
 
-    // â”€â”€â”€ Network inspect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Network inspect ──────────────────────────────────────────────
     open DiploWalker.Cli.Network
 
     [<Fact>]
@@ -287,7 +287,7 @@ module ExitCodeTests =
         code |> should equal 1
         output.Errors |> should not' (be Empty)
 
-    // â”€â”€â”€ Compose â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Compose ──────────────────────────────────────────────────────
     open DiploWalker.Cli.Compose
 
     [<Fact>]

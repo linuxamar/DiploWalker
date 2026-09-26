@@ -94,7 +94,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                 | ex ->
                     Log.Warning(
                         ex,
-                        "Erreur lors de la crÃ©ation du volume {Name} avec le driver {Driver}",
+                        "Erreur lors de la création du volume {Name} avec le driver {Driver}",
                         name,
                         driverType
                     )
@@ -104,7 +104,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                             RpcException(
                                 Status(
                                     StatusCode.Internal,
-                                    sprintf "Erreur lors de la crÃ©ation du volume '%s': %s" name ex.Message
+                                    sprintf "Erreur lors de la création du volume '%s': %s" name ex.Message
                                 )
                             )
                         )
@@ -137,7 +137,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                 else
                     return
                         { RemoveVolumeResponse.Success = true
-                          Message = "Volume supprimÃ©" }
+                          Message = "Volume supprimé" }
             }
 
         member _.InspectVolume(request, _context) =
@@ -215,8 +215,8 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                 with ex ->
                     Log.Warning(ex, "Erreur lors du parsing des informations du volume {VolumeId}", request.Id)
 
-                    // Une erreur interne ne doit pas ressembler Ã  un volume vide :
-                    // le client distinguerait mal Â« absent Â» et Â« en panne Â».
+                    // Une erreur interne ne doit pas ressembler à un volume vide :
+                    // le client distinguerait mal « absent » et « en panne ».
                     return
                         raise (
                             RpcException(
@@ -247,7 +247,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                 let bounded =
                     if volumeCount > ServiceGuards.MaxListItems then
                         Log.Warning(
-                            "Liste des volumes tronquÃ©e Ã  {Limit} Ã©lÃ©ments (reÃ§u {Count})",
+                            "Liste des volumes tronquée à {Limit} éléments (reçu {Count})",
                             ServiceGuards.MaxListItems,
                             volumeCount
                         )
@@ -301,7 +301,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                         return
                             { MountVolumeResponse.State = MountState.Mounted
                               Mountpoint = mountpoint
-                              Message = "Volume montÃ©" }
+                              Message = "Volume monté" }
                     | None ->
                         return
                             { MountVolumeResponse.State = MountState.Error
@@ -337,7 +337,7 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                         | ex ->
                             Log.Warning(
                                 ex,
-                                "Le driver {Driver} n'a pas pu dÃ©monter le volume {VolumeId}",
+                                "Le driver {Driver} n'a pas pu démonter le volume {VolumeId}",
                                 driver.GetType().Name,
                                 request.Id
                             )
@@ -357,14 +357,14 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                               Message = "Démonté" }
                 with
                 | :? RpcException as rpcEx ->
-                    Log.Warning(rpcEx, "Erreur lors du dÃ©montage du volume {VolumeId}", request.Id)
+                    Log.Warning(rpcEx, "Erreur lors du démontage du volume {VolumeId}", request.Id)
                     return raise rpcEx
                 | ex ->
-                    Log.Warning(ex, "Erreur lors du dÃ©montage du volume {VolumeId}", request.Id)
+                    Log.Warning(ex, "Erreur lors du démontage du volume {VolumeId}", request.Id)
 
                     return
                         { UnmountVolumeResponse.State = MountState.Error
-                          Message = "Erreur interne lors du dÃ©montage du volume" }
+                          Message = "Erreur interne lors du démontage du volume" }
             }
 
         member _.PruneVolumes(request, _context) =
@@ -383,6 +383,6 @@ type VolumeServiceImpl(registry: VolumeDriverRegistry) =
                 return
                     { PruneVolumesResponse.VolumesDeleted = System.Collections.Generic.List<string>(allRemoved)
                       Count = count
-                      Message = sprintf "%d volume(s) supprimÃ©(s)" count }
+                      Message = sprintf "%d volume(s) supprimé(s)" count }
             }
 

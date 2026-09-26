@@ -8,7 +8,7 @@ open DiploWalker.Abstractions
 type DiploWalkerJsonTests() =
 
     [<Fact>]
-    let ``defaultOptions produit du JSON indentÃ©`` () =
+    let ``defaultOptions produit du JSON indenté`` () =
         let opts = DiploWalkerJson.defaultOptions
         opts.WriteIndented |> should equal true
 
@@ -18,7 +18,7 @@ type DiploWalkerJsonTests() =
         opts.PropertyNamingPolicy |> should equal JsonNamingPolicy.SnakeCaseLower
 
     [<Fact>]
-    let ``caseInsensitiveOptions est insensible Ã  la casse`` () =
+    let ``caseInsensitiveOptions est insensible à la casse`` () =
         let opts = DiploWalkerJson.caseInsensitiveOptions
         opts.PropertyNameCaseInsensitive |> should equal true
 

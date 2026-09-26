@@ -9,7 +9,7 @@ open DiploWalker.Abstractions
 type CachedConfigTests() =
 
     [<Fact>]
-    let ``Value charge via le loader une premiÃ¨re fois`` () =
+    let ``Value charge via le loader une première fois`` () =
         let mutable callCount = 0
 
         let loader =
@@ -63,18 +63,18 @@ type CachedConfigTests() =
         cache.Load() |> should equal 2
 
     [<Fact>]
-    let ``IsCached est false avant le premier accÃ¨s`` () =
+    let ``IsCached est false avant le premier accès`` () =
         let cache = CachedConfig<int>(fun () -> 42)
         cache.IsCached |> should equal false
 
     [<Fact>]
-    let ``IsCached est true aprÃ¨s un accÃ¨s`` () =
+    let ``IsCached est true après un accès`` () =
         let cache = CachedConfig<int>(fun () -> 42)
         cache.Value |> ignore
         cache.IsCached |> should equal true
 
     [<Fact>]
-    let ``IsCached est false aprÃ¨s invalidation`` () =
+    let ``IsCached est false après invalidation`` () =
         let cache = CachedConfig<int>(fun () -> 42)
         cache.Value |> ignore
         cache.Invalidate()
@@ -88,14 +88,14 @@ type CachedConfigTests() =
         cache.Value |> should equal "hello"
 
     [<Fact>]
-    let ``Un chargement rÃ©entrant lÃ¨ve une exception claire`` () =
+    let ``Un chargement réentrant lève une exception claire`` () =
         let mutable reentered = false
         let mutable cache = Unchecked.defaultof<CachedConfig<bool>>
         cache <- CachedConfig<bool>(fun () -> reentered <- cache.Value; reentered)
         Assert.Throws<InvalidOperationException>(fun () -> cache.Value |> ignore) |> ignore
 
     [<Fact>]
-    let ``AccÃ¨s concurrents : le loader n'est exÃ©cutÃ© qu'une seule fois`` () =
+    let ``Accès concurrents : le loader n'est exécuté qu'une seule fois`` () =
         let mutable callCount = 0
         let cache = CachedConfig<int>(fun () -> callCount <- callCount + 1; 42)
 

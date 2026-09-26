@@ -1,6 +1,6 @@
 ﻿namespace DiploWalker.Abstractions.Tests
 
-// SÃ©rialisÃ© avec AuthTokenTests : les deux manipulent le chemin global
+// Sérialisé avec AuthTokenTests : les deux manipulent le chemin global
 // du fichier de token.
 [<Xunit.Collection("auth-token")>]
 module TokenAuthMiddlewareTests =
@@ -49,9 +49,9 @@ module TokenAuthMiddlewareTests =
         ctx.Request.Headers.Append("Authorization", StringValues("Bearer " + token))
         |> ignore
 
-    // Redirige le chemin global du fichier de token vers un rÃ©pertoire
-    // temporaire utilisateur : Ã©vite l'UnauuthorizedAccessException sur
-    // C:\ProgramData\Diplo (rÃ©servÃ© aux administrateurs) en CI non Ã©lever.
+    // Redirige le chemin global du fichier de token vers un répertoire
+    // temporaire utilisateur : évite l'UnauuthorizedAccessException sur
+    // C:\ProgramData\Diplo (réservé aux administrateurs) en CI non élever.
     let withTempPath (f: unit -> unit) =
         let dir =
             Path.Combine(Path.GetTempPath(), "diplo-auth-http-" + Guid.NewGuid().ToString("N"))

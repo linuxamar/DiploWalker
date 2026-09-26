@@ -8,7 +8,7 @@ module ArtifactSigningTests =
     open FsUnit.Xunit
     open DiploWalker.Installer.ArtifactSigning
 
-    // â”€â”€â”€ Parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Parsing ──────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``parseManifest ignore les commentaires et les lignes vides`` () =
@@ -22,12 +22,12 @@ sha256  b.tgz    0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDE
         map |> should haveCount 2
 
     [<Fact>]
-    let ``parseManifest rejette une ligne avec un en-tÃªte inconnu`` () =
+    let ``parseManifest rejette une ligne avec un en-tête inconnu`` () =
         let content = "md5  a.tar.gz  abc"
         (fun () -> parseManifest content |> ignore) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``parseManifest rejette un nom de fichier dupliquÃ©`` () =
+    let ``parseManifest rejette un nom de fichier dupliqué`` () =
         let content =
             "sha256  a.tar.gz  0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD
 sha256  a.tar.gz  0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD"
@@ -35,7 +35,7 @@ sha256  a.tar.gz  0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD
         (fun () -> parseManifest content |> ignore) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``parseManifest rejette un condensat non hexadÃ©cimal de 64 caractÃ¨res`` () =
+    let ``parseManifest rejette un condensat non hexadécimal de 64 caractères`` () =
         let content = "sha256  a.tar.gz  pas-un-condensat"
         (fun () -> parseManifest content |> ignore) |> should throw typeof<Exception>
 
@@ -46,7 +46,7 @@ sha256  a.tar.gz  0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD
         let map = parseManifest (up + "\n" + low)
         map |> should haveCount 2
 
-    // â”€â”€â”€ VÃ©rification de signature pure â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Vérification de signature pure ───────────────────────────────────
 
     let private makeKeyPair () =
         let rsa = System.Security.Cryptography.RSA.Create(4096)
@@ -55,9 +55,9 @@ sha256  a.tar.gz  0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD
         pubPem, privPem
 
     [<Fact>]
-    let ``verifyDetachedSignature accepte une signature valide et rejette un contenu altÃ©rÃ©`` () =
+    let ``verifyDetachedSignature accepte une signature valide et rejette un contenu altéré`` () =
         let pubPem, privPem = makeKeyPair ()
-        let data = Encoding.UTF8.GetBytes("contenu signÃ©")
+        let data = Encoding.UTF8.GetBytes("contenu signé")
 
         use rsa = System.Security.Cryptography.RSA.Create()
         rsa.ImportFromPem(privPem)
@@ -66,13 +66,13 @@ sha256  a.tar.gz  0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD
 
         verifyDetachedSignature pubPem data signature |> should equal true
 
-        let tampered = Encoding.UTF8.GetBytes("contenu altÃ©rÃ©")
+        let tampered = Encoding.UTF8.GetBytes("contenu altéré")
         verifyDetachedSignature pubPem tampered signature |> should equal false
 
-    // â”€â”€â”€ Manifeste embarquÃ© (tests d'intÃ©gration) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Manifeste embarqué (tests d'intégration) ────────────────────────
 
     [<Fact>]
-    let ``loadVerifiedManifest vÃ©rifie et charge le manifeste embarquÃ© signÃ©`` () =
+    let ``loadVerifiedManifest vérifie et charge le manifeste embarqué signé`` () =
         let map = loadVerifiedManifest ()
         map |> should haveCount 4
 
@@ -101,7 +101,7 @@ sha256  a.tar.gz  0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD
         lookupChecksum map "inconnu.tar.gz" |> should equal None
 
     [<Fact>]
-    let ``verifyDetachedSignature rejette une signature produite par une autre clÃ©`` () =
+    let ``verifyDetachedSignature rejette une signature produite par une autre clé`` () =
         let pubPem, privPem = makeKeyPair ()
         let otherPub, otherPriv = makeKeyPair ()
         let data = Encoding.UTF8.GetBytes("contenu")

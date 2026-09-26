@@ -1,7 +1,7 @@
 ﻿namespace DiploWalker.Cli.Tests
 
-/// Parcours de succÃ¨s et d'Ã©chec gÃ©rÃ©s par les commandes CLI, via des clients
-/// injectÃ©s (FakeDiploClients) : la sortie et le code de retour ne dÃ©pendent
+/// Parcours de succès et d'échec gérés par les commandes CLI, via des clients
+/// injectés (FakeDiploClients) : la sortie et le code de retour ne dépendent
 /// pas d'un serveur gRPC.
 module SuccessPathTests =
 
@@ -20,17 +20,17 @@ module SuccessPathTests =
         let command = cmd :> ICommand<'T>
         command.ExecuteAsync(Unchecked.defaultof<CommandContext>, settings, CancellationToken.None).Result
 
-    // â”€â”€â”€ Conteneurs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Conteneurs ───────────────────────────────────────────────────
     open DiploWalker.Cli.Container
 
     [<Fact>]
-    let ``container delete en succÃ¨s retourne 0 et Ã©crit le message`` () =
+    let ``container delete en succès retourne 0 et écrit le message`` () =
         let output = MockOutputPort()
 
         let client =
             new FakeContainerClient(
                 { Success = true
-                  Message = "Conteneur supprimÃ©" },
+                  Message = "Conteneur supprimé" },
                 { Id = "c1"
                   Name = "app"
                   State = ContainerState.Stopped
@@ -49,11 +49,11 @@ module SuccessPathTests =
             run (DeleteContainerCommand(output, clients)) (DeleteSettings(Id = "abc"))
 
         code |> should equal 0
-        output.Successes |> should contain "Conteneur supprimÃ©"
+        output.Successes |> should contain "Conteneur supprimé"
         client.DeleteCalls |> should equal 1
 
     [<Fact>]
-    let ``container delete en Ã©chec retourne 1 et Ã©crit l'erreur`` () =
+    let ``container delete en échec retourne 1 et écrit l'erreur`` () =
         let output = MockOutputPort()
 
         let client =
@@ -81,7 +81,7 @@ module SuccessPathTests =
         output.Errors |> should contain "Conteneur introuvable"
 
     [<Fact>]
-    let ``container create en succÃ¨s retourne 0 et contacte le client`` () =
+    let ``container create en succès retourne 0 et contacte le client`` () =
         let output = MockOutputPort()
 
         let client =
@@ -109,7 +109,7 @@ module SuccessPathTests =
         output.Successes |> should not' (be Empty)
 
     [<Fact>]
-    let ``registry login en succÃ¨s retourne 0`` () =
+    let ``registry login en succès retourne 0`` () =
         let output = MockOutputPort()
 
         let client =
@@ -120,7 +120,7 @@ module SuccessPathTests =
                   State = ContainerState.Stopped
                   CreatedAt = "" },
                 { Success = true
-                  Message = "Connexion Ã©tablie" }
+                  Message = "Connexion établie" }
             )
 
         let clients =
@@ -137,13 +137,13 @@ module SuccessPathTests =
 
         code |> should equal 0
         client.LoginCalls |> should equal 1
-        output.Successes |> should contain "Connexion Ã©tablie"
+        output.Successes |> should contain "Connexion établie"
 
-    // â”€â”€â”€ Volumes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Volumes ──────────────────────────────────────────────────────
     open DiploWalker.Cli.Volume
 
     [<Fact>]
-    let ``volume create en succÃ¨s retourne 0`` () =
+    let ``volume create en succès retourne 0`` () =
         let output = MockOutputPort()
 
         let volume =
@@ -171,7 +171,7 @@ module SuccessPathTests =
         output.Successes |> should not' (be Empty)
 
     [<Fact>]
-    let ``volume remove en Ã©chec retourne 1 et Ã©crit l'erreur`` () =
+    let ``volume remove en échec retourne 1 et écrit l'erreur`` () =
         let output = MockOutputPort()
 
         let volume =
@@ -182,7 +182,7 @@ module SuccessPathTests =
                   Mountpoint = ""
                   CreatedAt = "" },
                 { Success = false
-                  Message = "Volume non trouvÃ©" }
+                  Message = "Volume non trouvé" }
             )
 
         let clients =
@@ -197,13 +197,13 @@ module SuccessPathTests =
 
         code |> should equal 1
         volume.RemoveCalls |> should equal 1
-        output.Errors |> should contain "Volume non trouvÃ©"
+        output.Errors |> should contain "Volume non trouvé"
 
-    // â”€â”€â”€ RÃ©seaux â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Réseaux ──────────────────────────────────────────────────────
     open DiploWalker.Cli.Network
 
     [<Fact>]
-    let ``network create en succÃ¨s retourne 0`` () =
+    let ``network create en succès retourne 0`` () =
         let output = MockOutputPort()
 
         let network =
@@ -236,7 +236,7 @@ module SuccessPathTests =
         output.Successes |> should not' (be Empty)
 
     [<Fact>]
-    let ``run-cni-plugin en succÃ¨s retourne 0 et affiche l'interface`` () =
+    let ``run-cni-plugin en succès retourne 0 et affiche l'interface`` () =
         let output = MockOutputPort()
 
         let network =
@@ -273,11 +273,11 @@ module SuccessPathTests =
 
         code |> should equal 0
         network.RunCniCalls |> should equal 1
-        output.Successes |> should contain "Plugin CNI exÃ©cutÃ© avec succÃ¨s"
+        output.Successes |> should contain "Plugin CNI exécuté avec succès"
         output.Lines |> should contain (sprintf "  IPv4      : %s" "10.0.0.2")
 
     [<Fact>]
-    let ``run-cni-plugin en Ã©chec retourne 1 et Ã©crit l'erreur`` () =
+    let ``run-cni-plugin en échec retourne 1 et écrit l'erreur`` () =
         let output = MockOutputPort()
 
         let network =
@@ -292,7 +292,7 @@ module SuccessPathTests =
                   Ifname = ""
                   Ipv4Address = ""
                   Gateway = ""
-                  Message = "ADD a Ã©chouÃ©" }
+                  Message = "ADD a échoué" }
             )
 
         let clients =
@@ -315,13 +315,13 @@ module SuccessPathTests =
         code |> should equal 1
 
         output.Errors
-        |> should contain (sprintf "Ã‰chec du plugin CNI: %s" "ADD a Ã©chouÃ©")
+        |> should contain (sprintf "Échec du plugin CNI: %s" "ADD a échoué")
 
-    // â”€â”€â”€ Disk â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Disk ─────────────────────────────────────────────────────────
     open DiploWalker.Cli.Disk
 
     [<Fact>]
-    let ``disk create-image en succÃ¨s retourne 0 et Ã©crit le succÃ¨s`` () =
+    let ``disk create-image en succès retourne 0 et écrit le succès`` () =
         let output = MockOutputPort()
         let root = TestHelpers.createTempDir "cli-disk"
 

@@ -216,7 +216,7 @@ module ContainerIntegrationTests =
         finally
             stopApp app
 
-    /// CrÃ©e une image disque FAT 64 Mo (table de partitions BIOS) contenant
+    /// Crée une image disque FAT 64 Mo (table de partitions BIOS) contenant
     /// les fichiers (chemin relatif, contenu texte) fournis.
     let private createFatImage (path: string) (contents: (string * string) list) =
         use fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite)
@@ -288,7 +288,7 @@ module ContainerIntegrationTests =
             let startReq: StartContainerRequest = { Id = createResult.Id; Attach = false }
             let startResult = client.StartContainer(startReq, CancellationToken.None).Result
             startResult.State |> should equal ContainerState.Running
-            startResult.Message |> should equal "Conteneur dÃ©marrÃ©")
+            startResult.Message |> should equal "Conteneur démarré")
 
     [<Fact>]
     let ``CreateContainer avec montage d'un repertoire via gRPC`` () =
@@ -488,7 +488,7 @@ module ContainerIntegrationTests =
 
             let stopResult = client.StopContainer(stopReq, CancellationToken.None).Result
             stopResult.State |> should equal ContainerState.Stopped
-            stopResult.Message |> should equal "Conteneur arrÃªtÃ©")
+            stopResult.Message |> should equal "Conteneur arrêté")
 
     [<Fact>]
     let ``CreateContainer avec image vide via gRPC lance exception`` () =

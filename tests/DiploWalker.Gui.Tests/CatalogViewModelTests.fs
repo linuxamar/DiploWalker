@@ -31,7 +31,7 @@ let private tempCatalog () =
     let path = Path.Combine(dir, "diplo-catalog.json")
     (dir, path)
 
-// â”€â”€ ListCatalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ListCatalog ────────────────────────────────────────────────
 
 [<Fact>]
 let ``ContainerTabViewModel ListCatalog ecrit le bilan du catalogue`` () =
@@ -58,10 +58,10 @@ let ``ContainerTabViewModel ListCatalog catalogue vide affiche 0`` () =
     finally
         Directory.Delete(dir, true)
 
-// â”€â”€ AddToCatalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AddToCatalog ───────────────────────────────────────────────
 
 [<Fact>]
-let ``ContainerTabViewModel AddToCatalog tire l'image et inscrit l'entrÃ©e`` () =
+let ``ContainerTabViewModel AddToCatalog tire l'image et inscrit l'entrée`` () =
     let port = MockOutputPort()
     let fake = new FakeContainerClient()
     let dir, path = tempCatalog ()
@@ -81,7 +81,7 @@ let ``ContainerTabViewModel AddToCatalog tire l'image et inscrit l'entrÃ©e`` (
         Directory.Delete(dir, true)
 
 [<Fact>]
-let ``ContainerTabViewModel AddToCatalog doublon prÃ©vient sans toucher au fichier`` () =
+let ``ContainerTabViewModel AddToCatalog doublon prévient sans toucher au fichier`` () =
     let port = MockOutputPort()
     let fake = new FakeContainerClient()
     let dir, path = tempCatalog ()
@@ -93,15 +93,15 @@ let ``ContainerTabViewModel AddToCatalog doublon prÃ©vient sans toucher au fic
         (vm.AddToCatalogCommand :> ICommand).Execute(null)
         waitUntil (fun () -> port.Warnings |> List.exists (fun m -> m.Contains "est déjà au catalogue")) |> should equal true
         ImageCatalog.load path |> should haveLength 1
-        // RefreshCatalogue relit le fichier en tÃ¢che de fond via UiThread.Post :
-        // on attend la fin de la relecture avant de supprimer le rÃ©pertoire,
+        // RefreshCatalogue relit le fichier en tâche de fond via UiThread.Post :
+        // on attend la fin de la relecture avant de supprimer le répertoire,
         // sinon Directory.Delete court avec la lecture du fichier.
         waitUntil (fun () -> vm.Catalogue.Count = 1) |> should equal true
     finally
         Directory.Delete(dir, true)
 
 [<Fact>]
-let ``ContainerTabViewModel AddToCatalog sans rÃ©fÃ©rence prÃ©vient sans pull`` () =
+let ``ContainerTabViewModel AddToCatalog sans référence prévient sans pull`` () =
     let port = MockOutputPort()
     let fake = new FakeContainerClient()
     let dir, path = tempCatalog ()
@@ -115,10 +115,10 @@ let ``ContainerTabViewModel AddToCatalog sans rÃ©fÃ©rence prÃ©vient sans p
     finally
         Directory.Delete(dir, true)
 
-// â”€â”€ UpdateCatalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── UpdateCatalog ──────────────────────────────────────────────
 
 [<Fact>]
-let ``ContainerTabViewModel UpdateCatalog Ã©tiquette et renomme l'entrÃ©e`` () =
+let ``ContainerTabViewModel UpdateCatalog étiquette et renomme l'entrée`` () =
     let port = MockOutputPort()
     let fake = new FakeContainerClient()
     let dir, path = tempCatalog ()
@@ -144,7 +144,7 @@ let ``ContainerTabViewModel UpdateCatalog Ã©tiquette et renomme l'entrÃ©e`` 
         Directory.Delete(dir, true)
 
 [<Fact>]
-let ``ContainerTabViewModel UpdateCatalog rÃ©fÃ©rence absente prÃ©vient`` () =
+let ``ContainerTabViewModel UpdateCatalog référence absente prévient`` () =
     let port = MockOutputPort()
     let fake = new FakeContainerClient()
     let dir, path = tempCatalog ()
@@ -163,10 +163,10 @@ let ``ContainerTabViewModel UpdateCatalog rÃ©fÃ©rence absente prÃ©vient`` 
     finally
         Directory.Delete(dir, true)
 
-// â”€â”€ RemoveFromCatalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── RemoveFromCatalog ──────────────────────────────────────────
 
 [<Fact>]
-let ``ContainerTabViewModel RemoveFromCatalog supprime et retire l'entrÃ©e`` () =
+let ``ContainerTabViewModel RemoveFromCatalog supprime et retire l'entrée`` () =
     let port = MockOutputPort()
     let fake = new FakeContainerClient()
     let dir, path = tempCatalog ()
@@ -188,7 +188,7 @@ let ``ContainerTabViewModel RemoveFromCatalog supprime et retire l'entrÃ©e`` (
         Directory.Delete(dir, true)
 
 [<Fact>]
-let ``ContainerTabViewModel RemoveFromCatalog rÃ©fÃ©rence absente prÃ©vient sans Docker`` () =
+let ``ContainerTabViewModel RemoveFromCatalog référence absente prévient sans Docker`` () =
     let port = MockOutputPort()
     let fake = new FakeContainerClient()
     let dir, path = tempCatalog ()

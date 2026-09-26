@@ -7,7 +7,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Logging
 open DiploWalker.Abstractions.AuthToken
 
-/// FenÃªtre glissante de rate limiting par adresse IP.
+/// Fenêtre glissante de rate limiting par adresse IP.
 type private RateLimiter(maxRequests: int, windowSeconds: int) =
     let hits = ConcurrentDictionary<string, ResizeArray<DateTime>>()
 
@@ -17,7 +17,7 @@ type private RateLimiter(maxRequests: int, windowSeconds: int) =
         let timestamps = hits.GetOrAdd(ip, fun _ -> ResizeArray<DateTime>())
 
         lock (box timestamps) (fun () ->
-            // Nettoyer les entrÃ©es hors fenÃªtre
+            // Nettoyer les entrées hors fenêtre
             timestamps.RemoveAll(fun t -> t < windowStart) |> ignore
 
             if timestamps.Count >= maxRequests then
@@ -28,7 +28,7 @@ type private RateLimiter(maxRequests: int, windowSeconds: int) =
 
     member _.TryReset(ip: string) = hits.TryRemove(ip) |> ignore
 
-    /// Nettoie les entrÃ©es expirÃ©es de toutes les IP (appelÃ© pÃ©riodiquement).
+    /// Nettoie les entrées expirées de toutes les IP (appelé périodiquement).
     member _.PurgeExpired() =
         let now = DateTime.UtcNow
         let windowStart = now.AddSeconds(-float windowSeconds)
@@ -42,9 +42,9 @@ type private RateLimiter(maxRequests: int, windowSeconds: int) =
 
 let private rateLimiter = RateLimiter(maxRequests = 30, windowSeconds = 60)
 
-/// Timer de nettoyage : purge les entrÃ©es expirÃ©es toutes les 2 minutes.
-/// DÃ©tenu au niveau du module pour la persistance du rate limiter entre les
-/// requÃªtes ; dispose sur l'arrÃªt du service (voir disposePurge).
+/// Timer de nettoyage : purge les entrées expirées toutes les 2 minutes.
+/// Détenu au niveau du module pour la persistance du rate limiter entre les
+/// requêtes ; dispose sur l'arrêt du service (voir disposePurge).
 let private purgeTimer =
     new System.Threading.Timer(
         (fun _ -> rateLimiter.PurgeExpired()),
@@ -53,8 +53,8 @@ let private purgeTimer =
         System.TimeSpan.FromMinutes(2.0)
     )
 
-/// Dispose le timer de purge (appelÃ© Ã  l'arrÃªt du service â€” M9) : Ã©vite de
-/// laisser un Timer racine actif indÃ©finiment.
+/// Dispose le timer de purge (appelé à l'arrêt du service — M9) : évite de
+/// laisser un Timer racine actif indéfiniment.
 let disposePurge () =
     try
         purgeTimer.Dispose()
@@ -68,8 +68,8 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
         path.StartsWith("/healthz", StringComparison.OrdinalIgnoreCase)
 
     member _.Invoke(context: HttpContext) : Task =
-        // Erreurs serveur : aucune mise en cache, et le corps de la rÃ©ponse Ã©crit
-        // est bien retournÃ© comme tÃ¢che (M9 â€” sinon la rÃ©ponse peut Ãªtre tronquÃ©e).
+        // Erreurs serveur : aucune mise en cache, et le corps de la réponse écrit
+        // est bien retourné comme tâche (M9 — sinon la réponse peut être tronquée).
         let writeError (status: int) (message: string) =
             context.Response.Headers.CacheControl <- "no-store"
             context.Response.StatusCode <- status
@@ -88,12 +88,12 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
                     | None -> "unknown"
 
             if not (rateLimiter.IsAllowed(clientIp)) then
-                logger.LogWarning("Rate limit dÃ©passÃ© pour {ClientIp}", clientIp)
-                writeError 429 "Trop de requÃªtes â€” rÃ©essayez plus tard"
+                logger.LogWarning("Rate limit dépassé pour {ClientIp}", clientIp)
+                writeError 429 "Trop de requêtes — réessayez plus tard"
             else
                 match loadToken () with
                 | None ->
-                    logger.LogWarning("Fichier auth-token.json introuvable â€” accÃ¨s refusÃ© (fail-closed)")
+                    logger.LogWarning("Fichier auth-token.json introuvable — accès refusé (fail-closed)")
                     writeError 401 "Fichier auth-token.json introuvable"
                 | Some _ ->
                     match context.Request.Headers.TryGetValue("authorization") with
@@ -109,8 +109,8 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
                                 logger.LogWarning("Token invalide depuis {ClientIp}", clientIp)
                                 writeError 401 "Token invalide"
                         else
-                            // Ne jamais journaliser la valeur brute de l'en-tÃªte
-                            // (elle peut contenir un secret) : schÃ©ma seul + longueur.
+                            // Ne jamais journaliser la valeur brute de l'en-tête
+                            // (elle peut contenir un secret) : schéma seul + longueur.
                             let schemeEnd = header.IndexOf(' ')
 
                             let scheme =
@@ -120,7 +120,7 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
                                     "<sans espace>"
 
                             logger.LogWarning(
-                                "Format Authorization invalide depuis {ClientIp} (schÃ©ma: {Scheme}, longueur: {Length})",
+                                "Format Authorization invalide depuis {ClientIp} (schéma: {Scheme}, longueur: {Length})",
                                 clientIp,
                                 scheme,
                                 header.Length
@@ -128,6 +128,6 @@ type TokenAuthMiddleware(next: RequestDelegate, logger: ILogger<TokenAuthMiddlew
 
                             writeError 401 "Format Authorization invalide"
                     | _ ->
-                        logger.LogWarning("En-tÃªte Authorization manquant depuis {ClientIp}", clientIp)
-                        writeError 401 "En-tÃªte Authorization manquant"
+                        logger.LogWarning("En-tête Authorization manquant depuis {ClientIp}", clientIp)
+                        writeError 401 "En-tête Authorization manquant"
 

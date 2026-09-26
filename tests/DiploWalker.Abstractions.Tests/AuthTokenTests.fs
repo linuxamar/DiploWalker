@@ -9,7 +9,7 @@ module AuthTokenTests =
     open FsUnit.Xunit
     open DiploWalker.Abstractions.AuthToken
 
-    // SÃ©rialisÃ© avec TokenAuthMiddlewareTests : les deux manipulent le
+    // Sérialisé avec TokenAuthMiddlewareTests : les deux manipulent le
     // chemin global du fichier de token.
     [<Xunit.Collection("auth-token")>]
     module Tests =

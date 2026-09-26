@@ -8,7 +8,7 @@ module NetworkConfigTests =
     open FsUnit.Xunit
     open DiploWalker.Abstractions.NetworkConfig
 
-    // â”€â”€â”€ Valeurs par dÃ©faut â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Valeurs par défaut ─────────────────────────────────────────────
 
     [<Fact>]
     let ``defaultConfig a les bonnes valeurs par defaut`` () =
@@ -27,7 +27,7 @@ module NetworkConfigTests =
     let ``defaultCniCandidates contient 5 sous-reseaux`` () =
         defaultCniCandidates.Length |> should equal 5
 
-    // â”€â”€â”€ Serialisation JSON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Serialisation JSON ──────────────────────────────────────────────
 
     [<Fact>]
     let ``serializeConfig produit du JSON valide`` () =
@@ -71,7 +71,7 @@ module NetworkConfigTests =
         restored.PortMappings |> should equal false
         restored.Dns |> should equal false
 
-    // â”€â”€â”€ Chargement/sauvegarde fichier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Chargement/sauvegarde fichier ──────────────────────────────────
 
     [<Fact>]
     let ``loadConfig retourne defaultConfig si fichier absent`` () =
@@ -122,7 +122,7 @@ module NetworkConfigTests =
         File.Delete(tempPath)
         Directory.Delete(tempDir, true)
 
-    // â”€â”€â”€ Detection de sous-reseau â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Detection de sous-reseau ────────────────────────────────────────
 
     [<Fact>]
     let ``findAvailableSubnet retourne le premier candidat non utilise`` () =
@@ -147,7 +147,7 @@ module NetworkConfigTests =
         let candidates = [ "10.244.0.0/16" ]
         findAvailableSubnet candidates Set.empty |> Result.defaultWith failwith |> should equal "10.244.0.0/16"
 
-    // â”€â”€â”€ deriveGateway â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── deriveGateway ───────────────────────────────────────────────────
 
     [<Fact>]
     let ``deriveGateway retourne .1 comme passerelle`` () =
@@ -161,7 +161,7 @@ module NetworkConfigTests =
     let ``deriveGateway fonctionne avec 10.x`` () =
         deriveGateway "10.100.0.0/16" |> Result.defaultWith failwith |> should equal "10.100.0.1"
 
-    // â”€â”€â”€ resolveSubnet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── resolveSubnet ──────────────────────────────────────────────────
 
     [<Fact>]
     let ``resolveSubnet retourne le subnet specifie si non vide`` () =
@@ -190,7 +190,7 @@ module NetworkConfigTests =
 
         resolveSubnet config Set.empty |> Result.defaultWith failwith |> should equal (defaultBridgeCandidates |> List.head)
 
-    // â”€â”€â”€ resolveGateway â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── resolveGateway ─────────────────────────────────────────────────
 
     [<Fact>]
     let ``resolveGateway retourne le gateway specifie si non vide`` () =
@@ -207,7 +207,7 @@ module NetworkConfigTests =
         let result = resolveGateway config "172.20.0.0/16" |> Result.defaultWith failwith
         result |> should equal "172.20.0.1"
 
-    // â”€â”€â”€ generateCniConflistJson â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── generateCniConflistJson ────────────────────────────────────────
 
     [<Fact>]
     let ``generateCniConflistJson contient le bon cniVersion`` () =
@@ -261,7 +261,7 @@ module NetworkConfigTests =
         json.Contains("\"type\": \"nat\"") |> should equal true
         json.Contains("\"master\": \"Ethernet\"") |> should equal true
 
-    // â”€â”€â”€ Integration: config personnalisee â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Integration: config personnalisee ──────────────────────────────
 
     [<Fact>]
     let ``config personnalisee se charge et genere un conflist valide`` () =

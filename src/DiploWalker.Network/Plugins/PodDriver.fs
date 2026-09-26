@@ -26,7 +26,7 @@ type HnsPowerShellProvider() =
             try
                 runPowershellWithArgs "Remove-HNSNetwork" [ "-Name", name ] |> ignore
             with ex ->
-                Log.Warning(ex, "Erreur lors de la suppression du rÃ©seau HNS {Name}", name)
+                Log.Warning(ex, "Erreur lors de la suppression du réseau HNS {Name}", name)
 
         member _.CreateNat(natName, subnet) =
             let existing =
@@ -36,7 +36,7 @@ type HnsPowerShellProvider() =
 
                     not (String.IsNullOrWhiteSpace(result))
                 with ex ->
-                    Log.Debug(ex, "VÃ©rification du NAT {NatName} Ã©chouÃ©e, hypothÃ¨se : inexistant", natName)
+                    Log.Debug(ex, "Vérification du NAT {NatName} échouée, hypothèse : inexistant", natName)
                     false
 
             if not existing then
@@ -97,7 +97,7 @@ type PodDriver(hns: IHnsProvider) =
                     SecurityValidation.validateLabel kvp.Key kvp.Value
 
                 if not (String.IsNullOrEmpty(subnet)) then
-                    SecurityValidation.validateCidr subnet "Le sous-rÃ©seau du Pod"
+                    SecurityValidation.validateCidr subnet "Le sous-réseau du Pod"
 
                 if not (String.IsNullOrEmpty(gateway)) then
                     SecurityValidation.validateIp gateway "La passerelle du Pod"
@@ -116,18 +116,18 @@ type PodDriver(hns: IHnsProvider) =
                     else
                         gateway
 
-                // Rollback : un Ã©chec du NAT aprÃ¨s crÃ©ation du rÃ©seau HNS
-                // laisserait sinon un HNSNetwork orphelin sur l'hÃ´te.
+                // Rollback : un échec du NAT après création du réseau HNS
+                // laisserait sinon un HNSNetwork orphelin sur l'hôte.
                 try
                     hns.CreateNetwork(name, actualSubnet)
                 with ex ->
-                    Log.Error(ex, "CrÃ©ation du rÃ©seau HNS {Name} Ã©chouÃ©e", name)
+                    Log.Error(ex, "Création du réseau HNS {Name} échouée", name)
                     ExceptionDispatchInfo.Capture(ex).Throw()
 
                 try
                     hns.CreateNat(sprintf "%sNat" name, actualSubnet)
                 with natEx ->
-                    Log.Error(natEx, "CrÃ©ation du NAT {Name} Ã©chouÃ©e : rollback du rÃ©seau HNS", sprintf "%sNat" name)
+                    Log.Error(natEx, "Création du NAT {Name} échouée : rollback du réseau HNS", sprintf "%sNat" name)
                     hns.RemoveNetwork(name)
                     ExceptionDispatchInfo.Capture(natEx).Throw()
 
@@ -151,7 +151,7 @@ type PodDriver(hns: IHnsProvider) =
                 endpoints.TryAdd(id, ConcurrentDictionary<string, EndpointInfo>()) |> ignore
 
                 Log.Information(
-                    "Pod {Name} crÃ©Ã© avec sous-rÃ©seau {Subnet} (max {Max} conteneurs)",
+                    "Pod {Name} créé avec sous-réseau {Subnet} (max {Max} conteneurs)",
                     name,
                     actualSubnet,
                     maxContainers
@@ -159,20 +159,20 @@ type PodDriver(hns: IHnsProvider) =
 
                 Ok info
             with ex ->
-                Log.Error(ex, "Erreur lors de la crÃ©ation du Pod {Name}", name)
-                Error "Erreur lors de la crÃ©ation du Pod"
+                Log.Error(ex, "Erreur lors de la création du Pod {Name}", name)
+                Error "Erreur lors de la création du Pod"
 
         member _.Remove(id, force) =
             match networks.TryGetValue(id) with
             | true, podInfo ->
                 let epCount = getEndpointCount id
 
-                // SÃ©mantique docker : refuser sans -f lorsqu'il reste des
-                // endpoints actifs (le compte ne servait qu'Ã  un log).
+                // Sémantique docker : refuser sans -f lorsqu'il reste des
+                // endpoints actifs (le compte ne servait qu'à un log).
                 if epCount > 0 && not force then
                     Error(
                         sprintf
-                            "Le Pod '%s' contient %d endpoint(s) actif(s) â€” utilisez force pour forcer la suppression"
+                            "Le Pod '%s' contient %d endpoint(s) actif(s) — utilisez force pour forcer la suppression"
                             podInfo.DriverInfo.Name
                             epCount
                     )
@@ -235,18 +235,18 @@ type PodDriver(hns: IHnsProvider) =
                               MacAddress = ""
                               Message =
                                 sprintf
-                                    "ConnectÃ© au Pod '%s' (%d/%d)"
+                                    "Connecté au Pod '%s' (%d/%d)"
                                     podInfo.DriverInfo.Name
                                     (epCount + 1)
                                     podInfo.MaxContainers }
 
                         let podEndpoints = endpoints.GetOrAdd(networkId, fun _ -> ConcurrentDictionary())
 
-                        // Course check-then-add : vÃ©rifier le compteur APRÃˆS
-                        // l'ajout et dÃ©faire si la limite est dÃ©passÃ©e â€” N
-                        // connexions simultanÃ©es voyaient toutes epCount < max.
+                        // Course check-then-add : vérifier le compteur APRÈS
+                        // l'ajout et défaire si la limite est dépassée — N
+                        // connexions simultanées voyaient toutes epCount < max.
                         if not (podEndpoints.TryAdd(actualEndpointId, epInfo)) then
-                            Error(sprintf "L'endpoint '%s' existe dÃ©jÃ " actualEndpointId)
+                            Error(sprintf "L'endpoint '%s' existe déjà" actualEndpointId)
                         else
                             let newCount = getEndpointCount networkId
 
@@ -287,7 +287,7 @@ type PodDriver(hns: IHnsProvider) =
 
                             if not removed then
                                 Log.Warning(
-                                    "Aucun endpoint trouvÃ© pour le conteneur {ContainerId} dans le Pod {NetworkId}",
+                                    "Aucun endpoint trouvé pour le conteneur {ContainerId} dans le Pod {NetworkId}",
                                     containerId,
                                     networkId
                                 )
@@ -297,11 +297,11 @@ type PodDriver(hns: IHnsProvider) =
                         Ok()
                     | false, _ -> Ok()
                 with ex ->
-                    Log.Error(ex, "Erreur de dÃ©connexion du Pod {NetworkId}", networkId)
-                    Error "Erreur de dÃ©connexion du Pod"
+                    Log.Error(ex, "Erreur de déconnexion du Pod {NetworkId}", networkId)
+                    Error "Erreur de déconnexion du Pod"
 
-        /// Nettoyage RÃ‰EL : supprime les Pods sans endpoint actif et retourne
-        /// uniquement les identifiants rÃ©ellement supprimÃ©s.
+        /// Nettoyage RÉEL : supprime les Pods sans endpoint actif et retourne
+        /// uniquement les identifiants réellement supprimés.
         member this.Prune() =
             let removed = ResizeArray<string>()
 

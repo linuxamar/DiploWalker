@@ -5,11 +5,11 @@ open DiscUtils
 open DiscUtils.Streams
 open Serilog
 
-/// Adaptateur DiscUtils.Vdi pour l'extraction et la rÃ©Ã©criture
-/// de systÃ¨mes de fichiers contenus dans des images VDI (VirtualBox).
+/// Adaptateur DiscUtils.Vdi pour l'extraction et la réécriture
+/// de systèmes de fichiers contenus dans des images VDI (VirtualBox).
 ///
-/// DiscUtils.Vdi.Disk gÃ¨re nativement la lecture et l'Ã©criture VDI
-/// (fixe et dynamique). L'approche est identique Ã  qcow2 : on passe
+/// DiscUtils.Vdi.Disk gère nativement la lecture et l'écriture VDI
+/// (fixe et dynamique). L'approche est identique à qcow2 : on passe
 /// un Stream au disque DiscUtils, puis on extrait le FS contenu.
 module VdiFs =
     open DiscFsHelper
@@ -26,7 +26,7 @@ module VdiFs =
             reraise ()
 
     /// Tente d'extraire une image VDI via DiscUtils.Vdi.
-    /// Retourne Some(nombreFichiers) si le format est gÃ©rÃ©, None sinon.
+    /// Retourne Some(nombreFichiers) si le format est géré, None sinon.
     let tryExtract (sourcePath: string) (targetDir: string) : int option =
         if not (File.Exists(sourcePath)) then
             None
@@ -44,14 +44,14 @@ module VdiFs =
                 | None -> None
             with
             | :? IOException as ex ->
-                Log.Warning(ex, "Ã‰chec extraction VDI pour {Path}", sourcePath)
+                Log.Warning(ex, "Échec extraction VDI pour {Path}", sourcePath)
                 None
             | ex ->
                 Log.Warning(ex, "Erreur inattendue extraction VDI pour {Path}", sourcePath)
                 None
 
-    /// RÃ©Ã©crit le contenu de `sourceDir` dans l'image VDI via DiscUtils.Vdi.
-    /// Retourne true si rÃ©ussi, false sinon.
+    /// Réécrit le contenu de `sourceDir` dans l'image VDI via DiscUtils.Vdi.
+    /// Retourne true si réussi, false sinon.
     let tryWriteBack (sourcePath: string) (sourceDir: string) : bool =
         if not (File.Exists(sourcePath)) then
             false
@@ -69,9 +69,9 @@ module VdiFs =
                 | None -> false
             with
             | :? IOException as ex ->
-                Log.Warning(ex, "Ã‰chec rÃ©Ã©criture VDI pour {Path}", sourcePath)
+                Log.Warning(ex, "Échec réécriture VDI pour {Path}", sourcePath)
                 false
             | ex ->
-                Log.Warning(ex, "Erreur inattendue rÃ©Ã©criture VDI pour {Path}", sourcePath)
+                Log.Warning(ex, "Erreur inattendue réécriture VDI pour {Path}", sourcePath)
                 false
 

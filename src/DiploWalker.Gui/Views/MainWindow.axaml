@@ -4,42 +4,42 @@
         xmlns:uc="using:DiploWalker.Gui.UserControls"
         x:CompileBindings="True"
         x:DataType="vm:MainWindowViewModel"
-        Title="Diplo â€” Gestion Docker"
+        Title="Diplo — Gestion Docker"
         Width="1100" Height="750"
         WindowStartupLocation="CenterScreen">
 
     <DockPanel>
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_Fichier">
-                <MenuItem Header="_Exporter le journalâ€¦" Command="{Binding ExportLogCommand}" />
+                <MenuItem Header="_Exporter le journal…" Command="{Binding ExportLogCommand}" />
                 <MenuItem Header="_Quitter" Command="{Binding QuitCommand}" />
             </MenuItem>
             <MenuItem Header="_Aide">
-                <MenuItem x:Name="AboutMenuItem" Header="_Ã€ propos" />
+                <MenuItem x:Name="AboutMenuItem" Header="_À propos" />
             </MenuItem>
         </Menu>
 
         <Grid RowDefinitions="*,5,Auto">
             <TabControl Grid.Row="0" Margin="4">
-            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="ðŸ–¼"/><TextBlock Text=" Images" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="🖼"/><TextBlock Text=" Images" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="ðŸ”„ Lister" Command="{Binding ImagesTab.ListImagesCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔄 Lister" Command="{Binding ImagesTab.ListImagesCommand}" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ImagesTab.ImageSearchInput}" Width="220" Margin="0,0,12,0"
                                  x:Name="ImageSearchBox" MaxLength="120"
-                                 PlaceholderText="ðŸ” Rechercher (docker.io, quay.io, ghcr.io, mcr.microsoft.com)â€¦" />
+                                 PlaceholderText="🔍 Rechercher (docker.io, quay.io, ghcr.io, mcr.microsoft.com)…" />
                         <TextBox Text="{Binding ImagesTab.RegistreInput}" Width="150" Margin="0,0,12,0"
                                  x:Name="RegistreSearchBox" MaxLength="80"
                                  PlaceholderText="Registre (vide = tous)" />
-                        <Button Content="ðŸ“¥ TÃ©lÃ©charger" Command="{Binding ImagesTab.PullImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ” Inspecter" Command="{Binding ImagesTab.InspectImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="âœ Ã‰tiqueter" Command="{Binding ImagesTab.TagImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ—‘ Supprimer" Command="{Binding ImagesTab.RemoveImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ§¹ Nettoyer" Command="{Binding ImagesTab.PruneImagesCommand}" Margin="0,0,4,0" />
+                        <Button Content="📥 Télécharger" Command="{Binding ImagesTab.PullImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding ImagesTab.InspectImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="✏ Étiqueter" Command="{Binding ImagesTab.TagImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding ImagesTab.RemoveImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding ImagesTab.PruneImagesCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <TextBlock Text="RÃ©f. tÃ©lÃ©charger:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBlock Text="Réf. télécharger:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
                         <TextBox Text="{Binding ImagesTab.PullRefInput}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="nom:tag" />
                         <TextBlock Text="User (pull):" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
@@ -51,16 +51,16 @@
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <TextBlock Text="Source Ã©tiqueter:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBlock Text="Source étiqueter:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
                         <TextBox Text="{Binding ImagesTab.TagSourceInput}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="source:tag" />
-                        <TextBlock Text="Cible Ã©tiqueter:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
+                        <TextBlock Text="Cible étiqueter:" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
                         <TextBox Text="{Binding ImagesTab.TagTargetInput}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="cible:tag" />
-                        <TextBlock Text="RÃ©f. (inspecter/suppr.):" VerticalAlignment="Center" Margin="0,0,4,0"
+                        <TextBlock Text="Réf. (inspecter/suppr.):" VerticalAlignment="Center" Margin="0,0,4,0"
                                    Opacity="0.7" />
                         <TextBox Text="{Binding ImagesTab.ImageRefInput}" Width="180" Margin="0,0,12,0"
-                                 PlaceholderText="rÃ©f. image (sinon sÃ©lection)" />
+                                 PlaceholderText="réf. image (sinon sélection)" />
                     </WrapPanel>
 
                     <DataGrid ItemsSource="{Binding ImagesTab.Images}" AutoGenerateColumns="False"
@@ -68,16 +68,16 @@
                               CanUserResizeColumns="True" CanUserSortColumns="True"
                               SelectedItem="{Binding ImagesTab.SelectedImage}">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="RÃ©fÃ©rentiel" Binding="{Binding Ref}" Width="200" />
+                            <DataGridTextColumn Header="Référentiel" Binding="{Binding Ref}" Width="200" />
                             <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="120" />
                             <DataGridTextColumn Header="Taille" Binding="{Binding Size}" Width="120" />
-                            <DataGridTextColumn Header="CrÃ©Ã© le" Binding="{Binding CreatedAt}" Width="160" />
+                            <DataGridTextColumn Header="Créé le" Binding="{Binding CreatedAt}" Width="160" />
                         </DataGrid.Columns>
                     </DataGrid>
 
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" Spacing="4">
                         <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="ðŸ“¥ Tirer la sÃ©lection"
+                            <Button DockPanel.Dock="Right" Content="📥 Tirer la sélection"
                                     Command="{Binding ImagesTab.SearchResultPullCommand}" Margin="4,0,0,0" />
                             <TextBlock Text="{Binding ImagesTab.SearchStatus}" VerticalAlignment="Center"
                                        FontWeight="SemiBold" TextWrapping="Wrap" />
@@ -88,8 +88,8 @@
                                   MaxHeight="220" SelectedItem="{Binding ImagesTab.SelectedSearchResult}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Registre" Binding="{Binding Registre}" Width="140" />
-                                <DataGridTextColumn Header="RÃ©fÃ©rence" Binding="{Binding Ref}" Width="260" />
-                                <DataGridTextColumn Header="Ã‰toiles" Binding="{Binding Stars}" Width="80" />
+                                <DataGridTextColumn Header="Référence" Binding="{Binding Ref}" Width="260" />
+                                <DataGridTextColumn Header="Étoiles" Binding="{Binding Stars}" Width="80" />
                                 <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" />
                             </DataGrid.Columns>
                         </DataGrid>
@@ -97,22 +97,22 @@
                 </DockPanel>
             </TabItem>
 
-            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="ðŸ³"/><TextBlock Text=" Conteneurs" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="🐳"/><TextBlock Text=" Conteneurs" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <!-- Toolbar principal -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="ðŸ”„ Lister" Command="{Binding ContainerTab.ListContainersCommand}" Margin="0,0,4,0" />
-                        <Button Content="âž• CrÃ©er" Command="{Binding ContainerTab.CreateContainerCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ“¥ TÃ©lÃ©charger" Command="{Binding ContainerTab.PullImageCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ” Inspecter" Command="{Binding ContainerTab.InspectContainerCommand}" Margin="0,0,12,0" />
-                        <Button Content="ðŸ“ Espaces" Command="{Binding ContainerTab.ListNamespacesCommand}" Margin="0,0,4,0" />
-                        <Button Content="â„¹ Version" Command="{Binding ContainerTab.VersionCommand}" Margin="0,0,8,0" />
-                        <Button Content="ðŸ§¹ Nettoyer" Command="{Binding ContainerTab.PruneContainersCommand}" Margin="0,0,8,0" />
-                        <Button Content="ðŸ“¢ Ã‰vÃ©nements" Command="{Binding ContainerTab.GetContainerEventsCommand}" Margin="0,0,4,0" />
-                        <Button Content="â¹ ArrÃªter" Command="{Binding ContainerTab.StopFollowEventsCommand}" />
+                        <Button Content="🔄 Lister" Command="{Binding ContainerTab.ListContainersCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding ContainerTab.CreateContainerCommand}" Margin="0,0,4,0" />
+                        <Button Content="📥 Télécharger" Command="{Binding ContainerTab.PullImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectContainerCommand}" Margin="0,0,12,0" />
+                        <Button Content="📁 Espaces" Command="{Binding ContainerTab.ListNamespacesCommand}" Margin="0,0,4,0" />
+                        <Button Content="ℹ Version" Command="{Binding ContainerTab.VersionCommand}" Margin="0,0,8,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding ContainerTab.PruneContainersCommand}" Margin="0,0,8,0" />
+                        <Button Content="📢 Événements" Command="{Binding ContainerTab.GetContainerEventsCommand}" Margin="0,0,4,0" />
+                        <Button Content="⏹ Arrêter" Command="{Binding ContainerTab.StopFollowEventsCommand}" />
                     </WrapPanel>
 
-                    <!-- Champs de crÃ©ation / recherche -->
+                    <!-- Champs de création / recherche -->
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="ID :" VerticalAlignment="Center" Margin="0,0,4,0" Opacity="0.7" />
                         <TextBox Text="{Binding ContainerTab.ContainerIdInput}" Width="180" Margin="0,0,12,0"
@@ -138,7 +138,7 @@
                                    VerticalAlignment="Center" />
                     </WrapPanel>
 
-                    <!-- Zone principale : DataGrid + DÃ©tail -->
+                    <!-- Zone principale : DataGrid + Détail -->
                     <Grid ColumnDefinitions="*,4,*" Margin="0,0,0,4">
                         <!-- DataGrid Conteneurs -->
                         <DataGrid Grid.Column="0" ItemsSource="{Binding ContainerTab.Containers}"
@@ -150,8 +150,8 @@
                                 <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="90" />
                                 <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="140" />
                                 <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="180" />
-                                <DataGridTextColumn Header="Ã‰tat" Binding="{Binding State}" Width="80" />
-                                <DataGridTextColumn Header="CrÃ©Ã© le" Binding="{Binding CreatedAt}" Width="130" />
+                                <DataGridTextColumn Header="État" Binding="{Binding State}" Width="80" />
+                                <DataGridTextColumn Header="Créé le" Binding="{Binding CreatedAt}" Width="130" />
                             </DataGrid.Columns>
                         </DataGrid>
 
@@ -159,23 +159,23 @@
                                       ResizeDirection="Columns"
                                       Background="{DynamicResource SystemChromeGrayColor}" />
 
-                        <!-- DÃ©tail du conteneur sÃ©lectionnÃ© -->
+                        <!-- Détail du conteneur sélectionné -->
                         <uc:ContainerDetailUserControl Grid.Column="2" />
                     </Grid>
 
                 </DockPanel>
             </TabItem>
 
-            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="ðŸ“"/><TextBlock Text=" Volumes" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="📁"/><TextBlock Text=" Volumes" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="ðŸ”„ Lister" Command="{Binding VolumeTab.ListVolumesCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ” Inspecter" Command="{Binding VolumeTab.InspectVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="âž• CrÃ©er" Command="{Binding VolumeTab.CreateVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ—‘ Supprimer" Command="{Binding VolumeTab.RemoveVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ“ Monter" Command="{Binding VolumeTab.MountVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ“‚ DÃ©monter" Command="{Binding VolumeTab.UnmountVolumeCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ§¹ Nettoyer" Command="{Binding VolumeTab.PruneVolumesCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔄 Lister" Command="{Binding VolumeTab.ListVolumesCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding VolumeTab.InspectVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding VolumeTab.CreateVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding VolumeTab.RemoveVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="📁 Monter" Command="{Binding VolumeTab.MountVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="📂 Démonter" Command="{Binding VolumeTab.UnmountVolumeCommand}" Margin="0,0,4,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding VolumeTab.PruneVolumesCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -196,18 +196,18 @@
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <TextBlock Text="RÃ©p. source:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBlock Text="Rép. source:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding VolumeTab.ImageSourceDir}" Width="200" Margin="0,0,4,0"
-                                 PlaceholderText="chemin vers le rÃ©pertoire source" />
-                        <Button Content="â€¦" Command="{Binding VolumeTab.BrowseSourceCommand}" Width="28" Margin="0,0,12,0" />
+                                 PlaceholderText="chemin vers le répertoire source" />
+                        <Button Content="…" Command="{Binding VolumeTab.BrowseSourceCommand}" Width="28" Margin="0,0,12,0" />
                         <TextBlock Text="Destination:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding VolumeTab.ImageDestPath}" Width="200" Margin="0,0,4,0"
-                                 PlaceholderText="chemin de l'image Ã  crÃ©er" />
-                        <Button Content="â€¦" Command="{Binding VolumeTab.BrowseDestCommand}" Width="28" Margin="0,0,12,0" />
+                                 PlaceholderText="chemin de l'image à créer" />
+                        <Button Content="…" Command="{Binding VolumeTab.BrowseDestCommand}" Width="28" Margin="0,0,12,0" />
                         <TextBlock Text="Format:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding VolumeTab.ImageFormat}" Width="80" Margin="0,0,12,0"
                                  PlaceholderText="raw" />
-                        <Button Content="ðŸ–¼ CrÃ©er image" Command="{Binding VolumeTab.CreateImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🖼 Créer image" Command="{Binding VolumeTab.CreateImageCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <DataGrid ItemsSource="{Binding VolumeTab.Volumes}" AutoGenerateColumns="False"
@@ -223,30 +223,30 @@
                 </DockPanel>
             </TabItem>
 
-            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="ðŸŒ"/><TextBlock Text=" RÃ©seaux" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="🌐"/><TextBlock Text=" Réseaux" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="ðŸ”„ Lister" Command="{Binding NetworkTab.ListNetworksCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ” Inspecter" Command="{Binding NetworkTab.InspectNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="âž• CrÃ©er" Command="{Binding NetworkTab.CreateNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ—‘ Supprimer" Command="{Binding NetworkTab.RemoveNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ”— Connecter" Command="{Binding NetworkTab.ConnectNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ”Œ DÃ©connecter" Command="{Binding NetworkTab.DisconnectNetworkCommand}" Margin="0,0,4,0" />
-                        <Button Content="âš™ ExÃ©cuter CNI" Command="{Binding NetworkTab.RunCniPluginCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ§¹ Nettoyer" Command="{Binding NetworkTab.PruneNetworksCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔄 Lister" Command="{Binding NetworkTab.ListNetworksCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter" Command="{Binding NetworkTab.InspectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="➕ Créer" Command="{Binding NetworkTab.CreateNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🗑 Supprimer" Command="{Binding NetworkTab.RemoveNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔗 Connecter" Command="{Binding NetworkTab.ConnectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔌 Déconnecter" Command="{Binding NetworkTab.DisconnectNetworkCommand}" Margin="0,0,4,0" />
+                        <Button Content="⚙ Exécuter CNI" Command="{Binding NetworkTab.RunCniPluginCommand}" Margin="0,0,4,0" />
+                        <Button Content="🧹 Nettoyer" Command="{Binding NetworkTab.PruneNetworksCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="ID:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkTab.NetworkIdInput}" Width="180" Margin="0,0,12,0"
-                                 PlaceholderText="identifiant rÃ©seau" />
+                                 PlaceholderText="identifiant réseau" />
                         <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkTab.NetworkNameInput}" Width="140" Margin="0,0,12,0"
-                                 PlaceholderText="nom du rÃ©seau" />
+                                 PlaceholderText="nom du réseau" />
                         <TextBlock Text="Driver:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkTab.NetworkDriver}" Width="100" Margin="0,0,12,0"
                                  PlaceholderText="bridge" />
-                        <TextBlock Text="Sous-rÃ©seau:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBlock Text="Sous-réseau:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkTab.NetworkSubnet}" Width="140" Margin="0,0,12,0"
                                  PlaceholderText="172.20.0.0/16" />
                         <TextBlock Text="Passerelle:" VerticalAlignment="Center" Margin="0,0,4,0" />
@@ -257,7 +257,7 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <TextBlock Text="Endpoint:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkTab.NetworkEndpointId}" Width="180" Margin="0,0,12,0"
-                                 PlaceholderText="ID endpoint (connect/dÃ©connect)" />
+                                 PlaceholderText="ID endpoint (connect/déconnect)" />
                         <TextBlock Text="Conteneur:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkTab.NetworkContainerId}" Width="180" Margin="0,0,12,0"
                                  PlaceholderText="ID conteneur" />
@@ -277,7 +277,7 @@
                                  PlaceholderText="ADD/DEL/CHECK" />
                         <TextBlock Text="NetNS:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding NetworkTab.NetworkNetnsPath}" Width="200" Margin="0,0,12,0"
-                                 PlaceholderText="chemin namespace rÃ©seau" />
+                                 PlaceholderText="chemin namespace réseau" />
                     </WrapPanel>
 
                     <DataGrid ItemsSource="{Binding NetworkTab.Networks}" AutoGenerateColumns="False"
@@ -286,29 +286,29 @@
                             <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="100" />
                             <DataGridTextColumn Header="Nom" Binding="{Binding Nom}" Width="140" />
                             <DataGridTextColumn Header="Driver" Binding="{Binding Driver}" Width="80" />
-                            <DataGridTextColumn Header="Sous-rÃ©seau" Binding="{Binding SousReseau}" Width="140" />
+                            <DataGridTextColumn Header="Sous-réseau" Binding="{Binding SousReseau}" Width="140" />
                             <DataGridTextColumn Header="Passerelle" Binding="{Binding Passerelle}" Width="120" />
-                            <DataGridTextColumn Header="CrÃ©Ã© le" Binding="{Binding CreatedAt}" Width="140" />
+                            <DataGridTextColumn Header="Créé le" Binding="{Binding CreatedAt}" Width="140" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>
             </TabItem>
 
-            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="ðŸ“"/><TextBlock Text=" Compose" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="📝"/><TextBlock Text=" Compose" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
-                        <Button Content="â–¶ DÃ©marrer" Command="{Binding ComposeTab.ComposeUpCommand}" Margin="0,0,4,0" />
-                        <Button Content="â¹ ArrÃªter" Command="{Binding ComposeTab.ComposeDownCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ“‹ Ã‰tat" Command="{Binding ComposeTab.ComposePsCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ“œ Journaux" Command="{Binding ComposeTab.ComposeLogsCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ“¥ TÃ©lÃ©charger" Command="{Binding ComposeTab.ComposePullCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ”¨ Construire" Command="{Binding ComposeTab.ComposeBuildCommand}" Margin="0,0,4,0" />
+                        <Button Content="▶ Démarrer" Command="{Binding ComposeTab.ComposeUpCommand}" Margin="0,0,4,0" />
+                        <Button Content="⏹ Arrêter" Command="{Binding ComposeTab.ComposeDownCommand}" Margin="0,0,4,0" />
+                        <Button Content="📋 État" Command="{Binding ComposeTab.ComposePsCommand}" Margin="0,0,4,0" />
+                        <Button Content="📜 Journaux" Command="{Binding ComposeTab.ComposeLogsCommand}" Margin="0,0,4,0" />
+                        <Button Content="📥 Télécharger" Command="{Binding ComposeTab.ComposePullCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔨 Construire" Command="{Binding ComposeTab.ComposeBuildCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
-                        <Button Content="ðŸ“‚ Ouvrir" Command="{Binding ComposeTab.OpenComposeFileCommand}" Margin="0,0,4,0" />
-                        <Button Content="ðŸ’¾ Enregistrer" Command="{Binding ComposeTab.SaveComposeFileCommand}" Margin="0,0,4,0" />
-                        <Button Content="âœ… Valider" Command="{Binding ComposeTab.ValidateComposeFileCommand}" Margin="0,0,4,0" />
+                        <Button Content="📂 Ouvrir" Command="{Binding ComposeTab.OpenComposeFileCommand}" Margin="0,0,4,0" />
+                        <Button Content="💾 Enregistrer" Command="{Binding ComposeTab.SaveComposeFileCommand}" Margin="0,0,4,0" />
+                        <Button Content="✅ Valider" Command="{Binding ComposeTab.ValidateComposeFileCommand}" Margin="0,0,4,0" />
                         <TextBlock Text="{Binding ComposeTab.ComposeEditor.FilePath}" VerticalAlignment="Center"
                                    Margin="12,0,0,0" Opacity="0.6" />
                     </WrapPanel>
@@ -323,10 +323,10 @@
                     </WrapPanel>
 
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
-                        <TextBlock Text="RÃ©f. image:" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBlock Text="Réf. image:" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <TextBox Text="{Binding ComposeTab.InspectImageRef}" Width="200" Margin="0,0,12,0"
                                  PlaceholderText="image:tag (inspecter)" />
-                        <Button Content="ðŸ” Inspecter img" Command="{Binding ComposeTab.InspectImageCommand}" Margin="0,0,4,0" />
+                        <Button Content="🔍 Inspecter img" Command="{Binding ComposeTab.InspectImageCommand}" Margin="0,0,4,0" />
                     </WrapPanel>
 
                     <Panel x:Name="ComposeEditorHost" DockPanel.Dock="Top" Height="250" />
@@ -344,14 +344,14 @@
                             <DataGridTextColumn Header="Service" Binding="{Binding Service}" Width="120" />
                             <DataGridTextColumn Header="Conteneur" Binding="{Binding Conteneur}" Width="200" />
                             <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="200" />
-                            <DataGridTextColumn Header="Ã‰tat" Binding="{Binding State}" Width="80" />
+                            <DataGridTextColumn Header="État" Binding="{Binding State}" Width="80" />
                             <DataGridTextColumn Header="Projet" Binding="{Binding Projet}" Width="120" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>
             </TabItem>
 
-            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="âš™"/><TextBlock Text=" ParamÃ¨tres" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
+            <TabItem><TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="⚙"/><TextBlock Text=" Paramètres" Margin="4,0,0,0"/></StackPanel></TabItem.Header>
                 <StackPanel Margin="12">
                     <TextBlock Text="Configuration client (DiploWalker.json)" FontWeight="Bold" />
                     <TextBlock Text="{Binding SettingsTab.ConfigPath}" TextWrapping="Wrap"
@@ -368,20 +368,20 @@
                                  PlaceholderText="localhost:5002" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Adresse rÃ©seaux :" Width="150" VerticalAlignment="Center" />
+                        <TextBlock Text="Adresse réseaux :" Width="150" VerticalAlignment="Center" />
                         <TextBox Text="{Binding SettingsTab.NetworkAddress}" Width="360"
                                  PlaceholderText="localhost:5003" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                        <Button Content="ðŸ’¾ Enregistrer" Command="{Binding SettingsTab.SaveCommand}"
+                        <Button Content="💾 Enregistrer" Command="{Binding SettingsTab.SaveCommand}"
                                 Margin="0,0,8,0" />
-                        <Button Content="ðŸ”„ Recharger" Command="{Binding SettingsTab.ReloadCommand}" />
+                        <Button Content="🔄 Recharger" Command="{Binding SettingsTab.ReloadCommand}" />
                     </StackPanel>
 
                     <TextBlock Text="{Binding SettingsTab.StatusMessage}" Margin="0,8,0,0"
                                TextWrapping="Wrap" />
-                    <TextBlock Text="Remarque : la configuration enregistrÃ©e est appliquÃ©e aux prochaines opÃ©rations des onglets."
+                    <TextBlock Text="Remarque : la configuration enregistrée est appliquée aux prochaines opérations des onglets."
                                Margin="0,12,0,0" TextWrapping="Wrap" />
                 </StackPanel>
             </TabItem>

@@ -11,12 +11,12 @@ open Serilog
 open DiploWalker.Abstractions
 
 /// Persistance des identifiants de registres de conteneurs (login/logout).
-/// Le mot de passe est chiffrÃ© avec DPAPI (portÃ©e utilisateur courant) sous
-/// Windows ; ailleurs, il est scellÃ© en AES-GCM avec une clÃ© par utilisateur
-/// (fichier Ã  droits restreints, voir SECURITY.md).
+/// Le mot de passe est chiffré avec DPAPI (portée utilisateur courant) sous
+/// Windows ; ailleurs, il est scellé en AES-GCM avec une clé par utilisateur
+/// (fichier à droits restreints, voir SECURITY.md).
 module RegistryAuth =
 
-    /// Identifiant d'un registre tel que persistÃ© dans le fichier d'Ã©tat.
+    /// Identifiant d'un registre tel que persisté dans le fichier d'état.
     type RegistryEntry =
         { Registry: string
           Username: string
@@ -26,23 +26,23 @@ module RegistryAuth =
 
     let private defaultStateFile () = Path.Combine(AppPaths.dataRoot (), stateFileName)
 
-    /// Chemin du fichier d'Ã©tat (par dÃ©faut : %ProgramData%\Diplo\registry-auth.json).
+    /// Chemin du fichier d'état (par défaut : %ProgramData%\Diplo\registry-auth.json).
     let private stateFileRef = ref (defaultStateFile ())
 
-    /// Remplace le chemin du fichier d'Ã©tat (utile pour les tests).
+    /// Remplace le chemin du fichier d'état (utile pour les tests).
     let setStateFile (path: string) =
         lock stateFileRef (fun () -> stateFileRef := path)
 
-    /// Chemin courant du fichier d'Ã©tat des identifiants de registres.
+    /// Chemin courant du fichier d'état des identifiants de registres.
     let stateFile () = !stateFileRef
 
-    /// Fichier de clÃ© AES-GCM (hors Windows), sous la racine par utilisateur
+    /// Fichier de clé AES-GCM (hors Windows), sous la racine par utilisateur
     /// (`AppPaths.userRoot`) : `%LocalAppData%\Diplo\registry-key.bin` sous
     /// Windows, `$XDG_DATA_HOME/Diplo/registry-key.bin` ailleurs.
     let keyFile () = Path.Combine(AppPaths.userRoot (), "registry-key.bin")
 
-    /// Charge ou crÃ©e la clÃ© par utilisateur. Sur les plateformes POSIX le fichier
-    /// est crÃ©Ã© avec des droits 0600 ; sous Windows il hÃ©rite du profil utilisateur.
+    /// Charge ou crée la clé par utilisateur. Sur les plateformes POSIX le fichier
+    /// est créé avec des droits 0600 ; sous Windows il hérite du profil utilisateur.
     let private loadOrCreateKey () : byte array =
         let path = keyFile ()
         Directory.CreateDirectory(Path.GetDirectoryName path) |> ignore
@@ -73,14 +73,14 @@ module RegistryAuth =
 
     let private protect (password: string) =
         if isNull password then
-            invalidArg (nameof password) "Le mot de passe ne peut pas Ãªtre null"
+            invalidArg (nameof password) "Le mot de passe ne peut pas être null"
 
         if OperatingSystem.IsWindows() then
             let bytes = System.Text.Encoding.UTF8.GetBytes(password)
             Convert.ToBase64String(ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser))
         else
-            // M7 : hors Windows, PAS de repli base64 en clair â€” chiffrement
-            // AES-GCM scellÃ© par une clÃ© par utilisateur (fichier Ã  droits
+            // M7 : hors Windows, PAS de repli base64 en clair — chiffrement
+            // AES-GCM scellé par une clé par utilisateur (fichier à droits
             // restreints, voir loadOrCreateKey).
             let plain = System.Text.Encoding.UTF8.GetBytes(password)
             let key = loadOrCreateKey ()
@@ -113,16 +113,16 @@ module RegistryAuth =
                 aes.Decrypt(nonce, cipher, tag, plain)
                 System.Text.Encoding.UTF8.GetString(plain)
             with _ ->
-                // Repli de compatibilitÃ© : anciens Ã©tats hors Windows Ã©crits en
-                // base64 clair. Lecture tolÃ©rÃ©e (le stockage, lui, n'est plus en
-                // clair) ; une nouvelle connexion rÃ©Ã©crit l'entrÃ©e en AES-GCM.
+                // Repli de compatibilité : anciens états hors Windows écrits en
+                // base64 clair. Lecture tolérée (le stockage, lui, n'est plus en
+                // clair) ; une nouvelle connexion réécrit l'entrée en AES-GCM.
                 try
                     System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded))
                 with _ ->
-                    failwith "Impossible de dÃ©chiffrer le mot de passe (donnÃ©es corrompues)"
+                    failwith "Impossible de déchiffrer le mot de passe (données corrompues)"
 
-    /// Charge les identifiants persistÃ©s (Map registre -> identifiant).
-    /// Retourne un Ã©tat vide si le fichier est absent ou illisible.
+    /// Charge les identifiants persistés (Map registre -> identifiant).
+    /// Retourne un état vide si le fichier est absent ou illisible.
     let load (path: string) : Map<string, RegistryEntry> =
         try
             if not (File.Exists path) then
@@ -147,19 +147,19 @@ module RegistryAuth =
             Log.Warning(ex, "Erreur lors de la lecture du fichier d'authentification registre: {Path}", path)
             Map.empty
 
-    /// Enregistre les identifiants (Ã©criture atomique : fichier temporaire puis remplacement).
+    /// Enregistre les identifiants (écriture atomique : fichier temporaire puis remplacement).
     let save (path: string) (entries: seq<RegistryEntry>) =
         let json =
             JsonSerializer.Serialize(entries |> Seq.toList, JsonSerializerOptions(WriteIndented = true))
 
         AtomicFile.write path json
 
-    /// Verrou global : les handlers gRPC s'exÃ©cutent en parallÃ¨le et add/remove
-    /// font une lecture-modification-Ã©criture â€” sans verrou, deux mutations
-    /// concurrentes s'Ã©crasent mutuellement (perte silencieuse d'identifiants).
+    /// Verrou global : les handlers gRPC s'exécutent en parallèle et add/remove
+    /// font une lecture-modification-écriture — sans verrou, deux mutations
+    /// concurrentes s'écrasent mutuellement (perte silencieuse d'identifiants).
     let private stateLock = obj ()
 
-    /// Ajoute ou met Ã  jour l'identifiant d'un registre (mot de passe chiffrÃ©).
+    /// Ajoute ou met à jour l'identifiant d'un registre (mot de passe chiffré).
     let add (path: string) (registry: string) (username: string) (password: string) =
         lock stateLock (fun () ->
             let current = load path
@@ -187,17 +187,17 @@ module RegistryAuth =
         |> Map.tryFind registry
         |> Option.map (fun e -> sprintf "%s:%s" e.Username (unprotect e.EncryptedPassword))
 
-    // â”€â”€â”€ Helper de credentials containerd â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Helper de credentials containerd ─────────────────────────────
     //
     // `ctr image pull --user user:pass` expose le mot de passe dans argv,
     // lisible par tout processus local (WMI Win32_Process, journaux d'audit).
     // containerd supporte le protocole docker-credential-helper : un hosts.toml
-    // dÃ©clare Â« auth = <programme> Â», et le programme reÃ§oit l'URL du serveur
-    // sur stdin puis rÃ©pond {"Username":â€¦,"Secret":â€¦}. Le secret ne transite
-    // plus par argv â€” il reste en mÃ©moire du helper uniquement.
+    // déclare « auth = <programme> », et le programme reçoit l'URL du serveur
+    // sur stdin puis répond {"Username":…,"Secret":…}. Le secret ne transite
+    // plus par argv — il reste en mémoire du helper uniquement.
 
-    /// RÃ©pertoire du helper : chemin SANS espace (C:\ProgramData\Diplo\...),
-    /// requis car containerd exÃ©cute la valeur Â« auth Â» telle quelle.
+    /// Répertoire du helper : chemin SANS espace (C:\ProgramData\Diplo\...),
+    /// requis car containerd exécute la valeur « auth » telle quelle.
     let helperDir () = AppPaths.dataDir "cred-helper"
 
     /// Script PowerShell du helper de credentials. Portable : le dechiffrement
@@ -255,21 +255,21 @@ try {
   exit 1
 } catch { exit 1 }"""
 
-    /// Nom du lanceur rÃ©fÃ©rencÃ© dans hosts.toml.
+    /// Nom du lanceur référencé dans hosts.toml.
     let private launcherName =
         if OperatingSystem.IsWindows() then
             "diplo-cred-helper.cmd"
         else
             "diplo-cred-helper"
 
-    /// Ã‰crit (idempotent) dans `dir` une copie du script PowerShell et un
+    /// Écrit (idempotent) dans `dir` une copie du script PowerShell et un
     /// lanceur de la plateforme, et retourne le chemin du lanceur.
     ///
-    /// containerd exÃ©cute la valeur Â« auth Â» de hosts.toml telle quelle, sans
+    /// containerd exécute la valeur « auth » de hosts.toml telle quelle, sans
     /// argument : le lanceur est donc indispensable. Il se contente de
-    /// transmettre les chemins du fichier d'Ã©tat et de la clÃ© de chiffrement,
-    /// puis d'exÃ©cuter le script. Sous Unix il doit Ãªtre exÃ©cutable (droits
-    /// 0755) et PowerShell 7 (`pwsh`) doit Ãªtre installÃ© sur l'hÃ´te.
+    /// transmettre les chemins du fichier d'état et de la clé de chiffrement,
+    /// puis d'exécuter le script. Sous Unix il doit être exécutable (droits
+    /// 0755) et PowerShell 7 (`pwsh`) doit être installé sur l'hôte.
     let writeHelperTo (dir: string) (statePath: string) (keyPath: string) : string =
         Directory.CreateDirectory dir |> ignore
 
@@ -316,15 +316,15 @@ try {
 
         launcherPath
 
-    /// Helper partagÃ©, installÃ© dans le rÃ©pertoire de donnÃ©es : le lanceur
-    /// retournÃ© est celui Ã  rÃ©fÃ©rencer depuis hosts.toml. Le script retrouve
-    /// l'Ã©tat et la clÃ© par rapport Ã  lui-mÃªme (`<racine>/cred-helper/..`), sans
-    /// chemin figÃ© dans le lanceur.
+    /// Helper partagé, installé dans le répertoire de données : le lanceur
+    /// retourné est celui à référencer depuis hosts.toml. Le script retrouve
+    /// l'état et la clé par rapport à lui-même (`<racine>/cred-helper/..`), sans
+    /// chemin figé dans le lanceur.
     let ensureHelper () : string = writeHelperTo (helperDir ()) "" ""
 
-    /// Recherche un exÃ©cutable dans le PATH sans le lancer. Sous Unix, un
-    /// fichier sans bit d'exÃ©cution est ignorÃ© : le shell refuserait de
-    /// l'invoquer, et PATH peut contenir des rÃ©pertoires sans accÃ¨s.
+    /// Recherche un exécutable dans le PATH sans le lancer. Sous Unix, un
+    /// fichier sans bit d'exécution est ignoré : le shell refuserait de
+    /// l'invoquer, et PATH peut contenir des répertoires sans accès.
     let tryFindOnPath (name: string) : string option =
         let isUsable (path: string) =
             if not (File.Exists path) then
@@ -333,8 +333,8 @@ try {
                 true
             else
                 try
-                    // Le shell exige le bit d'exÃ©cution pour au moins un
-                    // porteur : on suit cette rÃ¨gle plutÃ¶t que root uniquement.
+                    // Le shell exige le bit d'exécution pour au moins un
+                    // porteur : on suit cette règle plutöt que root uniquement.
                     let anyExecute =
                         UnixFileMode.UserExecute
                         ||| UnixFileMode.GroupExecute
@@ -355,10 +355,10 @@ try {
             |> Seq.tryFind isUsable
 
     /// Le helper de credentials est un script PowerShell : `powershell` sous
-    /// Windows (toujours prÃ©sent), `pwsh` ailleurs. Sans cet interprÃ©teur, le
-    /// lanceur installÃ© par [`writeHelperTo`](writeHelperTo) echoue et
-    /// containerd ne remonte qu'un refus d'authentification opaque : on vÃ©rifie
-    /// donc la prÃ©sence de l'exÃ©cutable avant de construire le hosts-dir.
+    /// Windows (toujours présent), `pwsh` ailleurs. Sans cet interpréteur, le
+    /// lanceur installé par [`writeHelperTo`](writeHelperTo) echoue et
+    /// containerd ne remonte qu'un refus d'authentification opaque : on vérifie
+    /// donc la présence de l'exécutable avant de construire le hosts-dir.
     let ensureHelperRuntime () =
         if not (OperatingSystem.IsWindows()) then
             match tryFindOnPath "pwsh" with
@@ -369,14 +369,14 @@ try {
                     RpcException(
                         Status(
                             StatusCode.FailedPrecondition,
-                            "Les registres authentifiÃ©s exigent PowerShell 7 (pwsh) sur cette plateforme : le helper de credentials est un script PowerShell exÃ©cutÃ© par containerd. Installez-le (dnf install powershell, apt install powershell ou snap install powershell --classic) puis rÃ©essayez."
+                            "Les registres authentifiés exigent PowerShell 7 (pwsh) sur cette plateforme : le helper de credentials est un script PowerShell exécuté par containerd. Installez-le (dnf install powershell, apt install powershell ou snap install powershell --classic) puis réessayez."
                         )
                     )
                 )
 
-    /// Normalise une chaÃ®ne de registre en URL de serveur utilisable comme clÃ©
-    /// hosts.toml. docker.io est mappÃ© sur son endpoint canonique. Retourne ""
-    /// si la chaÃ®ne n'est pas un hÃ´te exploitable (ex. bibliothÃ¨que locale).
+    /// Normalise une chaîne de registre en URL de serveur utilisable comme clé
+    /// hosts.toml. docker.io est mappé sur son endpoint canonique. Retourne ""
+    /// si la chaîne n'est pas un hôte exploitable (ex. bibliothèque locale).
     let normalizeRegistryHost (registry: string) : string =
         if String.IsNullOrWhiteSpace registry then
             ""
@@ -400,8 +400,8 @@ try {
             else
                 ""
 
-    /// PrÃ©pare un rÃ©pertoire hosts-dir temporaire dÃ©lÃ©guant l'authentification
-    /// au helper. Structure attendue par ctr : <racine>/<hÃ´te>/hosts.toml.
+    /// Prépare un répertoire hosts-dir temporaire déléguant l'authentification
+    /// au helper. Structure attendue par ctr : <racine>/<hôte>/hosts.toml.
     let prepareHostsDir (registry: string) : string option =
         match normalizeRegistryHost registry with
         | "" ->
@@ -416,7 +416,7 @@ try {
             let hostDir = Path.Combine(root, hostName)
             Directory.CreateDirectory(hostDir) |> ignore
 
-            // ChaÃ®ne littÃ©rale TOML (apostrophes) : les backslashes Windows
+            // Chaîne littérale TOML (apostrophes) : les backslashes Windows
             // restent tels quels pour containerd.
             let toml =
                 sprintf "[host.\"%s\"]\ncapabilities = [\"pull\", \"resolve\"]\nauth = '%s'\n" serverUrl (ensureHelper ())
@@ -424,18 +424,18 @@ try {
             File.WriteAllText(Path.Combine(hostDir, "hosts.toml"), toml)
             Some root
 
-    /// PrÃ©pare un hosts-dir temporaire pour des identifiants EXPLICITES
-    /// (option --user, au format Â« utilisateur:secret Â») : H6 â€” les secrets ne
-    /// transitent plus par argv. Les identifiants sont persistÃ©s dans un Ã©tat
-    /// jetable (chiffrÃ© comme `RegistryAuth.protect`) lu par un helper crÃ©Ã©
-    /// dans le mÃªme dossier.
+    /// Prépare un hosts-dir temporaire pour des identifiants EXPLICITES
+    /// (option --user, au format « utilisateur:secret ») : H6 — les secrets ne
+    /// transitent plus par argv. Les identifiants sont persistés dans un état
+    /// jetable (chiffré comme `RegistryAuth.protect`) lu par un helper créé
+    /// dans le même dossier.
     /// Retourne None si l'argument n'est pas au format attendu.
     let prepareHostsDirForCredentials (registry: string) (authArg: string) : string option =
         match normalizeRegistryHost registry with
         | "" ->
             None
         | serverUrl ->
-            // Â« user[:password] Â» : seul le dernier Â« : Â» sÃ©pare les deux.
+            // « user[:password] » : seul le dernier « : » sépare les deux.
             match authArg.LastIndexOf(':') with
             | sep when sep <= 0 || sep = authArg.Length - 1 ->
                 None

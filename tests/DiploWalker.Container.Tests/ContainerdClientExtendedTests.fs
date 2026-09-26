@@ -22,7 +22,7 @@ type ContainerdClientExtendedTests() =
         runner.SecureCommands
         |> List.tryFind (fun (_, args) -> (args |> String.concat " ").Contains(pattern))
 
-    // â”€â”€ Pause / Reprise â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Pause / Reprise ─────────────────────────────────────────────────
 
     [<Fact>]
     member _.``PauseContainer appelle task pause``() =
@@ -46,7 +46,7 @@ type ContainerdClientExtendedTests() =
 
         findCommand runner "task resume" |> should not' (equal None)
 
-    // â”€â”€ Renommage / top / stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Renommage / top / stats ────────────────────────────────────────
 
     [<Fact>]
     member _.``RenameContainer appelle container rename avec l'ancien et le nouveau nom``() =
@@ -74,7 +74,7 @@ type ContainerdClientExtendedTests() =
     [<Fact>]
     member _.``TopContainer en erreur retourne un message``() =
         let runner = createRunner ()
-        runner.SetFail("ctr a Ã©chouÃ©")
+        runner.SetFail("ctr a échoué")
         let client = asClient runner
 
         let result = client.TopContainer("default", "c-1")
@@ -92,13 +92,13 @@ type ContainerdClientExtendedTests() =
     [<Fact>]
     member _.``GetContainerStats en erreur retourne un objet vide``() =
         let runner = createRunner ()
-        runner.SetFail("ctr a Ã©chouÃ©")
+        runner.SetFail("ctr a échoué")
         let client = asClient runner
 
         let result = client.GetContainerStats("default", "c-1")
         result.ToString() |> should equal "{}"
 
-    // â”€â”€ Images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Images ─────────────────────────────────────────────────────────
 
     [<Fact>]
     member _.``ListImages parse les refs et les tags``() =
@@ -126,7 +126,7 @@ type ContainerdClientExtendedTests() =
         (redis.GetProperty "repository").GetString() |> should equal "docker.io/library/redis"
         (redis.GetProperty "tag").GetString() |> should equal ""
 
-        // La ligne d'en-tÃªte "REF" n'est pas restituÃ©e comme une image.
+        // La ligne d'en-tête "REF" n'est pas restituée comme une image.
         images
         |> List.exists (fun e -> (e.GetProperty "ref").GetString().Equals("REF", StringComparison.Ordinal))
         |> should be False
@@ -134,7 +134,7 @@ type ContainerdClientExtendedTests() =
     [<Fact>]
     member _.``ListImages en erreur retourne une liste vide``() =
         let runner = createRunner ()
-        runner.SetFail("ctr a Ã©chouÃ©")
+        runner.SetFail("ctr a échoué")
         let client = asClient runner
         client.ListImages("default") |> should be Empty
 
@@ -150,7 +150,7 @@ type ContainerdClientExtendedTests() =
     [<Fact>]
     member _.``InspectImage en erreur retourne un objet vide``() =
         let runner = createRunner ()
-        runner.SetFail("ctr a Ã©chouÃ©")
+        runner.SetFail("ctr a échoué")
         let client = asClient runner
 
         let result = client.InspectImage("default", "nginx:latest")
@@ -163,12 +163,12 @@ type ContainerdClientExtendedTests() =
         let client = asClient runner
 
         let result = client.RemoveImage("default", "nginx:latest")
-        result |> shouldContain "supprimÃ©e"
+        result |> shouldContain "supprimée"
 
     [<Fact>]
     member _.``RemoveImage en erreur retourne un message d'erreur``() =
         let runner = createRunner ()
-        runner.SetFail("ctr a Ã©chouÃ©")
+        runner.SetFail("ctr a échoué")
         let client = asClient runner
 
         let result = client.RemoveImage("default", "nginx:latest")
@@ -211,7 +211,7 @@ type ContainerdClientExtendedTests() =
         let result = client.ImportImage("default", "C:\\tmp\\img.tar")
         result |> should haveLength 2
 
-    // â”€â”€ Namespaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Namespaces ─────────────────────────────────────────────────────
 
     [<Fact>]
     member _.``CreateNamespace appelle namespace create``() =
@@ -239,7 +239,7 @@ type ContainerdClientExtendedTests() =
 
         ex.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€ TaskInfo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── TaskInfo ───────────────────────────────────────────────────────
 
     [<Fact>]
     member _.``TaskInfo retourne le statut et le PID``() =
@@ -260,7 +260,7 @@ type ContainerdClientExtendedTests() =
         let result = client.TaskInfo("default", "absent")
         result.ToString() |> should equal "{}"
 
-    // â”€â”€ CreateContainer : options avancÃ©es â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── CreateContainer : options avancées ─────────────────────────────
 
     [<Fact>]
     member _.``CreateContainer avec env, memoire, cpu et commande ajoute les bons arguments``() =
@@ -294,7 +294,7 @@ type ContainerdClientExtendedTests() =
         joined |> shouldContain "-c"
         joined |> shouldContain "echo hi"
 
-    // â”€â”€ Validations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Validations ────────────────────────────────────────────────────
 
     [<Fact>]
     member _.``CreateContainer rejette un namespace invalide``() =
@@ -379,7 +379,7 @@ type ContainerdClientExtendedTests() =
 
         ex.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€ Attente de sortie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Attente de sortie ──────────────────────────────────────────────
 
     [<Fact>]
     member _.``WaitForContainerExit retourne 0 quand le conteneur est STOPPED``() =
@@ -427,8 +427,8 @@ type ContainerdClientExtendedTests() =
             let runner = createRunner ()
             runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 123 PAUSED")
             let client = asClient runner
-            // PAUSED n'est pas un Ã©tat terminal : on attend la reprise, donc le
-            // dÃ©lai est atteint et la fonction retourne -1.
+            // PAUSED n'est pas un état terminal : on attend la reprise, donc le
+            // délai est atteint et la fonction retourne -1.
             let! code = client.WaitForContainerExit("default", "c-1", 1, System.Threading.CancellationToken.None)
             code |> should equal -1
         }

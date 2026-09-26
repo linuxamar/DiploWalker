@@ -3,11 +3,11 @@
 open DiploWalker.Grpc.Volume
 open DiploWalker.Grpc.Network
 
-/// Mapping centralisÃ© entre les types enum de drivers et leurs reprÃ©sentations texte.
+/// Mapping centralisé entre les types enum de drivers et leurs représentations texte.
 [<RequireQualifiedAccess>]
 module DriverMappings =
 
-    // â”€â”€ Volume drivers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Volume drivers ─────────────────────────────────────────────
 
     let volumeDriverToString (dt: StorageDriverType) =
         match dt with
@@ -44,7 +44,7 @@ module DriverMappings =
 
     let allVolumeDriverNames = [ "local"; "nfs"; "smb"; "azure"; "aws"; "gcp"; "iso" ]
 
-    // â”€â”€ Network drivers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Network drivers ────────────────────────────────────────────
 
     let networkDriverToString (dt: NetworkDriver) =
         match dt with

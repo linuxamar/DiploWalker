@@ -7,19 +7,19 @@ open DiscUtils
 open DiscUtils.Streams
 open Serilog
 
-/// Couche d'accÃ¨s au systÃ¨me de fichiers contenu dans une image disque.
+/// Couche d'accès au système de fichiers contenu dans une image disque.
 ///
-/// Les images qcow2 sont prÃ©sentÃ©es Ã  DiscUtils comme un disque brut par-
+/// Les images qcow2 sont présentées à DiscUtils comme un disque brut par-
 /// dessus le pilote maison (`Qcow2Stream`) : aucune conversion n'est faite,
-/// le fichier qcow2 reste le stockage de rÃ©fÃ©rence. Les images vhd, vhdx,
-/// vmdk et raw sont ouvertes nativement par DiscUtils. Le systÃ¨me de fichiers
-/// (ntfs, fat, ext, btrfs, â€¦) est dÃ©tectÃ© automatiquement aprÃ¨s enregistrement
+/// le fichier qcow2 reste le stockage de référence. Les images vhd, vhdx,
+/// vmdk et raw sont ouvertes nativement par DiscUtils. Le système de fichiers
+/// (ntfs, fat, ext, btrfs, …) est détecté automatiquement après enregistrement
 /// des fournisseurs via `SetupHelper.SetupComplete()`.
 module FsImage =
     open DiscFsHelper
 
     /// Enregistre une seule fois les fournisseurs DiscUtils (conteneurs et
-    /// systÃ¨mes de fichiers) pour la dÃ©tection automatique des formats.
+    /// systèmes de fichiers) pour la détection automatique des formats.
     let private registrations = lazy (DiscUtils.Complete.SetupHelper.SetupComplete())
 
     let private ensureRegistered () = registrations.Force()
@@ -42,16 +42,16 @@ module FsImage =
             :> VirtualDisk
         | _ -> VirtualDisk.OpenDisk(sourcePath, access)
 
-    /// Retrouve le systÃ¨me de fichiers de l'image via l'adaptateur partagÃ©.
+    /// Retrouve le système de fichiers de l'image via l'adaptateur partagé.
     let private openFileSystem (disk: VirtualDisk) : DiscFileSystem =
         match DiscFsHelper.openFileSystem disk with
         | Some fs -> fs
-        | None -> failwith "Aucun systÃ¨me de fichiers dÃ©tectÃ© dans l'image disque"
+        | None -> failwith "Aucun système de fichiers détecté dans l'image disque"
 
-    /// Extrait le contenu du systÃ¨me de fichiers de l'image dans `targetDir`.
+    /// Extrait le contenu du système de fichiers de l'image dans `targetDir`.
     /// Retourne le nombre de fichiers extraits.
-    /// Essaie les adaptateurs spÃ©cialisÃ©s (Hawkynt Btrfs/XFS/HFS+, VDI, DMG)
-    /// avant de fallback sur DiscUtils gÃ©nÃ©rique.
+    /// Essaie les adaptateurs spécialisés (Hawkynt Btrfs/XFS/HFS+, VDI, DMG)
+    /// avant de fallback sur DiscUtils générique.
     let extractCore (sourcePath: string) (targetDir: string) (readOnly: bool) : int =
         match IsoFs.tryExtract sourcePath targetDir with
         | Some count -> count
@@ -74,9 +74,9 @@ module FsImage =
     let extract (sourcePath: string) (targetDir: string) (readOnly: bool) : Result<int, string> =
         BinaryIo.protect (fun () -> extractCore sourcePath targetDir readOnly)
 
-    /// RÃ©Ã©crit le contenu de `sourceDir` dans le systÃ¨me de fichiers de
-    /// l'image : retour arriÃ¨re des modifications effectuÃ©es par le conteneur.
-    /// Essaie les adaptateurs spÃ©cialisÃ©s avant fallback DiscUtils gÃ©nÃ©rique.
+    /// Réécrit le contenu de `sourceDir` dans le système de fichiers de
+    /// l'image : retour arrière des modifications effectuées par le conteneur.
+    /// Essaie les adaptateurs spécialisés avant fallback DiscUtils générique.
     let writeBackCore (sourcePath: string) (sourceDir: string) =
         if HawkyntFs.tryWriteBack sourcePath sourceDir then
             ()
@@ -93,7 +93,7 @@ module FsImage =
     let writeBack (sourcePath: string) (sourceDir: string) : Result<unit, string> =
         BinaryIo.protect (fun () -> writeBackCore sourcePath sourceDir)
 
-    // â”€â”€ CrÃ©ation d'image disque â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Création d'image disque ─────────────────────────────────────
 
     let rec private calcDirSize (dir: string) : int64 =
         let mutable size = 0L
@@ -106,9 +106,9 @@ module FsImage =
 
         size
 
-    /// Ouvre ou crÃ©e un disque virtuel dans le format donnÃ©.
-    /// Si le fichier existe dÃ©jÃ , il est ouvert ; sinon, un nouveau disque
-    /// est crÃ©Ã© avec la taille virtuelle spÃ©cifiÃ©e (en octets).
+    /// Ouvre ou crée un disque virtuel dans le format donné.
+    /// Si le fichier existe déjà, il est ouvert ; sinon, un nouveau disque
+    /// est créé avec la taille virtuelle spécifiée (en octets).
     let private openOrCreateDisk (path: string) (format: DiskFormat.Format) (virtualSize: int64) : VirtualDisk =
         ensureRegistered ()
 
@@ -141,17 +141,17 @@ module FsImage =
                 )
 
     /// Formate le disque avec NTFS et copie le contenu de `sourceDir`
-    /// dans l'image crÃ©Ã©e. Retourne le chemin du fichier image.
+    /// dans l'image créée. Retourne le chemin du fichier image.
     ///
-    /// Formats supportÃ©s en Ã©criture : VHD, VHDX, VMDK, VDI, Raw.
-    /// Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportÃ©s
-    /// en crÃ©ation (pas de factory publique dans DiscUtils).
+    /// Formats supportés en écriture : VHD, VHDX, VMDK, VDI, Raw.
+    /// Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés
+    /// en création (pas de factory publique dans DiscUtils).
     let createCore (sourceDir: string) (destPath: string) (format: DiskFormat.Format) : string =
         if not (Directory.Exists sourceDir) then
-            invalidArg "sourceDir" (sprintf "Le rÃ©pertoire source n'existe pas : '%s'" sourceDir)
+            invalidArg "sourceDir" (sprintf "Le répertoire source n'existe pas : '%s'" sourceDir)
 
         if format = DiskFormat.Iso then
-            // CrÃ©ation ISO9660 niveau 1 directement (pas de disque virtuel).
+            // Création ISO9660 niveau 1 directement (pas de disque virtuel).
             IsoFs.createCore sourceDir destPath |> ignore
             destPath
         else
@@ -161,7 +161,7 @@ module FsImage =
             | DiskFormat.Parallels
             | DiskFormat.Dmg
             | DiskFormat.Unknown ->
-                invalidArg "format" (sprintf "Le format '%s' n'est pas supportÃ© en crÃ©ation" (DiskFormat.toString format))
+                invalidArg "format" (sprintf "Le format '%s' n'est pas supporté en création" (DiskFormat.toString format))
             | _ -> ()
 
             let dirSize = calcDirSize sourceDir
@@ -184,7 +184,7 @@ module FsImage =
                     volumeManager.GetPhysicalVolumes() |> Seq.cast<VolumeInfo> |> Seq.toList
 
                 if physicalVolumes.IsEmpty then
-                    failwith "Aucun volume physique dÃ©tectÃ© dans le disque crÃ©Ã©"
+                    failwith "Aucun volume physique détecté dans le disque créé"
 
                 let pv = physicalVolumes.Head
                 Ntfs.NtfsFileSystem.Format(pv, "Diplo", Ntfs.NtfsFormatOptions()) |> ignore
@@ -192,15 +192,15 @@ module FsImage =
                 DiscFsHelper.copyIntoFs fs "\\" sourceDir
                 destPath
             with ex ->
-                // Ne supprimer l'image que si NOUS l'avons crÃ©Ã©e : un Ã©chec de
+                // Ne supprimer l'image que si NOUS l'avons créée : un échec de
                 // formatage sur une image EXISTANTE (ouverte par openOrCreateDisk)
-                // ne doit jamais la dÃ©truire.
+                // ne doit jamais la détruire.
                 if fileCreated then
                     try
                         if File.Exists destPath then
                             File.Delete destPath
                     with cleanupEx ->
-                        Log.Warning(cleanupEx, "Ã‰chec de la suppression du fichier temporaire {DestPath}", destPath)
+                        Log.Warning(cleanupEx, "Échec de la suppression du fichier temporaire {DestPath}", destPath)
 
                 reraise ()
 

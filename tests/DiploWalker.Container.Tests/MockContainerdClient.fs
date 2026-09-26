@@ -166,7 +166,7 @@ type MockContainerdClient() =
 
         member _.RemoveImage(_namespaceName, imageRef) =
             removedImages <- removedImages |> Set.add imageRef
-            sprintf "Image %s supprimÃ©e" imageRef
+            sprintf "Image %s supprimée" imageRef
 
         member _.TagImage(_namespaceName, _source, _target) = ()
 

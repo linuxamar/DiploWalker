@@ -17,7 +17,7 @@ module Qcow2Tests =
         finally
             TestImage.cleanupDir root
 
-    // â”€â”€ helpers binaires â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── helpers binaires ────────────────────────────────────────────────────
 
     let private putBe16 (d: byte[]) (o: int) (v: int) =
         d.[o] <- byte (v >>> 8)
@@ -56,8 +56,8 @@ module Qcow2Tests =
         fs.Write(b, 0, b.Length)
         fs.Flush()
 
-    /// Transforme l'en-tÃªte en version 3 (incompatible/refcount_order
-    /// conformes) : version Ã  4, header_length Ã  100, refcount_order Ã  96.
+    /// Transforme l'en-tête en version 3 (incompatible/refcount_order
+    /// conformes) : version à 4, header_length à 100, refcount_order à 96.
     let private makeV3 (b: byte[]) =
         putBe32 b 4 3
         putBe32 b 72 0
@@ -74,7 +74,7 @@ module Qcow2Tests =
             let r = fs.Read(b, total, 8 - total)
 
             if r <= 0 then
-                failwith "Fichier tronquÃ©"
+                failwith "Fichier tronqué"
 
             total <- total + r
 
@@ -91,11 +91,11 @@ module Qcow2Tests =
     let private captureException (f: unit -> unit) : Exception =
         try
             f ()
-            failwith "Aucune exception levÃ©e"
+            failwith "Aucune exception levée"
         with e ->
             e
 
-    // â”€â”€ comportement nominal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── comportement nominal ────────────────────────────────────────────────
 
     [<Fact>]
     let ``lecture d'une region non allouee renvoie des zeros`` () =
@@ -155,7 +155,7 @@ module Qcow2Tests =
             s.Position <- offset
             s.Write(payload, 0, payload.Length)
             s.Flush()
-            // RÃ©Ã©criture partielle au milieu (lecture-modification-Ã©criture).
+            // Réécriture partielle au milieu (lecture-modification-écriture).
             let partial = Array.create 4096 0x5Auy
             s.Position <- offset + int64 (2 * 1024 * 1024)
             s.Write(partial, 0, partial.Length)
@@ -259,7 +259,7 @@ module Qcow2Tests =
             FsImage.extract img re false |> Result.defaultWith failwith |> ignore
             File.ReadAllText(Path.Combine(re, "hello.txt")) |> should equal "v2")
 
-    // â”€â”€ refus et limites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── refus et limites ────────────────────────────────────────────────────
 
     [<Fact>]
     let ``une image qcow2 avec fichier de sauvegarde est refusee`` () =
@@ -275,7 +275,7 @@ module Qcow2Tests =
             TestImage.createQcow2 img []
             patchHeader img (fun b -> putBe32 b 32 1)
             let ex = captureException (fun () -> DiskMounter.mount img "/data" false |> ignore)
-            ex.Message |> should haveSubstring "chiffrÃ©es")
+            ex.Message |> should haveSubstring "chiffrées")
 
     [<Fact>]
     let ``une image qcow2 v3 avec fichier de donnees externe est refusee`` () =
@@ -287,7 +287,7 @@ module Qcow2Tests =
                 putBe32 b 72 4)
 
             let ex = captureException (fun () -> DiskMounter.mount img "/data" false |> ignore)
-            ex.Message |> should haveSubstring "fichier de donnÃ©es externe")
+            ex.Message |> should haveSubstring "fichier de données externe")
 
     [<Fact>]
     let ``un cluster compresse est refuse a la lecture`` () =
@@ -297,9 +297,9 @@ module Qcow2Tests =
             let l1 = readUInt64AtFile img 4096L
             let l2Table = l1 &&& 0x00FFFFFFFFFFFFFE00L
             let desc = readUInt64AtFile img l2Table
-            // Le cluster virtuel 0 doit Ãªtre allouÃ© (le formatage y Ã©crit le MBR).
+            // Le cluster virtuel 0 doit être alloué (le formatage y écrit le MBR).
             desc |> should not' (equal 0L)
-            // Marque le cluster comme compressÃ© (bit 62).
+            // Marque le cluster comme compressé (bit 62).
             writeUInt64AtFile img l2Table (desc ||| 0x4000000000000000L)
             use s = new Qcow2Stream(img, FileAccess.Read)
             let b = Array.zeroCreate<byte> 512
@@ -310,7 +310,7 @@ module Qcow2Tests =
     let ``l'allocation echoue si le bloc de refcounts est manquant`` () =
         run (fun root img ->
             TestImage.createQcow2 img []
-            // Vide la table de refcounts : plus aucun bloc n'est rÃ©fÃ©rencÃ©.
+            // Vide la table de refcounts : plus aucun bloc n'est référencé.
             do
                 use fs =
                     new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
@@ -322,13 +322,13 @@ module Qcow2Tests =
 
             use s = new Qcow2Stream(img, FileAccess.ReadWrite)
             let b = Array.create 4096 0x01uy
-            // Ã‰criture dans une rÃ©gion non allouÃ©e : l'allocation d'un cluster
+            // Écriture dans une région non allouée : l'allocation d'un cluster
             // (et de sa table L2) exige un bloc de refcounts absent.
             s.Position <- 16L * 1024L * 1024L
             let ex = captureException (fun () -> s.Write(b, 0, b.Length) |> ignore)
-            ex.Message |> should haveSubstring "saturÃ©e")
+            ex.Message |> should haveSubstring "saturée")
 
-    // â”€â”€ redimensionnement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── redimensionnement ───────────────────────────────────────────────────
 
     [<Fact>]
     let ``grow etend la taille virtuelle et permet d'ecrire au-dela`` () =
@@ -344,13 +344,13 @@ module Qcow2Tests =
 
             use s = new Qcow2Stream(img, FileAccess.ReadWrite)
             s.Length |> should equal (72L * 1024L * 1024L)
-            // la rÃ©gion au-delÃ  de 64 Mo est nulle
+            // la région au-delà de 64 Mo est nulle
             s.Position <- 65L * 1024L * 1024L
             let zeros = Array.zeroCreate<byte> 4096
             let buf = Array.zeroCreate<byte> 4096
             s.Read(buf, 0, buf.Length) |> ignore
             buf |> should equal zeros
-            // Ã©criture puis relecture dans la rÃ©gion Ã©tendue
+            // écriture puis relecture dans la région étendue
             let payload = Array.create 4096 0x5Auy
             s.Position <- 70L * 1024L * 1024L
             s.Write(payload, 0, payload.Length)
@@ -362,7 +362,7 @@ module Qcow2Tests =
     [<Fact>]
     let ``grow avec expansion de la table L1 relocalise et conserve les donnees`` () =
         run (fun root img ->
-            // image vide de 1 Go : la table L1 occupe un cluster (512 entrÃ©es)
+            // image vide de 1 Go : la table L1 occupe un cluster (512 entrées)
             TestImage.createEmptyQcow2 img 1024L
             let l1Before = readUInt64AtFile img 40L
 
@@ -378,7 +378,7 @@ module Qcow2Tests =
             l1After |> should not' (equal l1Before)
             use s = new Qcow2Stream(img, FileAccess.ReadWrite)
             s.Length |> should equal (1152L * 1024L * 1024L)
-            // Ã©criture puis relecture dans la partie Ã©tendue
+            // écriture puis relecture dans la partie étendue
             let payload = Array.create 4096 0x3Cuy
             s.Position <- 1024L * 1024L * 1024L
             s.Write(payload, 0, payload.Length)
@@ -391,7 +391,7 @@ module Qcow2Tests =
     let ``shrink reduit la taille, libere les clusters et tronque le fichier`` () =
         run (fun root img ->
             TestImage.createQcow2 img [ "a.txt", "a" ]
-            // occupe des clusters Ã©levÃ©s (50 Mo)
+            // occupe des clusters élevés (50 Mo)
             do
                 use s = new Qcow2Stream(img, FileAccess.ReadWrite)
                 let payload = Array.create 4096 0x21uy
@@ -410,14 +410,14 @@ module Qcow2Tests =
 
             use s = new Qcow2Stream(img, FileAccess.Read)
             s.Length |> should equal (32L * 1024L * 1024L)
-            // au-delÃ  de la nouvelle taille, la lecture est vide
+            // au-delà de la nouvelle taille, la lecture est vide
             let b = Array.zeroCreate<byte> 4096
             s.Position <- 40L * 1024L * 1024L
             s.Read(b, 0, b.Length) |> should equal 0
-            // le fichier est tronquÃ© Ã  la derniÃ¨re position utile
+            // le fichier est tronqué à la dernière position utile
             FileInfo(img).Length |> should be (lessThan sizeBefore)
             s.Dispose()
-            // aprÃ¨s un nouvel agrandissement, la zone libÃ©rÃ©e est rÃ©utilisable (zÃ©ros)
+            // après un nouvel agrandissement, la zone libérée est réutilisable (zéros)
             do
                 use fs =
                     new FileStream(img, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)

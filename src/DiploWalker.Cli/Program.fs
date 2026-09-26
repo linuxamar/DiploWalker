@@ -18,8 +18,8 @@ let private addCmd (c: IConfigurator<CommandSettings>) (name: string) (t: Type) 
     |> fun mi -> mi.MakeGenericMethod(t).Invoke(c, [| name |])
     |> ignore
 
-/// Handler global : les erreurs de transport (gRPC / HTTP) remontÃ©es jusque
-/// lÃ  sont rapportÃ©es proprement au lieu d'une exception non gÃ©rÃ©e. Une
+/// Handler global : les erreurs de transport (gRPC / HTTP) remontées jusque
+/// là sont rapportées proprement au lieu d'une exception non gérée. Une
 /// annulation volontaire (Ctrl+C) sort avec le code 0.
 let private handleException (output: IOutputPort) (ex: exn) : int =
     match ex with
@@ -28,7 +28,7 @@ let private handleException (output: IOutputPort) (ex: exn) : int =
         output.WriteError(sprintf "Erreur gRPC : %s" rex.Status.Detail)
         1
     | :? HttpRequestException as hex ->
-        output.WriteError(sprintf "Erreur rÃ©seau : %s" (if String.IsNullOrWhiteSpace hex.Message then "connexion au service refusÃ©e" else hex.Message))
+        output.WriteError(sprintf "Erreur réseau : %s" (if String.IsNullOrWhiteSpace hex.Message then "connexion au service refusée" else hex.Message))
         1
     | _ -> raise ex
 
@@ -147,6 +147,6 @@ let main argv =
     |> ignore
 
     // Propager le code retour de Spectre : l'ignorer faisait toujours sortir
-    // le processus en 0, cassant toute chaÃ®ne scriptÃ©e (&&, CI, planificateur).
+    // le processus en 0, cassant toute chaîne scriptée (&&, CI, planificateur).
     app.Run(argv)
 

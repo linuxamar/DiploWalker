@@ -97,7 +97,7 @@ module VolumeIntegrationTests =
                 _attempts <- _attempts + 1
 
                 if _attempts = 1 then
-                    raise (RpcException(Status(StatusCode.Unavailable, "panne simulÃ©e")))
+                    raise (RpcException(Status(StatusCode.Unavailable, "panne simulée")))
 
                 inner.CreateVolume(request, ct)
 
@@ -206,7 +206,7 @@ module VolumeIntegrationTests =
             let removeReq = { Id = createResult.Id; Force = false }
             let removeResult = client.RemoveVolume(removeReq, CancellationToken.None).Result
             removeResult.Success |> should equal true
-            removeResult.Message |> should equal "Volume supprimÃ©")
+            removeResult.Message |> should equal "Volume supprimé")
 
     [<Fact>]
     let ``CreateVolume puis InspectVolume via gRPC`` () =

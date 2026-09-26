@@ -11,8 +11,8 @@ open DiploWalker.Disk
 /// Fabrique d'images disque de test : formatage FAT via DiscUtils.
 module TestImage =
 
-    /// Flux qcow2 de test : tolÃ¨re l'appel SetLength de Raw.Disk.Initialize
-    /// (la taille virtuelle est fixÃ©e par l'en-tÃªte, aucun redimensionnement).
+    /// Flux qcow2 de test : tolère l'appel SetLength de Raw.Disk.Initialize
+    /// (la taille virtuelle est fixée par l'en-tête, aucun redimensionnement).
     type private Qcow2TestStream(path: string, access: FileAccess) =
         inherit Qcow2Stream(path, access)
         override _.SetLength _ = ()
@@ -37,9 +37,9 @@ module TestImage =
         d.[o + 6] <- byte (v >>> 8)
         d.[o + 7] <- byte v
 
-    /// Ã‰crit un squelette d'image qcow2 version 2 conforme Ã  la spÃ©cification
-    /// QEMU : en-tÃªte (cluster 0), table L1 (cluster 1), table de refcounts
-    /// (cluster 2) et blocs de refcounts prÃ©-allouÃ©s (clusters 3..11) avec un
+    /// Écrit un squelette d'image qcow2 version 2 conforme à la spécification
+    /// QEMU : en-tête (cluster 0), table L1 (cluster 1), table de refcounts
+    /// (cluster 2) et blocs de refcounts pré-alloués (clusters 3..11) avec un
     /// refcount de 1 pour les clusters structurels. Image vide, taille
     /// virtuelle 64 Mo (ou `virtualSize`), clusters de 4 Ko.
     let private writeQcow2Skeleton (path: string) (virtualSize: int64) =
@@ -91,7 +91,7 @@ module TestImage =
 
             fs.Write(block, 0, block.Length)
 
-    /// Ã‰crit le contenu (chemin relatif, contenu texte) dans un systÃ¨me de
+    /// Écrit le contenu (chemin relatif, contenu texte) dans un système de
     /// fichiers FAT.
     let private writeContents (fat: FatFileSystem) (contents: (string * string) list) =
         for (relPath, content) in contents do
@@ -105,8 +105,8 @@ module TestImage =
             sw.Write(content)
             sw.Flush()
 
-    /// CrÃ©e une image disque FAT 64 Mo, avec table de partitions BIOS, et y
-    /// Ã©crit le contenu (chemin relatif, contenu texte) fourni.
+    /// Crée une image disque FAT 64 Mo, avec table de partitions BIOS, et y
+    /// écrit le contenu (chemin relatif, contenu texte) fourni.
     let createFat (path: string) (contents: (string * string) list) =
         use fs = new FileStream(path, FileMode.Create, FileAccess.ReadWrite)
         use disk = Raw.Disk.Initialize(fs, Ownership.None, 64L * 1024L * 1024L)
@@ -114,8 +114,8 @@ module TestImage =
         use fat = FatFileSystem.FormatPartition(disk, 0, "DIPLO")
         writeContents fat contents
 
-    /// CrÃ©e une image disque qcow2 (version 2) de `virtualSize` Mo contenant
-    /// un systÃ¨me de fichiers FAT formatÃ© via DiscUtils, puis y Ã©crit le
+    /// Crée une image disque qcow2 (version 2) de `virtualSize` Mo contenant
+    /// un système de fichiers FAT formaté via DiscUtils, puis y écrit le
     /// contenu (chemin relatif, contenu texte) fourni.
     let createQcow2WithSize (path: string) (virtualSizeMb: int64) (contents: (string * string) list) =
         writeQcow2Skeleton path (virtualSizeMb * 1024L * 1024L)
@@ -128,18 +128,18 @@ module TestImage =
         use fat = FatFileSystem.FormatPartition(disk, 0, "DIPLO")
         writeContents fat contents
 
-    /// CrÃ©e une image disque qcow2 (version 2) contenant un systÃ¨me de
-    /// fichiers FAT 64 Mo formatÃ© via DiscUtils, puis y Ã©crit le contenu
+    /// Crée une image disque qcow2 (version 2) contenant un système de
+    /// fichiers FAT 64 Mo formaté via DiscUtils, puis y écrit le contenu
     /// (chemin relatif, contenu texte) fourni.
     let createQcow2 (path: string) (contents: (string * string) list) = createQcow2WithSize path 64L (contents)
 
-    /// CrÃ©e une image qcow2 (version 2) vide de `virtualSizeMo` Mo, sans
-    /// systÃ¨me de fichiers (squelette seul) : utile pour les tests de
-    /// redimensionnement sans coÃ»t de formatage.
+    /// Crée une image qcow2 (version 2) vide de `virtualSizeMo` Mo, sans
+    /// système de fichiers (squelette seul) : utile pour les tests de
+    /// redimensionnement sans coût de formatage.
     let createEmptyQcow2 (path: string) (virtualSizeMb: int64) =
         writeQcow2Skeleton path (virtualSizeMb * 1024L * 1024L)
 
-    /// RÃ©pertoire temporaire unique.
+    /// Répertoire temporaire unique.
     let createTempDir () =
         let dir =
             Path.Combine(Path.GetTempPath(), "diplo-disk-test-" + Guid.NewGuid().ToString("N"))
@@ -147,7 +147,7 @@ module TestImage =
         Directory.CreateDirectory(dir) |> ignore
         dir
 
-    /// Suppression rÃ©cursive tolÃ©rante aux erreurs.
+    /// Suppression récursive tolérante aux erreurs.
     let cleanupDir (dir: string) =
         try
             if Directory.Exists(dir) then

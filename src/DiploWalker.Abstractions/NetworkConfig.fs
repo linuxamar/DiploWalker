@@ -7,7 +7,7 @@ open System.Text.Json
 open System.Text.Json.Serialization
 open Serilog
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ───────────────────────────────────────────────────────────────
 
 type CniNatConfig =
     { [<JsonPropertyName("cni_version")>]
@@ -37,7 +37,7 @@ type CniNatConfig =
       [<JsonPropertyName("dns")>]
       Dns: bool }
 
-// â”€â”€â”€ Valeurs par dÃ©faut â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Valeurs par défaut ──────────────────────────────────────────────────
 
 let defaultBridgeCandidates =
     [ "172.18.0.0/16"
@@ -66,7 +66,7 @@ let defaultConfig =
       PortMappings = true
       Dns = true }
 
-// â”€â”€â”€ Serialisation JSON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Serialisation JSON ──────────────────────────────────────────────────
 
 let private jsonOptions = JsonSerializerOptions()
 do jsonOptions.PropertyNamingPolicy <- JsonNamingPolicy.SnakeCaseLower
@@ -80,9 +80,9 @@ let serializeConfig (config: CniNatConfig) : string =
 let deserializeConfig (json: string) : CniNatConfig =
     JsonSerializer.Deserialize<CniNatConfig>(json, jsonOptions)
 
-// â”€â”€â”€ Validation de format â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Validation de format ────────────────────────────────────────────────
 
-/// VÃ©rifie le format canonique A.B.C.D/masque d'un sous-rÃ©seau.
+/// Vérifie le format canonique A.B.C.D/masque d'un sous-réseau.
 let isValidCidr (cidr: string) =
     if String.IsNullOrWhiteSpace cidr then
         false
@@ -105,7 +105,7 @@ let isValidCidr (cidr: string) =
                     | _ -> false))
         | _ -> false
 
-// â”€â”€â”€ Chargement depuis fichier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Chargement depuis fichier ───────────────────────────────────────────
 
 let private getConfigPath () =
     let installDir =
@@ -124,9 +124,9 @@ let loadConfig (configPath: string option) : CniNatConfig =
             let keepOrDefault value fallback =
                 if String.IsNullOrWhiteSpace value then fallback else value
 
-            // Fusionner TOUS les champs manquants avec les dÃ©fauts, et valider
-            // le format des valeurs rÃ©seau : une config corrompue ne doit pas
-            // faire planter le service au dÃ©marrage.
+            // Fusionner TOUS les champs manquants avec les défauts, et valider
+            // le format des valeurs réseau : une config corrompue ne doit pas
+            // faire planter le service au démarrage.
             { CniVersion = keepOrDefault loaded.CniVersion defaultConfig.CniVersion
               NatName = keepOrDefault loaded.NatName defaultConfig.NatName
               Subnet =
@@ -134,7 +134,7 @@ let loadConfig (configPath: string option) : CniNatConfig =
                       loaded.Subnet
                   elif not (String.IsNullOrWhiteSpace loaded.Subnet) then
                       Log.Warning(
-                          "Sous-rÃ©seau invalide dans {Path} : '{Subnet}', dÃ©tection automatique activÃ©e",
+                          "Sous-réseau invalide dans {Path} : '{Subnet}', détection automatique activée",
                           path,
                           loaded.Subnet
                       )
@@ -146,7 +146,7 @@ let loadConfig (configPath: string option) : CniNatConfig =
                   if String.IsNullOrWhiteSpace loaded.Gateway || isValidCidr loaded.Gateway then
                       loaded.Gateway
                   else
-                      Log.Warning("Passerelle invalide dans {Path} : '{Gateway}', elle sera dÃ©rivÃ©e", path, loaded.Gateway)
+                      Log.Warning("Passerelle invalide dans {Path} : '{Gateway}', elle sera dérivée", path, loaded.Gateway)
 
                       ""
               MasterInterface = keepOrDefault loaded.MasterInterface defaultConfig.MasterInterface
@@ -170,7 +170,7 @@ let saveConfig (configPath: string option) (config: CniNatConfig) =
 
     if not (Directory.Exists(dir)) then
         Directory.CreateDirectory(dir) |> ignore
-    // Ã‰criture atomique : fichier temp + renommage pour Ã©viter la corruption
+    // Écriture atomique : fichier temp + renommage pour éviter la corruption
     let tempPath = path + ".tmp." + Guid.NewGuid().ToString("N")
 
     try
@@ -181,11 +181,11 @@ let saveConfig (configPath: string option) (config: CniNatConfig) =
             if File.Exists(tempPath) then
                 File.Delete(tempPath)
         with cleanupEx ->
-            Log.Warning(cleanupEx, "Ã‰chec de la suppression du fichier temporaire {Tmp}", tempPath)
+            Log.Warning(cleanupEx, "Échec de la suppression du fichier temporaire {Tmp}", tempPath)
 
         reraise ()
 
-// â”€â”€â”€ DÃ©tection automatique de sous-rÃ©seau â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Détection automatique de sous-réseau ────────────────────────────────
 
 let getUsedPrefixes () =
     let interfaces = NetworkInterface.GetAllNetworkInterfaces()
@@ -203,8 +203,8 @@ let getUsedPrefixes () =
     |> Set.ofArray
 
 /// Extrait les deux premiers octets d'une IP ou d'un CIDR sous forme de paire
-/// d'entiers. Comparer par segments (et non via StartsWith) Ã©vite les faux
-/// positifs du type Â« 172.200.x.x Â» considÃ©rÃ© comme dans Â« 172.20.0.0/16 Â».
+/// d'entiers. Comparer par segments (et non via StartsWith) évite les faux
+/// positifs du type « 172.200.x.x » considéré comme dans « 172.20.0.0/16 ».
 let private firstTwoOctets (addressOrCidr: string) =
     if String.IsNullOrWhiteSpace addressOrCidr then
         None
@@ -224,7 +224,7 @@ let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) : 
 
     candidates
     |> List.tryFind (fun c ->
-        // Ignorer silencieusement tout candidat mal formÃ© (config externe)
+        // Ignorer silencieusement tout candidat mal formé (config externe)
         match firstTwoOctets c with
         | Some pair when isValidCidr c -> not (usedPairs.Contains pair)
         | _ -> false)
@@ -233,18 +233,18 @@ let findAvailableSubnet (candidates: string list) (usedPrefixes: Set<string>) : 
         | None ->
             match candidates |> List.tryFind isValidCidr with
             | Some h -> Ok h
-            | None -> Error "Aucun sous-rÃ©seau valide disponible"
+            | None -> Error "Aucun sous-réseau valide disponible"
 
 let deriveGateway (subnet: string) : Result<string, string> =
     let ipPart = subnet.Split('/') |> Array.head
     let parts = ipPart.Split('.')
 
     if parts.Length < 3 then
-        Error(sprintf "Sous-rÃ©seau invalide pour dÃ©river la passerelle: '%s'" subnet)
+        Error(sprintf "Sous-réseau invalide pour dériver la passerelle: '%s'" subnet)
     else
         Ok(sprintf "%s.%s.%s.1" parts.[0] parts.[1] parts.[2])
 
-// â”€â”€â”€ RÃ©solution de la configuration finale â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Résolution de la configuration finale ───────────────────────────────
 
 let resolveSubnet (config: CniNatConfig) (usedPrefixes: Set<string>) : Result<string, string> =
     if String.IsNullOrEmpty(config.Subnet) && config.AutoDetect then
@@ -252,7 +252,7 @@ let resolveSubnet (config: CniNatConfig) (usedPrefixes: Set<string>) : Result<st
     elif String.IsNullOrEmpty(config.Subnet) then
         match config.SubnetCandidates |> List.tryHead with
         | Some h -> Ok h
-        | None -> Error "Aucun sous-rÃ©seau disponible"
+        | None -> Error "Aucun sous-réseau disponible"
     else
         Ok config.Subnet
 
@@ -270,7 +270,7 @@ let resolveAll (configPath: string option) : Result<CniNatConfig * string * stri
         resolveGateway config subnet
         |> Result.map (fun gateway -> (config, subnet, gateway)))
 
-// â”€â”€â”€ GÃ©nÃ©ration du conflist CNI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Génération du conflist CNI ─────────────────────────────────────────
 
 let generateCniConflistJson (config: CniNatConfig) (subnet: string) (gateway: string) =
     let conflist =

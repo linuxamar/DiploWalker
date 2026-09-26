@@ -4,12 +4,12 @@ open System.IO
 open Serilog
 
 /// Adaptateur Hawkynt.FileFormats.FileSystems pour l'extraction et la
-/// rÃ©Ã©criture de systÃ¨mes de fichiers Btrfs, XFS et HFS+.
+/// réécriture de systèmes de fichiers Btrfs, XFS et HFS+.
 module HawkyntFs =
 
     let private maxInMemoryBytes = 2L * 1024L * 1024L * 1024L
 
-    // â”€â”€ Extraction Btrfs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Extraction Btrfs ──────────────────────────────────────────────
 
     let private extractBtrfs (stream: Stream) (targetDir: string) =
         use reader = new FileSystem.Btrfs.BtrfsReader(stream, true)
@@ -32,7 +32,7 @@ module HawkyntFs =
 
         count
 
-    // â”€â”€ Extraction XFS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Extraction XFS ────────────────────────────────────────────────
 
     let private extractXfs (stream: Stream) (targetDir: string) =
         use reader = new FileSystem.Xfs.XfsReader(stream, true)
@@ -55,7 +55,7 @@ module HawkyntFs =
 
         count
 
-    // â”€â”€ Extraction HFS+ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Extraction HFS+ ───────────────────────────────────────────────
 
     let private extractHfsPlus (stream: Stream) (targetDir: string) =
         use reader = new FileSystem.HfsPlus.HfsPlusReader(stream, true)
@@ -85,10 +85,10 @@ module HawkyntFs =
         count
 
     /// Tente d'extraire une image disque via Hawkynt.
-    /// Retourne Some(nombreFichiers) si le format est gÃ©rÃ©, None sinon.
-    /// Chaque tentative extrait dans un sous-rÃ©pertoire dÃ©diÃ© et n'est promue
+    /// Retourne Some(nombreFichiers) si le format est géré, None sinon.
+    /// Chaque tentative extrait dans un sous-répertoire dédié et n'est promue
     /// que si elle produit des fichiers : sinon un Btrfs partiel suivi d'un XFS
-    /// rÃ©ussi mÃ©langerait deux interprÃ©tations dans le mÃªme staging.
+    /// réussi mélangerait deux interprétations dans le même staging.
     let private extractInAttemptDir
         (extract: Stream -> string -> int)
         (stream: Stream)
@@ -120,7 +120,7 @@ module HawkyntFs =
                 try
                     Directory.Delete(attemptDir, true)
                 with ex ->
-                    Log.Warning(ex, "Impossible de supprimer le rÃ©pertoire de tentative {Dir}", attemptDir)
+                    Log.Warning(ex, "Impossible de supprimer le répertoire de tentative {Dir}", attemptDir)
 
     let tryExtract (sourcePath: string) (targetDir: string) : int option =
         if not (File.Exists(sourcePath)) then
@@ -143,7 +143,7 @@ module HawkyntFs =
                         try
                             extractInAttemptDir extractBtrfs stream targetDir
                         with ex ->
-                            Log.Warning(ex, "Ã‰chec extraction Btrfs, tentative XFS")
+                            Log.Warning(ex, "Échec extraction Btrfs, tentative XFS")
                             stream.Position <- 0L
 
                             match extractInAttemptDir extractXfs stream targetDir with
@@ -153,22 +153,22 @@ module HawkyntFs =
 
                                 match extractInAttemptDir extractHfsPlus stream targetDir with
                                 | Some c ->
-                                    Log.Information("Extraction HFS+ rÃ©ussie aprÃ¨s Ã©checs Btrfs/XFS")
+                                    Log.Information("Extraction HFS+ réussie après échecs Btrfs/XFS")
                                     Some c
                                 | None ->
-                                    Log.Warning("Ã‰chec extraction HFS+ : aucun systÃ¨me de fichiers reconnu")
+                                    Log.Warning("Échec extraction HFS+ : aucun système de fichiers reconnu")
                                     None
                     | _ -> None
                 with ex ->
-                    Log.Warning(ex, "Ã‰chec dÃ©tection format Hawkynt pour {Path}", sourcePath)
+                    Log.Warning(ex, "Échec détection format Hawkynt pour {Path}", sourcePath)
                     None
 
-    // â”€â”€ RÃ©Ã©criture (schÃ©ma commun) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Réécriture (schéma commun) ────────────────────────────────────
 
-    /// SÃ©rialise dans un fichier temporaire puis remplace l'image source d'un
-    /// bloc : FileMode.Create tronquerait l'image AVANT tout succÃ¨s de
-    /// sÃ©rialisation â€” un Ã©chec (disque plein) dÃ©truirait l'image et le
-    /// fallback relirait ensuite un fichier dÃ©jÃ  corrompu.
+    /// Sérialise dans un fichier temporaire puis remplace l'image source d'un
+    /// bloc : FileMode.Create tronquerait l'image AVANT tout succès de
+    /// sérialisation — un échec (disque plein) détruirait l'image et le
+    /// fallback relirait ensuite un fichier déjà corrompu.
     let private replaceAfterSerialize (sourcePath: string) (serialize: FileStream -> unit) =
         let tmpPath = sourcePath + "." + System.Guid.NewGuid().ToString("N") + ".tmp"
 
@@ -185,10 +185,10 @@ module HawkyntFs =
         | _ ->
             try
                 File.Delete(tmpPath)
-            with ex -> Log.Warning(ex, "Ã‰chec de la suppression du fichier temporaire {Tmp}", tmpPath)
+            with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmpPath)
             reraise ()
 
-    // â”€â”€ RÃ©Ã©criture Btrfs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Réécriture Btrfs ──────────────────────────────────────────────
 
     let private writeBackBtrfs (sourcePath: string) (sourceDir: string) =
         let imageBytes = File.ReadAllBytes(sourcePath)
@@ -213,7 +213,7 @@ module HawkyntFs =
 
             writer.WriteTo(output))
 
-    // â”€â”€ RÃ©Ã©criture XFS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Réécriture XFS ────────────────────────────────────────────────
 
     let private writeBackXfs (sourcePath: string) (sourceDir: string) =
         let imageBytes = File.ReadAllBytes(sourcePath)
@@ -238,7 +238,7 @@ module HawkyntFs =
 
             writer.WriteTo(output))
 
-    // â”€â”€ RÃ©Ã©criture HFS+ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Réécriture HFS+ ───────────────────────────────────────────────
 
     let private writeBackHfsPlus (sourcePath: string) (sourceDir: string) =
         let imageBytes = File.ReadAllBytes(sourcePath)
@@ -269,8 +269,8 @@ module HawkyntFs =
 
             writer.BuildToStreamingAutoSized(output, 2048))
 
-    /// RÃ©Ã©crit le contenu de `sourceDir` dans l'image disque via Hawkynt.
-    /// Retourne true si rÃ©ussi, false si le format n'est pas gÃ©rÃ©.
+    /// Réécrit le contenu de `sourceDir` dans l'image disque via Hawkynt.
+    /// Retourne true si réussi, false si le format n'est pas géré.
     let tryWriteBack (sourcePath: string) (sourceDir: string) : bool =
         if not (File.Exists(sourcePath)) then
             false
@@ -290,22 +290,22 @@ module HawkyntFs =
                             writeBackBtrfs sourcePath sourceDir
                             true
                         with ex ->
-                            Log.Warning(ex, "Ã‰chec rÃ©Ã©criture Btrfs, tentative XFS")
+                            Log.Warning(ex, "Échec réécriture Btrfs, tentative XFS")
 
                             try
                                 writeBackXfs sourcePath sourceDir
                                 true
                             with ex ->
-                                Log.Warning(ex, "Ã‰chec rÃ©Ã©criture XFS, tentative HFS+")
+                                Log.Warning(ex, "Échec réécriture XFS, tentative HFS+")
 
                                 try
                                     writeBackHfsPlus sourcePath sourceDir
                                     true
                                 with ex ->
-                                    Log.Warning(ex, "Ã‰chec rÃ©Ã©criture HFS+")
+                                    Log.Warning(ex, "Échec réécriture HFS+")
                                     false
                     | _ -> false
                 with ex ->
-                    Log.Warning(ex, "Ã‰chec dÃ©tection format Hawkynt pour rÃ©Ã©criture {Path}", sourcePath)
+                    Log.Warning(ex, "Échec détection format Hawkynt pour réécriture {Path}", sourcePath)
                     false
 

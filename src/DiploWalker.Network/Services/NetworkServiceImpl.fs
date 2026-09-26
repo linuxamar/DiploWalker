@@ -25,7 +25,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
         | true, d -> d
         | false, _ ->
             raise (
-                RpcException(Status(StatusCode.Internal, "Driver Bridge non enregistrÃ© dans le registre"))
+                RpcException(Status(StatusCode.Internal, "Driver Bridge non enregistré dans le registre"))
             )
 
     interface INetworkService with
@@ -38,16 +38,16 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     else
                         request.Name
 
-                SecurityValidation.validateName name "Le nom du rÃ©seau"
-                SecurityValidation.validateCidr request.Subnet "Le sous-rÃ©seau"
+                SecurityValidation.validateName name "Le nom du réseau"
+                SecurityValidation.validateCidr request.Subnet "Le sous-réseau"
                 SecurityValidation.validateIp request.Gateway "La passerelle"
 
-                // IpRange est une PLAGE CIDR (Â« 10.0.0.0/24 Â»), pas une IP simple :
-                // validateIp rejetait toute valeur lÃ©gitime.
+                // IpRange est une PLAGE CIDR (« 10.0.0.0/24 »), pas une IP simple :
+                // validateIp rejetait toute valeur légitime.
                 SecurityValidation.validateCidr request.IpRange "La plage IP"
 
                 // Valeur d'enum hors plage (protobuf transporte un int32) :
-                // rejeter plutÃ´t que retomber silencieusement sur Bridge.
+                // rejeter plutôt que retomber silencieusement sur Bridge.
                 if not (System.Enum.IsDefined(typeof<NetworkDriver>, request.Driver)) then
                     raise (
                         RpcException(
@@ -68,8 +68,8 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                 let driverType = request.Driver
                 let driver = getDriver driverType |> Option.defaultValue (defaultDriver ())
 
-                // Le chemin de plugin CNI fourni est injectÃ© comme option
-                // standard consommÃ©e par CustomCniDriver.
+                // Le chemin de plugin CNI fourni est injecté comme option
+                // standard consommée par CustomCniDriver.
                 let options =
                     if String.IsNullOrEmpty(request.CniPluginPath) then
                         options
@@ -84,7 +84,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     | Ok v -> v
                     | Error msg ->
                         raise (
-                            RpcException(Status(StatusCode.Internal, sprintf "Ã‰chec de la crÃ©ation du rÃ©seau: %s" msg))
+                            RpcException(Status(StatusCode.Internal, sprintf "Échec de la création du réseau: %s" msg))
                         )
 
                 return
@@ -98,7 +98,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
         member _.RemoveNetwork(request, _context) =
             task {
-                SecurityValidation.validateId request.Id "L'identifiant du rÃ©seau"
+                SecurityValidation.validateId request.Id "L'identifiant du réseau"
 
                 let foundDriver =
                     drivers
@@ -108,7 +108,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                         | _ -> None)
 
                 if foundDriver.IsNone then
-                    raise (RpcException(Status(StatusCode.NotFound, sprintf "RÃ©seau '%s' introuvable" request.Id)))
+                    raise (RpcException(Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.Id)))
 
                 let driver = foundDriver.Value
 
@@ -116,7 +116,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                 | Ok() ->
                     return
                         { RemoveNetworkResponse.Success = true
-                          Message = "RÃ©seau supprimÃ©" }
+                          Message = "Réseau supprimé" }
                 | Error msg ->
                     return
                         { RemoveNetworkResponse.Success = false
@@ -125,7 +125,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
         member _.InspectNetwork(request, _context) =
             task {
-                SecurityValidation.validateId request.Id "L'identifiant du rÃ©seau"
+                SecurityValidation.validateId request.Id "L'identifiant du réseau"
 
                 let result =
                     drivers
@@ -135,11 +135,11 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                         | Error _ -> None)
 
                 if result.IsNone then
-                    raise (RpcException(Status(StatusCode.NotFound, sprintf "RÃ©seau '%s' introuvable" request.Id)))
+                    raise (RpcException(Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.Id)))
 
                 let info = result.Value
 
-                // DonnÃ©es honnÃªtes : CreatedAt rÃ©el, endpoints non fabriquÃ©s.
+                // Données honnêtes : CreatedAt réel, endpoints non fabriqués.
                 return
                     { InspectNetworkResponse.Id = info.Id
                       Name = info.Name
@@ -172,19 +172,19 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
                             response.Networks.Add(ni)
                     | Error msg ->
-                        // Un driver en Ã©chec ne doit pas passer inaperÃ§u : le
+                        // Un driver en échec ne doit pas passer inaperçu : le
                         // client croirait voir l'inventaire complet.
                         Log.Warning(
-                            "Liste des rÃ©seaux du driver {Driver} indisponible : {Error}",
+                            "Liste des réseaux du driver {Driver} indisponible : {Error}",
                             kvp.Key,
                             msg
                         )
 
-                // M14 : borne de liste serveur (cf. ListContainers) â€” protÃ¨ge la
-                // rÃ©ponse contre un inventaire dÃ©mesurÃ©.
+                // M14 : borne de liste serveur (cf. ListContainers) — protège la
+                // réponse contre un inventaire démesuré.
                 if response.Networks.Count > ServiceGuards.MaxListItems then
                     Log.Warning(
-                        "Liste des rÃ©seaux tronquÃ©e Ã  {Limit} Ã©lÃ©ments (reÃ§u {Count})",
+                        "Liste des réseaux tronquée à {Limit} éléments (reçu {Count})",
                         ServiceGuards.MaxListItems,
                         response.Networks.Count
                     )
@@ -199,7 +199,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
         member _.ConnectContainer(request, _context) =
             task {
-                SecurityValidation.validateId request.NetworkId "L'identifiant du rÃ©seau"
+                SecurityValidation.validateId request.NetworkId "L'identifiant du réseau"
                 SecurityValidation.validateContainerId request.ContainerId
 
                 if String.IsNullOrEmpty(request.EndpointId) |> not then
@@ -218,11 +218,11 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     match foundDriverType with
                     | Some dt -> getDriver dt |> Option.defaultValue (defaultDriver ())
                     | None ->
-                        // NotFound explicite : masquer l'absence derriÃ¨re une
-                        // rÃ©ponse Â« succÃ¨s Â» au message textuel casse le contrat.
+                        // NotFound explicite : masquer l'absence derrière une
+                        // réponse « succès » au message textuel casse le contrat.
                         raise (
                             RpcException(
-                                Status(StatusCode.NotFound, sprintf "RÃ©seau '%s' introuvable" request.NetworkId)
+                                Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.NetworkId)
                             )
                         )
 
@@ -253,7 +253,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
 
         member _.DisconnectContainer(request, _context) =
             task {
-                SecurityValidation.validateId request.NetworkId "L'identifiant du rÃ©seau"
+                SecurityValidation.validateId request.NetworkId "L'identifiant du réseau"
                 SecurityValidation.validateContainerId request.ContainerId
 
                 if String.IsNullOrEmpty(request.EndpointId) |> not then
@@ -272,7 +272,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     | None ->
                         raise (
                             RpcException(
-                                Status(StatusCode.NotFound, sprintf "RÃ©seau '%s' introuvable" request.NetworkId)
+                                Status(StatusCode.NotFound, sprintf "Réseau '%s' introuvable" request.NetworkId)
                             )
                         )
 
@@ -280,7 +280,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                 | Ok() ->
                     return
                         { DisconnectContainerResponse.Success = true
-                          Message = "DÃ©connectÃ©" }
+                          Message = "Déconnecté" }
                 | Error msg ->
                     return
                         { DisconnectContainerResponse.Success = false
@@ -298,7 +298,7 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                           Ifname = ""
                           Ipv4Address = ""
                           Gateway = ""
-                          Message = "Chemin du plugin CNI non spÃ©cifiÃ©" }
+                          Message = "Chemin du plugin CNI non spécifié" }
                 else
                     let resolvedPluginPath = SecurityValidation.validateCniPluginPath pluginPath
                     SecurityValidation.validateNetnsPath request.NetnsPath "Le chemin netns"
@@ -310,14 +310,14 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                             request.Command
 
                     SecurityValidation.validateCniCommand command
-                    // Propager la forme NORMALISÃ‰E : la spec CNI est sensible Ã 
-                    // la casse, Â« add Â» ou Â« ADD Â» avec espaces serait rejetÃ©.
+                    // Propager la forme NORMALISÉE : la spec CNI est sensible à
+                    // la casse, « add » ou « ADD » avec espaces serait rejeté.
                     let normalizedCommand = command.Trim().ToUpperInvariant()
 
                     try
                         let configJson =
                             if not (obj.ReferenceEquals(request.Config, null)) then
-                                SecurityValidation.validateCidr request.Config.Subnet "Le sous-rÃ©seau CNI"
+                                SecurityValidation.validateCidr request.Config.Subnet "Le sous-réseau CNI"
                                 SecurityValidation.validateIp request.Config.Gateway "La passerelle CNI"
 
                                 let config =
@@ -365,14 +365,14 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     with
                     | :? RpcException as rpcEx -> return raise rpcEx
                     | ex ->
-                        Log.Error(ex, "Erreur lors de l'exÃ©cution du plugin CNI {Plugin}", System.IO.Path.GetFileName(pluginPath))
+                        Log.Error(ex, "Erreur lors de l'exécution du plugin CNI {Plugin}", System.IO.Path.GetFileName(pluginPath))
 
                         return
                             { RunCniPluginResponse.Success = false
                               Ifname = ""
                               Ipv4Address = ""
                               Gateway = ""
-                              Message = "Erreur lors de l'exÃ©cution du plugin CNI" }
+                              Message = "Erreur lors de l'exécution du plugin CNI" }
             }
 
         member _.PruneNetworks(request, _context) =
@@ -383,12 +383,12 @@ type NetworkServiceImpl(drivers: IReadOnlyDictionary<NetworkDriver, INetworkDriv
                     match kvp.Value.Prune() with
                     | Ok ids -> deleted.AddRange(ids)
                     | Error msg ->
-                        Log.Warning("Erreur lors du nettoyage des rÃ©seaux du pilote {Driver}: {Error}", kvp.Key, msg)
+                        Log.Warning("Erreur lors du nettoyage des réseaux du pilote {Driver}: {Error}", kvp.Key, msg)
 
                 return
                     { PruneNetworksResponse.NetworksDeleted = List<string>(deleted)
                       Count = deleted.Count
-                      Message = sprintf "%d rÃ©seau(x) supprimÃ©(s)" deleted.Count }
+                      Message = sprintf "%d réseau(x) supprimé(s)" deleted.Count }
             }
 
 

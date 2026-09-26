@@ -23,7 +23,7 @@ module MountStateTests =
           Destination = dest
           ReadOnly = readOnly }
 
-    // â”€â”€ load : cas limites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── load : cas limites ─────────────────────────────────────────────
 
     [<Fact>]
     let ``load retourne Map.empty si le fichier n'existe pas`` () =
@@ -58,7 +58,7 @@ module MountStateTests =
             File.WriteAllText(path, "   \n  \t  ")
             MountState.load path |> should equal Map.empty<string, MountState.MountEntry list>)
 
-    // â”€â”€ load + save : aller-retour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── load + save : aller-retour ─────────────────────────────────────
 
     [<Fact>]
     let ``save puis load conserve les entrees`` () =
@@ -100,7 +100,7 @@ module MountStateTests =
             MountState.save path [ "c", [ sampleEntry "s" "h" "d" false ] ]
             File.Exists path |> should equal true)
 
-    // â”€â”€ stateFile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── stateFile ──────────────────────────────────────────────────────
 
     [<Fact>]
     let ``stateFile retourne un chemin dans la racine des donnees`` () =

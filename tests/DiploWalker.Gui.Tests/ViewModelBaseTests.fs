@@ -6,10 +6,10 @@ open Xunit
 open FsUnit.Xunit
 open DiploWalker.Gui.ViewModels
 
-// â”€â”€ RelayCommand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── RelayCommand ──────────────────────────────────────────────
 
 [<Fact>]
-let ``RelayCommand Action sans paramÃ¨tre exÃ©cute l'action`` () =
+let ``RelayCommand Action sans paramètre exécute l'action`` () =
     let mutable called = false
     let cmd = RelayCommand(Action(fun () -> called <- true))
     (cmd :> ICommand).Execute(null)
@@ -26,13 +26,13 @@ let ``RelayCommand Func canExecute retourne true`` () =
     (cmd :> ICommand).CanExecute(null) |> should be True
 
 [<Fact>]
-let ``RelayCommand Func paramÃ¨tre Ã©value le prÃ©dicat`` () =
+let ``RelayCommand Func paramètre évalue le prédicat`` () =
     let cmd = RelayCommand(Func<obj, bool>(fun o -> (o :?> int) > 10))
     (cmd :> ICommand).CanExecute(5) |> should be False
     (cmd :> ICommand).CanExecute(20) |> should be True
 
 [<Fact>]
-let ``RaiseCanExecuteChanged dÃ©clenche l'Ã©vÃ©nement`` () =
+let ``RaiseCanExecuteChanged déclenche l'événement`` () =
     let cmd = RelayCommand(Action(fun () -> ()))
     let mutable triggered = false
     (cmd :> ICommand).CanExecuteChanged.AddHandler(EventHandler(fun _ _ -> triggered <- true))
@@ -40,11 +40,11 @@ let ``RaiseCanExecuteChanged dÃ©clenche l'Ã©vÃ©nement`` () =
     triggered |> should be True
 
 [<Fact>]
-let ``RelayCommand sans canExecute personnalisÃ© autorise toujours`` () =
+let ``RelayCommand sans canExecute personnalisé autorise toujours`` () =
     let cmd = RelayCommand(Action(fun () -> ()))
     (cmd :> ICommand).CanExecute(null) |> should be True
 
-// â”€â”€ ViewModelBase â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ViewModelBase ─────────────────────────────────────────────
 
 type TestViewModel() =
     inherit ViewModelBase()
@@ -53,7 +53,7 @@ type TestViewModel() =
         this.OnPropertyChanged(?name = name)
 
 [<Fact>]
-let ``ViewModelBasePropertyChanged se dÃ©clenche`` () =
+let ``ViewModelBasePropertyChanged se déclenche`` () =
     let vm = TestViewModel()
     let mutable changedProps = []
     vm.PropertyChanged.Add(fun e -> changedProps <- e.PropertyName :: changedProps)
@@ -61,7 +61,7 @@ let ``ViewModelBasePropertyChanged se dÃ©clenche`` () =
     changedProps |> should contain "TestProp"
 
 [<Fact>]
-let ``ViewModelBase implÃ©mente INotifyPropertyChanged`` () =
+let ``ViewModelBase implémente INotifyPropertyChanged`` () =
     let vm = TestViewModel()
     let inpc = vm :> System.ComponentModel.INotifyPropertyChanged
     let mutable triggered = false

@@ -61,14 +61,14 @@ module ComposeModels =
     let buildServiceLabels (projectName: string) (serviceName: string) =
         dict [ composeProjectLabel, projectName; composeServiceLabel, serviceName ]
 
-    /// Analyse une entrÃ©e Â« ports Â». GÃ¨re les formes conteneur, hÃ´te:conteneur
-    /// et IP:hÃ´te:conteneur. Retourne None pour une entrÃ©e inexploitable.
+    /// Analyse une entrée « ports ». Gère les formes conteneur, hôte:conteneur
+    /// et IP:hôte:conteneur. Retourne None pour une entrée inexploitable.
     let private tryParsePortSpec (s: string) : PortMapping option =
         let parts = s.Split('/', 2)
         let protocol = if parts.Length > 1 then parts.[1] else "tcp"
         let spec = parts.[0].Trim()
 
-        // DÃ©couper sur tous les ':' : gÃ¨re "8080:80" et "127.0.0.1:8080:80".
+        // Découper sur tous les ':' : gère "8080:80" et "127.0.0.1:8080:80".
         match spec.Split(':') with
         | [| container |] ->
             match Int32.TryParse(container) with
@@ -87,8 +87,8 @@ module ComposeModels =
             | _ -> None
         | _ -> None
 
-    /// Retourne (mappings valides, entrÃ©es rejetÃ©es). Le rejet doit Ãªtre signalÃ©
-    /// par l'appelant : une configuration rÃ©seau perdue silencieusement est un bug.
+    /// Retourne (mappings valides, entrées rejetées). Le rejet doit être signalé
+    /// par l'appelant : une configuration réseau perdue silencieusement est un bug.
     let parsePorts (portStrings: string list) : PortMapping list * string list =
         portStrings
         |> List.partition (fun s -> tryParsePortSpec s |> Option.isSome)
@@ -102,7 +102,7 @@ module ComposeModels =
             let path = if readOnly then s.Substring(0, s.Length - 3) else s
 
             // Chemin Windows avec lettre de lecteur ("C:\data:/app") : le second
-            // ':' est le sÃ©parateur source/cible, pas une coupure du chemin.
+            // ':' est le séparateur source/cible, pas une coupure du chemin.
             let drivePrefixLen =
                 if path.Length >= 2 && Char.IsAsciiLetter path.[0] && path.[1] = ':' then
                     2

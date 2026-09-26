@@ -12,8 +12,8 @@ open DiploWalker.Gui.ViewModels
 open DiploWalker.TestHelpers
 
 // Tests des comportements GUI testables SANS serveur gRPC ni refactor
-// d'injection : chemins de validation qui s'exÃ©cutent avant tout appel
-// rÃ©seau, et avertissements liÃ©s Ã  l'absence de fournisseur de stockage.
+// d'injection : chemins de validation qui s'exécutent avant tout appel
+// réseau, et avertissements liés à l'absence de fournisseur de stockage.
 
 let private waitUntil (predicate: unit -> bool) =
     let sw = Diagnostics.Stopwatch.StartNew()
@@ -23,9 +23,9 @@ let private waitUntil (predicate: unit -> bool) =
 
     predicate ()
 
-// â”€â”€ VolumeTabViewModel : validation de CreateImage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Toutes ces branches s'exÃ©cutent AVANT d'appeler FsImage.create : elles
-// sont donc testables sans aucune opÃ©ration disque rÃ©elle.
+// ── VolumeTabViewModel : validation de CreateImage ──────────────
+// Toutes ces branches s'exécutent AVANT d'appeler FsImage.create : elles
+// sont donc testables sans aucune opération disque réelle.
 
 [<Fact>]
 let ``VolumeTabViewModel CreateImage sans repertoire source signale une erreur`` () =
@@ -77,7 +77,7 @@ let ``VolumeTabViewModel CreateImage avec format inconnu signale une erreur`` ()
     finally
         TestHelpers.cleanupDir dir
 
-// â”€â”€ VolumeTabViewModel : navigation sans fournisseur de stockage â”€â”€
+// ── VolumeTabViewModel : navigation sans fournisseur de stockage ──
 
 [<Fact>]
 let ``VolumeTabViewModel BrowseSource sans fournisseur ecrit un avertissement`` () =
@@ -99,13 +99,13 @@ let ``VolumeTabViewModel BrowseDest sans fournisseur ecrit un avertissement`` ()
 let ``VolumeTabViewModel SetStorageProvider enregistre le fournisseur`` () =
     let port = MockOutputPort()
     let vm = new VolumeTabViewModel(port)
-    // L'appel ne doit pas lever : le stockage reste remplaÃ§able.
+    // L'appel ne doit pas lever : le stockage reste remplaçable.
     vm.SetStorageProvider(null)
     (vm.BrowseSourceCommand :> ICommand).Execute(null)
     waitUntil (fun () -> port.Warnings.Length = 1) |> should equal true
 
-// â”€â”€ VolumeTabViewModel : navigation AVEC fournisseur de stockage â”€â”€
-// Les pickers du fake retournent un Ã©lÃ©ment injectÃ© : le ViewModel doit alors
+// ── VolumeTabViewModel : navigation AVEC fournisseur de stockage ──
+// Les pickers du fake retournent un élément injecté : le ViewModel doit alors
 // affecter ImageSourceDir / ImageDestPath au lieu de l'avertissement.
 
 [<Fact>]
@@ -143,14 +143,14 @@ let ``VolumeTabViewModel BrowseSource avec une liste vide n'affecte rien`` () =
     let vm = new VolumeTabViewModel(port)
     vm.SetStorageProvider(new FakeStorageProvider())
     (vm.BrowseSourceCommand :> ICommand).Execute(null)
-    // Aucune sortie, aucun chemin : le picker annulÃ© laisse la saisie intacte.
+    // Aucune sortie, aucun chemin : le picker annulé laisse la saisie intacte.
     Thread.Sleep 250
     port.HasOutput |> should equal false
     vm.ImageSourceDir |> should equal ""
 
-// â”€â”€ VolumeTabViewModel : CreateImage rÃ©ussi â”€â”€
-// La validation franchie, FsImage.create tourne rÃ©ellement (format raw) sur un
-// rÃ©pertoire source temporaire : net sur disque, sans aucun serveur gRPC.
+// ── VolumeTabViewModel : CreateImage réussi ──
+// La validation franchie, FsImage.create tourne réellement (format raw) sur un
+// répertoire source temporaire : net sur disque, sans aucun serveur gRPC.
 
 [<Fact>]
 let ``VolumeTabViewModel CreateImage cree une image raw depuis le repertoire source`` () =
@@ -174,8 +174,8 @@ let ``VolumeTabViewModel CreateImage cree une image raw depuis le repertoire sou
     finally
         TestHelpers.cleanupDir dir
 
-// â”€â”€ ComposeTabViewModel : enregistrement d'un fichier existant â”€â”€
-// Si un fichier est chargÃ© (FilePath non vide), SaveComposeFile Ã©crit le
+// ── ComposeTabViewModel : enregistrement d'un fichier existant ──
+// Si un fichier est chargé (FilePath non vide), SaveComposeFile écrit le
 // buffer via composeEditor.Save() sans passer par le fournisseur : testable
 // sans client gRPC.
 
@@ -188,7 +188,7 @@ let ``ComposeTabViewModel SaveComposeFile avec fichier charge enregistre le buff
     try
         let path = Path.Combine(dir, "docker-compose.yml")
         File.WriteAllText(path, "services:\n  web:\n    image: nginx\n")
-        // Le setter de ComposeFilePath charge le contenu dans l'Ã©diteur.
+        // Le setter de ComposeFilePath charge le contenu dans l'éditeur.
         vm.ComposeFilePath <- path
         vm.ComposeEditor.Document.Text <- "services:\n  web:\n    image: alpine:3.18\n"
         (vm.SaveComposeFileCommand :> ICommand).Execute(null)
@@ -198,9 +198,9 @@ let ``ComposeTabViewModel SaveComposeFile avec fichier charge enregistre le buff
     finally
         TestHelpers.cleanupDir dir
 
-// â”€â”€ ComposeTabViewModel : ComposeBuild â”€â”€
-// La vÃ©rification de l'existence du Dockerfile prÃ©cÃ¨de le lancement du
-// processus docker rÃ©el : un contexte sans Dockerfile est donc testable sans
+// ── ComposeTabViewModel : ComposeBuild ──
+// La vérification de l'existence du Dockerfile précède le lancement du
+// processus docker réel : un contexte sans Dockerfile est donc testable sans
 // binaire docker ni serveur gRPC.
 
 [<Fact>]

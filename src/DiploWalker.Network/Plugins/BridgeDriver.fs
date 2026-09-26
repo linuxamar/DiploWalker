@@ -12,15 +12,15 @@ type BridgeNetworkDriver() =
 
     let networks = ConcurrentDictionary<string, NetworkDriverInfo>()
 
-    // Endpoints suivis par rÃ©seau (endpointId -> containerId) : nÃ©cessaire au
-    // prune rÃ©el (un rÃ©seau avec endpoints actifs ne doit pas Ãªtre supprimÃ©)
-    // et au nettoyage lors des dÃ©connexions.
+    // Endpoints suivis par réseau (endpointId -> containerId) : nécessaire au
+    // prune réel (un réseau avec endpoints actifs ne doit pas être supprimé)
+    // et au nettoyage lors des déconnexions.
     let endpoints =
         ConcurrentDictionary<string, ConcurrentDictionary<string, string>>()
 
-    // SÃ©rialise Create/Remove/Connect/Disconnect : le ConcurrentDictionary ne
-    // protÃ¨ge que le registre, pas les ressources Hyper-V externes (TOCTOU
-    // switch/NAT, double allocation de sous-rÃ©seau).
+    // Sérialise Create/Remove/Connect/Disconnect : le ConcurrentDictionary ne
+    // protège que le registre, pas les ressources Hyper-V externes (TOCTOU
+    // switch/NAT, double allocation de sous-réseau).
     let stateLock = obj ()
 
     let getAvailableSubnet () =
@@ -36,24 +36,24 @@ type BridgeNetworkDriver() =
         member this.Create(name, subnet, gateway, _ipRange, _options, labels) =
             lock stateLock (fun () ->
                 try
-                    SecurityValidation.validateName name "Le nom du rÃ©seau"
+                    SecurityValidation.validateName name "Le nom du réseau"
 
                     for kv in labels do
                         SecurityValidation.validateLabel kv.Key kv.Value
 
                     if not (String.IsNullOrEmpty(subnet)) then
-                        SecurityValidation.validateCidr subnet "Le sous-rÃ©seau"
+                        SecurityValidation.validateCidr subnet "Le sous-réseau"
 
                     if not (String.IsNullOrEmpty(gateway)) then
                         SecurityValidation.validateIp gateway "La passerelle"
 
-                    // UnicitÃ© du nom : sinon deux rÃ©seaux partagent le mÃªme
+                    // Unicité du nom : sinon deux réseaux partagent le même
                     // VMSwitch/NAT et Remove de l'un casse l'autre.
                     if
                         networks.Values
                         |> Seq.exists (fun n -> n.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                     then
-                        Error(sprintf "Un rÃ©seau nommÃ© '%s' existe dÃ©jÃ " name)
+                        Error(sprintf "Un réseau nommé '%s' existe déjà" name)
                     else
                         let actualSubnet =
                             if String.IsNullOrEmpty(subnet) then
@@ -66,7 +66,7 @@ type BridgeNetworkDriver() =
                                 getDefaultGateway actualSubnet |> Result.defaultWith failwith
                             else
                                 gateway
-                        // Idempotence : vÃ©rifier si le switch existe dÃ©jÃ  avant de le crÃ©er
+                        // Idempotence : vérifier si le switch existe déjà avant de le créer
                         let existingSwitch =
                             try
                                 let result =
@@ -78,7 +78,7 @@ type BridgeNetworkDriver() =
                             with ex ->
                                 Log.Debug(
                                     ex,
-                                    "VÃ©rification du switch VM {Name} Ã©chouÃ©e, hypothÃ¨se : inexistant",
+                                    "Vérification du switch VM {Name} échouée, hypothèse : inexistant",
                                     name
                                 )
 
@@ -87,8 +87,8 @@ type BridgeNetworkDriver() =
                         let mutable createdSwitch = false
 
                         if not existingSwitch then
-                            // -ErrorAction Stop : sans lui, un Ã©chec non terminant
-                            // (Hyper-V absent...) sort en code 0 et passe pour un succÃ¨s.
+                            // -ErrorAction Stop : sans lui, un échec non terminant
+                            // (Hyper-V absent...) sort en code 0 et passe pour un succès.
                             runPowershellWithArgs
                                 "New-VMSwitch"
                                 [ "-Name", name
@@ -101,7 +101,7 @@ type BridgeNetworkDriver() =
 
                         try
                             if not (String.IsNullOrEmpty(actualSubnet)) then
-                                // Idempotence : vÃ©rifier si le NAT existe dÃ©jÃ 
+                                // Idempotence : vérifier si le NAT existe déjà
                                 let natName = sprintf "%sNat" name
 
                                 let existingNat =
@@ -115,7 +115,7 @@ type BridgeNetworkDriver() =
                                     with ex ->
                                         Log.Debug(
                                             ex,
-                                            "VÃ©rification du NAT {NatName} Ã©chouÃ©e, hypothÃ¨se : inexistant",
+                                            "Vérification du NAT {NatName} échouée, hypothèse : inexistant",
                                             natName
                                         )
 
@@ -146,8 +146,8 @@ type BridgeNetworkDriver() =
 
                             Ok info
                         with ex ->
-                            // Rollback : un Ã©chec du NAT aprÃ¨s crÃ©ation du switch
-                            // laisserait sinon un VMSwitch orphelin sur l'hÃ´te.
+                            // Rollback : un échec du NAT après création du switch
+                            // laisserait sinon un VMSwitch orphelin sur l'hôte.
                             if createdSwitch then
                                 try
                                     runPowershellWithArgs
@@ -160,8 +160,8 @@ type BridgeNetworkDriver() =
                             ExceptionDispatchInfo.Capture(ex).Throw()
                             Unchecked.defaultof<_>
                 with ex ->
-                    Log.Error(ex, "Erreur lors de la crÃ©ation du bridge {Name}", name)
-                    Error "Erreur lors de la crÃ©ation du bridge")
+                    Log.Error(ex, "Erreur lors de la création du bridge {Name}", name)
+                    Error "Erreur lors de la création du bridge")
 
         member _.Remove(id, _force) =
             lock stateLock (fun () ->
@@ -248,7 +248,7 @@ type BridgeNetworkDriver() =
 
                         if String.IsNullOrEmpty mac then
                             // Une MAC vide signifie que l'adaptateur n'est pas
-                            // opÃ©rationnel : Ã©chec, pas un endpoint amputÃ©.
+                            // opérationnel : échec, pas un endpoint amputé.
                             raise (
                                 InvalidOperationException(
                                     sprintf "L'adaptateur %s n'a pas de adresse MAC (propagation Hyper-V ?)" adapterName.Value
@@ -264,10 +264,10 @@ type BridgeNetworkDriver() =
                               ContainerId = containerId
                               Ipv4Address = assignedIp
                               MacAddress = mac
-                              Message = sprintf "ConnectÃ© au bridge '%s'" netInfo.Name }
+                              Message = sprintf "Connecté au bridge '%s'" netInfo.Name }
                     with ex ->
-                        // Rollback : retirer l'adaptateur crÃ©Ã©, sinon il reste
-                        // orphelin et bloque les reconnexions (nom dÃ©jÃ  pris).
+                        // Rollback : retirer l'adaptateur créé, sinon il reste
+                        // orphelin et bloque les reconnexions (nom déjà pris).
                         if createdAdapter then
                             try
                                 runPowershellWithArgs
@@ -315,11 +315,11 @@ type BridgeNetworkDriver() =
 
                         Ok()
                     with ex ->
-                        Log.Error(ex, "Erreur de dÃ©connexion du bridge {NetworkId}", networkId)
-                        Error "Erreur de dÃ©connexion du bridge")
+                        Log.Error(ex, "Erreur de déconnexion du bridge {NetworkId}", networkId)
+                        Error "Erreur de déconnexion du bridge")
 
-        /// Nettoyage RÃ‰EL : supprime les rÃ©seaux sans endpoint actif (switch +
-        /// NAT) et retourne uniquement les identifiants rÃ©ellement supprimÃ©s.
+        /// Nettoyage RÉEL : supprime les réseaux sans endpoint actif (switch +
+        /// NAT) et retourne uniquement les identifiants réellement supprimés.
         member this.Prune() =
             lock stateLock (fun () ->
                 let removed = ResizeArray<string>()
@@ -333,9 +333,9 @@ type BridgeNetworkDriver() =
                     if not hasEndpoints then
                         match (this :> INetworkDriver).Remove(kvp.Key, false) with
                         | Ok() -> removed.Add(kvp.Key)
-                        | Error msg -> Log.Warning("Prune du rÃ©seau {Id} impossible : {Error}", kvp.Key, msg)
+                        | Error msg -> Log.Warning("Prune du réseau {Id} impossible : {Error}", kvp.Key, msg)
                     else
-                        Log.Debug("RÃ©seau {Id} conservÃ© : {Count} endpoint(s) actif(s)", kvp.Key)
+                        Log.Debug("Réseau {Id} conservé : {Count} endpoint(s) actif(s)", kvp.Key)
 
                 Ok(removed |> Seq.toList))
 

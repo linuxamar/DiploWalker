@@ -6,8 +6,8 @@ open System.Text.Json
 open System.Text.Json.Nodes
 open Serilog
 
-/// Lecture/Ã©criture du fichier de configuration client `DiploWalker.json` (adresses des services).
-/// Format gÃ©nÃ©rÃ© par `container config init` :
+/// Lecture/écriture du fichier de configuration client `DiploWalker.json` (adresses des services).
+/// Format généré par `container config init` :
 /// { "container": { "address": "localhost:5001", "namespace": "default" },
 ///   "volume": { "address": "localhost:5002" },
 ///   "network": { "address": "localhost:5003" },
@@ -17,9 +17,9 @@ module DiploWalkerConfig =
 
     let private configFileName = "DiploWalker.json"
 
-    /// RÃ©sout l'adresse complÃ¨te (URL) d'un service Ã  partir de l'adresse configurÃ©e :
-    /// - "localhost:5001"            â†’ "http://localhost:5001"
-    /// - "http://pipe:/diplo-container" â†’ inchangÃ© (URL complÃ¨te, canal par named pipe)
+    /// Résout l'adresse complète (URL) d'un service à partir de l'adresse configurée :
+    /// - "localhost:5001"            → "http://localhost:5001"
+    /// - "http://pipe:/diplo-container" → inchangé (URL complète, canal par named pipe)
     let normalizeAddress (address: string) : string =
         let a = address.Trim()
         if a.Contains("://") then a else "http://" + a
@@ -56,12 +56,12 @@ module DiploWalkerConfig =
             let root = doc.RootElement
             (getAddress root "container", getAddress root "volume", getAddress root "network")
         with ex ->
-            // M15 : un JSON illisible n'est pas ignorÃ© en silence â€” avertissement
-            // explicite, puis repli sur les valeurs par dÃ©faut.
-            Log.Warning(ex, "Fichier de configuration client mal formÃ© (repli sur les valeurs par dÃ©faut)")
+            // M15 : un JSON illisible n'est pas ignoré en silence — avertissement
+            // explicite, puis repli sur les valeurs par défaut.
+            Log.Warning(ex, "Fichier de configuration client mal formé (repli sur les valeurs par défaut)")
             (None, None, None)
 
-    /// Extrait les mÃ©tadonnÃ©es (namespace, logLevel) d'un fichier existant afin de les
+    /// Extrait les métadonnées (namespace, logLevel) d'un fichier existant afin de les
     /// conserver lors d'une sauvegarde.
     let private readMeta (path: string) : (string option * string option) =
         try
@@ -74,12 +74,12 @@ module DiploWalkerConfig =
             else
                 (None, None)
         with ex ->
-            Log.Warning(ex, "Impossible de lire les mÃ©tadonnÃ©es du fichier de configuration {Path}", path)
+            Log.Warning(ex, "Impossible de lire les métadonnées du fichier de configuration {Path}", path)
             (None, None)
 
-    /// RÃ©sout le chemin du fichier de configuration, par prioritÃ© :
-    /// 1. `DIPLO_CONFIG_HOME/DiploWalker.json` si la variable d'environnement est dÃ©finie ;
-    /// 2. `DiploWalker.json` dans le rÃ©pertoire courant.
+    /// Résout le chemin du fichier de configuration, par priorité :
+    /// 1. `DIPLO_CONFIG_HOME/DiploWalker.json` si la variable d'environnement est définie ;
+    /// 2. `DiploWalker.json` dans le répertoire courant.
     let configPath () =
         let home = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
 
@@ -89,16 +89,16 @@ module DiploWalkerConfig =
             Path.Combine(home.Trim(), configFileName)
 
     /// Lit la configuration depuis un chemin explicite : None pour chaque section
-    /// si le fichier est absent ou mal formÃ© (repli sur les ports par dÃ©faut).
+    /// si le fichier est absent ou mal formé (repli sur les ports par défaut).
     let load (path: string) : (string option * string option * string option) =
         if File.Exists path then
             parseConfig (File.ReadAllText path)
         else
             (None, None, None)
 
-    /// Cache de la configuration lue une seule fois par processus, vidÃ© par
-    /// `invalidate` (fichier volontairement ignorÃ© s'il est absent ou mal formÃ© :
-    /// repli sur les ports par dÃ©faut).
+    /// Cache de la configuration lue une seule fois par processus, vidé par
+    /// `invalidate` (fichier volontairement ignoré s'il est absent ou mal formé :
+    /// repli sur les ports par défaut).
     let private cacheLock = obj ()
     let private cacheValue = ref None
 
@@ -123,17 +123,17 @@ module DiploWalkerConfig =
         let (_, _, n) = readCached ()
         n
 
-    /// Vide le cache : la prochaine lecture relira le fichier. UtilisÃ© par la GUI
-    /// aprÃ¨s un enregistrement des paramÃ¨tres pour appliquer la configuration
-    /// sans redÃ©marrage.
+    /// Vide le cache : la prochaine lecture relira le fichier. Utilisé par la GUI
+    /// après un enregistrement des paramètres pour appliquer la configuration
+    /// sans redémarrage.
     let invalidate () =
         lock cacheLock (fun () -> cacheValue.Value <- None)
 
-    /// Parse un texte JSON (exposÃ© pour les tests).
+    /// Parse un texte JSON (exposé pour les tests).
     let parse (json: string) : (string option * string option * string option) = parseConfig json
 
-    /// Ã‰crit la configuration client dans `path` (le rÃ©pertoire parent est crÃ©Ã© au
-    /// besoin). Les champs `namespace` et `logLevel` dÃ©jÃ  prÃ©sents sont conservÃ©s.
+    /// Écrit la configuration client dans `path` (le répertoire parent est créé au
+    /// besoin). Les champs `namespace` et `logLevel` déjà présents sont conservés.
     let save (path: string) (container: string) (volume: string) (network: string) : unit =
         let ns, logLevel = readMeta path
         let containerSection = JsonObject()
@@ -156,8 +156,8 @@ module DiploWalkerConfig =
         if not (String.IsNullOrEmpty dir) && not (Directory.Exists dir) then
             Directory.CreateDirectory(dir) |> ignore
 
-        // Ã‰criture atomique (temp + replace) : un crash pendant l'Ã©criture ne
-        // doit pas laisser un DiploWalker.json tronquÃ© que la lecture avalerait.
+        // Écriture atomique (temp + replace) : un crash pendant l'écriture ne
+        // doit pas laisser un DiploWalker.json tronqué que la lecture avalerait.
         let tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp"
 
         try
@@ -171,7 +171,7 @@ module DiploWalkerConfig =
         | _ ->
             try
                 File.Delete(tmp)
-            with ex -> Log.Warning(ex, "Ã‰chec de la suppression du fichier temporaire {Tmp}", tmp)
+            with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
             reraise ()
 
 

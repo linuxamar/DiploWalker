@@ -5,15 +5,15 @@ open Grpc.Core
 open DiploWalker.Abstractions
 open DiploWalker.Abstractions.Interfaces
 
-/// Options de montage utilisateur acceptÃ©es (allow-list) : ro, vers,
-/// hard/soft, timeo. Les autres sont ignorÃ©es volontairement.
-/// Module exposÃ© pour la testabilitÃ© (construction d'arguments pure).
+/// Options de montage utilisateur acceptées (allow-list) : ro, vers,
+/// hard/soft, timeo. Les autres sont ignorées volontairement.
+/// Module exposé pour la testabilité (construction d'arguments pure).
 module NfsMountOptions =
 
     let allowed = set [ "ro"; "vers"; "hard"; "soft"; "timeo" ]
 
-    /// Construit la chaÃ®ne d'options de montage : Â« nolock Â» toujours prÃ©sent,
-    /// suivi des options utilisateur autorisÃ©es (Â« clef Â» ou Â« clef=valeur Â»).
+    /// Construit la chaîne d'options de montage : « nolock » toujours présent,
+    /// suivi des options utilisateur autorisées (« clef » ou « clef=valeur »).
     let buildOptions (opts: Map<string, string>) =
         let userOpts =
             opts
@@ -23,8 +23,8 @@ module NfsMountOptions =
                     if v = "" || v = "true" then
                         Some(k.ToLowerInvariant())
                     else
-                        // ClÃ© Ã©mise normalisÃ©e en minuscules : les options de
-                        // montage NFS sont sensibles Ã  la casse.
+                        // Clé émise normalisée en minuscules : les options de
+                        // montage NFS sont sensibles à la casse.
                         Some(sprintf "%s=%s" (k.ToLowerInvariant()) v)
                 else
                     None)

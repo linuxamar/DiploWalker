@@ -24,7 +24,7 @@ type CloudAwsDriver(dataRoot: string) =
     override _.Mount remotePath targetPath _opts =
         // Chiffrement en transit (recommandation AWS pour EFS) : l'option tls
         // du helper de montage EFS tunnelise via stunnel. Sans elle, les
-        // donnÃ©es traversent le rÃ©seau en clair.
+        // données traversent le réseau en clair.
         ProcessExec.runUnit
             "mount"
             [ "-o"; "nfsvers=4.1,tls"; remotePath; targetPath ]

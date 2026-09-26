@@ -13,7 +13,7 @@ type CustomCniDriver() =
         System.Collections.Concurrent.ConcurrentDictionary<string, NetworkDriverInfo>()
 
     // Association endpointId -> containerId : le plugin CNI DEL exige le
-    // CONTAINER-ID ; passer l'endpointId Ã  sa place faisait Ã©chouer le DEL et
+    // CONTAINER-ID ; passer l'endpointId à sa place faisait échouer le DEL et
     // fuyait le bail IPAM du conteneur.
     let endpoints =
         System.Collections.Concurrent.ConcurrentDictionary<string, System.Collections.Concurrent.ConcurrentDictionary<string, string>>()
@@ -28,13 +28,13 @@ type CustomCniDriver() =
 
         member _.Create(name, subnet, gateway, ipRange, options, labels) =
             try
-                SecurityValidation.validateName name "Le nom du rÃ©seau CNI"
+                SecurityValidation.validateName name "Le nom du réseau CNI"
 
                 for kvp in labels do
                     SecurityValidation.validateLabel kvp.Key kvp.Value
 
                 if not (String.IsNullOrEmpty(subnet)) then
-                    SecurityValidation.validateCidr subnet "Le sous-rÃ©seau"
+                    SecurityValidation.validateCidr subnet "Le sous-réseau"
 
                 if not (String.IsNullOrEmpty(gateway)) then
                     SecurityValidation.validateIp gateway "La passerelle"
@@ -68,26 +68,26 @@ type CustomCniDriver() =
                 networks.TryAdd(id, info) |> ignore
                 Ok info
             with ex ->
-                Log.Error(ex, "Erreur lors de la crÃ©ation du rÃ©seau CNI {Name}", name)
-                Error "Erreur lors de la crÃ©ation du rÃ©seau CNI"
+                Log.Error(ex, "Erreur lors de la création du réseau CNI {Name}", name)
+                Error "Erreur lors de la création du réseau CNI"
 
         member _.Remove(id, _force) =
             match networks.TryRemove(id) with
             | true, _ ->
                 endpoints.TryRemove(id) |> ignore
                 Ok()
-            | false, _ -> Error(sprintf "RÃ©seau CNI '%s' introuvable" id)
+            | false, _ -> Error(sprintf "Réseau CNI '%s' introuvable" id)
 
         member _.Inspect(id) =
             match networks.TryGetValue(id) with
             | true, info -> Ok info
-            | false, _ -> Error(sprintf "RÃ©seau CNI '%s' introuvable" id)
+            | false, _ -> Error(sprintf "Réseau CNI '%s' introuvable" id)
 
         member _.List() = networks.Values |> Seq.toList |> Ok
 
         member _.Connect(networkId, containerId, endpointId, ipv4Address, options) =
             match networks.TryGetValue(networkId) with
-            | false, _ -> Error(sprintf "RÃ©seau CNI '%s' introuvable" networkId)
+            | false, _ -> Error(sprintf "Réseau CNI '%s' introuvable" networkId)
             | true, netInfo ->
                 try
                     SecurityValidation.validateContainerId containerId
@@ -117,8 +117,8 @@ type CustomCniDriver() =
                         let configJson = JsonSerializer.Serialize(config)
 
                         let (exitCode, stdout, stderr) =
-                            // REMARQUE : le chemin /proc/<pid>/ns/net est spÃ©cifique Ã  Linux.
-                            // Sur Windows, le driver CNI doit utiliser un mÃ©canisme diffÃ©rent (ex. HNSEndpoint).
+                            // REMARQUE : le chemin /proc/<pid>/ns/net est spécifique à Linux.
+                            // Sur Windows, le driver CNI doit utiliser un mécanisme différent (ex. HNSEndpoint).
                             ProcessExec.runWithResult
                                 resolvedPluginPath
                                 [ "ADD"
@@ -130,18 +130,18 @@ type CustomCniDriver() =
                                 (Some configJson)
                                 None
 
-                        // SymÃ©trique au DEL : ignorer le code retour annoncerait un
-                        // succÃ¨s sans allocation IP rÃ©elle.
+                        // Symétrique au DEL : ignorer le code retour annoncerait un
+                        // succès sans allocation IP réelle.
                         if exitCode <> 0 then
                             Error(
                                 sprintf
-                                    "Ã‰chec du plugin CNI ADD (code %d) : %s"
+                                    "Échec du plugin CNI ADD (code %d) : %s"
                                     exitCode
                                     (stderr.Trim())
                             )
                         else
                             let (_ifname, ipv4, _gw) = parseCniResult stdout
-                            // L'adresse IP allouÃ©e est celle qui compte (le ifname n'est pas un critÃ¨re).
+                            // L'adresse IP allouée est celle qui compte (le ifname n'est pas un critère).
                             if not (String.IsNullOrEmpty(ipv4)) then
                                 assignedIp <- ipv4
 
@@ -154,7 +154,7 @@ type CustomCniDriver() =
                                   ContainerId = containerId
                                   Ipv4Address = assignedIp
                                   MacAddress = mac
-                                  Message = sprintf "ConnectÃ© au rÃ©seau CNI '%s'" netInfo.Name }
+                                  Message = sprintf "Connecté au réseau CNI '%s'" netInfo.Name }
                     | _ ->
                         endpoints.GetOrAdd(networkId, fun _ -> System.Collections.Concurrent.ConcurrentDictionary())
                             .TryAdd(actualEndpointId, containerId)
@@ -165,22 +165,22 @@ type CustomCniDriver() =
                               ContainerId = containerId
                               Ipv4Address = assignedIp
                               MacAddress = mac
-                              Message = sprintf "ConnectÃ© au rÃ©seau CNI '%s'" netInfo.Name }
+                              Message = sprintf "Connecté au réseau CNI '%s'" netInfo.Name }
                 with ex ->
                     Log.Error(ex, "Erreur de connexion CNI {NetworkId}", networkId)
                     Error "Erreur de connexion CNI"
 
         member _.Disconnect(networkId, containerId, endpointId, _force) =
             match networks.TryGetValue(networkId) with
-            | false, _ -> Error(sprintf "RÃ©seau CNI '%s' introuvable" networkId)
+            | false, _ -> Error(sprintf "Réseau CNI '%s' introuvable" networkId)
             | true, netInfo ->
                 match netInfo.Options |> Map.tryFind "plugin_path" with
                 | Some pluginPath when not (String.IsNullOrEmpty(pluginPath)) ->
                     try
                         let resolvedPluginPath = SecurityValidation.validateCniPluginPath pluginPath
 
-                        // RÃ©soudre le vrai CONTAINER-ID : la requÃªte peut ne
-                        // fournir que l'endpointId (souvent le cas cÃ´tÃ© client),
+                        // Résoudre le vrai CONTAINER-ID : la requête peut ne
+                        // fournir que l'endpointId (souvent le cas côté client),
                         // et le plugin CNI DEL exige un container-id valide.
                         let resolvedContainerId =
                             match endpoints.TryGetValue(networkId) with
@@ -197,13 +197,13 @@ type CustomCniDriver() =
                                 resolvedContainerId
 
                         if String.IsNullOrEmpty(targetId) then
-                            Error "Ni containerId ni endpointId fournis pour la dÃ©connexion"
+                            Error "Ni containerId ni endpointId fournis pour la déconnexion"
                         else
                             SecurityValidation.validateContainerId targetId
 
                             let (exitCode, _stdout, stderr) =
-                                // REMARQUE : le chemin /proc/<pid>/ns/net est spÃ©cifique Ã  Linux.
-                                // Sur Windows, le driver CNI doit utiliser un mÃ©canisme diffÃ©rent (ex. HNSEndpoint).
+                                // REMARQUE : le chemin /proc/<pid>/ns/net est spécifique à Linux.
+                                // Sur Windows, le driver CNI doit utiliser un mécanisme différent (ex. HNSEndpoint).
                                 ProcessExec.runWithResult
                                     resolvedPluginPath
                                     [ "DEL"
@@ -215,7 +215,7 @@ type CustomCniDriver() =
                                     None
                                     None
 
-                            // Retirer l'association endpoint enregistrÃ©e.
+                            // Retirer l'association endpoint enregistrée.
                             match endpoints.TryGetValue(networkId) with
                             | true, eps ->
                                 for kv in eps do
@@ -228,17 +228,17 @@ type CustomCniDriver() =
                             else
                                 Error(
                                     sprintf
-                                        "Ã‰chec de la dÃ©connexion CNI (code %d) : %s"
+                                        "Échec de la déconnexion CNI (code %d) : %s"
                                         exitCode
                                         (stderr.Trim())
                                 )
                     with ex ->
-                        Log.Error(ex, "Erreur de dÃ©connexion CNI {NetworkId}", networkId)
-                        Error "Erreur de dÃ©connexion CNI"
+                        Log.Error(ex, "Erreur de déconnexion CNI {NetworkId}", networkId)
+                        Error "Erreur de déconnexion CNI"
                 | _ -> Ok()
 
-        /// Nettoyage rÃ©el : supprime les rÃ©seaux CNI (registre local, sans
-        /// ressource externe) et retourne les identifiants rÃ©ellement retirÃ©s.
+        /// Nettoyage réel : supprime les réseaux CNI (registre local, sans
+        /// ressource externe) et retourne les identifiants réellement retirés.
         member _.Prune() =
             let removed = ResizeArray<string>()
 

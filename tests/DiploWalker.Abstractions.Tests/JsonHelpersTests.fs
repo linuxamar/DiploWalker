@@ -15,32 +15,32 @@ type JsonHelpersTests() =
         JsonHelpers.tryGetString el "name" |> should equal "test"
 
     [<Fact>]
-    let ``tryGetString retourne chaÃ®ne vide si propriÃ©tÃ© absente`` () =
+    let ``tryGetString retourne chaîne vide si propriété absente`` () =
         let el = parseJson """{"other": "value"}"""
         JsonHelpers.tryGetString el "name" |> should equal ""
 
     [<Fact>]
-    let ``tryGetString retourne chaÃ®ne vide si pas une string`` () =
+    let ``tryGetString retourne chaîne vide si pas une string`` () =
         let el = parseJson """{"count": 42}"""
         JsonHelpers.tryGetString el "count" |> should equal ""
 
     [<Fact>]
-    let ``tryGetInt64 retourne la valeur numÃ©rique`` () =
+    let ``tryGetInt64 retourne la valeur numérique`` () =
         let el = parseJson """{"count": 42}"""
         JsonHelpers.tryGetInt64 el "count" |> should equal 42L
 
     [<Fact>]
-    let ``tryGetInt64 retourne 0 si propriÃ©tÃ© absente`` () =
+    let ``tryGetInt64 retourne 0 si propriété absente`` () =
         let el = parseJson """{"other": 1}"""
         JsonHelpers.tryGetInt64 el "count" |> should equal 0L
 
     [<Fact>]
-    let ``tryGetDouble retourne la valeur dÃ©cimale`` () =
+    let ``tryGetDouble retourne la valeur décimale`` () =
         let el = parseJson """{"ratio": 3.14}"""
         JsonHelpers.tryGetDouble el "ratio" |> should equal 3.14
 
     [<Fact>]
-    let ``tryGetDouble retourne 0.0 si propriÃ©tÃ© absente`` () =
+    let ``tryGetDouble retourne 0.0 si propriété absente`` () =
         let el = parseJson """{"other": 1.0}"""
         JsonHelpers.tryGetDouble el "ratio" |> should equal 0.0
 
@@ -55,18 +55,18 @@ type JsonHelpersTests() =
         JsonHelpers.tryGetBool el "enabled" |> should equal false
 
     [<Fact>]
-    let ``tryGetBool retourne false si propriÃ©tÃ© absente`` () =
+    let ``tryGetBool retourne false si propriété absente`` () =
         let el = parseJson """{"other": true}"""
         JsonHelpers.tryGetBool el "enabled" |> should equal false
 
     [<Fact>]
-    let ``tryGetElement retourne Some si propriÃ©tÃ© existe`` () =
+    let ``tryGetElement retourne Some si propriété existe`` () =
         let el = parseJson """{"data": {"nested": true}}"""
         let result = JsonHelpers.tryGetElement el "data"
         result.IsSome |> should equal true
 
     [<Fact>]
-    let ``tryGetElement retourne None si propriÃ©tÃ© absente`` () =
+    let ``tryGetElement retourne None si propriété absente`` () =
         let el = parseJson """{"other": 1}"""
         JsonHelpers.tryGetElement el "data" |> should equal None
 
@@ -81,7 +81,7 @@ type JsonHelpersTests() =
         JsonHelpers.tryGetStringValue el "count" |> should equal None
 
     [<Fact>]
-    let ``tryGetStringValue retourne None si propriÃ©tÃ© absente`` () =
+    let ``tryGetStringValue retourne None si propriété absente`` () =
         let el = parseJson """{"other": "hi"}"""
         JsonHelpers.tryGetStringValue el "name" |> should equal None
 

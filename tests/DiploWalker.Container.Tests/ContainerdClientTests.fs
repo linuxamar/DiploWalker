@@ -528,7 +528,7 @@ type ContainerdClientTests() =
             File.AppendAllText(file, "l3" + Environment.NewLine + "l4" + Environment.NewLine)
             runner.OnCommand("tasks list", "TASK PID STATUS\nc-1 0 STOPPED")
 
-            // Attendre que le producteur ait fini (TryComplete) avant de vÃ©rifier
+            // Attendre que le producteur ait fini (TryComplete) avant de vérifier
             completed.Task.Wait(5000) |> should equal true
             consumer.Wait()
 
@@ -596,7 +596,7 @@ type ContainerdClientTests() =
     [<Fact>]
     member _.``Version gere les erreurs ctr``() =
         let runner = createRunner ()
-        runner.SetFail("ctr n'est pas installÃ©")
+        runner.SetFail("ctr n'est pas installé")
 
         let client =
             ContainerdClient(runner) :> DiploWalker.Abstractions.Interfaces.IContainerdClient
@@ -645,7 +645,7 @@ type ContainerdClientTests() =
                 client.PullImage("myregistry.azurecr.io/team/app:latest", Some "inline:secret") |> ignore)
 
         ex.StatusCode |> should equal StatusCode.InvalidArgument
-        ex.Status.Detail |> shouldContain "non autorisÃ©e"
+        ex.Status.Detail |> shouldContain "non autorisée"
         ex.Status.Detail |> shouldContain "ghcr.io"
         runner.SecureCommands |> should be Empty
 
@@ -671,7 +671,7 @@ type ContainerdClientTests() =
                     client.PullImage("myregistry.azurecr.io/team/app:latest", None) |> ignore)
 
             ex.StatusCode |> should equal StatusCode.InvalidArgument
-            ex.Status.Detail |> shouldContain "non autorisÃ©e"
+            ex.Status.Detail |> shouldContain "non autorisée"
             runner.SecureCommands |> should be Empty
         finally
             try
@@ -690,7 +690,7 @@ type ContainerdClientTests() =
         let result = client.PullImage("ghcr.io/team/app:latest", Some "inline:secret")
         result |> should equal "resolved"
 
-        // H6 : l'identifiant EXPLICITE passe aussi par le hosts-dir du helper â€”
+        // H6 : l'identifiant EXPLICITE passe aussi par le hosts-dir du helper —
         // plus aucun secret dans argv.
         let (_, args) =
             runner.SecureCommands
@@ -764,7 +764,7 @@ type ContainerdClientTests() =
 
             let joined = args |> String.concat " "
 
-            // Identifiants STOCKÃ‰S : hosts-dir + helper, aucun secret en argv.
+            // Identifiants STOCKÉS : hosts-dir + helper, aucun secret en argv.
             joined |> shouldNotContain "--user"
             joined |> shouldNotContain "user:secret"
             joined |> shouldContain "--hosts-dir"
@@ -789,7 +789,7 @@ type ContainerdClientTests() =
         ex.StatusCode |> should equal StatusCode.InvalidArgument
         ex.Status.Detail |> shouldContain "utilisateur:secret"
 
-        // Refus catÃ©gorique : aucune commande ctr n'est exÃ©cutÃ©e, aucun --user en argv.
+        // Refus catégorique : aucune commande ctr n'est exécutée, aucun --user en argv.
         runner.SecureCommands |> should be Empty
 
     [<Fact>]
@@ -810,8 +810,8 @@ type ContainerdClientTests() =
             let client =
                 ContainerdClient(runner) :> DiploWalker.Abstractions.Interfaces.IContainerdClient
 
-            // InstantanÃ© AVANT le pull : l'assertion doit Ãªtre relative, pas
-            // dÃ©pendre des rÃ©sidus d'exÃ©cutions prÃ©cÃ©dentes.
+            // Instantané AVANT le pull : l'assertion doit être relative, pas
+            // dépendre des résidus d'exécutions précédentes.
             let before =
                 System.IO.Directory.GetDirectories(System.IO.Path.GetTempPath(), "diplo-hosts-*")
 
@@ -825,7 +825,7 @@ type ContainerdClientTests() =
             joined |> shouldContain "--hosts-dir"
             joined |> shouldNotContain "hubuser:hubpass"
 
-            // Le rÃ©pertoire temporaire est nettoyÃ© aprÃ¨s le pull : aucun
+            // Le répertoire temporaire est nettoyé après le pull : aucun
             // nouveau hosts-dir ne subsiste.
             let after =
                 System.IO.Directory.GetDirectories(System.IO.Path.GetTempPath(), "diplo-hosts-*")
@@ -875,13 +875,13 @@ type ContainerdClientTests() =
     [<Fact>]
     member _.``DeleteContainer avec force sur conteneur inexistant leve sur le delete``() =
         let runner = createRunner ()
-        runner.SetFail("ctr a Ã©chouÃ©")
+        runner.SetFail("ctr a échoué")
 
         let client =
             ContainerdClient(runner) :> DiploWalker.Abstractions.Interfaces.IContainerdClient
 
-        // Le kill est best-effort, mais l'Ã©chec de la SUPPRESSION doit remonter :
-        // un succÃ¨s mensonger libÃ©rerait prÃ©maturÃ©ment les volumes montÃ©s.
+        // Le kill est best-effort, mais l'échec de la SUPPRESSION doit remonter :
+        // un succès mensonger libérerait prématurément les volumes montés.
         Assert.Throws<System.Exception>(fun () -> client.DeleteContainer("default", "absent-1", true))
 
     [<Fact>]
@@ -905,11 +905,11 @@ type ContainerdClientTests() =
 
         client.UpdateContainer("default", "c-1", 0L, 0, 0)
 
-    // â”€â”€ Segments --mount : injections interdites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Segments --mount : injections interdites ────────────────
     //
-    // La spec --mount est une liste sÃ©parÃ©e par virgules : une destination
-    // OU une source contenant Â«, Â», un espace ou Â« .. Â» permettrait
-    // d'injecter des options arbitraires (ex. annuler le Â« ro Â» imposÃ©).
+    // La spec --mount est une liste séparée par virgules : une destination
+    // OU une source contenant «, », un espace ou « .. » permettrait
+    // d'injecter des options arbitraires (ex. annuler le « ro » imposé).
 
     [<Fact>]
     member _.``CreateContainer refuse une destination contenant une virgule``() =
@@ -968,7 +968,7 @@ type ContainerdClientTests() =
         Assert.Throws<ArgumentException>(inj "C:\\app data")
 
     [<Fact>]
-    member _.``CreateContainer refuse une destination avec traversÃ©e ..``() =
+    member _.``CreateContainer refuse une destination avec traversée ..``() =
         let runner = createRunner ()
 
         let client =
@@ -1031,8 +1031,8 @@ type ContainerdClientTests() =
         let client =
             ContainerdClient(runner) :> DiploWalker.Abstractions.Interfaces.IContainerdClient
 
-        // Chemin sous %TEMP% (rÃ©pertoire autorisÃ©) mais contenant une virgule :
-        // validateVolumePath le laisse passer, le contrÃ´le de segment doit le rejeter.
+        // Chemin sous %TEMP% (répertoire autorisé) mais contenant une virgule :
+        // validateVolumePath le laisse passer, le contrôle de segment doit le rejeter.
         let src = Path.Combine(Path.GetTempPath(), "diplo,data")
 
         let inj s =

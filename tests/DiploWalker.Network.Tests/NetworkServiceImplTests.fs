@@ -84,7 +84,7 @@ module NetworkServiceImplTests =
         let req = { Id = createResult.Id; Force = false }
         let result = (svc :> INetworkService).RemoveNetwork(req, ctx).Result
         result.Success |> should equal true
-        result.Message |> should equal "RÃ©seau supprimÃ©"
+        result.Message |> should equal "Réseau supprimé"
 
     [<Fact>]
     let ``RemoveNetwork sur reseau inexistant lance RpcException NotFound`` () =
@@ -268,7 +268,7 @@ module NetworkServiceImplTests =
 
         let result = (svc :> INetworkService).DisconnectContainer(req, ctx).Result
         result.Success |> should equal true
-        result.Message |> should equal "DÃ©connectÃ©"
+        result.Message |> should equal "Déconnecté"
 
     [<Fact>]
     let ``DisconnectContainer sur reseau inexistant retourne NotFound`` () =
@@ -297,9 +297,9 @@ module NetworkServiceImplTests =
         let result = (svc :> INetworkService).PruneNetworks(req, ctx).Result
         result.Count |> should equal 0
         result.NetworksDeleted.Count |> should equal 0
-        result.Message |> should equal "0 rÃ©seau(x) supprimÃ©(s)"
+        result.Message |> should equal "0 réseau(x) supprimé(s)"
 
-    // --- SÃ©curitÃ© : CreateNetwork ---
+    // --- Sécurité : CreateNetwork ---
     [<Fact>]
     let ``CreateNetwork avec nom injection lance exception`` () =
         let svc, _ = createService ()
@@ -319,7 +319,7 @@ module NetworkServiceImplTests =
             Assert.Throws<AggregateException>(fun () ->
                 (svc :> INetworkService).CreateNetwork(req, ctx).Result |> ignore)
 
-        ex.InnerException.Message |> should haveSubstring "Le nom du rÃ©seau"
+        ex.InnerException.Message |> should haveSubstring "Le nom du réseau"
 
     [<Fact>]
     let ``CreateNetwork avec subnet invalide lance exception`` () =
@@ -340,7 +340,7 @@ module NetworkServiceImplTests =
             Assert.Throws<AggregateException>(fun () ->
                 (svc :> INetworkService).CreateNetwork(req, ctx).Result |> ignore)
 
-        ex.InnerException.Message |> should haveSubstring "Le sous-rÃ©seau"
+        ex.InnerException.Message |> should haveSubstring "Le sous-réseau"
 
     [<Fact>]
     let ``CreateNetwork avec gateway invalide lance exception`` () =
@@ -364,7 +364,7 @@ module NetworkServiceImplTests =
         ex.InnerException.Message |> should haveSubstring "La passerelle"
 
     [<Fact>]
-    let ``CreateNetwork avec label clÃ© invalide lance exception`` () =
+    let ``CreateNetwork avec label clé invalide lance exception`` () =
         let svc, _ = createService ()
         let ctx = createCtx ()
 
@@ -409,7 +409,7 @@ module NetworkServiceImplTests =
 
         ex.InnerException.Message |> should haveSubstring "La valeur du label"
 
-    // --- SÃ©curitÃ© : RemoveNetwork ---
+    // --- Sécurité : RemoveNetwork ---
     [<Fact>]
     let ``RemoveNetwork avec id injection lance exception`` () =
         let svc, _ = createService ()
@@ -420,7 +420,7 @@ module NetworkServiceImplTests =
             Assert.Throws<AggregateException>(fun () ->
                 (svc :> INetworkService).RemoveNetwork(req, ctx).Result |> ignore)
 
-        ex.InnerException.Message |> should haveSubstring "L'identifiant du rÃ©seau"
+        ex.InnerException.Message |> should haveSubstring "L'identifiant du réseau"
 
     [<Fact>]
     let ``RemoveNetwork avec id vide lance exception`` () =
@@ -432,9 +432,9 @@ module NetworkServiceImplTests =
             Assert.Throws<AggregateException>(fun () ->
                 (svc :> INetworkService).RemoveNetwork(req, ctx).Result |> ignore)
 
-        ex.InnerException.Message |> should haveSubstring "L'identifiant du rÃ©seau"
+        ex.InnerException.Message |> should haveSubstring "L'identifiant du réseau"
 
-    // --- SÃ©curitÃ© : InspectNetwork ---
+    // --- Sécurité : InspectNetwork ---
     [<Fact>]
     let ``InspectNetwork avec id vide lance exception`` () =
         let svc, _ = createService ()
@@ -445,7 +445,7 @@ module NetworkServiceImplTests =
             Assert.Throws<AggregateException>(fun () ->
                 (svc :> INetworkService).InspectNetwork(req, ctx).Result |> ignore)
 
-        ex.InnerException.Message |> should haveSubstring "L'identifiant du rÃ©seau"
+        ex.InnerException.Message |> should haveSubstring "L'identifiant du réseau"
 
     [<Fact>]
     let ``InspectNetwork avec id injection lance exception`` () =
@@ -457,9 +457,9 @@ module NetworkServiceImplTests =
             Assert.Throws<AggregateException>(fun () ->
                 (svc :> INetworkService).InspectNetwork(req, ctx).Result |> ignore)
 
-        ex.InnerException.Message |> should haveSubstring "L'identifiant du rÃ©seau"
+        ex.InnerException.Message |> should haveSubstring "L'identifiant du réseau"
 
-    // --- SÃ©curitÃ© : ConnectContainer ---
+    // --- Sécurité : ConnectContainer ---
     [<Fact>]
     let ``ConnectContainer avec container id vide lance exception`` () =
         let svc, _ = createService ()
@@ -514,7 +514,7 @@ module NetworkServiceImplTests =
 
         ex.InnerException.Message |> should haveSubstring "L'adresse IPv4"
 
-    // --- SÃ©curitÃ© : DisconnectContainer ---
+    // --- Sécurité : DisconnectContainer ---
     [<Fact>]
     let ``DisconnectContainer avec container id vide lance exception`` () =
         let svc, _ = createService ()
@@ -547,9 +547,9 @@ module NetworkServiceImplTests =
             Assert.Throws<AggregateException>(fun () ->
                 (svc :> INetworkService).DisconnectContainer(req, ctx).Result |> ignore)
 
-        ex.InnerException.Message |> should haveSubstring "L'identifiant du rÃ©seau"
+        ex.InnerException.Message |> should haveSubstring "L'identifiant du réseau"
 
-    // --- SÃ©curitÃ© : RunCniPlugin ---
+    // --- Sécurité : RunCniPlugin ---
     [<Fact>]
     let ``RunCniPlugin avec container id vide lance exception`` () =
         let svc, _ = createService ()

@@ -15,10 +15,10 @@ module CoreTests =
         Directory.CreateDirectory(dir) |> ignore
         dir
 
-    // â”€â”€â”€ Checksum â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Checksum ────────────────────────────────────────────────────────
 
     [<Fact>]
-    let ``computeSha256 retourne le condensat hexadÃ©cimal minuscule`` () =
+    let ``computeSha256 retourne le condensat hexadécimal minuscule`` () =
         let dir = tempDir ()
 
         try
@@ -31,7 +31,7 @@ module CoreTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``verifyChecksum ne lÃ¨ve pas si le condensat correspond`` () =
+    let ``verifyChecksum ne lève pas si le condensat correspond`` () =
         let dir = tempDir ()
 
         try
@@ -43,7 +43,7 @@ module CoreTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``verifyChecksum lÃ¨ve si le condensat ne correspond pas`` () =
+    let ``verifyChecksum lève si le condensat ne correspond pas`` () =
         let dir = tempDir ()
 
         try
@@ -54,7 +54,7 @@ module CoreTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``verifyChecksum lÃ¨ve si aucun checksum fourni`` () =
+    let ``verifyChecksum lève si aucun checksum fourni`` () =
         let dir = tempDir ()
 
         try
@@ -65,17 +65,17 @@ module CoreTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``verifyChecksum lÃ¨ve si checksum placeholder todo`` () =
+    let ``verifyChecksum lève si checksum placeholder todo`` () =
         let dir = tempDir ()
 
         try
             let path = Path.Combine(dir, "f.txt")
             File.WriteAllText(path, "hello")
-            (fun () -> verifyChecksum path (Some "todo_Ã _mettre_Ã _jour")) |> should throw typeof<Exception>
+            (fun () -> verifyChecksum path (Some "todo_à_mettre_à_jour")) |> should throw typeof<Exception>
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€â”€ Extraction Zip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Extraction Zip ──────────────────────────────────────────────────
 
     [<Fact>]
     let ``extractZip extrait les fichiers vers la destination`` () =
@@ -102,10 +102,10 @@ module CoreTests =
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€â”€ Config containerd â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Config containerd ───────────────────────────────────────────────
 
     [<Fact>]
-    let ``buildContainerdConfigToml contient les rÃ©pertoires de travail`` () =
+    let ``buildContainerdConfigToml contient les répertoires de travail`` () =
         let toml = buildContainerdConfigToml ()
         toml.Contains(sprintf "root = \"%s\"" containerdRootDir) |> should equal true
         toml.Contains(sprintf "state = \"%s\"" containerdStateDir) |> should equal true
@@ -116,18 +116,18 @@ module CoreTests =
         toml.Contains("address = \"npipe:////./pipe/containerd-containerd\"") |> should equal true
 
     [<Fact>]
-    let ``buildContainerdConfigToml rÃ©fÃ©rence l'image sandbox du serveur`` () =
+    let ``buildContainerdConfigToml référence l'image sandbox du serveur`` () =
         let toml = buildContainerdConfigToml ()
         let sandbox = getSandboxImage ()
         toml.Contains(sprintf "sandbox_image = \"%s\"" sandbox) |> should equal true
 
     [<Fact>]
-    let ``buildContainerdConfigToml configure les rÃ©pertoires CNI`` () =
+    let ``buildContainerdConfigToml configure les répertoires CNI`` () =
         let toml = buildContainerdConfigToml ()
         toml.Contains(sprintf "bin_dir = \"%s\"" cniBinDir) |> should equal true
         toml.Contains(sprintf "conf_dir = \"%s\"" cniConfDir) |> should equal true
 
-    // â”€â”€â”€ CohÃ©rence version Windows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Cohérence version Windows ───────────────────────────────────────
 
     [<Fact>]
     let ``getSandboxImage suit le tag de la version serveur`` () =

@@ -13,14 +13,14 @@ module SecurityValidationTests =
     let private absolutePath (segment1: string) (segment2: string) =
         IO.Path.Combine(IO.Path.GetPathRoot(IO.Path.GetTempPath()), segment1, segment2)
 
-    // â”€â”€ validateCommand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateCommand ──────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateCommand avec commande vide lÃ¨ve une exception`` () =
+    let ``validateCommand avec commande vide lève une exception`` () =
         (fun () -> validateCommand [||]) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec null lÃ¨ve une exception`` () =
+    let ``validateCommand avec null lève une exception`` () =
         (fun () -> validateCommand null) |> should throw typeof<Exception>
 
     [<Fact>]
@@ -31,43 +31,43 @@ module SecurityValidationTests =
         validateCommand [| "echo"; "hello"; "world" |]
 
     [<Fact>]
-    let ``validateCommand avec plus de 64 arguments lÃ¨ve une exception`` () =
+    let ``validateCommand avec plus de 64 arguments lève une exception`` () =
         let args = Array.init 65 (fun i -> sprintf "arg%d" i)
         (fun () -> validateCommand args) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec caractÃ¨re point-virgule lÃ¨ve une exception`` () =
+    let ``validateCommand avec caractère point-virgule lève une exception`` () =
         (fun () -> validateCommand [| "ls;rm" |]) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec pipe lÃ¨ve une exception`` () =
+    let ``validateCommand avec pipe lève une exception`` () =
         (fun () -> validateCommand [| "ls|cat" |]) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec backtick lÃ¨ve une exception`` () =
+    let ``validateCommand avec backtick lève une exception`` () =
         (fun () -> validateCommand [| "`whoami`" |]) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec variable PATH interdite lÃ¨ve une exception`` () =
+    let ``validateCommand avec variable PATH interdite lève une exception`` () =
         (fun () -> validateCommand [| "%PATH%" |]) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec variable WINDIR interdite lÃ¨ve une exception`` () =
+    let ``validateCommand avec variable WINDIR interdite lève une exception`` () =
         (fun () -> validateCommand [| "%WINDIR%\\system32" |])
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec prÃ©fixe double slash lÃ¨ve une exception`` () =
+    let ``validateCommand avec préfixe double slash lève une exception`` () =
         (fun () -> validateCommand [| "\\\\server\\share" |])
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec exÃ©cutable contenant slash lÃ¨ve une exception`` () =
+    let ``validateCommand avec exécutable contenant slash lève une exception`` () =
         (fun () -> validateCommand [| "/bin/sh"; "arg" |])
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec argument trop long lÃ¨ve une exception`` () =
+    let ``validateCommand avec argument trop long lève une exception`` () =
         let longArg = String('a', 1025)
         (fun () -> validateCommand [| longArg |]) |> should throw typeof<Exception>
 
@@ -82,17 +82,17 @@ module SecurityValidationTests =
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec redirection lÃ¨ve une exception`` () =
+    let ``validateCommand avec redirection lève une exception`` () =
         (fun () -> validateCommand [| "ls>out.txt" |]) |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCommand avec parenthÃ¨se lÃ¨ve une exception`` () =
+    let ``validateCommand avec parenthèse lève une exception`` () =
         (fun () -> validateCommand [| "ls(" |]) |> should throw typeof<Exception>
 
-    // â”€â”€ validateCidr â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateCidr ────────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateCidr avec vide ne lÃ¨ve pas d'exception`` () = validateCidr "" "test"
+    let ``validateCidr avec vide ne lève pas d'exception`` () = validateCidr "" "test"
 
     [<Fact>]
     let ``validateCidr avec CIDR valide passe`` () = validateCidr "192.168.1.0/24" "test"
@@ -101,28 +101,28 @@ module SecurityValidationTests =
     let ``validateCidr avec IP seule passe`` () = validateCidr "10.0.0.1" "test"
 
     [<Fact>]
-    let ``validateCidr avec octet > 255 lÃ¨ve une exception`` () =
+    let ``validateCidr avec octet > 255 lève une exception`` () =
         (fun () -> validateCidr "256.0.0.1/24" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCidr avec octet nÃ©gatif lÃ¨ve une exception`` () =
+    let ``validateCidr avec octet négatif lève une exception`` () =
         (fun () -> validateCidr "-1.0.0.1/24" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCidr avec masque > 32 lÃ¨ve une exception`` () =
+    let ``validateCidr avec masque > 32 lève une exception`` () =
         (fun () -> validateCidr "10.0.0.1/33" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCidr avec masque nÃ©gatif lÃ¨ve une exception`` () =
+    let ``validateCidr avec masque négatif lève une exception`` () =
         (fun () -> validateCidr "10.0.0.1/-1" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCidr avec trop de parties lÃ¨ve une exception`` () =
+    let ``validateCidr avec trop de parties lève une exception`` () =
         (fun () -> validateCidr "1.2.3.4/24/extra" "test")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCidr avec IP incomplÃ¨te lÃ¨ve une exception`` () =
+    let ``validateCidr avec IP incomplète lève une exception`` () =
         (fun () -> validateCidr "192.168.1" "test") |> should throw typeof<Exception>
 
     [<Fact>]
@@ -131,10 +131,10 @@ module SecurityValidationTests =
     [<Fact>]
     let ``validateCidr avec masque 32 est valide`` () = validateCidr "10.0.0.1/32" "test"
 
-    // â”€â”€ validateIp â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateIp ──────────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateIp avec vide ne lÃ¨ve pas d'exception`` () = validateIp "" "test"
+    let ``validateIp avec vide ne lève pas d'exception`` () = validateIp "" "test"
 
     [<Fact>]
     let ``validateIp avec IP valide passe`` () = validateIp "192.168.1.1" "test"
@@ -143,22 +143,22 @@ module SecurityValidationTests =
     let ``validateIp avec 127.0.0.1 valide passe`` () = validateIp "127.0.0.1" "test"
 
     [<Fact>]
-    let ``validateIp avec octet > 255 lÃ¨ve une exception`` () =
+    let ``validateIp avec octet > 255 lève une exception`` () =
         (fun () -> validateIp "999.999.999.999" "test")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateIp avec 3 parties lÃ¨ve une exception`` () =
+    let ``validateIp avec 3 parties lève une exception`` () =
         (fun () -> validateIp "192.168.1" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateIp avec 5 parties lÃ¨ve une exception`` () =
+    let ``validateIp avec 5 parties lève une exception`` () =
         (fun () -> validateIp "1.2.3.4.5" "test") |> should throw typeof<Exception>
 
-    // â”€â”€ validateContainerId â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateContainerId ──────────────────────────────────────────
 
     [<Fact>]
-    let ``validateContainerId avec vide lÃ¨ve une exception`` () =
+    let ``validateContainerId avec vide lève une exception`` () =
         (fun () -> validateContainerId "") |> should throw typeof<Exception>
 
     [<Fact>]
@@ -173,42 +173,42 @@ module SecurityValidationTests =
         validateContainerId "container_test-123"
 
     [<Fact>]
-    let ``validateContainerId avec caractÃ¨res interdits lÃ¨ve une exception`` () =
+    let ``validateContainerId avec caractères interdits lève une exception`` () =
         (fun () -> validateContainerId "container;rm -rf /")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateContainerId avec espace lÃ¨ve une exception`` () =
+    let ``validateContainerId avec espace lève une exception`` () =
         (fun () -> validateContainerId "container with space")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateContainerId avec pipe lÃ¨ve une exception`` () =
+    let ``validateContainerId avec pipe lève une exception`` () =
         (fun () -> validateContainerId "container|cmd")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateContainerId avec backtick lÃ¨ve une exception`` () =
+    let ``validateContainerId avec backtick lève une exception`` () =
         (fun () -> validateContainerId "container`cmd`")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateContainerId trop long lÃ¨ve une exception`` () =
+    let ``validateContainerId trop long lève une exception`` () =
         let longId = String('a', 129)
         (fun () -> validateContainerId longId) |> should throw typeof<Exception>
 
-    // â”€â”€ validateLabel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateLabel ───────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateLabel avec clÃ© et valeur valides passe`` () = validateLabel "app" "my-app"
+    let ``validateLabel avec clé et valeur valides passe`` () = validateLabel "app" "my-app"
 
     [<Fact>]
-    let ``validateLabel avec clÃ© interdite lÃ¨ve une exception`` () =
-        (fun () -> validateLabel "clÃ© invalide" "value")
+    let ``validateLabel avec clé interdite lève une exception`` () =
+        (fun () -> validateLabel "clé invalide" "value")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateLabel avec valeur interdite lÃ¨ve une exception`` () =
+    let ``validateLabel avec valeur interdite lève une exception`` () =
         (fun () -> validateLabel "key" "value;injection")
         |> should throw typeof<Exception>
 
@@ -216,7 +216,7 @@ module SecurityValidationTests =
     let ``validateLabel avec tirets et points passe`` () =
         validateLabel "app.kubernetes.io-name" "test-value"
 
-    // â”€â”€ validateCniCommand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateCniCommand ──────────────────────────────────────────
 
     [<Fact>]
     let ``validateCniCommand avec ADD valide passe`` () = validateCniCommand "ADD"
@@ -234,14 +234,14 @@ module SecurityValidationTests =
     let ``validateCniCommand avec add en minuscule passe (case insensitive)`` () = validateCniCommand "add"
 
     [<Fact>]
-    let ``validateCniCommand avec commande inconnue lÃ¨ve une exception`` () =
+    let ``validateCniCommand avec commande inconnue lève une exception`` () =
         (fun () -> validateCniCommand "EXEC") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateCniCommand avec vide lÃ¨ve une exception`` () =
+    let ``validateCniCommand avec vide lève une exception`` () =
         (fun () -> validateCniCommand "") |> should throw typeof<Exception>
 
-    // â”€â”€ validateGrpcAddress â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateGrpcAddress ─────────────────────────────────────────
 
     [<Fact>]
     let ``validateGrpcAddress avec localhost passe`` () =
@@ -259,26 +259,26 @@ module SecurityValidationTests =
         validateGrpcAddress "https://localhost:5001"
 
     [<Fact>]
-    let ``validateGrpcAddress avec adresse distante lÃ¨ve une exception`` () =
+    let ``validateGrpcAddress avec adresse distante lève une exception`` () =
         (fun () -> validateGrpcAddress "http://192.168.1.100:5000")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateGrpcAddress avec nom de domaine lÃ¨ve une exception`` () =
+    let ``validateGrpcAddress avec nom de domaine lève une exception`` () =
         (fun () -> validateGrpcAddress "http://example.com:5000")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateGrpcAddress avec vide lÃ¨ve une exception`` () =
+    let ``validateGrpcAddress avec vide lève une exception`` () =
         (fun () -> validateGrpcAddress "") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateGrpcAddress avec schÃ©ma ftp lÃ¨ve une exception`` () =
+    let ``validateGrpcAddress avec schéma ftp lève une exception`` () =
         (fun () -> validateGrpcAddress "ftp://localhost:5000")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateGrpcAddress avec URL invalide lÃ¨ve une exception`` () =
+    let ``validateGrpcAddress avec URL invalide lève une exception`` () =
         (fun () -> validateGrpcAddress "not-a-url") |> should throw typeof<Exception>
 
     [<Fact>]
@@ -286,32 +286,32 @@ module SecurityValidationTests =
         validateGrpcAddress "http://pipe:/diplo-container"
 
     [<Fact>]
-    let ``validateGrpcAddress avec adresse pipe Ã  plusieurs segments passe`` () =
+    let ``validateGrpcAddress avec adresse pipe à plusieurs segments passe`` () =
         validateGrpcAddress "http://pipe:/diplo/container"
 
     [<Fact>]
-    let ``validateGrpcAddress avec nom de pipe vide lÃ¨ve une exception`` () =
+    let ``validateGrpcAddress avec nom de pipe vide lève une exception`` () =
         (fun () -> validateGrpcAddress "http://pipe:/")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateGrpcAddress avec nom de pipe contenant backslash lÃ¨ve une exception`` () =
+    let ``validateGrpcAddress avec nom de pipe contenant backslash lève une exception`` () =
         (fun () -> validateGrpcAddress @"http://pipe:/diplo\..\evil")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateGrpcAddress avec nom de pipe contenant traversÃ©e lÃ¨ve une exception`` () =
+    let ``validateGrpcAddress avec nom de pipe contenant traversée lève une exception`` () =
         (fun () -> validateGrpcAddress "http://pipe:/../diplo")
         |> should throw typeof<Exception>
 
-    // â”€â”€ validatePath â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validatePath ────────────────────────────────────────────────
 
     [<Fact>]
-    let ``validatePath avec vide lÃ¨ve une exception`` () =
+    let ``validatePath avec vide lève une exception`` () =
         (fun () -> validatePath "" "/tmp" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validatePath avec traversÃ©e .. lÃ¨ve une exception`` () =
+    let ``validatePath avec traversée .. lève une exception`` () =
         (fun () -> validatePath "../../etc/passwd" "/tmp" "test")
         |> should throw typeof<Exception>
 
@@ -320,7 +320,7 @@ module SecurityValidationTests =
         validatePath "data/file.txt" "/tmp" "test"
 
     [<Fact>]
-    let ``validatePath qui sort du rÃ©pertoire de base lÃ¨ve une exception`` () =
+    let ``validatePath qui sort du répertoire de base lève une exception`` () =
         let baseDir =
             IO.Path.Combine(IO.Path.GetTempPath(), "diplo-test-" + Guid.NewGuid().ToString("N"))
 
@@ -332,14 +332,14 @@ module SecurityValidationTests =
         finally
             IO.Directory.Delete(baseDir, true)
 
-    // â”€â”€ validateCniPluginPath â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateCniPluginPath ───────────────────────────────────────
 
     [<Fact>]
-    let ``validateCniPluginPath avec vide lÃ¨ve une exception`` () =
+    let ``validateCniPluginPath avec vide lève une exception`` () =
         Assert.Throws<RpcException>(fun () -> validateCniPluginPath "" |> ignore)
 
     [<Fact>]
-    let ``validateCniPluginPath avec chemin dans rÃ©pertoire autorisÃ© retourne le chemin rÃ©solu`` () =
+    let ``validateCniPluginPath avec chemin dans répertoire autorisé retourne le chemin résolu`` () =
         // Premier repertoire de la liste blanche : plugin installe par la
         // plateforme (containerd sous Windows, /opt/cni/bin ailleurs).
         let allowedDir = List.head allowedCniPluginDirs
@@ -348,7 +348,7 @@ module SecurityValidationTests =
         result |> should not' (be NullOrEmptyString)
 
     [<Fact>]
-    let ``validateCniPluginPath avec chemin non autorisÃ© lÃ¨ve une exception`` () =
+    let ``validateCniPluginPath avec chemin non autorisé lève une exception`` () =
         Assert.Throws<RpcException>(fun () -> validateCniPluginPath @"C:\malicious\path\plugin.exe" |> ignore)
 
     [<Fact>]
@@ -357,70 +357,70 @@ module SecurityValidationTests =
         let result = validateCniPluginPath path
         result |> should not' (be NullOrEmptyString)
 
-    // â”€â”€ validateVolumePath â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateVolumePath ──────────────────────────────────────────
 
     [<Fact>]
-    let ``validateVolumePath avec vide lÃ¨ve une exception`` () =
+    let ``validateVolumePath avec vide lève une exception`` () =
         (fun () -> validateVolumePath "" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateVolumePath avec traversÃ©e .. lÃ¨ve une exception`` () =
+    let ``validateVolumePath avec traversée .. lève une exception`` () =
         (fun () -> validateVolumePath "../../etc/passwd" "test")
         |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateVolumePath avec caractÃ¨re nul lÃ¨ve une exception`` () =
+    let ``validateVolumePath avec caractère nul lève une exception`` () =
         (fun () -> validateVolumePath "file\0.txt" "test")
         |> should throw typeof<Exception>
 
-    // â”€â”€ validateName â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateName ────────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateName avec vide lÃ¨ve une exception`` () =
+    let ``validateName avec vide lève une exception`` () =
         (fun () -> validateName "" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateName valide passe`` () = validateName "my-network" "test"
 
     [<Fact>]
-    let ``validateName avec caractÃ¨res interdits lÃ¨ve une exception`` () =
-        (fun () -> validateName "rÃ©seau;injection" "test")
+    let ``validateName avec caractères interdits lève une exception`` () =
+        (fun () -> validateName "réseau;injection" "test")
         |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateName avec points et tirets passe`` () = validateName "test.name_v1" "test"
 
     [<Fact>]
-    let ``validateName trop long lÃ¨ve une exception`` () =
+    let ``validateName trop long lève une exception`` () =
         let longName = String('a', 65)
         (fun () -> validateName longName "test") |> should throw typeof<Exception>
 
-    // â”€â”€ validateId â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateId ──────────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateId avec vide lÃ¨ve une exception`` () =
+    let ``validateId avec vide lève une exception`` () =
         (fun () -> validateId "" "test") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateId valide passe`` () = validateId "abc-123_def" "test"
 
     [<Fact>]
-    let ``validateId avec caractÃ¨res interdits lÃ¨ve une exception`` () =
+    let ``validateId avec caractères interdits lève une exception`` () =
         (fun () -> validateId "id;injection" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateId avec espace lÃ¨ve une exception`` () =
+    let ``validateId avec espace lève une exception`` () =
         (fun () -> validateId "id with space" "test") |> should throw typeof<Exception>
 
     [<Fact>]
-    let ``validateId trop long lÃ¨ve une exception`` () =
+    let ``validateId trop long lève une exception`` () =
         let longId = String('a', 129)
         (fun () -> validateId longId "test") |> should throw typeof<Exception>
 
-    // â”€â”€ validateImage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateImage ───────────────────────────────────────────────
 
     [<Fact>]
-    let ``validateImage avec vide lÃ¨ve une exception`` () =
+    let ``validateImage avec vide lève une exception`` () =
         (fun () -> validateImage "") |> should throw typeof<Exception>
 
     [<Fact>]
@@ -431,18 +431,18 @@ module SecurityValidationTests =
         validateImage "docker.io/library/nginx:latest"
 
     [<Fact>]
-    let ``validateImage avec caractÃ¨res interdits lÃ¨ve une exception`` () =
+    let ``validateImage avec caractères interdits lève une exception`` () =
         (fun () -> validateImage "image;rm -rf /") |> should throw typeof<Exception>
 
     [<Fact>]
     let ``validateImage avec digest valide passe`` () = validateImage "nginx@sha256:abc123"
 
     [<Fact>]
-    let ``validateImage trop long lÃ¨ve une exception`` () =
+    let ``validateImage trop long lève une exception`` () =
         let longImage = String('a', 513)
         (fun () -> validateImage longImage) |> should throw typeof<Exception>
 
-    // â”€â”€ validateFilePath (fichiers de configuration compose) â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validateFilePath (fichiers de configuration compose) ────────
 
     [<Fact>]
     let ``validateFilePath accepte un chemin absolu yaml`` () =
@@ -457,7 +457,7 @@ module SecurityValidationTests =
         (fun () -> validateFilePath "compose.yaml" "Le fichier") |> should throw typeof<RpcException>
 
     [<Fact>]
-    let ``validateFilePath rejette une traversÃ©e ..`` () =
+    let ``validateFilePath rejette une traversée ..`` () =
         (fun () -> validateFilePath @"C:\stack\..\secret.yaml" "Le fichier")
         |> should throw typeof<RpcException>
 
@@ -467,7 +467,7 @@ module SecurityValidationTests =
         |> should throw typeof<RpcException>
 
     [<Fact>]
-    let ``validateFilePath rejette un chemin rÃ©seau en slashes`` () =
+    let ``validateFilePath rejette un chemin réseau en slashes`` () =
         (fun () -> validateFilePath "//srv/share/compose.yml" "Le fichier")
         |> should throw typeof<RpcException>
 
@@ -477,7 +477,7 @@ module SecurityValidationTests =
         |> should throw typeof<RpcException>
 
     [<Fact>]
-    let ``validateFilePath rejette un caractÃ¨re nul`` () =
+    let ``validateFilePath rejette un caractère nul`` () =
         (fun () -> validateFilePath "C:\\stack\\a\u0000.yaml" "Le fichier")
         |> should throw typeof<RpcException>
 
@@ -485,7 +485,7 @@ module SecurityValidationTests =
     let ``validateFilePath rejette un chemin vide`` () =
         (fun () -> validateFilePath "" "Le fichier") |> should throw typeof<RpcException>
 
-    // â”€â”€ validateContainerPath (chemins dans les commandes internes) â”€
+    // ── validateContainerPath (chemins dans les commandes internes) ─
 
     [<Fact>]
     let ``validateContainerPath accepte un chemin POSIX simple`` () =
@@ -496,7 +496,7 @@ module SecurityValidationTests =
         validateContainerPath @"C:\data\out.log" "La destination"
 
     [<Fact>]
-    let ``validateContainerPath rejette une traversÃ©e ..`` () =
+    let ``validateContainerPath rejette une traversée ..`` () =
         (fun () -> validateContainerPath "/app/../etc/passwd" "La destination")
         |> should throw typeof<RpcException>
 
@@ -509,7 +509,7 @@ module SecurityValidationTests =
         (fun () -> validateContainerPath "/app/x>y" "La destination") |> should throw typeof<RpcException>
 
     [<Fact>]
-    let ``validateContainerPath rejette un caractÃ¨re nul`` () =
+    let ``validateContainerPath rejette un caractère nul`` () =
         (fun () -> validateContainerPath "/app/a\u0000b" "La destination")
         |> should throw typeof<RpcException>
 
@@ -522,14 +522,14 @@ module SecurityValidationTests =
     let ``validateContainerPath rejette un chemin vide`` () =
         (fun () -> validateContainerPath "" "La destination") |> should throw typeof<RpcException>
 
-    // â”€â”€ validateNetnsPath (namespaces rÃ©seau pour plugins CNI) â”€â”€â”€â”€â”€â”€
+    // ── validateNetnsPath (namespaces réseau pour plugins CNI) ──────
 
     [<Fact>]
     let ``validateNetnsPath accepte un chemin /proc standard`` () =
         validateNetnsPath "/proc/1234/ns/net" "Le netns"
 
     [<Fact>]
-    let ``validateNetnsPath rejette une traversÃ©e ..`` () =
+    let ``validateNetnsPath rejette une traversée ..`` () =
         (fun () -> validateNetnsPath "/proc/../etc" "Le netns") |> should throw typeof<RpcException>
 
     [<Fact>]
@@ -549,30 +549,30 @@ module SecurityValidationTests =
         let long = String('p', 1025)
         (fun () -> validateNetnsPath long "Le netns") |> should throw typeof<RpcException>
 
-    // â”€â”€ addAllowedVolumeDir (liste blanche dynamique des volumes) â”€â”€â”€
+    // ── addAllowedVolumeDir (liste blanche dynamique des volumes) ───
     //
-    // La liste est globale et additive : on utilise des rÃ©pertoires temporaires
-    // uniques par exÃ©cution, jamais retirÃ©s (effet rÃ©siduel inoffensif).
+    // La liste est globale et additive : on utilise des répertoires temporaires
+    // uniques par exécution, jamais retirés (effet résiduel inoffensif).
 
     [<Fact>]
-    let ``addAllowedVolumeDir autorise un nouveau rÃ©pertoire de base`` () =
+    let ``addAllowedVolumeDir autorise un nouveau répertoire de base`` () =
         let unique = "diplo-voldir-" + Guid.NewGuid().ToString("N")
         let candidate = IO.Path.Combine(IO.Path.GetPathRoot(IO.Path.GetTempPath()), unique)
         let other =
             IO.Path.Combine(IO.Path.GetPathRoot(IO.Path.GetTempPath()), "diplo-other-" + Guid.NewGuid().ToString("N"))
 
         try
-            // Avant ajout : rejetÃ© (hors des bases par dÃ©faut).
+            // Avant ajout : rejeté (hors des bases par défaut).
             (fun () -> validateVolumePath (IO.Path.Combine(candidate, "sub")) "Le chemin")
             |> should throw typeof<RpcException>
 
             addAllowedVolumeDir candidate
 
-            // AprÃ¨s ajout : acceptÃ©, y compris en sous-rÃ©pertoire.
+            // Après ajout : accepté, y compris en sous-répertoire.
             validateVolumePath (IO.Path.Combine(candidate, "sub")) "Le chemin"
             validateVolumePath (IO.Path.Combine(candidate, "sub", "deeper")) "Le chemin"
 
-            // Un autre rÃ©pertoire reste rejetÃ©.
+            // Un autre répertoire reste rejeté.
             (fun () -> validateVolumePath (IO.Path.Combine(other, "x")) "Le chemin")
             |> should throw typeof<RpcException>
         finally

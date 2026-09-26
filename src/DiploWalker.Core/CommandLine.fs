@@ -2,17 +2,17 @@
 
 open System.Text
 
-/// DÃ©coupage d'une ligne de commande en arguments en respectant les
-/// guillemets doubles (ex. `cmd /c "echo bonjour le monde"`). PartagÃ© entre
+/// Découpage d'une ligne de commande en arguments en respectant les
+/// guillemets doubles (ex. `cmd /c "echo bonjour le monde"`). Partagé entre
 /// la CLI et l'interface graphique pour `exec` sur un conteneur.
 module CommandLine =
 
-    /// DÃ©coupe une ligne en arguments. RÃ¨gles :
+    /// Découpe une ligne en arguments. Règles :
     /// - un guillemet ouvre/ferme une section entre guillemets (les espaces y
-    ///   sont prÃ©servÃ©s) ;
-    /// - `""` Ã  l'intÃ©rieur d'une section reprÃ©sente un guillemet littÃ©ral
+    ///   sont préservés) ;
+    /// - `""` à l'intérieur d'une section représente un guillemet littéral
     ///   (aller-retour avec `join`) ;
-    /// - des guillemets non Ã©quilibrÃ©s lÃ¨vent `ArgumentException`.
+    /// - des guillemets non équilibrés lèvent `ArgumentException`.
     let split (line: string) : string list =
         if isNull line then
             []
@@ -25,7 +25,7 @@ module CommandLine =
             while i < line.Length do
                 match line[i] with
                 | '"' when inQuotes && i + 1 < line.Length && line[i + 1] = '"' ->
-                    // Guillemet Ã©chappÃ© : `""` devient `"` (voir `join`).
+                    // Guillemet échappé : `""` devient `"` (voir `join`).
                     current.Append('"') |> ignore
                     i <- i + 2
                 | '"' ->
@@ -42,15 +42,15 @@ module CommandLine =
                     i <- i + 1
 
             if inQuotes then
-                raise (System.ArgumentException("Guillemets non Ã©quilibrÃ©s dans la commande", "line"))
+                raise (System.ArgumentException("Guillemets non équilibrés dans la commande", "line"))
 
             if current.Length > 0 then
                 tokens.Add(current.ToString())
 
             tokens |> List.ofSeq
 
-    /// RÃ©assemble les arguments en une ligne rÃ©-interprÃ©table par split :
-    /// les jetons contenant espace ou guillemet sont rÃ©-entourÃ©s de guillemets.
+    /// Réassemble les arguments en une ligne ré-interprétable par split :
+    /// les jetons contenant espace ou guillemet sont ré-entourés de guillemets.
     let join (args: string seq) : string =
         args
         |> Seq.map (fun a ->

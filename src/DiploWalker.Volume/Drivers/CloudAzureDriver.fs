@@ -5,10 +5,10 @@ open Grpc.Core
 open DiploWalker.Abstractions
 open DiploWalker.Abstractions.Interfaces
 
-/// Construction des arguments de Â« net use Â» pour Azure Files. La clÃ© du
-/// compte de stockage ne doit JAMAIS figurer dans argv, oÃ¹ elle est visible
-/// par tout processus local (WMI Win32_Process, audits) : le Â« * Â» force sa
-/// lecture sur l'entrÃ©e standard. Module exposÃ© pour la testabilitÃ©.
+/// Construction des arguments de « net use » pour Azure Files. La clé du
+/// compte de stockage ne doit JAMAIS figurer dans argv, où elle est visible
+/// par tout processus local (WMI Win32_Process, audits) : le « * » force sa
+/// lecture sur l'entrée standard. Module exposé pour la testabilité.
 module AzureNetUse =
 
     let buildArgs (sharePath: string) (targetPath: string) (driverOpts: Map<string, string>) =
@@ -54,7 +54,7 @@ type CloudAzureDriver(dataRoot: string) =
     override _.Mount sharePath targetPath opts =
         let args = AzureNetUse.buildArgs sharePath targetPath opts
 
-        // La clÃ© transite par l'entrÃ©e standard, pas par la ligne de commande.
+        // La clé transite par l'entrée standard, pas par la ligne de commande.
         let secret = opts |> Map.tryFind "storageKey"
         ProcessExec.runUnit "net" ("use" :: args) (Some ProcessExec.MountTimeoutMs) secret None
 

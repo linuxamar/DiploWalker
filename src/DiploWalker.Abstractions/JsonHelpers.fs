@@ -2,16 +2,16 @@
 
 open System.Text.Json
 
-/// Helpers mutualisÃ©s pour l'extraction de propriÃ©tÃ©s depuis des JsonElement.
+/// Helpers mutualisés pour l'extraction de propriétés depuis des JsonElement.
 /// CONTRAT SENTINELLE : tryGetString/tryGetInt64/tryGetDouble/tryGetBool
-/// retournent la valeur par dÃ©faut du type ("", 0L, 0.0, false) aussi bien
-/// pour une propriÃ©tÃ© absente que pour un mismatch de type â€” impossible de
-/// distinguer Â« absent Â» de Â« vide Â». Pour diffÃ©rencier, utiliser les
+/// retournent la valeur par défaut du type ("", 0L, 0.0, false) aussi bien
+/// pour une propriété absente que pour un mismatch de type — impossible de
+/// distinguer « absent » de « vide ». Pour différencier, utiliser les
 /// variantes Option (tryGetElement, tryGetStringValue).
 [<RequireQualifiedAccess>]
 module JsonHelpers =
 
-    /// Valeur de la propriÃ©tÃ©, ou "" si absente ou non-chaÃ®ne (sentinelle ambiguÃ«).
+    /// Valeur de la propriété, ou "" si absente ou non-chaîne (sentinelle ambiguë).
     let tryGetString (el: JsonElement) (prop: string) =
         let mutable v = Unchecked.defaultof<JsonElement>
 

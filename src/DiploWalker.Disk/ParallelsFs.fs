@@ -57,18 +57,18 @@ module Parallels =
         if sectorSize = 0 then
             failwith "Sector size invalide"
 
-        // GÃ©omÃ©trie validÃ©e : heads/sectors Ã  zÃ©ro provoqueraient une division
-        // par zÃ©ro au SetLength ; blockSize non bornÃ© permettrait des
-        // allocations gÃ©antes (ou nÃ©gatives) sur image forgÃ©e.
+        // Géométrie validée : heads/sectors à zéro provoqueraient une division
+        // par zéro au SetLength ; blockSize non borné permettrait des
+        // allocations géantes (ou négatives) sur image forgée.
         if heads < 1 || sectors < 1 || cylinders < 0 then
-            failwith "GÃ©omÃ©trie invalide (heads/sectors/cylinders)"
+            failwith "Géométrie invalide (heads/sectors/cylinders)"
 
         if blockSize < 512 || blockSize > 8 * 1024 * 1024 || blockSize % sectorSize <> 0 then
             failwithf "Block size invalide : %d" blockSize
 
-        // Bornes de sÃ©curitÃ© sur une image forgÃ©e : un nombre de blocs ouvert
-        // provoquerait des parcours Ã©normes dans findFreeBlock, et une table L1
-        // dÃ©bordante fausserait les index (voir blockIndex64).
+        // Bornes de sécurité sur une image forgée : un nombre de blocs ouvert
+        // provoquerait des parcours énormes dans findFreeBlock, et une table L1
+        // débordante fausserait les index (voir blockIndex64).
         if l1Size < 1 || l1Size > (1 <<< 24) then
             failwithf "Table L1 Parallels invalide (l1_size = %d)" l1Size
 
@@ -187,9 +187,9 @@ module Parallels =
                 let freeBlock = findFreeBlock s h
 
                 // Format stocke l'offset de secteur sur 32 bits : refuser de
-                // dÃ©border au-delÃ  de 2 To plutÃ´t que de corrompre la table L1.
+                // déborder au-delà de 2 To plutôt que de corrompre la table L1.
                 if freeBlock > int64 UInt32.MaxValue then
-                    failwith "Image Parallels pleine : limite de 2 To dÃ©passÃ©e"
+                    failwith "Image Parallels pleine : limite de 2 To dépassée"
 
                 let newOffset = freeBlock
                 s.Position <- l1Off
@@ -267,8 +267,8 @@ type ParallelsStream(path: string, access: FileAccess) =
         position
 
     override _.SetLength(value) =
-        // Arrondi par excÃ¨s : la division entiÃ¨re seule effondrerait la taille
-        // virtuelle (voire Ã  0) pour un SetLength non alignÃ©.
+        // Arrondi par excès : la division entière seule effondrerait la taille
+        // virtuelle (voire à 0) pour un SetLength non aligné.
         let sectorPerCyl = int64 header.Heads * int64 header.Sectors * int64 header.SectorSize
 
         let cylinders =

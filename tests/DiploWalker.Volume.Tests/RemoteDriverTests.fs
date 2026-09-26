@@ -27,9 +27,9 @@ module RemoteDriverTests =
         let ex = Assert.Throws<RpcException>(fun () -> f ())
         Assert.Equal(StatusCode.InvalidArgument, ex.StatusCode)
 
-    // â”€â”€ SmbDriver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── SmbDriver ────────────────────────────────────────────────
     [<Fact>]
-    let ``SmbDriver CreateVolume sans server lÃ¨ve RpcException InvalidArgument`` () =
+    let ``SmbDriver CreateVolume sans server lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -42,7 +42,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``SmbDriver CreateVolume sans share lÃ¨ve RpcException InvalidArgument`` () =
+    let ``SmbDriver CreateVolume sans share lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -55,7 +55,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``SmbDriver CreateVolume sans options lÃ¨ve RpcException InvalidArgument`` () =
+    let ``SmbDriver CreateVolume sans options lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -64,9 +64,9 @@ module RemoteDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ NfsDriver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── NfsDriver ────────────────────────────────────────────────
     [<Fact>]
-    let ``NfsDriver CreateVolume sans server lÃ¨ve RpcException InvalidArgument`` () =
+    let ``NfsDriver CreateVolume sans server lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -79,7 +79,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``NfsDriver CreateVolume sans export lÃ¨ve RpcException InvalidArgument`` () =
+    let ``NfsDriver CreateVolume sans export lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -92,7 +92,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``NfsDriver CreateVolume sans options lÃ¨ve RpcException InvalidArgument`` () =
+    let ``NfsDriver CreateVolume sans options lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -101,9 +101,9 @@ module RemoteDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ CloudAwsDriver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── CloudAwsDriver ──────────────────────────────────────────
     [<Fact>]
-    let ``CloudAwsDriver CreateVolume sans fsId lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudAwsDriver CreateVolume sans fsId lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -116,7 +116,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``CloudAwsDriver CreateVolume sans region lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudAwsDriver CreateVolume sans region lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -129,7 +129,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``CloudAwsDriver CreateVolume sans options lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudAwsDriver CreateVolume sans options lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -138,9 +138,9 @@ module RemoteDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ CloudGcpDriver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── CloudGcpDriver ──────────────────────────────────────────
     [<Fact>]
-    let ``CloudGcpDriver CreateVolume sans ipAddress lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudGcpDriver CreateVolume sans ipAddress lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -153,7 +153,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``CloudGcpDriver CreateVolume sans volumeName lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudGcpDriver CreateVolume sans volumeName lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -166,7 +166,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``CloudGcpDriver CreateVolume sans options lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudGcpDriver CreateVolume sans options lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -175,9 +175,9 @@ module RemoteDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ CloudAzureDriver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── CloudAzureDriver ────────────────────────────────────────
     [<Fact>]
-    let ``CloudAzureDriver CreateVolume sans storageAccount lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudAzureDriver CreateVolume sans storageAccount lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -191,7 +191,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``CloudAzureDriver CreateVolume sans shareName lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudAzureDriver CreateVolume sans shareName lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -205,7 +205,7 @@ module RemoteDriverTests =
             cleanupDir tempRoot
 
     [<Fact>]
-    let ``CloudAzureDriver CreateVolume sans options lÃ¨ve RpcException InvalidArgument`` () =
+    let ``CloudAzureDriver CreateVolume sans options lève RpcException InvalidArgument`` () =
         let tempRoot = createTempDir ()
 
         try
@@ -216,7 +216,7 @@ module RemoteDriverTests =
         finally
             cleanupDir tempRoot
 
-    // â”€â”€ AzureNetUse.buildArgs : la clÃ© ne transite jamais par argv â”€â”€
+    // ── AzureNetUse.buildArgs : la clé ne transite jamais par argv ──
 
     [<Fact>]
     let ``AzureNetUse buildArgs place la cible le partage et l'utilisateur AZURE`` () =
@@ -243,30 +243,30 @@ module RemoteDriverTests =
                 (Map.ofList [ "storageAccount", "acc"; "storageKey", "SECRET-VALUE-123" ])
 
         Assert.DoesNotContain("SECRET-VALUE-123", args)
-        // Â« * Â» force la lecture du secret sur l'entrÃ©e standard.
+        // « * » force la lecture du secret sur l'entrée standard.
         Assert.Contains("*", args)
 
     [<Fact>]
-    let ``AzureNetUse buildArgs sans storageKey lÃ¨ve RpcException InvalidArgument`` () =
+    let ``AzureNetUse buildArgs sans storageKey lève RpcException InvalidArgument`` () =
         assertInvalidArg (fun () ->
             AzureNetUse.buildArgs @"\\a\f\s" @"X:\m" (Map.ofList [ "storageAccount", "a" ])
             |> ignore)
 
     [<Fact>]
-    let ``AzureNetUse buildArgs sans storageAccount lÃ¨ve RpcException InvalidArgument`` () =
+    let ``AzureNetUse buildArgs sans storageAccount lève RpcException InvalidArgument`` () =
         assertInvalidArg (fun () ->
             AzureNetUse.buildArgs @"\\a\f\s" @"X:\m" (Map.ofList [ "storageKey", "K" ])
             |> ignore)
 
-    // â”€â”€ NfsMountOptions.buildOptions : allow-list stricte â”€â”€â”€â”€â”€â”€â”€
+    // ── NfsMountOptions.buildOptions : allow-list stricte ───────
 
     [<Fact>]
     let ``NfsMountOptions buildOptions ajoute toujours nolock`` () =
         NfsMountOptions.buildOptions Map.empty |> should equal "nolock"
 
     [<Fact>]
-    let ``NfsMountOptions buildOptions conserve uniquement les options autorisÃ©es`` () =
-        // Map itÃ©rÃ©e par ordre de clÃ©s : ro < timeo < vers.
+    let ``NfsMountOptions buildOptions conserve uniquement les options autorisées`` () =
+        // Map itérée par ordre de clés : ro < timeo < vers.
         let opts =
             Map.ofList [ "ro", ""
                          "vers", "4.1"
@@ -284,17 +284,17 @@ module RemoteDriverTests =
         |> should equal "nolock,hard,soft"
 
     [<Fact>]
-    let ``NfsMountOptions buildOptions normalise la casse des clÃ©s`` () =
+    let ``NfsMountOptions buildOptions normalise la casse des clés`` () =
         NfsMountOptions.buildOptions (Map.ofList [ "RO", ""; "Vers", "3" ])
         |> should equal "nolock,ro,vers=3"
 
     [<Fact>]
-    let ``NfsMountOptions buildOptions rejette une option utilisateur non autorisÃ©e avec valeur sensible`` () =
+    let ``NfsMountOptions buildOptions rejette une option utilisateur non autorisée avec valeur sensible`` () =
         let opts = Map.ofList [ "sec", "krb5i"; "port", "2049;rm" ]
 
         NfsMountOptions.buildOptions opts |> should equal "nolock"
 
-    // â”€â”€ RemotePath : branches de succÃ¨s â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── RemotePath : branches de succès ──────────────────────────
 
     [<Fact>]
     let ``NfsDriver RemotePath construit server:export`` () =

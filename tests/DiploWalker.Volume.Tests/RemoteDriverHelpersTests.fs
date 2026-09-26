@@ -29,7 +29,7 @@ module RemoteDriverHelpersTests =
 
     let parseJson (json: string) = JsonDocument.Parse(json).RootElement
 
-    // â”€â”€ extractRemotePathFromInfo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── extractRemotePathFromInfo ─────────────────────────────────
 
     [<Fact>]
     let ``extractRemotePathFromInfo retourne le chemin distant`` () =
@@ -46,7 +46,7 @@ module RemoteDriverHelpersTests =
 
         ex.StatusCode |> should equal StatusCode.NotFound
 
-    // â”€â”€ parseMergedOpts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── parseMergedOpts ──────────────────────────────────────────
 
     [<Fact>]
     let ``parseMergedOpts avec options vides retourne uniquement driverOpts`` () =
@@ -75,7 +75,7 @@ module RemoteDriverHelpersTests =
         let info = parseJson """{}"""
         RemoteDriverHelpers.parseMergedOpts info "" |> should equal Map.empty<string, string>
 
-    // â”€â”€ mountVolume â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── mountVolume ──────────────────────────────────────────────
 
     [<Fact>]
     let ``mountVolume appelle mountFn avec le chemin distant et les options fusionnees`` () =
@@ -122,7 +122,7 @@ module RemoteDriverHelpersTests =
         finally
             cleanupDir root
 
-    // â”€â”€ unmountVolume â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── unmountVolume ────────────────────────────────────────────
 
     [<Fact>]
     let ``unmountVolume appelle unmountFn et retourne Demonte`` () =
@@ -148,7 +148,7 @@ module RemoteDriverHelpersTests =
 
         ex.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€ unmountNfsLike â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── unmountNfsLike ───────────────────────────────────────────
 
     [<Fact>]
     let ``unmountNfsLike propage RpcException si umount echoue`` () =

@@ -8,7 +8,7 @@ module IsoSourceTests =
     open FsUnit.Xunit
     open DiploWalker.Disk
 
-    // â”€â”€ IsoSource.fromBytes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── IsoSource.fromBytes ────────────────────────────────────────────
 
     [<Fact>]
     let ``fromBytes retourne la bonne longueur`` () =
@@ -59,7 +59,7 @@ module IsoSourceTests =
         let result = src.ReadBytes 100L 10
         result.Length |> should equal 0
 
-    // â”€â”€ IsoSource.fromStream â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── IsoSource.fromStream ───────────────────────────────────────────
 
     [<Fact>]
     let ``fromStream retourne la bonne longueur`` () =
@@ -108,7 +108,7 @@ module IsoSourceTests =
         let result = src.ReadBytes 100L 10
         result.Length |> should equal 0
 
-    // â”€â”€ IsoSource.sanitizeName â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── IsoSource.sanitizeName ─────────────────────────────────────────
 
     [<Fact>]
     let ``sanitizeName remplace les caracteres interdits`` () =

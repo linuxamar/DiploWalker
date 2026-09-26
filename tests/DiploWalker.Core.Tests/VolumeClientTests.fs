@@ -143,7 +143,7 @@ module VolumeClientTests =
             use c = newClient address
             let response = c.PruneVolumesAsync() |> run
             response.Count |> should equal 0
-            response.Message |> should equal "0 volume(s) supprimÃ©(s)")
+            response.Message |> should equal "0 volume(s) supprimé(s)")
 
     [<Fact>]
     let ``Les gardes rejettent nome et identifiants vides`` () =

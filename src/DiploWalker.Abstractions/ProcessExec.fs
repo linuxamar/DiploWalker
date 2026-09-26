@@ -4,29 +4,29 @@ open System
 open System.Diagnostics
 open System.Threading.Tasks
 
-/// ExÃ©cution de processus externes de maniÃ¨re sÃ»re : lectures asynchrones
+/// Exécution de processus externes de manière sûre : lectures asynchrones
 /// concurrentes de stdout/stderr (pas de blocage quand un tampon de pipe est
-/// plein), dÃ©lai d'attente couvrant la durÃ©e totale, et arrÃªt (Kill) en cas de
-/// dÃ©passement.
+/// plein), délai d'attente couvrant la durée totale, et arrêt (Kill) en cas de
+/// dépassement.
 [<RequireQualifiedAccess>]
 module ProcessExec =
 
     let private defaultTimeoutMs = 60_000
 
-    /// DÃ©lai d'attente pour les opÃ©rations de montage/dÃ©montage (30 secondes).
+    /// Délai d'attente pour les opérations de montage/démontage (30 secondes).
     [<Literal>]
     let MountTimeoutMs = 30_000
 
     let private timeoutMsOr (timeoutMs: int option) = defaultArg timeoutMs defaultTimeoutMs
 
-    /// ExÃ©cute `fileName` avec `args` et renvoie `(code, stdout, stderr)`.
-    /// `input` (Some texte) alimente l'entrÃ©e standard ; `timeoutMs` borne la
-    /// durÃ©e totale (None = 60 s) et dÃ©clenche un `Kill` en cas de dÃ©passement ;
-    /// `ct` annule Ã©galement l'exÃ©cution (arrÃªt du processus).
+    /// Exécute `fileName` avec `args` et renvoie `(code, stdout, stderr)`.
+    /// `input` (Some texte) alimente l'entrée standard ; `timeoutMs` borne la
+    /// durée totale (None = 60 s) et déclenche un `Kill` en cas de dépassement ;
+    /// `ct` annule également l'exécution (arrêt du processus).
     ///
     /// L'attente utilise Process.WaitForExit(millisecondes) (attente synchrone
-    /// sur le handle du processus) pendant que stdout/stderr sont purgÃ©s en
-    /// arriÃ¨re-plan par ReadToEndAsync : aucune attente async-sur-sync ni blocage
+    /// sur le handle du processus) pendant que stdout/stderr sont purgés en
+    /// arrière-plan par ReadToEndAsync : aucune attente async-sur-sync ni blocage
     /// de pipe.
     let runWithResult
         (fileName: string)
@@ -53,7 +53,7 @@ module ProcessExec =
         use proc = Process.Start(psi)
 
         if isNull proc then
-            failwithf "Impossible de dÃ©marrer le processus '%s'" fileName
+            failwithf "Impossible de démarrer le processus '%s'" fileName
 
         let stdoutRead = proc.StandardOutput.ReadToEndAsync()
         let stderrRead = proc.StandardError.ReadToEndAsync()
@@ -66,8 +66,8 @@ module ProcessExec =
 
         match ct with
         | Some token when token.CanBeCanceled ->
-            // Attente dÃ©coupÃ©e pour rÃ©agir Ã  l'annulation, sans bloquer les
-            // lectures pipes (purgÃ©es en arriÃ¨re-plan).
+            // Attente découpée pour réagir à l'annulation, sans bloquer les
+            // lectures pipes (purgées en arrière-plan).
             let mutable exited = false
 
             while not exited && not token.IsCancellationRequested do
@@ -78,7 +78,7 @@ module ProcessExec =
                     proc.Kill(true)
                 with _ ->
                     ()
-                raise (OperationCanceledException(sprintf "ExÃ©cution annulÃ©e pour '%s'" fileName, token))
+                raise (OperationCanceledException(sprintf "Exécution annulée pour '%s'" fileName, token))
         | _ ->
             if not (proc.WaitForExit(timeout)) then
                 try
@@ -91,15 +91,15 @@ module ProcessExec =
                 with _ ->
                     ()
 
-                raise (TimeoutException(sprintf "DÃ©lai d'attente dÃ©passÃ© pour '%s' (%dms)" fileName timeout))
+                raise (TimeoutException(sprintf "Délai d'attente dépassé pour '%s' (%dms)" fileName timeout))
 
         let stdout = stdoutRead.GetAwaiter().GetResult()
         let stderr = stderrRead.GetAwaiter().GetResult()
         (proc.ExitCode, stdout, stderr)
 
-    /// ExÃ©cute `fileName` avec `args` et renvoie la sortie standard. LÃ¨ve si le
-    /// dÃ©lai d'attente est dÃ©passÃ© ou si le processus Ã©choue (la sortie d'erreur
-    /// est jointe au message). ParamÃ¨tres comme `runWithResult`.
+    /// Exécute `fileName` avec `args` et renvoie la sortie standard. Lève si le
+    /// délai d'attente est dépassé ou si le processus échoue (la sortie d'erreur
+    /// est jointe au message). Paramètres comme `runWithResult`.
     let run
         (fileName: string)
         (args: seq<string>)
@@ -116,11 +116,11 @@ module ProcessExec =
                 else
                     " " + stderr.Trim()
 
-            raise (InvalidOperationException(sprintf "La commande '%s' a Ã©chouÃ© (code %d):%s" fileName code detail))
+            raise (InvalidOperationException(sprintf "La commande '%s' a échoué (code %d):%s" fileName code detail))
 
         stdout
 
-    /// ExÃ©cute sans retourner la sortie (usage montage/dÃ©montage).
+    /// Exécute sans retourner la sortie (usage montage/démontage).
     let runUnit
         (fileName: string)
         (args: seq<string>)
@@ -131,19 +131,19 @@ module ProcessExec =
         run fileName args timeoutMs input ct |> ignore
 
     /// Encode un script PowerShell en Base64 UTF-16LE pour -EncodedCommand.
-    /// Ã‰vite l'injection via la ligne de commande (les valeurs sont dans le script,
+    /// Évite l'injection via la ligne de commande (les valeurs sont dans le script,
     /// pas dans argv).
     let private encodeScript (script: string) =
         let bytes = System.Text.Encoding.Unicode.GetBytes(script)
         Convert.ToBase64String(bytes)
 
-    /// Retire le prÃ©fixe Â« - Â» Ã©ventuel d'un nom de paramÃ¨tre PowerShell.
+    /// Retire le préfixe « - » éventuel d'un nom de paramètre PowerShell.
     let private stripParamPrefix (name: string) =
         if name.Length > 0 && name.[0] = '-' then name.Substring(1) else name
 
-    /// Allowlist stricte des noms de paramÃ¨tres interpolÃ©s dans le script
-    /// PowerShell : `[A-Za-z_][A-Za-z0-9_]*` (avec prÃ©fixe Â« - Â» optionnel).
-    /// Refuse tout nom qui s'Ã©carte de ce jeu pour empÃªcher l'injection.
+    /// Allowlist stricte des noms de paramètres interpolés dans le script
+    /// PowerShell : `[A-Za-z_][A-Za-z0-9_]*` (avec préfixe « - » optionnel).
+    /// Refuse tout nom qui s'écarte de ce jeu pour empêcher l'injection.
     let private validateParameterNames (api: string) (parameters: (string * string) list) =
         for name, _ in parameters do
             let bare = stripParamPrefix name
@@ -154,15 +154,15 @@ module ProcessExec =
                 && bare |> Seq.forall (fun c -> Char.IsAsciiLetterOrDigit c || c = '_')
 
             if not ok then
-                invalidArg "parameters" (sprintf "%s : nom de paramÃ¨tre PowerShell invalide '%s'" api name)
+                invalidArg "parameters" (sprintf "%s : nom de paramètre PowerShell invalide '%s'" api name)
 
-    /// ExÃ©cute un script PowerShell encodÃ© avec les paramÃ¨tres nommÃ©s.
-    /// Les VALEURS sont injectÃ©es dans le script lui-mÃªme en Base64 UTF-8 :
+    /// Exécute un script PowerShell encodé avec les paramètres nommés.
+    /// Les VALEURS sont injectées dans le script lui-même en Base64 UTF-8 :
     /// `-EncodedCommand` n'offre aucun canal de liaison pour un bloc param(),
-    /// et stdin n'est pas consommÃ© par le script â€” l'injection Base64 garantit
-    /// le binding rÃ©el des variables $pN sans risque d'injection.
-    /// PartagÃ© par runPowerShell et runPowerShellScript.
-    /// Attention : API bloquante â€” ne jamais appeler depuis le thread UI.
+    /// et stdin n'est pas consommé par le script — l'injection Base64 garantit
+    /// le binding réel des variables $pN sans risque d'injection.
+    /// Partagé par runPowerShell et runPowerShellScript.
+    /// Attention : API bloquante — ne jamais appeler depuis le thread UI.
     let private runEncodedScript
         (scriptBody: string)
         (parameters: (string * string) list)
@@ -202,15 +202,15 @@ module ProcessExec =
                 else
                     " " + stderr.Trim()
 
-            raise (InvalidOperationException(sprintf "PowerShell a Ã©chouÃ© (code %d):%s" code detail))
+            raise (InvalidOperationException(sprintf "PowerShell a échoué (code %d):%s" code detail))
 
         stdout
 
-    /// ExÃ©cute une commande PowerShell avec les paramÃ¨tres spÃ©cifiÃ©s.
-    /// Utilise -EncodedCommand pour un binding sÃ»r des paramÃ¨tres (pas de concatÃ©nation dans argv).
-    /// Les NOMS de paramÃ¨tres sont interpolÃ©s dans le script : ils sont donc
-    /// jaugÃ©s par une allowlist stricte ([-,]?[A-Za-z_][A-Za-z0-9_]*) pour
-    /// empÃªcher toute injection depuis un nom contrÃ´lÃ© par un appelant.
+    /// Exécute une commande PowerShell avec les paramètres spécifiés.
+    /// Utilise -EncodedCommand pour un binding sûr des paramètres (pas de concaténation dans argv).
+    /// Les NOMS de paramètres sont interpolés dans le script : ils sont donc
+    /// jaugés par une allowlist stricte ([-,]?[A-Za-z_][A-Za-z0-9_]*) pour
+    /// empêcher toute injection depuis un nom contrôlé par un appelant.
     let runPowerShell
         (command: string)
         (parameters: (string * string) list)
@@ -231,8 +231,8 @@ module ProcessExec =
 
         runEncodedScript scriptBody parameters timeoutMs ct
 
-    /// ExÃ©cute un script PowerShell brut avec des paramÃ¨tres nommÃ©s.
-    /// Utilise -EncodedCommand pour un binding sÃ»r des paramÃ¨tres.
+    /// Exécute un script PowerShell brut avec des paramètres nommés.
+    /// Utilise -EncodedCommand pour un binding sûr des paramètres.
     let runPowerShellScript
         (scriptBody: string)
         (parameters: (string * string) list)

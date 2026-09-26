@@ -93,7 +93,7 @@ module DiskFormatTests =
         let p = tempFile ()
 
         try
-            // Signature rÃ©elle VirtualBox : 7F 10 DA BE (LE) Ã  l'offset 0x40.
+            // Signature réelle VirtualBox : 7F 10 DA BE (LE) à l'offset 0x40.
             let header = Array.zeroCreate<byte> 72
             [| 0x7Fuy; 0x10uy; 0xDAuy; 0xBEuy |].CopyTo(header, 0x40)
             writeBytes p header
@@ -106,7 +106,7 @@ module DiskFormatTests =
         let p = tempFile ()
 
         try
-            // Magic UDIF Â« koly Â» dans le TRAILER de 512 octets.
+            // Magic UDIF « koly » dans le TRAILER de 512 octets.
             let foot = Array.zeroCreate<byte> 512
             Encoding.ASCII.GetBytes("koly").CopyTo(foot, 0)
             writeBytes p foot
@@ -119,7 +119,7 @@ module DiskFormatTests =
         let p = tempFile ()
 
         try
-            // Magic alignÃ© sur Parallels.readHeader (LE 0x30617261 â†’ Â« ara0 Â»).
+            // Magic aligné sur Parallels.readHeader (LE 0x30617261 → « ara0 »).
             let header = [| 0x61uy; 0x72uy; 0x61uy; 0x30uy |]
             writeBytes p header
             DiskFormat.detect p |> should equal DiskFormat.Parallels
@@ -131,7 +131,7 @@ module DiskFormatTests =
         let p = tempFile ()
 
         try
-            // Signature ISO9660 Â« CD001 Â» Ã  l'offset 0x8001 (bloc 16 : 2048*16+1).
+            // Signature ISO9660 « CD001 » à l'offset 0x8001 (bloc 16 : 2048*16+1).
             let data = Array.zeroCreate<byte> 40000
             Encoding.ASCII.GetBytes("CD001").CopyTo(data, 0x8001)
             writeBytes p data
@@ -185,7 +185,7 @@ module DiskFormatTests =
 
         DiskFormat.isDiskImage format |> should equal false
 
-    // â”€â”€ toString â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── toString ───────────────────────────────────────────────────────
 
     [<Fact>]
     let ``toString retourne qcow2`` () =

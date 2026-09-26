@@ -10,7 +10,7 @@ open Xunit
 open FsUnit.Xunit
 open DiploWalker.Container.Services
 
-/// Handler HTTP statique qui rÃ©pond selon l'URL demandÃ©e.
+/// Handler HTTP statique qui répond selon l'URL demandée.
 type StubHttpHandler(reply: Uri -> string) =
     inherit HttpMessageHandler()
 
@@ -19,7 +19,7 @@ type StubHttpHandler(reply: Uri -> string) =
         response.Content <- new StringContent(reply request.RequestUri, Encoding.UTF8, "application/json")
         Task.FromResult(response)
 
-/// Handler qui renvoie toujours le code d'Ã©tat demandÃ© (erreurs serveur simulÃ©es).
+/// Handler qui renvoie toujours le code d'état demandé (erreurs serveur simulées).
 type ErrorHttpHandler(status: HttpStatusCode) =
     inherit HttpMessageHandler()
 
@@ -199,7 +199,7 @@ let ``searchWith ignore un fournisseur en erreur et garde les autres resultats``
         { new HttpMessageHandler() with
             override _.SendAsync(request: HttpRequestMessage, _ct: CancellationToken) =
                 if request.RequestUri.Host = "hub.docker.com" then
-                    Task.FromException<HttpResponseMessage>(HttpRequestException("erreur rÃ©seau"))
+                    Task.FromException<HttpResponseMessage>(HttpRequestException("erreur réseau"))
                 else
                     let response = new HttpResponseMessage(HttpStatusCode.OK)
                     response.Content <-
@@ -269,8 +269,8 @@ let ``searchWith interroge les fournisseurs en parallele`` () =
 
     sw.Stop()
 
-    // Trois fournisseurs Ã  250 ms chacun : en parallÃ¨le la durÃ©e reste proche
-    // de 250 ms, trÃ¨s en dessous de la somme sÃ©quentielle (~750 ms).
+    // Trois fournisseurs à 250 ms chacun : en parallèle la durée reste proche
+    // de 250 ms, très en dessous de la somme séquentielle (~750 ms).
     hits.Length |> should equal 3
     sw.ElapsedMilliseconds < 600L |> should equal true
 

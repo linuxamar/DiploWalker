@@ -113,8 +113,8 @@ module CniParsingTests =
         ifname |> should equal "eth0"
         ipv4 |> should equal "10.0.0.2/24"
 
-        // SPEC CNI : dns.nameservers n'est PAS un repli de passerelle â€” un DNS
-        // public ne doit jamais Ãªtre retournÃ© comme passerelle du rÃ©seau.
+        // SPEC CNI : dns.nameservers n'est PAS un repli de passerelle — un DNS
+        // public ne doit jamais être retourné comme passerelle du réseau.
         gw |> should equal ""
 
     [<Fact>]

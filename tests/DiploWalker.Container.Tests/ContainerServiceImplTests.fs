@@ -22,8 +22,8 @@ module ContainerServiceImplTests =
     open DiploWalker.Disk
     open DiploWalker.Container
 
-    /// Faux mounter : retourne un volume dont le HostPath dÃ©rive de la source
-    /// et enregistre les libÃ©rations (writeBack) pour les assertions.
+    /// Faux mounter : retourne un volume dont le HostPath dérive de la source
+    /// et enregistre les libérations (writeBack) pour les assertions.
     type MockDiskMounter() =
         let mutable mounted = ResizeArray<string * string * bool>()
         let mutable disposed = ResizeArray<string>()
@@ -164,7 +164,7 @@ module ContainerServiceImplTests =
             let req: StartContainerRequest = { Id = "c1"; Attach = false }
             let result = (svc :> IContainerService).StartContainer(req, ctx).Result
             result.State |> should equal ContainerState.Running
-            result.Message |> should equal "Conteneur dÃ©marrÃ©"
+            result.Message |> should equal "Conteneur démarré"
         finally
             try
                 Directory.Delete(dir, true)
@@ -270,7 +270,7 @@ module ContainerServiceImplTests =
         let req: StopContainerRequest = { Id = "c1"; TimeoutSeconds = 0 }
         let result = (svc :> IContainerService).StopContainer(req, ctx).Result
         result.State |> should equal ContainerState.Stopped
-        result.Message |> should equal "Conteneur arrÃªtÃ©"
+        result.Message |> should equal "Conteneur arrêté"
         mock.StopCalled.["c1"] |> should equal 10
 
     [<Fact>]
@@ -321,7 +321,7 @@ module ContainerServiceImplTests =
         let req = { Id = "c1"; Force = false }
         let result = (svc :> IContainerService).DeleteContainer(req, ctx).Result
         result.Success |> should equal true
-        result.Message |> should equal "Conteneur supprimÃ©"
+        result.Message |> should equal "Conteneur supprimé"
         mock.DeletedContainers |> should contain "c1"
 
     [<Fact>]
@@ -871,7 +871,7 @@ module ContainerServiceImplTests =
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€â”€ Montages de volumes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Montages de volumes ───────────────────────────────────────────────
 
     let tempVolume (name: string) = Path.Combine(Path.GetTempPath(), name)
 
@@ -983,7 +983,7 @@ module ContainerServiceImplTests =
         (svc :> IContainerService).DeleteContainer(req, ctx).Result |> ignore
         mounter.Disposed |> should be Empty
 
-    // â”€â”€â”€ Pause / Unpause â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Pause / Unpause ────────────────────────────────────────────────────
 
     [<Fact>]
     let ``PauseContainer retourne Paused et appelle le client`` () =
@@ -1066,7 +1066,7 @@ module ContainerServiceImplTests =
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€â”€ Wait â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Wait ───────────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``WaitContainer retourne le code de sortie quand le conteneur s'arrete`` () =
@@ -1093,7 +1093,7 @@ module ContainerServiceImplTests =
         let result = (svc :> IContainerService).WaitContainer(req, ctx).Result
         result.ExitCode |> should equal 0
         result.State |> should equal ContainerState.Stopped
-        result.Message |> shouldContain "terminÃ©"
+        result.Message |> shouldContain "terminé"
 
     [<Fact>]
     let ``WaitContainer retourne un timeout quand le conteneur tourne toujours`` () =
@@ -1134,7 +1134,7 @@ module ContainerServiceImplTests =
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Update ─────────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``UpdateContainer retourne success et met a jour les limites`` () =
@@ -1165,7 +1165,7 @@ module ContainerServiceImplTests =
 
         let result = (svc :> IContainerService).UpdateContainer(req, ctx).Result
         result.Success |> should equal true
-        result.Message |> shouldContain "mis Ã  jour"
+        result.Message |> shouldContain "mis à jour"
         mock.UpdatedContainers |> should contain "c1"
 
     [<Fact>]
@@ -1187,7 +1187,7 @@ module ContainerServiceImplTests =
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€â”€ Prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Prune ──────────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``PruneContainers supprime uniquement les conteneurs arretes`` () =
@@ -1241,7 +1241,7 @@ module ContainerServiceImplTests =
         let result = (svc :> IContainerService).PruneImages(req, ctx).Result
         result.Deleted.Count |> should equal 0
 
-    // â”€â”€â”€ Stats en streaming â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Stats en streaming ─────────────────────────────────────────────────
 
     [<Fact>]
     let ``GetContainerStatsStream ecrit les metriques dans le stream`` () =
@@ -1293,7 +1293,7 @@ module ContainerServiceImplTests =
         Assert.Throws<RpcException>(fun () -> (svc :> IContainerService).GetContainerStatsStream(req, ctx) |> ignore)
         |> ignore
 
-    // â”€â”€â”€ Ã‰vÃ©nements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Événements ─────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``WatchEvents emet un evenement create pour un conteneur existant`` () =
@@ -1335,7 +1335,7 @@ module ContainerServiceImplTests =
         first.Id |> should equal "c1"
         first.Status |> should equal "created"
 
-    // â”€â”€â”€ Exec bidirectionnel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Exec bidirectionnel ────────────────────────────────────────────────
 
     [<Fact>]
     let ``ExecContainerStream renvoie la sortie du processus`` () =
@@ -1387,7 +1387,7 @@ module ContainerServiceImplTests =
         System.Text.Encoding.UTF8.GetString(outputs.[0].Data)
         |> should equal "bonjour-exec"
 
-    // â”€â”€â”€ Copie de fichiers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Copie de fichiers ──────────────────────────────────────────────────
 
     [<Fact>]
     let ``ReadFile retourne les donnees decodees en base64`` () =
@@ -1460,7 +1460,7 @@ module ContainerServiceImplTests =
 
         let result = (svc :> IContainerService).WriteFile(req, ctx).Result
         result.Success |> should equal true
-        result.Message |> should equal "Fichier Ã©crit"
+        result.Message |> should equal "Fichier écrit"
 
     [<Fact>]
     let ``WriteFile avec chemin vide leve InvalidArgument`` () =
@@ -1478,7 +1478,7 @@ module ContainerServiceImplTests =
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€â”€ Commit / Export / Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Commit / Export / Import ───────────────────────────────────────────
 
     [<Fact>]
     let ``CommitImage cree l'image depuis le conteneur`` () =
@@ -1573,7 +1573,7 @@ module ContainerServiceImplTests =
         result.ImageRefs.[0] |> should equal "archive-import"
         result.Message |> shouldContain "1 image"
 
-    // â”€â”€â”€ Registres â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Registres ──────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``LoginRegistry retourne success`` () =
@@ -1777,7 +1777,7 @@ module ContainerServiceImplTests =
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
         rpcEx.Status.Detail |> shouldContain "non pris en charge"
 
-    // â”€â”€â”€ Namespaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Namespaces ─────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``CreateNamespace retourne success et appelle le client`` () =
@@ -1825,10 +1825,10 @@ module ContainerServiceImplTests =
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
 
-    // â”€â”€â”€ Recherche d'images (SearchRegistry) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Recherche d'images (SearchRegistry) ────────────────────────────────
 
-    /// Handler HTTP dÃ©terministe pour les tests de SearchRegistry : rÃ©pond
-    /// selon l'hÃ´te demandÃ© et mÃ©morise les URL consultÃ©es.
+    /// Handler HTTP déterministe pour les tests de SearchRegistry : répond
+    /// selon l'hôte demandé et mémorise les URL consultées.
     type CapturingSearchHandler() as this =
         inherit HttpMessageHandler()
 
@@ -1839,8 +1839,8 @@ module ContainerServiceImplTests =
         member _.Client = client
 
         override _.SendAsync(request: HttpRequestMessage, _ct: CancellationToken) =
-            // Les fournisseurs sont interrogÃ©s en parallÃ¨le : protÃ©ger la liste
-            // des URL consultÃ©es (ResizeArray non thread-safe).
+            // Les fournisseurs sont interrogés en parallèle : protéger la liste
+            // des URL consultées (ResizeArray non thread-safe).
             lock urls (fun () -> urls.Add(request.RequestUri.ToString()))
 
             let body =
@@ -1874,7 +1874,7 @@ module ContainerServiceImplTests =
 
         let rpcEx = ex.InnerException :?> RpcException
         rpcEx.StatusCode |> should equal StatusCode.InvalidArgument
-        rpcEx.Status.Detail |> shouldContain "La requÃªte de recherche ne peut pas Ãªtre vide"
+        rpcEx.Status.Detail |> shouldContain "La requête de recherche ne peut pas être vide"
 
     [<Fact>]
     let ``SearchRegistry interroge tous les registres autorises par defaut`` () =
@@ -1923,7 +1923,7 @@ module ContainerServiceImplTests =
         let result = (svc :> IContainerService).SearchRegistry(req, ctx).Result
 
         result.Message |> shouldContain "myregistry.azurecr.io"
-        result.Message |> shouldContain "non autorisÃ©"
+        result.Message |> shouldContain "non autorisé"
         result.Results.Count |> should equal 3
         handler.Urls |> List.exists (fun u -> u.Contains "azurecr.io") |> should equal false
 

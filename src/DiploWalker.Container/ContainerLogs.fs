@@ -4,19 +4,19 @@ open System
 open System.IO
 open DiploWalker.Abstractions
 
-/// Gestion des journaux des conteneurs capturÃ©s au dÃ©marrage.
-/// containerd v2 a supprimÃ© 'ctr task logs' : les logs sont donc capturÃ©s
+/// Gestion des journaux des conteneurs capturés au démarrage.
+/// containerd v2 a supprimé 'ctr task logs' : les logs sont donc capturés
 /// dans un fichier par conteneur (%ProgramData%\Diplo\logs\<id>.log) lorsque
-/// le conteneur est dÃ©marrÃ© en mode dÃ©tachÃ©, puis relus par GetContainerLogs.
+/// le conteneur est démarré en mode détaché, puis relus par GetContainerLogs.
 module ContainerLogs =
 
     let private logsDirRef = ref (Path.Combine(AppPaths.dataRoot (), "logs"))
 
-    /// Remplace le rÃ©pertoire des journaux (utile pour les tests).
+    /// Remplace le répertoire des journaux (utile pour les tests).
     let setLogsDir (dir: string) =
         lock logsDirRef (fun () -> logsDirRef := dir)
 
-    /// RÃ©pertoire courant des journaux de conteneurs.
+    /// Répertoire courant des journaux de conteneurs.
     let logsDir () = !logsDirRef
 
     /// Chemin du journal d'un conteneur.
@@ -32,12 +32,12 @@ module ContainerLogs =
         else
             (FileInfo(file)).Length
 
-    /// Lit puis dÃ©code les lignes d'une fenÃªtre [startOffset, startOffset + byteLimit)
-    /// sans allouer un seul tampon gÃ©ant : StreamReader consomme le flux par blocs
-    /// (256 Ko) et dÃ©code les caractÃ¨res multi-octets continÃ»ment, y compris Ã 
-    /// cheval sur les limites de blocs. Une ligne dont la lecture dÃ©passe la
-    /// fenÃªtre est dÃ©libÃ©rÃ©ment ignorÃ©e (dÃ©gÃ©nÃ©rescence d'un journal de plus de
-    /// 1 Go), ce qui borne strictement la mÃ©moire aux lignes retournÃ©es.
+    /// Lit puis décode les lignes d'une fenêtre [startOffset, startOffset + byteLimit)
+    /// sans allouer un seul tampon géant : StreamReader consomme le flux par blocs
+    /// (256 Ko) et décode les caractères multi-octets continûment, y compris à
+    /// cheval sur les limites de blocs. Une ligne dont la lecture dépasse la
+    /// fenêtre est délibérément ignorée (dégénérescence d'un journal de plus de
+    /// 1 Go), ce qui borne strictement la mémoire aux lignes retournées.
     let private readLines (fs: FileStream) (startOffset: int64) (byteLimit: int64) : string array =
         fs.Position <- startOffset
 
@@ -59,12 +59,12 @@ module ContainerLogs =
 
         lines.ToArray()
 
-    /// Lit les lignes du journal jusqu'Ã  une marque (watermark) capturÃ©e AVANT
-    /// la lecture, et retourne (lignes, octets consommÃ©s). UtilisÃ© par le suivi :
+    /// Lit les lignes du journal jusqu'à une marque (watermark) capturée AVANT
+    /// la lecture, et retourne (lignes, octets consommés). Utilisé par le suivi :
     /// lire d'abord la longueur puis le contenu garantit qu'aucun octet n'est ni
-    /// sautÃ© (Ã©criture entre lecture et mesure) ni dupliquÃ© au redÃ©marrage.
-    /// La fenÃªtre est bornÃ©e Ã  1 Go et lue par blocs (voir readLines) pour
-    /// limiter la mÃ©moire sur journaux gÃ©ants.
+    /// sauté (écriture entre lecture et mesure) ni dupliqué au redémarrage.
+    /// La fenêtre est bornée à 1 Go et lue par blocs (voir readLines) pour
+    /// limiter la mémoire sur journaux géants.
     let readUpToCore (id: string) (tail: int) (since: string) : string array * int64 =
         let file = fileFor id
 
@@ -98,8 +98,8 @@ module ContainerLogs =
 
                 lines, watermark
 
-    /// Lit le journal d'un conteneur de maniÃ¨re bornÃ©e (fenÃªtre au plus 1 Go,
-    /// partagÃ©e avec readUpToCore) : derniÃ¨res `tail` lignes, filtrÃ©es par
+    /// Lit le journal d'un conteneur de manière bornée (fenêtre au plus 1 Go,
+    /// partagée avec readUpToCore) : dernières `tail` lignes, filtrées par
     /// `since`. Retourne [||] si aucun journal n'existe.
     let read (id: string) (tail: int) (since: string) : string array =
         readUpToCore id tail since |> fst
@@ -108,13 +108,13 @@ module ContainerLogs =
         try Ok(readUpToCore id tail since)
         with ex -> Error ex.Message
 
-    /// Lit les lignes complÃ¨tes ajoutÃ©es au journal depuis l'octet `fromOffset`.
+    /// Lit les lignes complètes ajoutées au journal depuis l'octet `fromOffset`.
     ///
-    /// Retourne (lignes, nouvel offset). Une ligne partielle (non terminÃ©e par
-    /// un saut de ligne) n'est pas retournÃ©e et l'offset n'avance pas, afin de
-    /// la relire lors d'un prochain appel une fois le dÃ©limiteur Ã©crit.
-    /// Le repÃ©rage du dernier dÃ©limiteur se fait par balayage arriÃ¨re par blocs
-    /// de 256 Ko â€” aucune allocation proportionnelle Ã  la taille du journal.
+    /// Retourne (lignes, nouvel offset). Une ligne partielle (non terminée par
+    /// un saut de ligne) n'est pas retournée et l'offset n'avance pas, afin de
+    /// la relire lors d'un prochain appel une fois le délimiteur écrit.
+    /// Le repérage du dernier délimiteur se fait par balayage arrière par blocs
+    /// de 256 Ko — aucune allocation proportionnelle à la taille du journal.
     let readIncrementalCore (id: string) (fromOffset: int64) : string array * int64 =
         let file = fileFor id
 
@@ -125,8 +125,8 @@ module ContainerLogs =
                 new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
 
             let length = fs.Length
-            // Fichier tronquÃ© ou recrÃ©Ã© : repartir du dÃ©but, sinon l'offset
-            // resterait bloquÃ© pour toujours et le suivi ne livrerait plus rien.
+            // Fichier tronqué ou recréé : repartir du début, sinon l'offset
+            // resterait bloqué pour toujours et le suivi ne livrerait plus rien.
             let fromOffset = min fromOffset length
 
             if length <= fromOffset then
@@ -147,7 +147,7 @@ module ContainerLogs =
                         let r = fs.Read(buffer, total, len - total)
 
                         if r <= 0 then
-                            failwith "Lecture tronquÃ©e du journal"
+                            failwith "Lecture tronquée du journal"
 
                         total <- total + r
 

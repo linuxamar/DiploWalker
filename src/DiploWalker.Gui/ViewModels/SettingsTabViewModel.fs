@@ -6,8 +6,8 @@ open DiploWalker.Core
 open DiploWalker.Core.Output
 open DiploWalker.Abstractions
 
-/// Onglet Â« ParamÃ¨tres Â» : lecture et Ã©dition de la configuration client `DiploWalker.json`
-/// (adresses des services conteneurs, volumes et rÃ©seaux).
+/// Onglet « Paramètres » : lecture et édition de la configuration client `DiploWalker.json`
+/// (adresses des services conteneurs, volumes et réseaux).
 type SettingsTabViewModel(outputPort: IOutputPort) as this =
     inherit ViewModelBase()
 
@@ -91,7 +91,7 @@ type SettingsTabViewModel(outputPort: IOutputPort) as this =
     member private this.Reload() =
         let c, v, n = DiploWalkerConfig.load this.ConfigPath
 
-        // DÃ©fauts alignÃ©s sur la configuration de build (DiploWalkerPorts) :
+        // Défauts alignés sur la configuration de build (DiploWalkerPorts) :
         // Debug 5001-5003, Release 6001-6003.
         containerAddress <- defaultArg c (sprintf "localhost:%d" DiploWalkerPorts.Container)
         volumeAddress <- defaultArg v (sprintf "localhost:%d" DiploWalkerPorts.Volume)

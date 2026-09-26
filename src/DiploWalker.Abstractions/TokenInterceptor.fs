@@ -2,7 +2,7 @@
 
 open Grpc.Core
 
-/// CrÃ©e des CallCredentials qui ajoutent l'en-tÃªte Authorization Ã  partir du token d'authentification.
+/// Crée des CallCredentials qui ajoutent l'en-tête Authorization à partir du token d'authentification.
 /// Utilisation avec Grpc.Net.Client.GrpcChannel :
 ///   let creds = TokenInterceptor.createTokenCredentials ()
 ///   let channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, creds)

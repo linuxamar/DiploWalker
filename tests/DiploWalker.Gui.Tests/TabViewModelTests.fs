@@ -16,7 +16,7 @@ open DiploWalker.Gui.Services
 open DiploWalker.Gui.ViewModels
 open DiploWalker.TestHelpers
 
-// â”€â”€ MockOutputPort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MockOutputPort ──────────────────────────────────────────
 
 [<Fact>]
 let ``MockOutputPort.WriteLine enregistre le message`` () =
@@ -43,7 +43,7 @@ let ``MockOutputPort.WriteWarning enregistre l'avertissement`` () =
     port.Warnings |> should contain "warn"
 
 [<Fact>]
-let ``MockOutputPort.Clear remet tout Ã  zÃ©ro`` () =
+let ``MockOutputPort.Clear remet tout à zéro`` () =
     let port = MockOutputPort()
     (port :> IOutputPort).WriteLine("x")
     (port :> IOutputPort).WriteError("y")
@@ -51,7 +51,7 @@ let ``MockOutputPort.Clear remet tout Ã  zÃ©ro`` () =
     port.Messages |> should be Empty
     port.Errors |> should be Empty
 
-// â”€â”€ ComposeTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ComposeTabViewModel ─────────────────────────────────────
 
 [<Fact>]
 let ``ComposeTabViewModel expose les 6 commandes ICommand`` () =
@@ -83,7 +83,7 @@ let ``ComposeTabViewModel proprietes declenchent PropertyChanged`` () =
     changed |> should contain "ComposeFilePath"
     changed |> should contain "ComposeServiceName"
 
-// â”€â”€ ContainerTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ContainerTabViewModel ───────────────────────────────────
 
 [<Fact>]
 let ``ContainerTabViewModel expose les commandes ICommand`` () =
@@ -155,7 +155,7 @@ let ``ContainerTabViewModel proprietes sette declenchent PropertyChanged`` () =
     changed |> should contain "ContainerNameInput"
     changed |> should contain "ContainerMounts"
 
-// â”€â”€ VolumeTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── VolumeTabViewModel ──────────────────────────────────────
 
 [<Fact>]
 let ``VolumeTabViewModel expose les 10 commandes ICommand`` () =
@@ -188,7 +188,7 @@ let ``VolumeTabViewModel etat initial`` () =
     vm.VolumeNameInput |> should equal ""
     vm.Volumes.Count |> should equal 0
 
-// â”€â”€ NetworkTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–ˆ
+// ── NetworkTabViewModel ─────────────────────────────────────█
 
 [<Fact>]
 let ``NetworkTabViewModel expose les 8 commandes ICommand`` () =
@@ -211,7 +211,7 @@ let ``NetworkTabViewModel etat initial`` () =
     vm.NetworkNameInput |> should equal ""
     vm.Networks.Count |> should equal 0
 
-// â”€â”€ SettingsTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SettingsTabViewModel ────────────────────────────────
 
 let private withConfigHome (action: string -> unit) =
     let old = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
@@ -239,13 +239,13 @@ let ``SettingsTabViewModel expose les commandes ICommand`` () =
         vm.ReloadCommand |> should not' (be Null))
 
 [<Fact>]
-let ``SettingsTabViewModel etat initial avec valeurs par dÃ©faut`` () =
+let ``SettingsTabViewModel etat initial avec valeurs par défaut`` () =
     withConfigHome (fun home ->
         let port = MockOutputPort()
         let vm = new SettingsTabViewModel(port)
         vm.ConfigPath |> should equal (Path.Combine(home, "DiploWalker.json"))
 
-        // DÃ©fauts alignÃ©s sur DiploWalkerPorts : Debug 5001-5003, Release 6001-6003.
+        // Défauts alignés sur DiploWalkerPorts : Debug 5001-5003, Release 6001-6003.
         vm.ContainerAddress |> should equal (sprintf "localhost:%d" DiploWalkerPorts.Container)
         vm.VolumeAddress |> should equal (sprintf "localhost:%d" DiploWalkerPorts.Volume)
         vm.NetworkAddress |> should equal (sprintf "localhost:%d" DiploWalkerPorts.Network))
@@ -311,7 +311,7 @@ let ``SettingsTabViewModel ReloadCommand relit la configuration depuis le disque
         vm.ContainerAddress |> should equal "http://localhost:8001"
         vm.StatusMessage |> should haveSubstring "relue")
 
-// â”€â”€ Journaux (source injectÃ©e) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Journaux (source injectée) ─────────────────────────────────
 
 let private fakeEntry (line: string) =
     { ContainerLogEntry.Timestamp = "2026-08-12T10:00:00Z"
@@ -361,13 +361,13 @@ let ``ContainerTabViewModel GetContainerLogs en mode suivi emet chaque ligne au 
     vm.ContainerIdInput <- "c1"
     vm.ContainerFollow <- true
     (vm.GetContainerLogsCommand :> ICommand).Execute(null)
-    // le flux Ã©met 2 lignes : chacune est Ã©crite immÃ©diatement
+    // le flux émet 2 lignes : chacune est écrite immédiatement
     waitUntil (fun () -> port.Messages.Length = 2) |> should equal true
     port.Messages |> should contain "[2026-08-12T10:00:00Z] ligne 1"
     port.Messages |> should contain "[2026-08-12T10:00:00Z] ligne 2"
 
 [<Fact>]
-let ``ContainerTabViewModel GetContainerLogs sans suivi affiche l'instantanÃ© en bloc`` () =
+let ``ContainerTabViewModel GetContainerLogs sans suivi affiche l'instantané en bloc`` () =
     let port = MockOutputPort()
     let vm = new ContainerTabViewModel(port, logsSourceFactory = fakeLogsSource)
     vm.ContainerIdInput <- "c1"
@@ -377,7 +377,7 @@ let ``ContainerTabViewModel GetContainerLogs sans suivi affiche l'instantanÃ© 
     Assert.Contains("[2026-08-12T10:00:00Z] ligne 1", port.Successes.Head)
     Assert.Contains("ligne 2", port.Successes.Head)
 
-// â”€â”€ ComposeEditorViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ComposeEditorViewModel ────────────────────────────────────
 
 [<Fact>]
 let ``ComposeEditorViewModel etat initial`` () =
@@ -463,7 +463,7 @@ let ``ComposeEditorViewModel proprietes declenchent PropertyChanged`` () =
     changed |> should contain "FilePath"
     changed |> should contain "SyntaxHighlightingName"
 
-// â”€â”€ ComposeTabViewModel â€” nouvelles fonctionnalitÃ©s â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ComposeTabViewModel — nouvelles fonctionnalités ───────────
 
 [<Fact>]
 let ``ComposeTabViewModel expose les commandes de l'editeur`` () =
@@ -507,7 +507,7 @@ let ``ComposeTabViewModel ValidateComposeFile sans fichier affiche avertissement
     let port = MockOutputPort()
     let vm = new ComposeTabViewModel(port)
     (vm.ValidateComposeFileCommand :> System.Windows.Input.ICommand).Execute(null)
-    // Pas de fichier chargÃ©, validate fonctionne sur le document vide
+    // Pas de fichier chargé, validate fonctionne sur le document vide
     waitUntil (fun () -> vm.ComposeEditor.Errors.Count > 0) |> should equal true
 
 [<Fact>]
@@ -515,7 +515,7 @@ let ``ComposeTabViewModel SaveComposeFile sans fichier ouvre le dialogue`` () =
     let port = MockOutputPort()
     let vm = new ComposeTabViewModel(port)
     (vm.SaveComposeFileCommand :> System.Windows.Input.ICommand).Execute(null)
-    // Sans storageProvider, Ã©crit un avertissement
+    // Sans storageProvider, écrit un avertissement
     port.Warnings
     |> Seq.exists (fun w -> w.Contains "Fournisseur")
     |> should equal true

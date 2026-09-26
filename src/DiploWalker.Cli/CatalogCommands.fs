@@ -9,8 +9,8 @@ open DiploWalker.Core.Clients
 open DiploWalker.Core.Output
 open Spectre.Console.Cli
 
-/// RÃ©sout le chemin du fichier catalogue : l'option --catalog prime sur le
-/// chemin par dÃ©faut (DIPLO_CONFIG_HOME ou rÃ©pertoire courant).
+/// Résout le chemin du fichier catalogue : l'option --catalog prime sur le
+/// chemin par défaut (DIPLO_CONFIG_HOME ou répertoire courant).
 module private Paths =
     let catalogPath (settingsPath: string) =
         if String.IsNullOrWhiteSpace settingsPath then
@@ -18,7 +18,7 @@ module private Paths =
         else
             settingsPath
 
-// â”€â”€ list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── list ──────────────────────────────────────────────────────────
 type CatalogListSettings() =
     inherit CommandSettings()
 
@@ -39,7 +39,7 @@ type CatalogListCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 output.WriteTable(
                     ResizeArray(entries),
-                    [| "RÃ©fÃ©rence"; "Note"; "AjoutÃ©"; "Mis Ã  jour" |],
+                    [| "Référence"; "Note"; "Ajouté"; "Mis à jour" |],
                     fun e ->
                         [| e.Ref
                            defaultArg e.Note ""
@@ -50,7 +50,7 @@ type CatalogListCommand(output: IOutputPort, clients: IDiploClients) =
             return 0
         }
 
-// â”€â”€ add â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── add ───────────────────────────────────────────────────────────
 type CatalogAddSettings() =
     inherit CommandSettings()
 
@@ -73,7 +73,7 @@ type CatalogAddCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace settings.Ref then
-                output.WriteError("La rÃ©fÃ©rence de l'image est requise")
+                output.WriteError("La référence de l'image est requise")
                 return 1
             else
                 let path = Paths.catalogPath settings.CatalogPath
@@ -81,7 +81,7 @@ type CatalogAddCommand(output: IOutputPort, clients: IDiploClients) =
                 if not settings.NoPull then
                     use client = clients.CreateContainerClient()
                     let! response = client.PullImageAsync(image = settings.Ref, ct = ct)
-                    output.WriteSuccess(sprintf "Image %s tÃ©lÃ©chargÃ©e - %s" settings.Ref response.Message)
+                    output.WriteSuccess(sprintf "Image %s téléchargée - %s" settings.Ref response.Message)
 
                 let note =
                     if String.IsNullOrWhiteSpace settings.Note then
@@ -90,14 +90,14 @@ type CatalogAddCommand(output: IOutputPort, clients: IDiploClients) =
                         Some settings.Note
 
                 if ImageCatalog.add path settings.Ref note then
-                    output.WriteSuccess(sprintf "Image %s ajoutÃ©e au catalogue" settings.Ref)
+                    output.WriteSuccess(sprintf "Image %s ajoutée au catalogue" settings.Ref)
                 else
-                    output.WriteWarning(sprintf "L'image %s est dÃ©jÃ  au catalogue" settings.Ref)
+                    output.WriteWarning(sprintf "L'image %s est déjà au catalogue" settings.Ref)
 
                 return 0
         }
 
-// â”€â”€ update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── update ────────────────────────────────────────────────────────
 type CatalogUpdateSettings() =
     inherit CommandSettings()
 
@@ -120,7 +120,7 @@ type CatalogUpdateCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace settings.Ref then
-                output.WriteError("La rÃ©fÃ©rence de l'image est requise")
+                output.WriteError("La référence de l'image est requise")
                 return 1
             else
                 let path = Paths.catalogPath settings.CatalogPath
@@ -129,7 +129,7 @@ type CatalogUpdateCommand(output: IOutputPort, clients: IDiploClients) =
                 if hasTarget then
                     use client = clients.CreateContainerClient()
                     let! response = client.TagImageAsync(source = settings.Ref, target = settings.Target, ct = ct)
-                    output.WriteSuccess(sprintf "Image %s Ã©tiquetÃ©e en %s - %s" settings.Ref settings.Target response.Message)
+                    output.WriteSuccess(sprintf "Image %s étiquetée en %s - %s" settings.Ref settings.Target response.Message)
 
                 let newRef =
                     if hasTarget then
@@ -144,14 +144,14 @@ type CatalogUpdateCommand(output: IOutputPort, clients: IDiploClients) =
                         Some settings.Note
 
                 if ImageCatalog.update path settings.Ref newRef note then
-                    output.WriteSuccess(sprintf "EntrÃ©e %s mise Ã  jour dans le catalogue" settings.Ref)
+                    output.WriteSuccess(sprintf "Entrée %s mise à jour dans le catalogue" settings.Ref)
                     return 0
                 else
                     output.WriteError(sprintf "L'image %s n'est pas au catalogue" settings.Ref)
                     return 1
         }
 
-// â”€â”€ delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── delete ────────────────────────────────────────────────────────
 type CatalogDeleteSettings() =
     inherit CommandSettings()
 
@@ -171,7 +171,7 @@ type CatalogDeleteCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace settings.Ref then
-                output.WriteError("La rÃ©fÃ©rence de l'image est requise")
+                output.WriteError("La référence de l'image est requise")
                 return 1
             else
                 let path = Paths.catalogPath settings.CatalogPath
@@ -181,7 +181,7 @@ type CatalogDeleteCommand(output: IOutputPort, clients: IDiploClients) =
                     return 0
                 elif settings.NoDocker then
                     ImageCatalog.remove path settings.Ref |> ignore
-                    output.WriteSuccess(sprintf "Image %s retirÃ©e du catalogue" settings.Ref)
+                    output.WriteSuccess(sprintf "Image %s retirée du catalogue" settings.Ref)
                     return 0
                 else
                     use client = clients.CreateContainerClient()
@@ -192,7 +192,7 @@ type CatalogDeleteCommand(output: IOutputPort, clients: IDiploClients) =
                         return 1
                     else
                         ImageCatalog.remove path settings.Ref |> ignore
-                        output.WriteSuccess(sprintf "Image %s supprimÃ©e et retirÃ©e du catalogue" settings.Ref)
+                        output.WriteSuccess(sprintf "Image %s supprimée et retirée du catalogue" settings.Ref)
                         return 0
         }
 

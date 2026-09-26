@@ -11,8 +11,8 @@ open DiploWalker.Grpc.Container
 open DiploWalker.Grpc.Network
 open DiploWalker.Grpc.Volume
 
-/// Contrat des appels gRPC conteneurs consommÃ©s par les commandes CLI.
-/// InjectÃ© via IDiploClients pour permettre les tests unitaires sans serveur.
+/// Contrat des appels gRPC conteneurs consommés par les commandes CLI.
+/// Injecté via IDiploClients pour permettre les tests unitaires sans serveur.
 type IContainerClient =
     inherit IDisposable
 
@@ -115,23 +115,23 @@ type IContainerClient =
     abstract member WriteFileAsync:
         id: string * path: string * data: byte[] * ?ct: CancellationToken -> Task<WriteFileResponse>
 
-    /// Flux d'export d'une image (tar), consommÃ© par la commande CLI.
+    /// Flux d'export d'une image (tar), consommé par la commande CLI.
     abstract member ExportImageStream:
         imageRef: string * ?namespaceName: string * ?ct: CancellationToken -> IAsyncEnumerable<ImageChunk>
 
     abstract member ImportImage:
         chunks: IAsyncEnumerable<ImageChunk> * ?ct: CancellationToken -> Task<ImportImageResponse>
 
-    /// Flux d'Ã©vÃ©nements conteneurs (create, start, stop, exit, pause,
-    /// unpause, delete) jusqu'Ã  l'annulation via `ct`.
+    /// Flux d'événements conteneurs (create, start, stop, exit, pause,
+    /// unpause, delete) jusqu'à l'annulation via `ct`.
     abstract member WatchEventsStream: ?ct: CancellationToken -> IAsyncEnumerable<ContainerEvent>
 
-    /// Flux de mÃ©triques Ã©mis au fil de l'eau jusqu'Ã  l'annulation via `ct`.
+    /// Flux de métriques émis au fil de l'eau jusqu'à l'annulation via `ct`.
     abstract member GetContainerStatsStream:
         id: string * ?intervalSeconds: int * ?ct: CancellationToken ->
             IAsyncEnumerable<GetContainerStatsResponse>
 
-/// Contrat des appels gRPC rÃ©seaux consommÃ©s par les commandes CLI.
+/// Contrat des appels gRPC réseaux consommés par les commandes CLI.
 type INetworkClient =
     inherit IDisposable
 
@@ -178,7 +178,7 @@ type INetworkClient =
 
     abstract member PruneNetworksAsync: ?ct: CancellationToken -> Task<PruneNetworksResponse>
 
-/// Contrat des appels gRPC volumes consommÃ©s par les commandes CLI.
+/// Contrat des appels gRPC volumes consommés par les commandes CLI.
 type IVolumeClient =
     inherit IDisposable
 

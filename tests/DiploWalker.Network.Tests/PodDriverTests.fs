@@ -34,10 +34,10 @@ module PodDriverTests =
             info.Subnet |> should equal "10.244.0.0/24"
             info.Gateway |> should equal "10.244.0.1"
             String.IsNullOrEmpty(info.Id) |> should equal false
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
-    let ``Create avec option max_containers personnalisÃ©e`` () =
+    let ``Create avec option max_containers personnalisée`` () =
         let driver = createDriver ()
         let options = Map.ofList [ ("max_containers", "64") ]
 
@@ -45,7 +45,7 @@ module PodDriverTests =
         | Ok info ->
             info.Name |> should equal "pod-limit"
             info.Driver |> should equal NetworkDriver.``Pod``
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Inspect retourne Ok pour un pod existant`` () =
@@ -55,8 +55,8 @@ module PodDriverTests =
         | Ok created ->
             match driver.Inspect(created.Id) with
             | Ok info -> info.Name |> should equal "inspect-pod"
-            | Error msg -> failwithf "Inspect a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "Inspect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Inspect retourne Error pour un id inexistant`` () =
@@ -74,8 +74,8 @@ module PodDriverTests =
         | Ok created ->
             match driver.Remove(created.Id, false) with
             | Ok _ -> ()
-            | Error msg -> failwithf "Remove a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "Remove a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Remove retourne Error pour un id inexistant`` () =
@@ -86,7 +86,7 @@ module PodDriverTests =
         | Ok _ -> failwith "Remove devrait retourner Error"
 
     [<Fact>]
-    let ``List retourne tous les pods crÃ©Ã©s`` () =
+    let ``List retourne tous les pods créés`` () =
         let driver = createDriver ()
 
         driver.Create("list-pod-1", "10.244.4.0/24", "10.244.4.1", "", Map.empty, Map.empty)
@@ -100,7 +100,7 @@ module PodDriverTests =
             pods.Length |> should equal 2
             pods |> List.exists (fun p -> p.Name = "list-pod-1") |> should equal true
             pods |> List.exists (fun p -> p.Name = "list-pod-2") |> should equal true
-        | Error msg -> failwithf "List a Ã©chouÃ©: %s" msg
+        | Error msg -> failwithf "List a échoué: %s" msg
 
     [<Fact>]
     let ``Connect retourne Ok avec un endpoint pour un conteneur`` () =
@@ -113,8 +113,8 @@ module PodDriverTests =
                 String.IsNullOrEmpty(ep.EndpointId) |> should equal false
                 ep.Message.Contains("conn-pod") |> should equal true
                 ep.Message.Contains("1/32") |> should equal true
-            | Error msg -> failwithf "Connect a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Disconnect retourne Ok`` () =
@@ -124,8 +124,8 @@ module PodDriverTests =
         | Ok created ->
             match driver.Disconnect(created.Id, "container-123", "endpoint-456", false) with
             | Ok _ -> ()
-            | Error msg -> failwithf "Disconnect a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "Disconnect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Remove puis List retourne liste vide`` () =
@@ -137,16 +137,16 @@ module PodDriverTests =
 
             match driver.List() with
             | Ok pods -> pods.Length |> should equal 0
-            | Error msg -> failwithf "List a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "List a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
-    let ``Create Ã©choue avec nom invalide`` () =
+    let ``Create échoue avec nom invalide`` () =
         let driver = createDriver ()
 
         match driver.Create("invalid name with spaces", "10.244.0.0/24", "10.244.0.1", "", Map.empty, Map.empty) with
         | Error _ -> ()
-        | Ok _ -> failwith "Create devrait Ã©chouer avec un nom invalide"
+        | Ok _ -> failwith "Create devrait échouer avec un nom invalide"
 
     [<Fact>]
     let ``Connect avec adresse IP statique`` () =
@@ -156,13 +156,13 @@ module PodDriverTests =
         | Ok created ->
             match driver.Connect(created.Id, "container-ip", "", Some "10.244.9.10", Map.empty) with
             | Ok ep -> ep.Ipv4Address |> should equal "10.244.9.10"
-            | Error msg -> failwithf "Connect a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
-    // â”€â”€â”€ SÃ©mantique de suppression (force) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Sémantique de suppression (force) ──────────────────────────────
 
     [<Fact>]
-    let ``Remove est refusÃ© quand le pod a des endpoints actifs sans force`` () =
+    let ``Remove est refusé quand le pod a des endpoints actifs sans force`` () =
         let driver = createDriver ()
 
         match driver.Create("force-pod", "10.244.10.0/24", "10.244.10.1", "", Map.empty, Map.empty) with
@@ -171,9 +171,9 @@ module PodDriverTests =
             | Ok _ ->
                 match driver.Remove(created.Id, false) with
                 | Error msg -> msg |> should haveSubstring "endpoint(s) actif(s)"
-                | Ok _ -> failwith "Remove devrait Ãªtre refusÃ© avec des endpoints actifs sans force"
-            | Error msg -> failwithf "Connect a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+                | Ok _ -> failwith "Remove devrait être refusé avec des endpoints actifs sans force"
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Remove avec force supprime un pod avec endpoints actifs`` () =
@@ -187,11 +187,11 @@ module PodDriverTests =
             | Ok _ ->
                 match driver.Inspect(created.Id) with
                 | Error _ -> ()
-                | Ok _ -> failwith "Inspect devrait retourner Error aprÃ¨s suppression"
-            | Error msg -> failwithf "Remove avec force a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+                | Ok _ -> failwith "Inspect devrait retourner Error après suppression"
+            | Error msg -> failwithf "Remove avec force a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
-    // â”€â”€â”€ Limite de conteneurs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Limite de conteneurs ───────────────────────────────────────────
 
     [<Fact>]
     let ``Create avec max_containers invalide utilise la valeur par defaut`` () =
@@ -202,8 +202,8 @@ module PodDriverTests =
         | Ok created ->
             match driver.Connect(created.Id, "c1", "", None, Map.empty) with
             | Ok ep -> ep.Message.Contains("1/32") |> should equal true
-            | Error msg -> failwithf "Connect a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Create avec max_containers zero utilise la valeur par defaut`` () =
@@ -214,8 +214,8 @@ module PodDriverTests =
         | Ok created ->
             match driver.Connect(created.Id, "c1", "", None, Map.empty) with
             | Ok ep -> ep.Message.Contains("1/32") |> should equal true
-            | Error msg -> failwithf "Connect a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Create avec max_containers superieur a la limite utilise la valeur par defaut`` () =
@@ -226,8 +226,8 @@ module PodDriverTests =
         | Ok created ->
             match driver.Connect(created.Id, "c1", "", None, Map.empty) with
             | Ok ep -> ep.Message.Contains("1/32") |> should equal true
-            | Error msg -> failwithf "Connect a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+            | Error msg -> failwithf "Connect a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Connect refuse quand la limite de conteneurs est atteinte`` () =
@@ -242,9 +242,9 @@ module PodDriverTests =
             match driver.Connect(created.Id, "c3", "", None, Map.empty) with
             | Error msg -> msg |> should haveSubstring "limite de 2 conteneurs"
             | Ok _ -> failwith "Connect devrait refuser quand la limite est atteinte"
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
-    // â”€â”€â”€ Prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Prune ──────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``Prune supprime les pods sans endpoint actif`` () =
@@ -262,9 +262,9 @@ module PodDriverTests =
 
                 match driver.List() with
                 | Ok nets -> nets.Length |> should equal 0
-                | Error msg -> failwithf "List a Ã©chouÃ©: %s" msg
-            | Error msg -> failwithf "Prune a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+                | Error msg -> failwithf "List a échoué: %s" msg
+            | Error msg -> failwithf "Prune a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 
     [<Fact>]
     let ``Prune conserve les pods avec endpoints actifs`` () =
@@ -280,7 +280,7 @@ module PodDriverTests =
 
                 match driver.List() with
                 | Ok nets -> nets.Length |> should equal 1
-                | Error msg -> failwithf "List a Ã©chouÃ©: %s" msg
-            | Error msg -> failwithf "Prune a Ã©chouÃ©: %s" msg
-        | Error msg -> failwithf "Create a Ã©chouÃ©: %s" msg
+                | Error msg -> failwithf "List a échoué: %s" msg
+            | Error msg -> failwithf "Prune a échoué: %s" msg
+        | Error msg -> failwithf "Create a échoué: %s" msg
 

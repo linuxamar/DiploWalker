@@ -13,8 +13,8 @@ open DiploWalker.Grpc.Network
 open DiploWalker.Grpc.Volume
 open DiploWalker.TestHelpers
 
-// Tests des Comportements rÃ©els des ViewModels via l'injection de clients
-// simulÃ©s (IContainerClient/INetworkClient/IVolumeClient). Les rÃ©ponses gRPC
+// Tests des Comportements réels des ViewModels via l'injection de clients
+// simulés (IContainerClient/INetworkClient/IVolumeClient). Les réponses gRPC
 // sont des enregistrements [<CLIMutable>] : construction avec syntaxe { }.
 
 let private waitUntil (predicate: unit -> bool) =
@@ -25,7 +25,7 @@ let private waitUntil (predicate: unit -> bool) =
 
     predicate ()
 
-// â”€â”€ ContainerTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ContainerTabViewModel ──────────────────────────────────────
 
 let private containerVm (port: MockOutputPort) (fake: FakeContainerClient) =
     new DiploWalker.Gui.ViewModels.ContainerTabViewModel(
@@ -446,11 +446,11 @@ let ``ContainerTabViewModel StopFollowEvents annule le flux d'evenements`` () =
     (vm.GetContainerEventsCommand :> ICommand).Execute(null)
     waitUntil (fun () -> port.Messages.Length = 1) |> should equal true
     (vm.StopFollowEventsCommand :> ICommand).Execute(null)
-    // Un nouvel appel annule le prÃ©cÃ©dent sans success final dupliquÃ©.
+    // Un nouvel appel annule le précédent sans success final dupliqué.
     (vm.GetContainerEventsCommand :> ICommand).Execute(null)
     waitUntil (fun () -> fake.EventsCalls = 2) |> should equal true
 
-// â”€â”€ VolumeTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── VolumeTabViewModel ─────────────────────────────────────────
 
 let private volumeVm (port: MockOutputPort) (fake: FakeVolumeClient) =
     new DiploWalker.Gui.ViewModels.VolumeTabViewModel(port, volumeClientFactory = fun () -> fake :> IVolumeClient)
@@ -511,7 +511,7 @@ let ``VolumeTabViewModel RemoveVolume en succes ecrit le bilan`` () =
 [<Fact>]
 let ``VolumeTabViewModel MountVolume ecrit le bilan`` () =
     let port = MockOutputPort()
-    let fake = new FakeVolumeClient(mount = { State = MountState.Mounted; Mountpoint = "/mnt"; Message = "montÃ©" })
+    let fake = new FakeVolumeClient(mount = { State = MountState.Mounted; Mountpoint = "/mnt"; Message = "monté" })
     let vm = volumeVm port fake
     vm.VolumeIdInput <- "v1"
     vm.VolumeTargetPath <- "C:\\mount"
@@ -536,14 +536,14 @@ let ``VolumeTabViewModel UnmountVolume ecrit le bilan`` () =
 let ``VolumeTabViewModel PruneVolumes ecrit le bilan`` () =
     let port = MockOutputPort()
     let fake =
-        new FakeVolumeClient(prune = { VolumesDeleted = List<string>(); Count = 0; Message = "nettoyÃ©" })
+        new FakeVolumeClient(prune = { VolumesDeleted = List<string>(); Count = 0; Message = "nettoyé" })
 
     let vm = volumeVm port fake
     (vm.PruneVolumesCommand :> ICommand).Execute(null)
     waitUntil (fun () -> fake.PruneCalls = 1) |> should equal true
     port.Successes.Head |> should haveSubstring "Volumes nettoyés"
 
-// â”€â”€ NetworkTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── NetworkTabViewModel ────────────────────────────────────────
 
 let private networkVm (port: MockOutputPort) (fake: FakeNetworkClient) =
     new DiploWalker.Gui.ViewModels.NetworkTabViewModel(port, networkClientFactory = fun () -> fake :> INetworkClient)
@@ -605,7 +605,7 @@ let ``NetworkTabViewModel RemoveNetwork en succes ecrit le bilan`` () =
 [<Fact>]
 let ``NetworkTabViewModel ConnectContainer ecrit le bilan`` () =
     let port = MockOutputPort()
-    let fake = new FakeNetworkClient(connect = { EndpointId = ""; Ipv4Address = ""; MacAddress = ""; Message = "connectÃ©" })
+    let fake = new FakeNetworkClient(connect = { EndpointId = ""; Ipv4Address = ""; MacAddress = ""; Message = "connecté" })
     let vm = networkVm port fake
     vm.NetworkIdInput <- "n1"
     vm.NetworkContainerId <- "c1"
@@ -643,14 +643,14 @@ let ``NetworkTabViewModel RunCniPlugin en succes ecrit le bilan`` () =
 let ``NetworkTabViewModel PruneNetworks ecrit le bilan`` () =
     let port = MockOutputPort()
     let fake =
-        new FakeNetworkClient(prune = { NetworksDeleted = List<string>(); Count = 0; Message = "nettoyÃ©" })
+        new FakeNetworkClient(prune = { NetworksDeleted = List<string>(); Count = 0; Message = "nettoyé" })
 
     let vm = networkVm port fake
     (vm.PruneNetworksCommand :> ICommand).Execute(null)
     waitUntil (fun () -> fake.PruneCalls = 1) |> should equal true
     port.Successes.Head |> should haveSubstring "Réseaux nettoyés"
 
-// â”€â”€ ComposeTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ComposeTabViewModel ─────────────────────────────────────────
 
 let private composeVm (port: MockOutputPort) (fake: FakeContainerClient) =
     new DiploWalker.Gui.ViewModels.ComposeTabViewModel(

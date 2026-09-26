@@ -19,9 +19,9 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
 
     let generateId () = Guid.NewGuid().ToString("N")
 
-    /// ClÃ©s sensibles Ã  supprimer avant persistance (credentials en clair interdit).
-    /// Couvre les variantes Azure/AWS/GCP : clÃ© de stockage, clÃ© de compte, SAS,
-    /// chaÃ®ne de connexion â€” sans elles, la clÃ© finit en clair dans meta.json.
+    /// Clés sensibles à supprimer avant persistance (credentials en clair interdit).
+    /// Couvre les variantes Azure/AWS/GCP : clé de stockage, clé de compte, SAS,
+    /// chaîne de connexion — sans elles, la clé finit en clair dans meta.json.
     let sensitiveKeys =
         set
             [ "password"
@@ -47,7 +47,7 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
             m |> Map.filter (fun k _ -> not (sensitiveKeys.Contains(k.ToLowerInvariant())))
 
         let safeOpts = sanitize driverOpts
-        // Les labels subissent le mÃªme filtre : y glisser un Â« password Â»
+        // Les labels subissent le même filtre : y glisser un « password »
         // contournerait sinon l'intention du filtre des driverOpts.
         let safeLabels = sanitize labels
 
@@ -71,7 +71,7 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
             try
                 Directory.Delete(dir, true)
             with :? DirectoryNotFoundException ->
-                Log.Warning("RÃ©pertoire dÃ©jÃ  supprimÃ©: {VolumeId}", id)
+                Log.Warning("Répertoire déjà supprimé: {VolumeId}", id)
 
             true
         else
@@ -108,7 +108,7 @@ type RemoteVolumeStore(dataRoot: string, driverName: string) =
 
     member _.VolumeExists(id: string) = File.Exists(metaPath id)
 
-    /// Supprime tous les volumes enregistrÃ©s et retourne la liste des identifiants supprimÃ©s.
+    /// Supprime tous les volumes enregistrés et retourne la liste des identifiants supprimés.
     member this.PruneAll() =
         let volumes = this.ListVolumes()
 

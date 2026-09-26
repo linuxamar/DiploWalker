@@ -31,7 +31,7 @@ module MessageSerializationTests =
           HealthCheck = Unchecked.defaultof<HealthCheckConfig> }
 
     [<Fact>]
-    let ``CreateContainerRequest round-trip prï¿½serve les collections renseignï¿½es`` () =
+    let ``CreateContainerRequest round-trip préserve les collections renseignées`` () =
         let request = freshCreateContainerRequest ()
         request.Name <- "demo"
         request.Image <- "nginx:latest"
