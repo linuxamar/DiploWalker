@@ -1,7 +1,7 @@
 ﻿<Project>
 
   <PropertyGroup>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <!--
       Traitement des avertissements du compilateur en erreurs : toute
       nouvelle alerte fait échouer le build (qualité maintenue par le CI).
