@@ -16,12 +16,87 @@ let private defaultTokenPath = Path.Combine(authTokenDir, "auth-token.json")
 /// Un verrou garde l'échange pour les redirections de tests concurrents.
 let private tokenPathRef = ref defaultTokenPath
 
-/// Redirige le fichier de token (utile pour les tests).
-let setTokenPath (path: string) =
-    lock tokenPathRef (fun () -> tokenPathRef := path)
-
 /// Chemin courant du fichier de token.
 let tokenPath () = !tokenPathRef
+
+/// Cache du token avec TTL pour éviter les lectures disque répétées.
+/// Le token est rechargé uniquement quand le cache expire ou que le fichier change.
+type private TokenCache() =
+    let mutable cachedToken: string option = None
+    let mutable lastWriteUtc: DateTime = DateTime.MinValue
+    let mutable lastLoadUtc: DateTime = DateTime.MinValue
+    let mutable lastExpiredLogUtc: DateTime = DateTime.MinValue
+    let cacheTtl = TimeSpan.FromSeconds(5.0)
+    let lockObj = obj ()
+
+    let loadFromDisk () =
+        try
+            if File.Exists(tokenPath ()) then
+                let fileInfo = new FileInfo(tokenPath ())
+                let writeTimeUtc = fileInfo.LastWriteTimeUtc
+                let now = DateTime.UtcNow
+                // Recharger si premier accès, TTL expiré, ou fichier modifié
+                if
+                    cachedToken.IsNone
+                    || (now - lastLoadUtc) > cacheTtl
+                    || writeTimeUtc > lastWriteUtc
+                then
+                    let json = File.ReadAllText(tokenPath ())
+
+                    // JsonDocument loue des buffers du pool : à disposer.
+                    use doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
+
+                    let root = doc.RootElement
+                    let token = root.GetProperty("Token").GetString()
+                    let mutable expiresElement = Unchecked.defaultof<JsonElement>
+
+                    if root.TryGetProperty("expiresAt", &expiresElement) then
+                        let expiresAt = expiresElement.GetDateTime()
+
+                        if DateTime.UtcNow > expiresAt then
+                            // Un seul avertissement par minute : sinon chaque requête
+                            // (après expiration du TTL) inonde les logs et le disque.
+                            if (now - lastExpiredLogUtc) > TimeSpan.FromMinutes(1.0) then
+                                Log.Warning("Token expiré le {ExpiresAt}", expiresAt)
+                                lastExpiredLogUtc <- now
+
+                            cachedToken <- None
+                        else
+                            cachedToken <- Some token
+                    else
+                        cachedToken <- Some token
+
+                    lastWriteUtc <- writeTimeUtc
+                    lastLoadUtc <- now
+            else
+                cachedToken <- None
+        with ex ->
+            Log.Warning(ex, "Erreur lors de la lecture du token dans {Path}", tokenPath ())
+            cachedToken <- None
+
+    member _.GetToken() : string option =
+        lock lockObj (fun () ->
+            loadFromDisk ()
+            cachedToken)
+
+    /// Vide le cache. Obligatoire dès que le chemin change : la garde
+    /// `writeTimeUtc > lastWriteUtc` ne détecte pas un nouveau fichier dont
+    /// l'horodatage est identique (écritures rapprochées sur NTFS).
+    member _.Invalidate() =
+        lock lockObj (fun () ->
+            cachedToken <- None
+            lastWriteUtc <- DateTime.MinValue
+            lastLoadUtc <- DateTime.MinValue)
+
+let private tokenCache = TokenCache()
+
+/// Redirige le fichier de token (utile pour les tests).
+let setTokenPath (path: string) =
+    lock tokenPathRef (fun () ->
+        tokenPathRef := path
+        // Le cache mémorise le token du chemin précédent : sans invalidation,
+        // verifyToken validerait le nouveau jeton contre l'ancien.
+        tokenCache.Invalidate())
 
 let private jsonOptions =
     JsonSerializerOptions(WriteIndented = true, PropertyNameCaseInsensitive = true, MaxDepth = 32)
@@ -90,6 +165,10 @@ let saveToken (token: string) =
             File.Replace(tmpPath, tokenPath (), null)
         with :? FileNotFoundException ->
             File.Move(tmpPath, tokenPath ())
+
+        // Le cache vient d'être invalidé : un jeton tout juste écrit (rotation)
+        // ne doit jamais être refusé pendant la durée du TTL.
+        tokenCache.Invalidate()
     with ex ->
         try
             File.Delete(tmpPath)
@@ -98,68 +177,6 @@ let saveToken (token: string) =
 
         Log.Error(ex, "Impossible de sauvegarder le token dans {Path}", tokenPath ())
         failwithf "Sécurité du token compromise: impossible de protéger %s" (tokenPath ())
-
-/// Cache du token avec TTL pour éviter les lectures disque répétées.
-/// Le token est rechargé uniquement quand le cache expire ou que le fichier change.
-type private TokenCache() =
-    let mutable cachedToken: string option = None
-    let mutable lastWriteUtc: DateTime = DateTime.MinValue
-    let mutable lastLoadUtc: DateTime = DateTime.MinValue
-    let mutable lastExpiredLogUtc: DateTime = DateTime.MinValue
-    let cacheTtl = TimeSpan.FromSeconds(5.0)
-    let lockObj = obj ()
-
-    let loadFromDisk () =
-        try
-            if File.Exists(tokenPath ()) then
-                let fileInfo = new FileInfo(tokenPath ())
-                let writeTimeUtc = fileInfo.LastWriteTimeUtc
-                let now = DateTime.UtcNow
-                // Recharger si premier accès, TTL expiré, ou fichier modifié
-                if
-                    cachedToken.IsNone
-                    || (now - lastLoadUtc) > cacheTtl
-                    || writeTimeUtc > lastWriteUtc
-                then
-                    let json = File.ReadAllText(tokenPath ())
-
-                    // JsonDocument loue des buffers du pool : à disposer.
-                    use doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
-
-                    let root = doc.RootElement
-                    let token = root.GetProperty("Token").GetString()
-                    let mutable expiresElement = Unchecked.defaultof<JsonElement>
-
-                    if root.TryGetProperty("expiresAt", &expiresElement) then
-                        let expiresAt = expiresElement.GetDateTime()
-
-                        if DateTime.UtcNow > expiresAt then
-                            // Un seul avertissement par minute : sinon chaque requête
-                            // (après expiration du TTL) inonde les logs et le disque.
-                            if (now - lastExpiredLogUtc) > TimeSpan.FromMinutes(1.0) then
-                                Log.Warning("Token expiré le {ExpiresAt}", expiresAt)
-                                lastExpiredLogUtc <- now
-
-                            cachedToken <- None
-                        else
-                            cachedToken <- Some token
-                    else
-                        cachedToken <- Some token
-
-                    lastWriteUtc <- writeTimeUtc
-                    lastLoadUtc <- now
-            else
-                cachedToken <- None
-        with ex ->
-            Log.Warning(ex, "Erreur lors de la lecture du token dans {Path}", tokenPath ())
-            cachedToken <- None
-
-    member _.GetToken() : string option =
-        lock lockObj (fun () ->
-            loadFromDisk ()
-            cachedToken)
-
-let private tokenCache = TokenCache()
 
 let loadToken () : string option = tokenCache.GetToken()
 
