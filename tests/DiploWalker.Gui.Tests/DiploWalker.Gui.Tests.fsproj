@@ -29,21 +29,21 @@
     <PackageReference Include="FsUnit.xUnit"  />
     <PackageReference Include="Avalonia.Headless"  />
     <!--
-      Le paquet Avalonia est rÃ©fÃ©rencÃ© directement uniquement pour exposer la
-      propriÃ©tÃ© MSBuild $(PkgAvalonia) (chemin du cache NuGet), utilisÃ©e par la
+      Le paquet Avalonia est référencé directement uniquement pour exposer la
+      propriété MSBuild $(PkgAvalonia) (chemin du cache NuGet), utilisée par la
       cible UseLibAvaloniaBase juste en dessous.
     -->
     <PackageReference Include="Avalonia"  />
   </ItemGroup>
 
   <!--
-    Contournement FS0366 : Avalonia fournit des rÃ©fÃ©rences assemblies
-    (ref\net10.0) dont les mÃ©tadonnÃ©es dÃ©clenchent une erreur fantÃ´me
-    Â« Aucune implÃ©mentation pour 'IStorageItem.(... is -not- implementable
-    by user code ...)' Â» quand F# implÃ©mente les interfaces IStorageItem /
+    Contournement FS0366 : Avalonia fournit des références assemblies
+    (ref\net10.0) dont les métadonnées déclenchent une erreur fantôme
+    « Aucune implémentation pour 'IStorageItem.(... is -not- implementable
+    by user code ...)' » quand F# implémente les interfaces IStorageItem /
     IStorageFile / IStorageFolder / IStorageProvider (cf. FakeStorageProvider.fs).
     On remplace donc uniquement l'asset de compilation Avalonia.Base par son
-    assembly lib\net10.0, qui ne prÃ©sente pas ce problÃ¨me.
+    assembly lib\net10.0, qui ne présente pas ce problème.
   -->
   <Target Name="UseLibAvaloniaBase" AfterTargets="ResolvePackageAssets">
     <ItemGroup>

@@ -296,7 +296,7 @@ module FsImageTests =
             File.Exists(Path.Combine(re, "ãƒ†ã‚¹ãƒˆ.txt")) |> should equal true
             File.Exists(Path.Combine(re, "æµ‹è¯•.txt")) |> should equal true
             File.Exists(Path.Combine(re, "í•œêµ­ì–´.txt")) |> should equal true
-            File.ReadAllText(Path.Combine(re, "テスト.txt")) |> should equal "japonais")
+            File.ReadAllText(Path.Combine(re, "ãƒ†ã‚¹ãƒˆ.txt")) |> should equal "japonais")
 
     [<Fact>]
     let ``create gere les fichiers en lecture seule`` () =
