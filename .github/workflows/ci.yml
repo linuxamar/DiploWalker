@@ -50,18 +50,27 @@ jobs:
         shell: pwsh
         run: |
           choco install nsis -y --no-progress
-          # community.chocolatey.org ne publie aucun paquet `git-crypt`
-          # (« The package was not found », vérifié sur runner). Scoop en
-          # publie un, et c'est par là que les postes de l'équipe l'installent.
-          scoop install git-crypt
-          # Le shims de Scoop est déjà dans le PATH de l'image runner ; on le
-          # ajoute quand même, puis on échoue bruyamment si le binaire manque,
-          # plutôt que de laisser l'étape de déchiffrement échouer plus loin.
-          $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
-          if (-not (Get-Command git-crypt -ErrorAction SilentlyContinue)) {
-            throw "git-crypt introuvable dans le PATH après installation Scoop"
+          # Ni community.chocolatey.org (aucun paquet `git-crypt`) ni Scoop
+          # (absent du PATH du runner) ne fournissent l'outil. On prend le
+          # binaire Windows officiel, version épinglée : la 0.8.0 ne publie
+          # aucun asset Windows, et la 0.7.0 est exactement la version validée
+          # en local sur la PKI de ce dépôt.
+          $version = "0.7.0"
+          $exe = Join-Path $env:RUNNER_TEMP "git-crypt.exe"
+          Invoke-WebRequest -Uri "https://github.com/AGWA/git-crypt/releases/download/$version/git-crypt-$version-x86_64.exe" -OutFile $exe
+          # Refuse une page d'erreur HTML enregistrée sous le nom de l'exécutable
+          if ((Get-Item $exe).Length -lt 1000000) {
+            throw "git-crypt.exe téléchargée est trop petite : $(Get-Item $exe).Length octets"
           }
-          git-crypt --version
+          $reported = & $exe --version
+          if ($reported -notmatch "0\.7\.0") {
+            throw "Version git-crypt inattendue : $reported"
+          }
+          Write-Host "  git-crypt : $reported"
+          # $env:PATH ne survit pas d'un step à l'autre : c'est $GITHUB_PATH
+          # qui propage le chemin aux étapes suivantes, dont le déchiffrement.
+          $env:PATH = "$(Split-Path $exe);$env:PATH"
+          Add-Content -Path $env:GITHUB_PATH -Value (Split-Path $exe)
       - name: Déchiffrement de la PKI (git-crypt)
         shell: pwsh
         env:
