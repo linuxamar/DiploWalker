@@ -5,10 +5,10 @@ open System.IO
 open Serilog
 open DiploWalker.Abstractions
 
-/// Volume montÃ© pour un conteneur : chemin hÃ´te Ã  bind-mounter dans le
-/// conteneur (`ctr --mount type=bind,src=...`) et action de libÃ©ration.
-/// `Source` est la source d'origine (rÃ©pertoire hÃ´te ou image disque) et
-/// permet de restaurer le write-back aprÃ¨s un redÃ©marrage du service.
+/// Volume monté pour un conteneur : chemin hôte à bind-mounter dans le
+/// conteneur (`ctr --mount type=bind,src=...`) et action de libération.
+/// `Source` est la source d'origine (répertoire hôte ou image disque) et
+/// permet de restaurer le write-back après un redémarrage du service.
 type MountedVolume =
     { Source: string
       HostPath: string
@@ -18,28 +18,28 @@ type MountedVolume =
 
 /// Service de montage d'images disque pour les conteneurs.
 type IDiskMounter =
-    /// Monte la source (rÃ©pertoire ou image disque) pour la destination
-    /// donnÃ©e et retourne le volume Ã  bind-mounter.
+    /// Monte la source (répertoire ou image disque) pour la destination
+    /// donnée et retourne le volume à bind-mounter.
     abstract member Mount: source: string * destination: string * readOnly: bool -> MountedVolume
 
-/// Orchestration du montage des images disque au dÃ©marrage des conteneurs.
+/// Orchestration du montage des images disque au démarrage des conteneurs.
 ///
-/// Une source peut Ãªtre :
-///  - un rÃ©pertoire hÃ´te : bind mount direct (aucune copie) ;
+/// Une source peut être :
+///  - un répertoire hôte : bind mount direct (aucune copie) ;
 ///  - une image disque (qcow2, raw, vhd, vhdx, vmdk) : son contenu est
-///    exposÃ© dans un dossier de staging sous %ProgramData%\Diplo\volumes.
-///    Ã€ la libÃ©ration, les modifications sont rÃ©Ã©crites dans l'image :
-///    pour qcow2, l'Ã©criture se fait directement dans les clusters du
+///    exposé dans un dossier de staging sous %ProgramData%\Diplo\volumes.
+///    À la libération, les modifications sont réécrites dans l'image :
+///    pour qcow2, l'écriture se fait directement dans les clusters du
 ///    fichier via le pilote maison (aucune conversion, aucun VHD).
 module DiskMounter =
 
     let stagingRoot () = AppPaths.dataDir "volumes"
 
     /// Supprime les dossiers de staging orphelins (GUID) plus anciens que
-    /// `maxAge`. Un staging est orphelin quand le service a crashÃ© entre
-    /// l'extraction et l'appel au write-back. Les stagings rÃ©fÃ©rencÃ©s par
-    /// l'Ã©tat persistÃ© (mounted-state.json, en attente de rehydration aprÃ¨s un
-    /// arrÃªt long) sont prÃ©servÃ©s : les supprimer dÃ©truirait des modifications
+    /// `maxAge`. Un staging est orphelin quand le service a crashé entre
+    /// l'extraction et l'appel au write-back. Les stagings référencés par
+    /// l'état persisté (mounted-state.json, en attente de rehydration après un
+    /// arrêt long) sont préservés : les supprimer détruirait des modifications
     /// de conteneur sans aucun write-back.
     let pruneStaleStaging (maxAge: TimeSpan) =
         let root = stagingRoot ()
@@ -59,7 +59,7 @@ module DiskMounter =
             with ex ->
                 Log.Warning(
                     ex,
-                    "Impossible de lire l'Ã©tat persistÃ© avant le prune : aucun staging ne sera supprimÃ©"
+                    "Impossible de lire l'état persisté avant le prune : aucun staging ne sera supprimé"
                 )
 
                 // Fail-safe : en cas d'erreur de lecture, ne rien supprimer.
@@ -79,9 +79,9 @@ module DiskMounter =
 
                     if age > maxAge then
                         Directory.Delete(dir, true)
-                        Log.Warning("Staging orphelin supprimÃ© : {Dir} (Ã¢ge {Age})", dir, age)
+                        Log.Warning("Staging orphelin supprimé : {Dir} (âge {Age})", dir, age)
                 with ex ->
-                    Log.Warning(ex, "Ã‰chec de la suppression du staging orphelin : {Dir}", dir)
+                    Log.Warning(ex, "Échec de la suppression du staging orphelin : {Dir}", dir)
 
     let private extractOrRaise (source: string) (staging: string) (readOnly: bool) =
         try
@@ -115,12 +115,12 @@ module DiskMounter =
                     if not readOnly then
                         try
                             FsImage.writeBack source staging |> Result.defaultWith failwith
-                            // Suppression du staging uniquement aprÃ¨s writeBack rÃ©ussi
+                            // Suppression du staging uniquement après writeBack réussi
                             Directory.Delete(staging, true)
                         with ex ->
                             Log.Error(
                                 ex,
-                                "Ã‰chec du write-back pour {Source} â€” le staging est conservÃ© dans {Staging}",
+                                "Échec du write-back pour {Source} — le staging est conservé dans {Staging}",
                                 source,
                                 staging
                             )
@@ -138,21 +138,21 @@ module DiskMounter =
         else
             invalidArg "source" (sprintf "La source du volume n'existe pas : '%s'" source)
 
-    /// Reconstruit un volume montÃ© Ã  partir de l'Ã©tat persistÃ© (aprÃ¨s un
-    /// redÃ©marrage du service) : rÃ©utilise le dossier de staging existant et
-    /// restaure le write-back sans rÃ©-extraire l'image. Pour un bind mount de
-    /// rÃ©pertoire (Source est un dossier), la libÃ©ration reste sans effet.
+    /// Reconstruit un volume monté à partir de l'état persisté (après un
+    /// redémarrage du service) : réutilise le dossier de staging existant et
+    /// restaure le write-back sans ré-extraire l'image. Pour un bind mount de
+    /// répertoire (Source est un dossier), la libération reste sans effet.
     let rehydrate (source: string) (hostPath: string) (destination: string) (readOnly: bool) : MountedVolume =
         let dispose =
             if Directory.Exists source then
                 fun () -> ()
             elif not (Directory.Exists hostPath) then
                 // Le staging a disparu (prune, nettoyage manuel...) : le
-                // write-back est impossible, le signaler bruyamment plutÃ´t que
-                // de transformer la libÃ©ration en no-op silencieux.
+                // write-back est impossible, le signaler bruyamment plutôt que
+                // de transformer la libération en no-op silencieux.
                 fun () ->
                     Log.Error(
-                        "Write-back impossible : le staging {HostPath} de la source {Source} n'existe plus â€” modifications perdues",
+                        "Write-back impossible : le staging {HostPath} de la source {Source} n'existe plus — modifications perdues",
                         hostPath,
                         source
                     )
@@ -165,7 +165,7 @@ module DiskMounter =
                         with ex ->
                             Log.Error(
                                 ex,
-                                "Ã‰chec du write-back pour {Source} â€” le staging est conservÃ© dans {Staging}",
+                                "Échec du write-back pour {Source} — le staging est conservé dans {Staging}",
                                 source,
                                 hostPath
                             )
@@ -181,7 +181,7 @@ module DiskMounter =
           ReadOnly = readOnly
           Dispose = dispose }
 
-/// ImplÃ©mentation concrÃ¨te d'IDiskMounter pour l'injection de dÃ©pendances.
+/// Implémentation concrète d'IDiskMounter pour l'injection de dépendances.
 type DiskMounter() =
     do DiskMounter.pruneStaleStaging (TimeSpan.FromHours 24.0)
     interface IDiskMounter with

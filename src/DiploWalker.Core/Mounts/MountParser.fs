@@ -2,14 +2,14 @@
 
 open System
 
-/// Analyse les spÃ©cifications de montage au format `src=...,dst=...[;ro]`.
-/// Les montages sont sÃ©parÃ©s par un retour Ã  la ligne, un point-virgule,
-/// ou (pour <c>parseArray</c>) par chaque Ã©lÃ©ment du tableau.
+/// Analyse les spécifications de montage au format `src=...,dst=...[;ro]`.
+/// Les montages sont séparés par un retour à la ligne, un point-virgule,
+/// ou (pour <c>parseArray</c>) par chaque élément du tableau.
 module MountParser =
 
-    /// Analyse une chaÃ®ne pouvant contenir plusieurs montages
-    /// (sÃ©parÃ©s par un retour Ã  la ligne ou un point-virgule).
-    /// Une spÃ©cification invalide (src ou dst manquant) est ignorÃ©e.
+    /// Analyse une chaîne pouvant contenir plusieurs montages
+    /// (séparés par un retour à la ligne ou un point-virgule).
+    /// Une spécification invalide (src ou dst manquant) est ignorée.
     let parse (text: string) : (string * string * bool) list =
         if isNull text then
             []
@@ -36,8 +36,8 @@ module MountParser =
                 | _ -> None)
             |> Array.toList
 
-    /// Analyse une liste de spÃ©cifications (une par Ã©lÃ©ment), comme
-    /// l'option de ligne de commande rÃ©pÃ©table.
+    /// Analyse une liste de spécifications (une par élément), comme
+    /// l'option de ligne de commande répétable.
     let parseArray (values: string[]) : (string * string * bool) list =
         values |> Array.collect (fun v -> parse v |> List.toArray) |> Array.toList
 

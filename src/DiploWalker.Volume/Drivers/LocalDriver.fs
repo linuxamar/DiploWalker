@@ -24,7 +24,7 @@ type LocalVolumeDriver(dataRoot: string) =
         if not (Directory.Exists(mountsDir)) then
             Directory.CreateDirectory(mountsDir) |> ignore
 
-    // Synchronisation pour Ã©viter les conditions de course entre Mount/Unmount/Remove
+    // Synchronisation pour éviter les conditions de course entre Mount/Unmount/Remove
     let lockObj = obj ()
 
     let metaPath (id: string) =
@@ -35,8 +35,8 @@ type LocalVolumeDriver(dataRoot: string) =
 
     let generateId () = Guid.NewGuid().ToString("N")
 
-    // Si le volume pointe directement sur un rÃ©pertoire externe (option "path"),
-    // renvoie ce rÃ©pertoire ; sinon le rÃ©pertoire _data interne au volume.
+    // Si le volume pointe directement sur un répertoire externe (option "path"),
+    // renvoie ce répertoire ; sinon le répertoire _data interne au volume.
     let resolveDataPath (id: string) =
         let file = metaPath id
 
@@ -58,14 +58,14 @@ type LocalVolumeDriver(dataRoot: string) =
         else
             dataPath id
 
-    /// Copie rÃ©cursivement le contenu de `source` vers `target`, en crÃ©ant les
-    /// sous-rÃ©pertoires et en Ã©crasant les fichiers existants. UtilisÃ© Ã  la fois
-    /// pour matÃ©rialiser un volume lors du montage et pour resynchroniser le
-    /// montage vers le volume au dÃ©montage.
-    /// Les points de reparse (junctions, liens symboliques) sont ignorÃ©s : en
-    /// recopier le contenu pourrait crÃ©er des cycles ou dupliquer des donnÃ©es
-    /// hors du volume. Un ensemble `visited` garde la trace des rÃ©pertoires dÃ©jÃ
-    /// copiÃ©s : toute boucle restante est interrompue sans rÃ©cursion infinie.
+    /// Copie récursivement le contenu de `source` vers `target`, en créant les
+    /// sous-répertoires et en écrasant les fichiers existants. Utilisé à la fois
+    /// pour matérialiser un volume lors du montage et pour resynchroniser le
+    /// montage vers le volume au démontage.
+    /// Les points de reparse (junctions, liens symboliques) sont ignorés : en
+    /// recopier le contenu pourrait créer des cycles ou dupliquer des données
+    /// hors du volume. Un ensemble `visited` garde la trace des répertoires déjÃ
+    /// copiés : toute boucle restante est interrompue sans récursion infinie.
     let rec copyDirectoryTree (source: string) (target: string) (visited: System.Collections.Generic.HashSet<string>) =
         if visited.Add(Path.GetFullPath source) then
             Directory.CreateDirectory(target) |> ignore
@@ -77,7 +77,7 @@ type LocalVolumeDriver(dataRoot: string) =
                 let attrs = File.GetAttributes(subdir)
 
                 if (attrs &&& FileAttributes.ReparsePoint) <> enum 0 then
-                    () // junction ou lien symbolique : on ne recopie pas derriÃ¨re
+                    () // junction ou lien symbolique : on ne recopie pas derrière
                 else
                     copyDirectoryTree subdir (Path.Combine(target, Path.GetFileName(subdir))) visited
 
@@ -89,8 +89,8 @@ type LocalVolumeDriver(dataRoot: string) =
         let dataDir =
             match driverOpts.TryFind "path" with
             | Some p when not (String.IsNullOrWhiteSpace p) ->
-                // RÃ©fÃ©rence directe : le volume pointe sur le rÃ©pertoire fourni,
-                // sans le copier. Le rÃ©pertoire est crÃ©Ã© s'il n'existe pas encore.
+                // Référence directe : le volume pointe sur le répertoire fourni,
+                // sans le copier. Le répertoire est créé s'il n'existe pas encore.
                 SecurityValidation.validateVolumePath p "Le chemin du volume"
                 let full = Path.GetFullPath(p)
                 Directory.CreateDirectory(full) |> ignore
@@ -124,7 +124,7 @@ type LocalVolumeDriver(dataRoot: string) =
                     RpcException(
                         Status(
                             StatusCode.FailedPrecondition,
-                            "Le volume est montÃ©. Utilisez force=true pour forcer la suppression."
+                            "Le volume est monté. Utilisez force=true pour forcer la suppression."
                         )
                     )
                 )
@@ -135,13 +135,13 @@ type LocalVolumeDriver(dataRoot: string) =
                 if dirExisted then
                     Directory.Delete(dir, true)
             with :? System.IO.DirectoryNotFoundException ->
-                Log.Warning("RÃ©pertoire de volume dÃ©jÃ  supprimÃ©: {VolumeId}", id)
+                Log.Warning("Répertoire de volume déjà supprimé: {VolumeId}", id)
 
             try
                 if Directory.Exists(mountFile) then
                     Directory.Delete(mountFile, true)
             with :? System.IO.DirectoryNotFoundException ->
-                Log.Warning("RÃ©pertoire de montage dÃ©jÃ  supprimÃ©: {VolumeId}", id)
+                Log.Warning("Répertoire de montage déjà supprimé: {VolumeId}", id)
 
             dirExisted)
 
@@ -176,7 +176,7 @@ type LocalVolumeDriver(dataRoot: string) =
                     None)
             |> Array.toList
             // Appliquer au minimum les filtres name et label : ignorer la
-            // requÃªte du client renverrait des volumes hors pÃ©rimÃ¨tre.
+            // requête du client renverrait des volumes hors périmètre.
             |> List.filter (fun elem ->
                 filters
                 |> Map.forall (fun key expected ->
@@ -251,17 +251,17 @@ type LocalVolumeDriver(dataRoot: string) =
                 let src = resolveDataPath id
 
                 // Resynchroniser les modifications du montage vers le volume :
-                // supprimer le rÃ©pertoire sans rÃ©Ã©criture dÃ©truirait TOUT ce
-                // que le conteneur a Ã©crit entre Mount et Unmount.
+                // supprimer le répertoire sans réécriture détruirait TOUT ce
+                // que le conteneur a écrit entre Mount et Unmount.
                 if Directory.Exists(src) then
                     try
                         copyDirectoryTree mountDir src (System.Collections.Generic.HashSet<string>())
                     with ex ->
-                        // Synchronisation Ã©chouÃ©e : conserver le montage pour ne
-                        // pas perdre les donnÃ©es, et signaler l'Ã©chec.
+                        // Synchronisation échouée : conserver le montage pour ne
+                        // pas perdre les données, et signaler l'échec.
                         Log.Error(
                             ex,
-                            "Synchronisation retour impossible de {MountDir} vers {DataPath} â€” contenu conservÃ©",
+                            "Synchronisation retour impossible de {MountDir} vers {DataPath} — contenu conservé",
                             mountDir,
                             src
                         )
@@ -270,7 +270,7 @@ type LocalVolumeDriver(dataRoot: string) =
                             RpcException(
                                 Status(
                                     StatusCode.Internal,
-                                    sprintf "DÃ©montage de '%s' annulÃ© : synchronisation retour Ã©chouÃ©e" id
+                                    sprintf "Démontage de '%s' annulé : synchronisation retour échouée" id
                                 )
                             )
                         )
@@ -309,9 +309,9 @@ type LocalVolumeDriver(dataRoot: string) =
                             for subdir in Directory.GetDirectories(current) do
                                 let subFull = Path.GetFullPath(subdir)
 
-                                // DÃ©tecter les boucles de symlinks â€” comparer avec
-                                // le sÃ©parateur final, sinon un rÃ©pertoire frÃ¨re
-                                // (vol-abc vs vol-abcd) serait inclus Ã  tort.
+                                // Détecter les boucles de symlinks — comparer avec
+                                // le séparateur final, sinon un répertoire frère
+                                // (vol-abc vs vol-abcd) serait inclus à tort.
                                 let dirFullWithSep =
                                     if dirFull.EndsWith(Path.DirectorySeparatorChar) then
                                         dirFull

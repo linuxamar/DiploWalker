@@ -84,7 +84,7 @@ module FsImageTests =
             FsImage.writeBack missing (Path.Combine(root, "staging"))
             |> function Error _ -> () | Ok () -> failwith "Expected Error but got Ok")
 
-    // â”€â”€ Tests de FsImage.create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Tests de FsImage.create ──────────────────────────────────────
 
     let private runCreate (f: string -> string -> string -> unit) =
         let root = TestImage.createTempDir ()
@@ -186,7 +186,7 @@ module FsImageTests =
     let ``create genere un fichier ISO9660 et lisible`` () =
         runCreate (fun _ src dest ->
             let destIso = Path.ChangeExtension(dest, ".iso")
-            // ISO9660 niveau 1 : noms 8.3, jeu de caractÃ¨res ASCII.
+            // ISO9660 niveau 1 : noms 8.3, jeu de caractères ASCII.
             writeSourceDir src
             let result = FsImage.create src destIso DiskFormat.Iso |> Result.defaultWith failwith
             result |> should equal destIso
@@ -250,14 +250,14 @@ module FsImageTests =
     let ``create gere les caracteres speciaux dans les noms de fichiers`` () =
         runCreate (fun _ src dest ->
             File.WriteAllText(Path.Combine(src, "fichier avec espaces.txt"), "espaces")
-            File.WriteAllText(Path.Combine(src, "donnÃ©es-franÃ§aises.txt"), "accents")
+            File.WriteAllText(Path.Combine(src, "données-françaises.txt"), "accents")
             File.WriteAllText(Path.Combine(src, "fichier-v2.1.0_beta.txt"), "version")
             FsImage.create src dest DiskFormat.Vhd |> Result.defaultWith failwith |> ignore
             File.Exists(dest) |> should equal true
             let re = Path.Combine(Path.GetDirectoryName(dest), "re")
             FsImage.extract dest re false |> Result.defaultWith failwith |> ignore
             File.Exists(Path.Combine(re, "fichier avec espaces.txt")) |> should equal true
-            File.Exists(Path.Combine(re, "donnÃ©es-franÃ§aises.txt")) |> should equal true
+            File.Exists(Path.Combine(re, "données-françaises.txt")) |> should equal true
             File.Exists(Path.Combine(re, "fichier-v2.1.0_beta.txt")) |> should equal true)
 
     [<Fact>]
@@ -296,25 +296,25 @@ module FsImageTests =
             File.Exists(Path.Combine(re, "ãƒ†ã‚¹ãƒˆ.txt")) |> should equal true
             File.Exists(Path.Combine(re, "æµ‹è¯•.txt")) |> should equal true
             File.Exists(Path.Combine(re, "í•œêµ­ì–´.txt")) |> should equal true
-            File.ReadAllText(Path.Combine(re, "ãƒ†ã‚¹ãƒˆ.txt")) |> should equal "japonais")
+            File.ReadAllText(Path.Combine(re, "テスト.txt")) |> should equal "japonais")
 
     [<Fact>]
     let ``create gere les fichiers en lecture seule`` () =
         runCreate (fun _ src dest ->
             let roFile = Path.Combine(src, "readonly.txt")
-            File.WriteAllText(roFile, "protÃ©gÃ©")
+            File.WriteAllText(roFile, "protégé")
             File.SetAttributes(roFile, FileAttributes.ReadOnly)
             FsImage.create src dest DiskFormat.Vhd |> Result.defaultWith failwith |> ignore
             File.Exists(dest) |> should equal true
             let re = Path.Combine(Path.GetDirectoryName(dest), "re")
             FsImage.extract dest re false |> Result.defaultWith failwith |> ignore
-            File.ReadAllText(Path.Combine(re, "readonly.txt")) |> should equal "protÃ©gÃ©"
+            File.ReadAllText(Path.Combine(re, "readonly.txt")) |> should equal "protégé"
             File.SetAttributes(roFile, FileAttributes.Normal))
 
     [<Fact>]
     let ``create gere les liens symboliques NTFS`` () =
         runCreate (fun _ src dest ->
-            File.WriteAllText(Path.Combine(src, "cible.txt"), "donnÃ©es")
+            File.WriteAllText(Path.Combine(src, "cible.txt"), "données")
             let linkPath = Path.Combine(src, "lien.txt")
 
             try
@@ -322,18 +322,18 @@ module FsImageTests =
                 FsImage.create src dest DiskFormat.Vhd |> Result.defaultWith failwith |> ignore
                 File.Exists(dest) |> should equal true
             with
-            // Le privilÃ¨ge SeCreateSymbolicLink n'est pas disponible sur
-            // tous les environnements (CI non Ã©lÃ©vÃ©e, mode dÃ©veloppeur
-            // dÃ©sactivÃ©) : le test ne peut pas s'exÃ©cuter, on le saute.
-            | :? PlatformNotSupportedException -> Assert.Skip("Symbolic links non supportÃ©s sur cette plateforme.")
-            | :? IOException -> Assert.Skip("PrivilÃ¨ge de crÃ©ation de liens symboliques indisponible."))
+            // Le privilège SeCreateSymbolicLink n'est pas disponible sur
+            // tous les environnements (CI non élévée, mode développeur
+            // désactivé) : le test ne peut pas s'exécuter, on le saute.
+            | :? PlatformNotSupportedException -> Assert.Skip("Symbolic links non supportés sur cette plateforme.")
+            | :? IOException -> Assert.Skip("Privilège de création de liens symboliques indisponible."))
 
     [<Fact>]
     let ``ISO desambiguise les noms 8.3 en collision`` () =
         runCreate (fun _ src dest ->
             let destIso = Path.ChangeExtension(dest, ".iso")
-            // Les deux noms se rÃ©duisent au mÃªme 8.3 "ABCDEFGH.TXT" ; la
-            // dÃ©sambiguÃ¯sation doit produire deux entrÃ©es distinctes.
+            // Les deux noms se réduisent au même 8.3 "ABCDEFGH.TXT" ; la
+            // désambiguïsation doit produire deux entrées distinctes.
             File.WriteAllText(Path.Combine(src, "abcdefgh1.txt"), "premier")
             File.WriteAllText(Path.Combine(src, "abcdefgh2.txt"), "deuxieme")
             FsImage.create src destIso DiskFormat.Iso |> Result.defaultWith failwith |> ignore
@@ -351,8 +351,8 @@ module FsImageTests =
                 |> Set.toList
                 |> List.head
 
-            // Le contenu de chaque fichier est prÃ©servÃ© (ordre prÃ©servÃ© :
-            // le surgfixe _1 correspond au premier nom rencontrÃ©).
+            // Le contenu de chaque fichier est préservé (ordre préservé :
+            // le surgfixe _1 correspond au premier nom rencontré).
             let byName = Directory.GetFiles(re) |> Array.map (fun p -> Path.GetFileName p, File.ReadAllText p) |> Map.ofArray
 
             Map.exists (fun _ v -> v = "premier") byName |> should equal true
@@ -360,11 +360,11 @@ module FsImageTests =
             other |> should not' (equal "ABCDEFGH.TXT"))
 
     [<Fact>]
-    let ``ISO extrait un gros fichier (> 2 Go) sans le matÃ©rialiser en mÃ©moire`` () =
+    let ``ISO extrait un gros fichier (> 2 Go) sans le matérialiser en mémoire`` () =
         runCreate (fun _ src dest ->
             let destIso = Path.ChangeExtension(dest, ".iso")
-            // Fichier sparse de ~2,5 Go : objectif du streaming Ã  la crÃ©ation
-            // (copie par blocs) et Ã  l'extraction (lecture par blocs).
+            // Fichier sparse de ~2,5 Go : objectif du streaming à la création
+            // (copie par blocs) et à l'extraction (lecture par blocs).
             let bigPath = Path.Combine(src, "big.bin")
             let bigLength = 2_500_000_000L
 

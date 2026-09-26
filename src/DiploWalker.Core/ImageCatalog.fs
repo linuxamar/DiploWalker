@@ -6,9 +6,9 @@ open System.Text.Json
 open Serilog
 
 /// Catalogue local persistant des images de conteneurs (`diplo-catalog.json`).
-/// MÃªme convention que `DiploWalkerConfig` : chemin rÃ©solu via `DIPLO_CONFIG_HOME`,
-/// lecture tolÃ©rante (fichier absent/malformÃ© â‡’ catalogue vide) et Ã©criture
-/// atomique (temp + replace). Le fichier est partagÃ© entre CLI et GUI.
+/// Même convention que `DiploWalkerConfig` : chemin résolu via `DIPLO_CONFIG_HOME`,
+/// lecture tolérante (fichier absent/malformé ⇒ catalogue vide) et écriture
+/// atomique (temp + replace). Le fichier est partagé entre CLI et GUI.
 [<RequireQualifiedAccess>]
 module ImageCatalog =
 
@@ -28,9 +28,9 @@ module ImageCatalog =
         let t = s.Trim()
         if String.IsNullOrEmpty t then None else Some t
 
-    /// RÃ©sout le chemin du fichier catalogue, par prioritÃ© :
-    /// 1. `DIPLO_CONFIG_HOME/diplo-catalog.json` si la variable d'environnement est dÃ©finie ;
-    /// 2. `diplo-catalog.json` dans le rÃ©pertoire courant.
+    /// Résout le chemin du fichier catalogue, par priorité :
+    /// 1. `DIPLO_CONFIG_HOME/diplo-catalog.json` si la variable d'environnement est définie ;
+    /// 2. `diplo-catalog.json` dans le répertoire courant.
     let catalogPath () =
         let home = Environment.GetEnvironmentVariable("DIPLO_CONFIG_HOME")
 
@@ -40,7 +40,7 @@ module ImageCatalog =
             Path.Combine(home.Trim(), catalogFileName)
 
     /// Lit le catalogue depuis un chemin explicite : [] si le fichier est absent
-    /// ou mal formÃ© (repli : catalogue vide).
+    /// ou mal formé (repli : catalogue vide).
     let load (path: string) : CatalogEntry list =
         try
             if File.Exists path then
@@ -48,21 +48,21 @@ module ImageCatalog =
             else
                 []
         with ex ->
-            // M15 : un catalogue illisible ne passe plus en silence â€” avertir,
+            // M15 : un catalogue illisible ne passe plus en silence — avertir,
             // puis repli sur catalogue vide.
             Log.Warning(ex, "Catalogue d'images illisible {Path} (repli sur un catalogue vide)", path)
             []
 
-    /// Ã‰crit le catalogue dans `path` (le rÃ©pertoire parent est crÃ©Ã© au besoin).
-    /// Ã‰criture atomique (temp + replace) : un crash pendant l'Ã©criture ne doit
-    /// pas laisser un catalogue tronquÃ© que la lecture avalerait.
+    /// Écrit le catalogue dans `path` (le répertoire parent est créé au besoin).
+    /// Écriture atomique (temp + replace) : un crash pendant l'écriture ne doit
+    /// pas laisser un catalogue tronqué que la lecture avalerait.
     let save (path: string) (entries: CatalogEntry list) : unit =
         let dir = Path.GetDirectoryName path
 
         if not (String.IsNullOrEmpty dir) && not (Directory.Exists dir) then
             Directory.CreateDirectory(dir) |> ignore
 
-        // Ã‰criture atomique (temp + replace) : voir DiploWalkerConfig.save.
+        // Écriture atomique (temp + replace) : voir DiploWalkerConfig.save.
         let tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp"
 
         try
@@ -76,12 +76,12 @@ module ImageCatalog =
         | _ ->
             try
                 File.Delete(tmp)
-            with ex -> Log.Warning(ex, "Ã‰chec de la suppression du fichier temporaire {Tmp}", tmp)
+            with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
 
             reraise ()
 
-    /// Ajoute une entrÃ©e au catalogue : true si elle a rÃ©ellement Ã©tÃ© ajoutÃ©e,
-    /// false si la rÃ©fÃ©rence est dÃ©jÃ  prÃ©sente (catalogue inchangÃ©).
+    /// Ajoute une entrée au catalogue : true si elle a réellement été ajoutée,
+    /// false si la référence est déjà présente (catalogue inchangé).
     let add (path: string) (ref: string) (note: string option) : bool =
         let entries = load path
 
@@ -97,8 +97,8 @@ module ImageCatalog =
             save path (entries @ [ entry ])
             true
 
-    /// Met Ã  jour l'entrÃ©e `ref` (nom via `newRef` et/ou note) : true si une
-    /// entrÃ©e a Ã©tÃ© modifiÃ©e, false si la rÃ©fÃ©rence est introuvable au catalogue.
+    /// Met à jour l'entrée `ref` (nom via `newRef` et/ou note) : true si une
+    /// entrée a été modifiée, false si la référence est introuvable au catalogue.
     let update (path: string) (ref: string) (newRef: string option) (note: string option) : bool =
         let entries = load path
 
@@ -116,7 +116,7 @@ module ImageCatalog =
             save path (entries |> List.map (fun e -> if e.Ref = ref then updated else e))
             true
 
-    /// Retire l'entrÃ©e `ref` du catalogue : true si elle a Ã©tÃ© retirÃ©e, false
+    /// Retire l'entrée `ref` du catalogue : true si elle a été retirée, false
     /// si elle n'y figurait pas.
     let remove (path: string) (ref: string) : bool =
         let entries = load path

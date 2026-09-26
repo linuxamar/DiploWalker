@@ -6,7 +6,7 @@ open DiploWalker.Core.Output
 open DiploWalker.Disk
 open Spectre.Console.Cli
 
-// â”€â”€ create-image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── create-image ──────────────────────────────────────────────────
 type CreateImageSettings() =
     inherit CommandSettings()
 
@@ -25,10 +25,10 @@ type CreateImageCommand(output: IOutputPort) =
     override _.ExecuteAsync(_ctx, settings, _ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace settings.Source then
-                output.WriteError("Le rÃ©pertoire source est requis")
+                output.WriteError("Le répertoire source est requis")
                 return 1
             elif not (IO.Directory.Exists settings.Source) then
-                output.WriteError(sprintf "Le rÃ©pertoire source n'existe pas : '%s'" settings.Source)
+                output.WriteError(sprintf "Le répertoire source n'existe pas : '%s'" settings.Source)
                 return 1
             elif String.IsNullOrWhiteSpace settings.Dest then
                 output.WriteError("Le chemin de destination est requis")
@@ -52,15 +52,15 @@ type CreateImageCommand(output: IOutputPort) =
 
                     try
                         output.WriteLine(
-                            sprintf "CrÃ©ation de l'image '%s' au format %sâ€¦" settings.Dest (DiskFormat.toString format)
+                            sprintf "Création de l'image '%s' au format %s…" settings.Dest (DiskFormat.toString format)
                         )
 
                         let result = FsImage.create settings.Source settings.Dest format |> Result.defaultWith failwith
                         let size = IO.FileInfo(result).Length
-                        output.WriteSuccess(sprintf "Image crÃ©Ã©e : %s (%d Mo)" result (size / 1024L / 1024L))
+                        output.WriteSuccess(sprintf "Image créée : %s (%d Mo)" result (size / 1024L / 1024L))
                         return 0
                     with ex ->
-                        output.WriteError(sprintf "Ã‰chec de la crÃ©ation : %s" ex.Message)
+                        output.WriteError(sprintf "Échec de la création : %s" ex.Message)
                         return 1
         }
 

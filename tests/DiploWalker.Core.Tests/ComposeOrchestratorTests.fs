@@ -17,7 +17,7 @@ module ComposeOrchestratorTests =
     open DiploWalker.TestHelpers
 
     /// Fake IContainerClient qui enregistre les appels du ComposeOrchestrator
-    /// et renvoie des rÃ©ponses prÃ©visibles, sans serveur gRPC.
+    /// et renvoie des réponses prévisibles, sans serveur gRPC.
     type RecordingContainerClient() =
 
         let mutable created = ResizeArray<string * string>()
@@ -71,7 +71,7 @@ module ComposeOrchestratorTests =
                 createCount <- createCount + 1
 
                 if createCount >= failFromCreate then
-                    raise (Exception("Ã©chec simulÃ©"))
+                    raise (Exception("échec simulé"))
 
                 created.Add(name, image)
                 createdPorts.Add(defaultArg _ports [])
@@ -90,18 +90,18 @@ module ComposeOrchestratorTests =
 
             member _.StartAsync(id, ?_attach, ?_ct) =
                 started.Add(id)
-                Task.FromResult({ StartContainerResponse.State = ContainerState.Running; Message = "DÃ©marrÃ©" })
+                Task.FromResult({ StartContainerResponse.State = ContainerState.Running; Message = "Démarré" })
 
             member _.StopAsync(id, ?_timeoutSeconds, ?_ct) =
                 if failOnStopIds.Contains(id) then
-                    raise (Exception("Ã©chec simulÃ© de l'arrÃªt"))
+                    raise (Exception("échec simulé de l'arrêt"))
 
                 stopped.Add(id)
-                Task.FromResult({ StopContainerResponse.State = ContainerState.Stopped; Message = "ArrÃªtÃ©" })
+                Task.FromResult({ StopContainerResponse.State = ContainerState.Stopped; Message = "Arrêté" })
 
             member _.DeleteAsync(id, ?_force, ?_ct) =
                 deleted.Add(id)
-                Task.FromResult({ DeleteContainerResponse.Success = true; Message = "SupprimÃ©" })
+                Task.FromResult({ DeleteContainerResponse.Success = true; Message = "Supprimé" })
 
             member _.InspectAsync(_id, ?_ct) = raise (NotImplementedException())
 
@@ -122,7 +122,7 @@ module ComposeOrchestratorTests =
 
                 Task.FromResult(
                     { PullImageResponse.Image = image
-                      Message = "Image tÃ©lÃ©chargÃ©e" }
+                      Message = "Image téléchargée" }
                 )
 
             member _.LoginRegistryAsync(_registry, _username, _password, ?_ct) = raise (NotImplementedException())
@@ -344,7 +344,7 @@ services:
                 labels.[composeProjectLabel] |> should equal "app"
                 labels.[composeServiceLabel] |> should equal "web"
 
-            output.Successes |> should contain "Projet 'app' dÃ©marrÃ© (2 conteneur(s))"
+            output.Successes |> should contain "Projet 'app' démarré (2 conteneur(s))"
         finally
             TestHelpers.cleanupDir dir
 
@@ -370,10 +370,10 @@ services:
             run (orchestrator.Up(path))
 
             client.Started |> should haveLength 1
-            output.Warnings |> should contain "Projet 'app' partiellement dÃ©marrÃ© (1 OK, 1 Ã©chec(s))"
+            output.Warnings |> should contain "Projet 'app' partiellement démarré (1 OK, 1 échec(s))"
 
             output.Errors
-            |> List.exists (fun e -> e.Contains("Service 'db' en Ã©chec"))
+            |> List.exists (fun e -> e.Contains("Service 'db' en échec"))
             |> should equal true
         finally
             TestHelpers.cleanupDir dir
@@ -405,7 +405,7 @@ services:
 
             client.Stopped |> should equal [ "ctr-web" ]
             client.Deleted |> should equal [ "ctr-web" ]
-            output.Successes |> should contain "Projet 'app' arrÃªtÃ© (1 conteneur(s))"
+            output.Successes |> should contain "Projet 'app' arrêté (1 conteneur(s))"
         finally
             TestHelpers.cleanupDir dir
 
@@ -435,7 +435,7 @@ services:
             output.Tables |> should haveLength 1
 
             output.Tables.[0]
-            |> should equal [| "Service"; "Conteneur"; "Image"; "Ã‰tat"; "ID" |]
+            |> should equal [| "Service"; "Conteneur"; "Image"; "État"; "ID" |]
         finally
             TestHelpers.cleanupDir dir
 
@@ -588,7 +588,7 @@ services:
             run (orchestrator.Build(path))
 
             client.PulledImages |> should equal [ "nginx:latest" ]
-            output.Successes |> should contain "  âœ“ Image 'nginx:latest' disponible"
+            output.Successes |> should contain "  ✓ Image 'nginx:latest' disponible"
 
             output.Errors
             |> List.exists (fun e -> e.Contains "Dockerfile introuvable" && e.Contains "worker")
@@ -875,10 +875,10 @@ services:
 
             client.Stopped |> should equal [ "ctr-web" ]
             client.Deleted |> should equal [ "ctr-web" ]
-            output.Warnings |> should contain "Projet 'app' partiellement arrÃªtÃ© (1 OK, 1 Ã©chec(s))"
+            output.Warnings |> should contain "Projet 'app' partiellement arrêté (1 OK, 1 échec(s))"
 
             output.Errors
-            |> List.exists (fun e -> e.Contains "app_db_0" && e.Contains "Ã©chec de l'arrÃªt")
+            |> List.exists (fun e -> e.Contains "app_db_0" && e.Contains "échec de l'arrêt")
             |> should equal true
         finally
             TestHelpers.cleanupDir dir

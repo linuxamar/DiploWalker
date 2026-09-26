@@ -12,7 +12,7 @@ open System.Text.Json.Nodes
 open System.Threading.Tasks
 open DiploWalker.Abstractions
 
-// â”€â”€â”€ Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Configuration ───────────────────────────────────────────────────────
 
 let installDir =
     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Diplo")
@@ -30,7 +30,7 @@ let services =
        "DiploWalker.Volume", "DiploWalker.Volume Service", DiploWalkerPorts.Volume
        "DiploWalker.Network", "DiploWalker.Network Service", DiploWalkerPorts.Network |]
 
-// â”€â”€â”€ Utilitaires â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Utilitaires ─────────────────────────────────────────────────────────
 
 let runProcess (exe: string) (args: string list) : int =
     let code, stdout, stderr = ProcessExec.runWithResult exe args None None None
@@ -59,9 +59,9 @@ let isAdministrator () =
 let ensureDirectory (path: string) =
     if not (Directory.Exists(path)) then
         Directory.CreateDirectory(path) |> ignore
-        printfn "  [+] CrÃ©Ã©: %s" path
+        printfn "  [+] Créé: %s" path
 
-// â”€â”€â”€ DÃ©tection version Windows Server â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Détection version Windows Server ────────────────────────────────────
 
 let getWindowsServerVersion () =
     let build = Environment.OSVersion.Version.Build
@@ -95,14 +95,14 @@ let getSandboxImage () =
     let tag = getWindowsServerVersion ()
     sprintf "mcr.microsoft.com/windows/nanoserver:%s" tag
 
-// â”€â”€â”€ TÃ©lÃ©chargement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Téléchargement ──────────────────────────────────────────────────────
 
 let downloadContainerdVersion = getMinContainerdVersion ()
 let cniPluginsVersion = "1.6.2"
 let winCniVersion = "0.3.1"
 
-/// Manifeste des checksums signÃ© (RSA-4096/SHA-384) â€” vÃ©rifiÃ© une seule fois au
-/// dÃ©marrage. LÃ¨ve dÃ¨s le chargement si la signature est invalide (fail-closed).
+/// Manifeste des checksums signé (RSA-4096/SHA-384) — vérifié une seule fois au
+/// démarrage. Lève dès le chargement si la signature est invalide (fail-closed).
 let artifactChecksums = ArtifactSigning.loadVerifiedManifest ()
 
 let containerdArchive =
@@ -114,8 +114,8 @@ let containerdUrl =
         downloadContainerdVersion
         containerdArchive
 
-/// HttpClient partagÃ© (M16) : rÃ©utilisÃ© entre les tÃ©lÃ©chargements au lieu d'un
-/// client jetable par appel (qui Ã©puise les sockets). Timeout bornÃ©.
+/// HttpClient partagé (M16) : réutilisé entre les téléchargements au lieu d'un
+/// client jetable par appel (qui épuise les sockets). Timeout borné.
 let private downloader =
     let client = new HttpClient()
     client.Timeout <- TimeSpan.FromMinutes(10.0)
@@ -127,8 +127,8 @@ let downloadFile (url: string) (dest: string) =
         let mutable ok = false
         let mutable attempt = 1
 
-        // 3 tentatives au plus, avec backoff croissant : les tÃ©lÃ©chargements
-        // GitHub sont sujets Ã  des coupures rÃ©seau transitoires.
+        // 3 tentatives au plus, avec backoff croissant : les téléchargements
+        // GitHub sont sujets à des coupures réseau transitoires.
         while not ok && attempt <= 3 do
             try
                 use! response = downloader.GetAsync(url)
@@ -137,7 +137,7 @@ let downloadFile (url: string) (dest: string) =
                 use fileStream = File.Create(dest)
                 do! stream.CopyToAsync(fileStream)
                 ok <- true
-                printfn "  [+] TÃ©lÃ©chargÃ©: %s" (Path.GetFileName(dest))
+                printfn "  [+] Téléchargé: %s" (Path.GetFileName(dest))
             with ex ->
                 lastError <- ex
 
@@ -145,7 +145,7 @@ let downloadFile (url: string) (dest: string) =
                     let delaySeconds = attempt * 2
 
                     printfn
-                        "  [!] Ã‰chec du tÃ©lÃ©chargement (tentative %d/3), nouvel essai dans %ds : %s"
+                        "  [!] Échec du téléchargement (tentative %d/3), nouvel essai dans %ds : %s"
                         attempt
                         delaySeconds
                         ex.Message
@@ -156,7 +156,7 @@ let downloadFile (url: string) (dest: string) =
 
         if not ok then
             let message = if isNull lastError then "erreur inconnue" else lastError.Message
-            failwithf "Ã‰chec du tÃ©lÃ©chargement de %s aprÃ¨s 3 tentatives : %s" url message
+            failwithf "Échec du téléchargement de %s après 3 tentatives : %s" url message
     }
 
 let computeSha256 (filePath: string) =
@@ -167,11 +167,11 @@ let computeSha256 (filePath: string) =
     |> Array.map (fun b -> b.ToString("x2"))
     |> String.concat ""
 
-/// Confrontation Ã  temps constant de deux condensats hexadÃ©cimaux, sans
-/// court-circuit selon la position de la premiÃ¨re diffÃ©rence.
+/// Confrontation à temps constant de deux condensats hexadécimaux, sans
+/// court-circuit selon la position de la première différence.
 let private fixedTimeEqualsHex (a: string) (b: string) =
     if a.Length = 0 || a.Length <> b.Length || (a.Length % 2 <> 0) then
-        // Longueur (publique) diffÃ©rente : traiter comme non Ã©quivalents.
+        // Longueur (publique) différente : traiter comme non équivalents.
         false
     else
         let mutable diff = 0
@@ -187,23 +187,23 @@ let verifyChecksum (filePath: string) (expectedSha256: string option) =
     match expectedSha256 with
     | None
     | Some null ->
-        failwithf "Aucun checksum fourni pour %s â€” vÃ©rification d'intÃ©gritÃ© requise" (Path.GetFileName(filePath))
+        failwithf "Aucun checksum fourni pour %s — vérification d'intégrité requise" (Path.GetFileName(filePath))
     | Some expected ->
         if expected.StartsWith("todo", StringComparison.OrdinalIgnoreCase) then
             failwithf
-                "Checksum placeholder non mis Ã  jour pour %s â€” vÃ©rification d'intÃ©gritÃ© requise"
+                "Checksum placeholder non mis à jour pour %s — vérification d'intégrité requise"
                 (Path.GetFileName(filePath))
 
         let actual = computeSha256 filePath
 
         if not (fixedTimeEqualsHex actual expected) then
             failwithf
-                "Ã‰chec de la vÃ©rification d'intÃ©gritÃ© de %s\n  Attendu: %s\n  Obtenu:  %s"
+                "Échec de la vérification d'intégrité de %s\n  Attendu: %s\n  Obtenu:  %s"
                 (Path.GetFileName(filePath))
                 expected
                 actual
 
-        printfn "  [+] SHA256 vÃ©rifiÃ©: %s" (Path.GetFileName(filePath))
+        printfn "  [+] SHA256 vérifié: %s" (Path.GetFileName(filePath))
 
 let extractTarGz (archive: string) (destination: string) =
     task {
@@ -217,9 +217,9 @@ let extractTarGz (archive: string) (destination: string) =
 
         let tempFull = Path.GetFullPath(tempDir)
 
-        // Contenance stricte (M16) : la cible doit Ãªtre STRICTEMENT sous la
-        // racine â€” un simple StartsWith accepterait un voisin Â« _tmp_extract_X2 Â»
-        // ou un chemin Â« sous Â» la racine par coÃ¯ncidence de prÃ©fixe.
+        // Contenance stricte (M16) : la cible doit être STRICTEMENT sous la
+        // racine — un simple StartsWith accepterait un voisin « _tmp_extract_X2 »
+        // ou un chemin « sous » la racine par coïncidence de préfixe.
         let isWithin (root: string) (candidate: string) =
             let rootWithSep =
                 Path.TrimEndingDirectorySeparator(root) + string Path.DirectorySeparatorChar
@@ -227,31 +227,31 @@ let extractTarGz (archive: string) (destination: string) =
             candidate.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase)
 
         try
-            // PrÃ©-Ã©numÃ©ration (M11) : on liste le contenu de l'archive AVANT
-            // toute extraction. Chaque entrÃ©e doit rester sous le rÃ©pertoire de
-            // staging â€” un Â« .. Â», un chemin enracinÃ© ou une lettre de lecteur
-            // est rejetÃ© sans rien extraire. L'entrÃ©e racine (Â« . Â») est admise.
+            // Pré-énumération (M11) : on liste le contenu de l'archive AVANT
+            // toute extraction. Chaque entrée doit rester sous le répertoire de
+            // staging — un « .. », un chemin enraciné ou une lettre de lecteur
+            // est rejeté sans rien extraire. L'entrée racine (« . ») est admise.
             let listCode, listOut, _ = ProcessExec.runWithResult "tar" [ "tzf"; archive ] None None None
 
             if listCode <> 0 then
-                failwithf "Ã‰chec de la lecture de %s (code %d)" archive listCode
+                failwithf "Échec de la lecture de %s (code %d)" archive listCode
 
             for entry in
                 listOut.Split([| '\r'; '\n' |], StringSplitOptions.RemoveEmptyEntries) do
                 let entryFull = Path.GetFullPath(Path.Combine(tempFull, entry))
 
                 if entryFull <> tempFull && not (isWithin tempFull entryFull) then
-                    failwithf "EntrÃ©e d'archive hors de la destination: %s" entry
+                    failwithf "Entrée d'archive hors de la destination: %s" entry
 
             let exitCode = runCommandWithArgs "tar" [ "xzf"; archive; "-C"; tempDir ]
 
             if exitCode <> 0 then
-                failwithf "Ã‰chec de l'extraction de %s (code %d)" archive exitCode
+                failwithf "Échec de l'extraction de %s (code %d)" archive exitCode
 
             let destFull = Path.GetFullPath(destination)
 
-            // Revalidation post-extraction : chaque entrÃ©e (fichier OU rÃ©pertoire)
-            // doit rester sous le rÃ©pertoire d'extraction temporaire.
+            // Revalidation post-extraction : chaque entrée (fichier OU répertoire)
+            // doit rester sous le répertoire d'extraction temporaire.
             for file in Directory.GetFiles(tempFull, "*", SearchOption.AllDirectories) do
                 let fileFull = Path.GetFullPath(file)
 
@@ -262,10 +262,10 @@ let extractTarGz (archive: string) (destination: string) =
                 let dirFull = Path.GetFullPath(dir)
 
                 if not (isWithin tempFull dirFull) then
-                    failwithf "RÃ©pertoire extrait hors de la destination: %s" dirFull
+                    failwithf "Répertoire extrait hors de la destination: %s" dirFull
 
-            // DÃ©placement avec revalidation de la CIBLE : un relPath qui serait
-            // rÃ©solu hors de `destination` est rejetÃ© avant tout accÃ¨s fichier.
+            // Déplacement avec revalidation de la CIBLE : un relPath qui serait
+            // résolu hors de `destination` est rejeté avant tout accès fichier.
             for file in Directory.GetFiles(tempFull, "*", SearchOption.AllDirectories) do
                 let fileFull = Path.GetFullPath(file)
                 let relPath = fileFull.Substring(tempFull.Length).TrimStart(Path.DirectorySeparatorChar)
@@ -308,12 +308,12 @@ let extractZip (archive: string) (destination: string) =
         let entryPath = Path.GetFullPath(Path.Combine(destFull, entry.FullName))
 
         if entryPath <> destFull && not (entryPath.StartsWith(destFullWithSep, StringComparison.OrdinalIgnoreCase)) then
-            failwithf "Zip Slip dÃ©tectÃ© â€” chemin non autorisÃ©: %s" entry.FullName
+            failwithf "Zip Slip détecté — chemin non autorisé: %s" entry.FullName
 
     ZipFile.ExtractToDirectory(archive, destination)
     printfn "  [+] Extrait: %s" destination
 
-// â”€â”€â”€ Installation containerd + CNI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Installation containerd + CNI ───────────────────────────────────────
 
 let archiveSuffix = Guid.NewGuid().ToString("N")
 
@@ -327,14 +327,14 @@ let installContainerd () =
         let archivePath =
             Path.Combine(Path.GetTempPath(), sprintf "%s_%s" archiveSuffix containerdArchive)
 
-        printfn "  [*] TÃ©lÃ©chargement depuis GitHub..."
+        printfn "  [*] Téléchargement depuis GitHub..."
         do! downloadFile containerdUrl archivePath
         let expectedChecksum = ArtifactSigning.lookupChecksum artifactChecksums containerdArchive
 
         try
             verifyChecksum archivePath expectedChecksum
         with ex ->
-            printfn "  [!] Ã‰chec de vÃ©rification SHA256: %s" ex.Message
+            printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(archivePath)
             ExceptionDispatchInfo.Capture(ex).Throw()
 
@@ -343,7 +343,7 @@ let installContainerd () =
 
         File.Delete(archivePath)
 
-        printfn "  [âœ“] containerd installÃ© dans %s" containerdDir
+        printfn "  [✓] containerd installé dans %s" containerdDir
     }
 
 let downloadCniPlugins () =
@@ -352,7 +352,7 @@ let downloadCniPlugins () =
         ensureDirectory cniBinDir
         ensureDirectory cniConfDir
 
-        printfn "  [*] TÃ©lÃ©chargement des plugins Microsoft CNI v%s..." winCniVersion
+        printfn "  [*] Téléchargement des plugins Microsoft CNI v%s..." winCniVersion
 
         let winCniArchive =
             sprintf "windows-container-networking-cni-amd64-v%s.zip" winCniVersion
@@ -371,14 +371,14 @@ let downloadCniPlugins () =
         try
             verifyChecksum winCniTemp (ArtifactSigning.lookupChecksum artifactChecksums winCniArchive)
         with ex ->
-            printfn "  [!] Ã‰chec de vÃ©rification SHA256: %s" ex.Message
+            printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(winCniTemp)
             ExceptionDispatchInfo.Capture(ex).Throw()
 
         extractZip winCniTemp cniBinDir
         File.Delete(winCniTemp)
 
-        printfn "  [*] TÃ©lÃ©chargement des plugins CNI standards v%s..." cniPluginsVersion
+        printfn "  [*] Téléchargement des plugins CNI standards v%s..." cniPluginsVersion
         let cniArchive = sprintf "cni-plugins-windows-amd64-%s.tgz" cniPluginsVersion
 
         let cniUrl =
@@ -395,7 +395,7 @@ let downloadCniPlugins () =
         try
             verifyChecksum cniTemp (ArtifactSigning.lookupChecksum artifactChecksums cniArchive)
         with ex ->
-            printfn "  [!] Ã‰chec de vÃ©rification SHA256: %s" ex.Message
+            printfn "  [!] Échec de vérification SHA256: %s" ex.Message
             File.Delete(cniTemp)
             ExceptionDispatchInfo.Capture(ex).Throw()
 
@@ -403,10 +403,10 @@ let downloadCniPlugins () =
 
         File.Delete(cniTemp)
 
-        printfn "  [âœ“] Plugins CNI installÃ©s dans %s" cniBinDir
+        printfn "  [✓] Plugins CNI installés dans %s" cniBinDir
     }
 
-// â”€â”€â”€ Installation des services Windows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Installation des services Windows ───────────────────────────────────
 
 let serviceDllPath (serviceName: string) =
     Path.Combine(installDir, serviceName, sprintf "%s.exe" serviceName)
@@ -418,15 +418,15 @@ let installWindowsService (serviceName: string, displayName: string, port: int) 
         let exePath = serviceDllPath serviceName
 
         if not (File.Exists(exePath)) then
-            printfn "  [!] EXE non trouvÃ©: %s" exePath
-            printfn "  [!] Assurez-vous que le build a copiÃ© l'exÃ©cutable dans %s" (Path.GetDirectoryName(exePath))
+            printfn "  [!] EXE non trouvé: %s" exePath
+            printfn "  [!] Assurez-vous que le build a copié l'exécutable dans %s" (Path.GetDirectoryName(exePath))
 
-            // Un service absent n'est pas un succÃ¨s : l'appelant doit pouvoir
-            // distinguer une installation partielle d'une rÃ©ussite.
+            // Un service absent n'est pas un succès : l'appelant doit pouvoir
+            // distinguer une installation partielle d'une réussite.
             return false
         else
             // Guillemets INTERNES obligatoires : sans eux, SCM tente de lancer
-            // Â« C:\Program Â» pour un chemin contenant des espaces.
+            // « C:\Program » pour un chemin contenant des espaces.
             let quotedExe = sprintf "\"%s\"" exePath
 
             let scArgs =
@@ -439,10 +439,10 @@ let installWindowsService (serviceName: string, displayName: string, port: int) 
             let exitCode = runCommandWithArgs "sc.exe" scArgs
 
             if exitCode = 0 then
-                printfn "  [âœ“] Service %s crÃ©Ã©" serviceName
+                printfn "  [✓] Service %s créé" serviceName
                 return true
             else
-                printfn "  [âœ—] Ã‰chec de la crÃ©ation du service %s (code %d)" serviceName exitCode
+                printfn "  [✗] Échec de la création du service %s (code %d)" serviceName exitCode
                 return false
     }
 
@@ -453,9 +453,9 @@ let removeWindowsService (serviceName: string) =
         let stopResult = runCommandWithArgs "sc.exe" [ "stop"; serviceName ]
 
         if stopResult = 0 then
-            printfn "  [+] ArrÃªt du service %s demandÃ©" serviceName
+            printfn "  [+] Arrêt du service %s demandé" serviceName
 
-            // Attendre l'Ã©tat STOPPED : un `sc delete` immÃ©diat Ã©choue en 1072
+            // Attendre l'état STOPPED : un `sc delete` immédiat échoue en 1072
             // tant que le service est RUNNING/STOP_PENDING.
             try
                 use svc =
@@ -469,20 +469,20 @@ let removeWindowsService (serviceName: string) =
                     svc.Refresh()
                     waited <- waited + System.TimeSpan.FromMilliseconds(500.0)
             with ex ->
-                printfn "  [!] Attente de l'arrÃªt du service impossible : %s" ex.Message
+                printfn "  [!] Attente de l'arrêt du service impossible : %s" ex.Message
 
         let exitCode = runCommandWithArgs "sc.exe" [ "delete"; serviceName ]
 
         if exitCode = 0 then
-            printfn "  [âœ“] Service %s supprimÃ©" serviceName
+            printfn "  [✓] Service %s supprimé" serviceName
             return true
         else
-            printfn "  [!] Code retour %d (service peut-Ãªtre dÃ©jÃ  supprimÃ©)" exitCode
+            printfn "  [!] Code retour %d (service peut-être déjà supprimé)" exitCode
 
-            return (exitCode = 1072 || exitCode = 1060) // dÃ©jÃ  supprimÃ© / inexistant : OK
+            return (exitCode = 1072 || exitCode = 1060) // déjà supprimé / inexistant : OK
     }
 
-// â”€â”€â”€ Configuration containerd â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Configuration containerd ─────────────────────────────────────────────
 
 let buildContainerdConfigToml () =
     let legacy = isLegacyContainerd ()
@@ -492,7 +492,7 @@ let buildContainerdConfigToml () =
         [ "# configuration containerd Diplo"
           "# Genere par DiploWalker.Installer"
           if legacy then
-              "# containerd 1.6.x (LTS â€” Windows Server 2016)"
+              "# containerd 1.6.x (LTS — Windows Server 2016)"
           else
               "# containerd 1.7.x (Windows Server 2019+)"
           ""
@@ -601,7 +601,7 @@ let buildContainerdConfigToml () =
           "    disable_http2 = false"
           "    stream_idle_timeout = \"0s\"" ]
 
-// â”€â”€â”€ Configuration CNI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Configuration CNI ──────────────────────────────────────────────────
 
 let createCniConfig () =
     ensureDirectory cniConfDir
@@ -619,9 +619,9 @@ let createCniConfig () =
         File.WriteAllText(configPath, config)
         printfn "  [+] config CNI: %s (subnet: %s, gateway: %s)" (Path.GetFileName(configPath)) subnet gateway
     else
-        printfn "  [=] config CNI existe dÃ©jÃ , ignorÃ©"
+        printfn "  [=] config CNI existe déjà, ignoré"
 
-// â”€â”€â”€ Configuration services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Configuration services ───────────────────────────────────────────────
 
 let buildAppSettingsJson (grpcPort: int) (pipeName: string) (isolationType: string option) =
     let serviceSettings = JsonObject()
@@ -650,16 +650,16 @@ let buildAppSettingsJson (grpcPort: int) (pipeName: string) (isolationType: stri
     root.ToJsonString(options)
 
 let createConfigFiles () =
-    printfn "=== CrÃ©ation de la configuration ==="
+    printfn "=== Création de la configuration ==="
     ensureDirectory configDir
 
     let containerdConfigPath = Path.Combine(containerdDir, "config.toml")
 
     if not (File.Exists(containerdConfigPath)) then
         File.WriteAllText(containerdConfigPath, buildContainerdConfigToml ())
-        printfn "  [+] config.toml (tous les plugins containerd configurÃ©s)"
+        printfn "  [+] config.toml (tous les plugins containerd configurés)"
     else
-        printfn "  [=] config.toml existe dÃ©jÃ , ignorÃ©"
+        printfn "  [=] config.toml existe déjà, ignoré"
 
     createCniConfig ()
 
@@ -669,10 +669,10 @@ let createConfigFiles () =
         let token = DiploWalker.Abstractions.AuthToken.generateToken ()
         DiploWalker.Abstractions.AuthToken.saveToken token
 
-        // saveToken n'accorde FullControl qu'Ã  l'utilisateur COURANT (l'admin
+        // saveToken n'accorde FullControl qu'à l'utilisateur COURANT (l'admin
         // qui lance l'installeur) : or les services tournent en LocalSystem.
-        // Sans cette ouverture, les lectures du token Ã©chouent en AccessDenied
-        // juste aprÃ¨s l'installation.
+        // Sans cette ouverture, les lectures du token échouent en AccessDenied
+        // juste après l'installation.
         try
             let fileInfo = FileInfo(tokenPath)
             let acl = fileInfo.GetAccessControl()
@@ -687,7 +687,7 @@ let createConfigFiles () =
                         )
                     )
                 with ex ->
-                    printfn "  [!] Octroi de lecture Ã  '%s' impossible : %s" account ex.Message
+                    printfn "  [!] Octroi de lecture à '%s' impossible : %s" account ex.Message
 
             grantRead "SYSTEM"
             grantRead "Administrators"
@@ -695,9 +695,9 @@ let createConfigFiles () =
         with ex ->
             printfn "  [!] Ajustement ACL du token impossible : %s" ex.Message
 
-        printfn "  [+] auth-token.json (token gRPC gÃ©nÃ©rÃ©)"
+        printfn "  [+] auth-token.json (token gRPC généré)"
     else
-        printfn "  [=] auth-token.json existe dÃ©jÃ , ignorÃ©"
+        printfn "  [=] auth-token.json existe déjà, ignoré"
 
     for (serviceName, _, port) in services do
         let pipeName = serviceName.ToLowerInvariant().Replace(".", "-")
@@ -717,7 +717,7 @@ let createConfigFiles () =
             File.WriteAllText(settingsPath, settings)
             printfn "  [+] %s" (Path.GetFileName(settingsPath))
         else
-            printfn "  [=] %s existe dÃ©jÃ , ignorÃ©" (Path.GetFileName(settingsPath))
+            printfn "  [=] %s existe déjà, ignoré" (Path.GetFileName(settingsPath))
 
     let containerSettingsPath =
         Path.Combine(configDir, "DiploWalker.Container.appsettings.json")
@@ -729,12 +729,12 @@ let createConfigFiles () =
         let options = DiploWalkerJson.defaultOptions
         File.WriteAllText(containerSettingsPath, doc.ToJsonString(options))
     with ex ->
-        printfn "  [!] Erreur lors de la mise Ã  jour de %s: %s" (Path.GetFileName(containerSettingsPath)) ex.Message
+        printfn "  [!] Erreur lors de la mise à jour de %s: %s" (Path.GetFileName(containerSettingsPath)) ex.Message
 
-    printfn "  [âœ“] Configuration crÃ©Ã©e dans %s" configDir
+    printfn "  [✓] Configuration créée dans %s" configDir
 
 let createDirectories () =
-    printfn "=== CrÃ©ation des rÃ©pertoires ==="
+    printfn "=== Création des répertoires ==="
     ensureDirectory installDir
     ensureDirectory containerdDir
     ensureDirectory containerdRootDir

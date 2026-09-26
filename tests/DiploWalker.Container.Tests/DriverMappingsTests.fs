@@ -8,7 +8,7 @@ open DiploWalker.Grpc.Network
 
 type DriverMappingsTests() =
 
-    // â”€â”€ Volume drivers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Volume drivers ─────────────────────────────────────────
 
     [<Fact>]
     let ``volumeDriverToString retourne local pour Local`` () =
@@ -72,7 +72,7 @@ type DriverMappingsTests() =
         DriverMappings.parseVolumeDriver "iso" |> should equal StorageDriverType.Iso
 
     [<Fact>]
-    let ``parseVolumeDriver est insensible Ã  la casse`` () =
+    let ``parseVolumeDriver est insensible à la casse`` () =
         DriverMappings.parseVolumeDriver "NFS" |> should equal StorageDriverType.Nfs
 
     [<Fact>]
@@ -109,7 +109,7 @@ type DriverMappingsTests() =
         DriverMappings.isValidVolumeDriver "gcp" |> should equal true
 
     [<Fact>]
-    let ``isValidVolumeDriver est insensible Ã  la casse`` () =
+    let ``isValidVolumeDriver est insensible à la casse`` () =
         DriverMappings.isValidVolumeDriver "ISO" |> should equal true
 
     [<Fact>]
@@ -117,7 +117,7 @@ type DriverMappingsTests() =
         DriverMappings.isValidVolumeDriver "unknown" |> should equal false
 
     [<Fact>]
-    let ``allVolumeDriverNames contient 7 Ã©lÃ©ments`` () =
+    let ``allVolumeDriverNames contient 7 éléments`` () =
         DriverMappings.allVolumeDriverNames.Length |> should equal 7
 
     [<Fact>]
@@ -125,7 +125,7 @@ type DriverMappingsTests() =
         DriverMappings.allVolumeDriverNames
         |> should equal [ "local"; "nfs"; "smb"; "azure"; "aws"; "gcp"; "iso" ]
 
-    // â”€â”€ Network drivers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Network drivers ────────────────────────────────────────
 
     [<Fact>]
     let ``networkDriverToString retourne bridge pour Bridge`` () =
@@ -172,7 +172,7 @@ type DriverMappingsTests() =
         DriverMappings.parseNetworkDriver "pod" |> should equal NetworkDriver.Pod
 
     [<Fact>]
-    let ``parseNetworkDriver est insensible Ã  la casse`` () =
+    let ``parseNetworkDriver est insensible à la casse`` () =
         DriverMappings.parseNetworkDriver "POD" |> should equal NetworkDriver.Pod
 
     [<Fact>]
@@ -200,7 +200,7 @@ type DriverMappingsTests() =
         DriverMappings.isValidNetworkDriver "pod" |> should equal true
 
     [<Fact>]
-    let ``isValidNetworkDriver est insensible Ã  la casse`` () =
+    let ``isValidNetworkDriver est insensible à la casse`` () =
         DriverMappings.isValidNetworkDriver "BRIDGE" |> should equal true
 
     [<Fact>]
@@ -208,7 +208,7 @@ type DriverMappingsTests() =
         DriverMappings.isValidNetworkDriver "unknown" |> should equal false
 
     [<Fact>]
-    let ``allNetworkDriverNames contient 4 Ã©lÃ©ments`` () =
+    let ``allNetworkDriverNames contient 4 éléments`` () =
         DriverMappings.allNetworkDriverNames.Length |> should equal 4
 
     [<Fact>]

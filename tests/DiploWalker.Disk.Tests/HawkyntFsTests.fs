@@ -8,12 +8,12 @@ open DiploWalker.Disk
 
 /// Tests de l'adaptateur Hawkynt pour Btrfs, XFS et HFS+.
 ///
-/// Les images Btrfs/XFS/HFS+ natives ne sont pas crÃ©ables
+/// Les images Btrfs/XFS/HFS+ natives ne sont pas créables
 /// programmatiquement (pas de formatage DiscUtils pour ces FS).
 /// Ces tests valident :
-/// - La dÃ©tection de format et le fallback vers DiscUtils
-/// - Le comportement de tryExtract/tryWriteBack hors format gÃ©rÃ©
-/// - L'intÃ©gration FsImage â†’ Hawkynt â†’ DiscUtils pour FAT
+/// - La détection de format et le fallback vers DiscUtils
+/// - Le comportement de tryExtract/tryWriteBack hors format géré
+/// - L'intégration FsImage → Hawkynt → DiscUtils pour FAT
 module HawkyntFsTests =
 
     let private run (f: string -> string -> unit) =
@@ -25,7 +25,7 @@ module HawkyntFsTests =
         finally
             TestImage.cleanupDir root
 
-    // â”€â”€ tryExtract â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── tryExtract ────────────────────────────────────────────────────
 
     [<Fact>]
     let ``tryExtract retourne None pour un fichier brut sans FS`` () =
@@ -51,7 +51,7 @@ module HawkyntFsTests =
             Directory.CreateDirectory(staging) |> ignore
             HawkyntFs.tryExtract img staging |> should equal None)
 
-    // â”€â”€ tryWriteBack â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── tryWriteBack ──────────────────────────────────────────────────
 
     [<Fact>]
     let ``tryWriteBack retourne false pour un fichier brut sans FS`` () =
@@ -77,7 +77,7 @@ module HawkyntFsTests =
             Directory.CreateDirectory(staging) |> ignore
             HawkyntFs.tryWriteBack img staging |> should equal false)
 
-    // â”€â”€ Fallback DiscUtils via FsImage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Fallback DiscUtils via FsImage ────────────────────────────────
 
     [<Fact>]
     let ``FsImage.extract sur FAT delegue bien a DiscUtils via fallback`` () =

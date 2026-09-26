@@ -114,8 +114,8 @@ type VolumeTabViewModel(outputPort: IOutputPort, ?volumeClientFactory: unit -> I
     member _.BrowseDestCommand = browseDestCmd
 
     member private this.BrowseSource() =
-        // Cmd.run : exceptions attendues et signalÃ©es â€” le fire-and-forget
-        // rendait l'Ã©chec du picker totalement muet.
+        // Cmd.run : exceptions attendues et signalées — le fire-and-forget
+        // rendait l'échec du picker totalement muet.
         Cmd.run outputPort (fun () ->
             task {
                 if isNull storageProvider then
@@ -123,7 +123,7 @@ type VolumeTabViewModel(outputPort: IOutputPort, ?volumeClientFactory: unit -> I
                 else
                     let! result =
                         storageProvider.OpenFolderPickerAsync(
-                            FolderPickerOpenOptions(Title = "SÃ©lectionner le rÃ©pertoire source", AllowMultiple = false)
+                            FolderPickerOpenOptions(Title = "Sélectionner le répertoire source", AllowMultiple = false)
                         )
 
                     if result.Count > 0 then
@@ -274,8 +274,8 @@ type VolumeTabViewModel(outputPort: IOutputPort, ?volumeClientFactory: unit -> I
                                 (DiskFormat.toString format)
                         )
 
-                        // Travail lourd (parcours rÃ©cursif, Ã©criture de Go) :
-                        // dÃ©portÃ© hors du thread UI sinon l'interface gÃ¨le.
+                        // Travail lourd (parcours récursif, écriture de Go) :
+                        // déporté hors du thread UI sinon l'interface gèle.
                         let! result = System.Threading.Tasks.Task.Run(fun () ->
                             FsImage.create this.ImageSourceDir this.ImageDestPath format
                             |> Result.defaultWith failwith)

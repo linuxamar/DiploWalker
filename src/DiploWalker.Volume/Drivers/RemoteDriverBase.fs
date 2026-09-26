@@ -6,7 +6,7 @@ open Grpc.Core
 open DiploWalker.Abstractions
 open DiploWalker.Abstractions.Interfaces
 
-/// Helpers partagÃ©s pour les drivers de volume distants.
+/// Helpers partagés pour les drivers de volume distants.
 module RemoteDriverHelpers =
 
     let extractRemotePathFromInfo (info: JsonElement) (id: string) =
@@ -45,7 +45,7 @@ module RemoteDriverHelpers =
         else
             optsMap
 
-    /// Montage partagÃ© : validate â†’ inspect â†’ extract remotePath â†’ call mountFn.
+    /// Montage partagé : validate → inspect → extract remotePath → call mountFn.
     let mountVolume
         (store: RemoteVolumeStore)
         (id: string)
@@ -64,14 +64,14 @@ module RemoteDriverHelpers =
             mountFn remotePath targetPath mergedOpts
             (true, targetPath)
 
-    /// DÃ©montage partagÃ© : validate â†’ call unmountFn.
+    /// Démontage partagé : validate → call unmountFn.
     let unmountVolume (id: string) (targetPath: string) (unmountFn: string -> unit) =
         SecurityValidation.validateId id "L'identifiant du volume"
         SecurityValidation.validateVolumePath targetPath "Le chemin cible"
         unmountFn targetPath
         (true, "Démonté")
 
-    /// DÃ©montage NFS-like : umount â†’ fallback mount -u â†’ error.
+    /// Démontage NFS-like : umount → fallback mount -u → error.
     let unmountNfsLike (targetPath: string) =
         try
             ProcessExec.runUnit "umount" [ targetPath ] (Some ProcessExec.MountTimeoutMs) None None
@@ -81,27 +81,27 @@ module RemoteDriverHelpers =
             with ex ->
                 raise (
                     RpcException(
-                        Status(StatusCode.Internal, sprintf "Impossible de dÃ©monter '%s': %s" targetPath ex.Message)
+                        Status(StatusCode.Internal, sprintf "Impossible de démonter '%s': %s" targetPath ex.Message)
                     )
                 )
 
 /// Base commune aux drivers de volume distants. Mutualise le store, la
-/// crÃ©ation d'un volume (construction du chemin distant), le montage/dÃ©montage
-/// et la suppression de masse â€” le reste (chemin, monteur) reste spÃ©cifique.
+/// création d'un volume (construction du chemin distant), le montage/démontage
+/// et la suppression de masse — le reste (chemin, monteur) reste spécifique.
 [<AbstractClass>]
 type RemoteVolumeDriver(dataRoot: string, driverName: string) as this =
 
     let store = RemoteVolumeStore(dataRoot, driverName)
 
-    /// Construit le chemin distant (partage / export / maquette) Ã  partir des
-    /// options du driver. LÃ¨ve RpcException InvalidArgument si un champ manque.
+    /// Construit le chemin distant (partage / export / maquette) à partir des
+    /// options du driver. Lève RpcException InvalidArgument si un champ manque.
     abstract RemotePath: Map<string, string> -> string
 
     /// Monte la ressource distante `remotePath` sur `targetPath`.
     abstract Mount: string -> string -> Map<string, string> -> unit
 
-    /// DÃ©monte la ressource montÃ©e sur `targetPath`. DÃ©faut : dÃ©montage de
-    /// type NFS (umount â†’ fallback mount -u) ; Azure/SMB surchargent.
+    /// Démonte la ressource montée sur `targetPath`. Défaut : démontage de
+    /// type NFS (umount → fallback mount -u) ; Azure/SMB surchargent.
     abstract Unmount: string -> unit
     default this.Unmount targetPath = RemoteDriverHelpers.unmountNfsLike targetPath
 

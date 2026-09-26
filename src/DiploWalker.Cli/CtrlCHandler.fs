@@ -3,8 +3,8 @@
 open System
 open System.Threading
 
-/// GÃ¨re l'arrÃªt propre sur Ctrl+C : pose e.Cancel = true pour empÃªcher la
-/// terminaison brutale du processus et annule un jeton d'annulation observÃ©
+/// Gère l'arrêt propre sur Ctrl+C : pose e.Cancel = true pour empêcher la
+/// terminaison brutale du processus et annule un jeton d'annulation observé
 /// par les commandes bloquantes (suivi de journaux).
 type CtrlCHandler() =
     let cts = new CancellationTokenSource()

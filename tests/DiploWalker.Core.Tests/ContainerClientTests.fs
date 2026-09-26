@@ -53,7 +53,7 @@ module ContainerClientTests =
         channel.Target |> should not' (be Null)
         channel.Dispose()
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ CrÃ©ation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────── Création ───────────────────────
 
     [<Fact>]
     let ``CreateAsync cree un conteneur et retourne son ID`` () =
@@ -117,7 +117,7 @@ module ContainerClientTests =
             req.MemoryLimit |> should equal 512L
             req.CpuShares |> should equal 2)
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Cycle de vie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────── Cycle de vie ───────────────────────
 
     [<Fact>]
     let ``StartAsync demarre un conteneur`` () =
@@ -173,7 +173,7 @@ module ContainerClientTests =
             req.All |> should equal true
             req.Filters.["label"] |> should equal "x")
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Journaux â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────── Journaux ───────────────────────
 
     [<Fact>]
     let ``GetLogsStream emet les entrees du service`` () =
@@ -217,7 +217,7 @@ module ContainerClientTests =
             logs |> should haveCount 2
             logs |> Seq.map (fun e -> e.Log) |> List.ofSeq |> should equal [ "ligne 1"; "erreur" ])
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ ExÃ©cution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────── Exécution ───────────────────────
 
     [<Fact>]
     let ``Exec envoie la commande et retourne la sortie`` () =
@@ -232,7 +232,7 @@ module ContainerClientTests =
             (outputs |> Seq.head).Stream |> should equal "stdout"
             System.Text.Encoding.UTF8.GetString((outputs |> Seq.head).Data) |> should equal "hello")
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────── Images ───────────────────────
 
     [<Fact>]
     let ``PullImageAsync telecharge une image`` () =
@@ -285,7 +285,7 @@ module ContainerClientTests =
             req.Source |> should equal "nginx:latest"
             req.Target |> should equal "registry.local/nginx:2")
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Registres â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────── Registres ───────────────────────
 
     [<Fact>]
     let ``LoginRegistryAsync se connecte au registre`` () =
@@ -308,7 +308,7 @@ module ContainerClientTests =
             response.Success |> should equal true
             stub.LastLogout.Value.Registry |> should equal "registry.local")
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Divers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────── Divers ───────────────────────
 
     [<Fact>]
     let ``GetVersionAsync retourne la version du service`` () =
@@ -357,7 +357,7 @@ module ContainerClientTests =
             response.MemoryLimit |> should equal 65536L
             stub.LastStats.Value.Id |> should equal "c1")
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Gardes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────── Gardes ───────────────────────
 
     [<Fact>]
     let ``Les gardes de creation rejettent nom et image vides`` () =

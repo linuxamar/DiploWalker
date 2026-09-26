@@ -5,7 +5,7 @@ open System.IO
 open System.ServiceProcess
 open DiploWalker.Installer.Core
 
-// â”€â”€â”€ Commandes CLI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Commandes CLI ───────────────────────────────────────────────────────
 
 let installAll () =
     task {
@@ -13,22 +13,22 @@ let installAll () =
             printfn "[ERREUR] L'installation ne fonctionne que sous Windows."
             return 1
         elif not (isAdministrator ()) then
-            printfn "[ERREUR] L'installation nÃ©cessite les droits administrateur."
-            printfn "  Relancez la console en tant qu'administrateur, puis rÃ©exÃ©cutez :"
+            printfn "[ERREUR] L'installation nécessite les droits administrateur."
+            printfn "  Relancez la console en tant qu'administrateur, puis réexécutez :"
             printfn "    DiploWalker.Installer.exe install"
             return 1
         else
             let osVersion = getWindowsServerVersion ()
             let osYear = getWindowsServerYear ()
-            printfn "=== DÃ©tection du systÃ¨me ==="
+            printfn "=== Détection du système ==="
             printfn "  Windows Server %s (build %d)" osYear Environment.OSVersion.Version.Build
 
             if isWs2016 () then
                 printfn ""
-                printfn "  [!] ATTENTION: Windows Server 2016 dÃ©tectÃ©"
-                printfn "      - Containerd 1.6.x (LTS) sera installÃ©"
+                printfn "  [!] ATTENTION: Windows Server 2016 détecté"
+                printfn "      - Containerd 1.6.x (LTS) sera installé"
                 printfn "      - Isolation process uniquement (pas de Hyper-V requis)"
-                printfn "      - Certaines fonctionnalitÃ©s 1.7.x ne seront pas disponibles"
+                printfn "      - Certaines fonctionnalités 1.7.x ne seront pas disponibles"
                 printfn ""
 
             createDirectories ()
@@ -45,22 +45,22 @@ let installAll () =
                     failures <- failures + 1
 
             printfn ""
-            printfn "=== Installation terminÃ©e ==="
+            printfn "=== Installation terminée ==="
 
             if failures > 0 then
-                printfn "  [!] %d service(s) NON installÃ©(s) â€” installation partielle" failures
+                printfn "  [!] %d service(s) NON installé(s) — installation partielle" failures
                 return 1
             else
-                printfn "  SystÃ¨me: Windows Server %s (build %d)" osYear Environment.OSVersion.Version.Build
-                printfn "  RÃ©pertoire: %s" installDir
-                printfn "  Services: %d installÃ©s" services.Length
+                printfn "  Système: Windows Server %s (build %d)" osYear Environment.OSVersion.Version.Build
+                printfn "  Répertoire: %s" installDir
+                printfn "  Services: %d installés" services.Length
                 printfn "  Containerd: %s (isolation process)" downloadContainerdVersion
                 printfn "  Sandbox image: %s" (getSandboxImage ())
                 printfn "  Plugins CNI: Microsoft v%s + Standards v%s" winCniVersion cniPluginsVersion
                 printfn "  Logs: %s" logDir
                 printfn "  Config: %s" configDir
                 printfn ""
-                printfn "  Pour dÃ©marrer les services:"
+                printfn "  Pour démarrer les services:"
 
                 for (name, _, _) in services do
                     printfn "    sc.exe start \"%s\"" name
@@ -71,10 +71,10 @@ let installAll () =
 let uninstallAll () =
     task {
         if not (isWindows ()) then
-            printfn "[ERREUR] La dÃ©sinstallation ne fonctionne que sous Windows."
+            printfn "[ERREUR] La désinstallation ne fonctionne que sous Windows."
             return 1
         elif not (isAdministrator ()) then
-            printfn "[ERREUR] La dÃ©sinstallation nÃ©cessite les droits administrateur."
+            printfn "[ERREUR] La désinstallation nécessite les droits administrateur."
             return 1
         else
             for (serviceName, _, _) in services do
@@ -89,7 +89,7 @@ let uninstallAll () =
                 with ex ->
                     eprintfn "  [!] Impossible de supprimer %s : %s" tokenPath ex.Message
 
-                printfn "  [+] auth-token.json supprimÃ©"
+                printfn "  [+] auth-token.json supprimé"
 
             let tokenDir = DiploWalker.Abstractions.AuthToken.authTokenDir
 
@@ -100,14 +100,14 @@ let uninstallAll () =
                         && Directory.GetDirectories(tokenDir).Length = 0
                     then
                         Directory.Delete(tokenDir)
-                        printfn "  [+] RÃ©pertoire %s supprimÃ©" tokenDir
+                        printfn "  [+] Répertoire %s supprimé" tokenDir
                 with _ ->
                     ()
 
             printfn ""
-            printfn "=== DÃ©sinstallation des services terminÃ©e ==="
-            printfn "  Les fichiers dans %s n'ont pas Ã©tÃ© supprimÃ©s." installDir
-            printfn "  Supprimez manuellement si nÃ©cessaire."
+            printfn "=== Désinstallation des services terminée ==="
+            printfn "  Les fichiers dans %s n'ont pas été supprimés." installDir
+            printfn "  Supprimez manuellement si nécessaire."
             return 0
     }
 
@@ -122,7 +122,7 @@ let statusAll () =
         with _ ->
             printfn "  %-20s [INCONNU]      port %d" serviceName port
 
-// â”€â”€â”€ Point d'entrÃ©e â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Point d'entrée ─────────────────────────────────────────────────────
 
 [<EntryPoint>]
 let main argv =
@@ -132,8 +132,8 @@ let main argv =
     else
         match argv with
         | [| "install" |] ->
-            // Propager le code retour : un dÃ©ploiement partiellement ratÃ© ne
-            // doit pas Ãªtre indistinguable d'un succÃ¨s pour l'outillage.
+            // Propager le code retour : un déploiement partiellement raté ne
+            // doit pas être indistinguable d'un succès pour l'outillage.
             installAll () |> Async.AwaitTask |> Async.RunSynchronously
         | [| "uninstall" |] ->
             uninstallAll () |> Async.AwaitTask |> Async.RunSynchronously
@@ -141,27 +141,27 @@ let main argv =
             statusAll ()
             0
         | _ ->
-            printfn "DiploWalker.Installer â€” Installation des services Windows Diplo"
+            printfn "DiploWalker.Installer — Installation des services Windows Diplo"
             printfn ""
             printfn "Usage:"
             printfn "  DiploWalker.Installer.exe install      Installer containerd + plugins CNI + services"
             printfn "  DiploWalker.Installer.exe uninstall    Supprimer les services"
-            printfn "  DiploWalker.Installer.exe status       Afficher l'Ã©tat des services"
+            printfn "  DiploWalker.Installer.exe status       Afficher l'état des services"
             printfn ""
-            printfn "PrÃ©requis:"
-            printfn "  - Windows Server (2016 ou plus rÃ©cent)"
+            printfn "Prérequis:"
+            printfn "  - Windows Server (2016 ou plus récent)"
             printfn "  - .NET 10 Runtime"
             printfn "  - Droits administrateur"
             printfn "  - PAS de virtualisation requise (isolation process uniquement)"
             printfn ""
-            printfn "FonctionnalitÃ©s:"
-            printfn "  - TÃ©lÃ©charge et installe containerd %s" downloadContainerdVersion
+            printfn "Fonctionnalités:"
+            printfn "  - Télécharge et installe containerd %s" downloadContainerdVersion
             printfn "  - Installe les plugins CNI Microsoft v%s (nat, overlay, l2bridge)" winCniVersion
             printfn "  - Installe les plugins CNI standards v%s (bridge, host-local, portmap)" cniPluginsVersion
             printfn "  - Configure containerd avec tous les plugins (isolation process, pas de Hyper-V)"
-            printfn "  - CrÃ©e la config CNI par dÃ©faut (rÃ©seau nat 172.20.0.0/16)"
-            printfn "  - CrÃ©e les services Windows DiploWalker.Container, DiploWalker.Volume, DiploWalker.Network"
-            printfn "  - Configure les logs, la config et les rÃ©pertoires"
+            printfn "  - Crée la config CNI par défaut (réseau nat 172.20.0.0/16)"
+            printfn "  - Crée les services Windows DiploWalker.Container, DiploWalker.Volume, DiploWalker.Network"
+            printfn "  - Configure les logs, la config et les répertoires"
             0
 
 

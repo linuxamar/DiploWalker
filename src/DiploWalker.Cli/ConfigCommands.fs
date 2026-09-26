@@ -19,7 +19,7 @@ type InitConfigSettings() =
 type InitConfigCommand(output: IOutputPort) =
     inherit Command<InitConfigSettings>()
 
-    // DÃ©fauts alignÃ©s sur DiploWalkerPorts (Debug 5001-5003, Release 6001-6003).
+    // Défauts alignés sur DiploWalkerPorts (Debug 5001-5003, Release 6001-6003).
     let defaultConfig =
         sprintf
             """{
@@ -60,7 +60,7 @@ type InitConfigCommand(output: IOutputPort) =
             | "tcp" -> Some defaultConfig
             | "pipe" -> Some pipeConfig
             | other ->
-                output.WriteError(sprintf "Transport inconnu : '%s'. Valeurs acceptÃ©es : tcp, pipe" other)
+                output.WriteError(sprintf "Transport inconnu : '%s'. Valeurs acceptées : tcp, pipe" other)
                 None
 
         match content with
@@ -79,10 +79,10 @@ type InitConfigCommand(output: IOutputPort) =
 
             try
                 File.WriteAllText(filePath, content)
-                output.WriteSuccess(sprintf "Configuration Ã©crite dans %s" filePath)
+                output.WriteSuccess(sprintf "Configuration écrite dans %s" filePath)
                 0
             with ex ->
-                output.WriteError(sprintf "Erreur lors de l'Ã©criture de %s : %s" filePath ex.Message)
+                output.WriteError(sprintf "Erreur lors de l'écriture de %s : %s" filePath ex.Message)
                 1
 
 

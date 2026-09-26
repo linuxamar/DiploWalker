@@ -1,12 +1,12 @@
 ﻿namespace DiploWalker.Contracts
 
-/// Types partagÃ©s entre les services DiploWalker.
+/// Types partagés entre les services DiploWalker.
 module Types =
 
     /// Identifiant unique d'un conteneur
     type ContainerId = ContainerId of string
 
-    /// Ã‰tat d'un conteneur
+    /// État d'un conteneur
     type ContainerState =
         | Created
         | Running

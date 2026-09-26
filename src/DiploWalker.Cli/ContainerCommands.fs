@@ -16,7 +16,7 @@ open DiploWalker.Grpc.Container
 open Spectre.Console.Cli
 open Spectre.Console
 
-// â”€â”€ list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── list ──────────────────────────────────────────────────────────
 type ListSettings() =
     inherit CommandSettings()
 
@@ -37,18 +37,18 @@ type ListCommand(output: IOutputPort, clients: IDiploClients) =
             let! response = client.ListAsync(namespaceName = ns, all = settings.All, ct = ct)
 
             if response.Containers.Count = 0 then
-                output.WriteWarning("Aucun conteneur trouvÃ©.")
+                output.WriteWarning("Aucun conteneur trouvé.")
             else
                 output.WriteTable(
                     response.Containers,
-                    [| "ID"; "Nom"; "Image"; "Ã‰tat"; "CrÃ©Ã©" |],
+                    [| "ID"; "Nom"; "Image"; "État"; "Créé" |],
                     fun c -> [| c.Id; c.Name; c.Image; c.State.ToString(); c.CreatedAt |]
                 )
 
             return 0
         }
 
-// â”€â”€ inspect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── inspect ───────────────────────────────────────────────────────
 type InspectContainerSettings() =
     inherit CommandSettings()
 
@@ -71,23 +71,23 @@ type InspectContainerCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteSuccess(sprintf "Conteneur %s" response.Name)
                 output.WriteLine(sprintf "  ID        : %s" response.Id)
                 output.WriteLine(sprintf "  Image     : %s" response.Image)
-                output.WriteLine(sprintf "  Ã‰tat      : %s" (response.State.ToString()))
-                output.WriteLine(sprintf "  CrÃ©Ã©      : %s" response.CreatedAt)
-                output.WriteLine(sprintf "  DÃ©marrÃ©   : %s" response.StartedAt)
-                output.WriteLine(sprintf "  ArrÃªtÃ©    : %s" response.FinishedAt)
+                output.WriteLine(sprintf "  État      : %s" (response.State.ToString()))
+                output.WriteLine(sprintf "  Créé      : %s" response.CreatedAt)
+                output.WriteLine(sprintf "  Démarré   : %s" response.StartedAt)
+                output.WriteLine(sprintf "  Arrêté    : %s" response.FinishedAt)
                 output.WriteLine(sprintf "  PID       : %d" response.Pid)
                 output.WriteLine(sprintf "  Exit code : %d" response.ExitCode)
                 return 0
         }
 
-// â”€â”€ start â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── start ─────────────────────────────────────────────────────────
 type StartSettings() =
     inherit CommandSettings()
 
     [<CommandArgument(0, "<ID>")>]
     member val Id: string = null with get, set
 
-    /// DÃ©marre en attachÃ© Ã  la console (sinon non interactif, en arriÃ¨re-plan).
+    /// Démarre en attaché à la console (sinon non interactif, en arrière-plan).
     [<CommandOption("-a|--attach")>]
     member val Attach = false with get, set
 
@@ -103,11 +103,11 @@ type StartContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let! response = client.StartAsync(settings.Id, attach = settings.Attach, ct = ct)
-                output.WriteSuccess(sprintf "Conteneur %s dÃ©marrÃ© (%s)" settings.Id (response.State.ToString()))
+                output.WriteSuccess(sprintf "Conteneur %s démarré (%s)" settings.Id (response.State.ToString()))
                 return 0
         }
 
-// â”€â”€ stop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── stop ──────────────────────────────────────────────────────────
 type StopSettings() =
     inherit CommandSettings()
 
@@ -129,11 +129,11 @@ type StopContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let! response = client.StopAsync(settings.Id, settings.Timeout, ct = ct)
-                output.WriteSuccess(sprintf "Conteneur %s arrÃªtÃ© (%s)" settings.Id (response.State.ToString()))
+                output.WriteSuccess(sprintf "Conteneur %s arrêté (%s)" settings.Id (response.State.ToString()))
                 return 0
         }
 
-// â”€â”€ delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── delete ────────────────────────────────────────────────────────
 type DeleteSettings() =
     inherit CommandSettings()
 
@@ -164,7 +164,7 @@ type DeleteContainerCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ pull â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── pull ──────────────────────────────────────────────────────────
 type PullSettings() =
     inherit CommandSettings()
 
@@ -205,7 +205,7 @@ type PullImageCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ login / logout (registres) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── login / logout (registres) ────────────────────────────────────
 type RegistryLoginSettings() =
     inherit CommandSettings()
 
@@ -285,7 +285,7 @@ type RegistryLogoutCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── create ────────────────────────────────────────────────────────
 
 type CreateContainerSettings() =
     inherit CommandSettings()
@@ -335,8 +335,8 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
 
-                // Signaler les entrÃ©es malformÃ©es : Â« --env FOO Â» sans '=' est
-                // sinon ignorÃ© en silence et la variable n'atteint jamais le
+                // Signaler les entrées malformées : « --env FOO » sans '=' est
+                // sinon ignoré en silence et la variable n'atteint jamais le
                 // conteneur.
                 let envPairs, envRejected =
                     settings.Env
@@ -348,13 +348,13 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
 
                 if not (Array.isEmpty envRejected) then
                     output.WriteWarning(
-                        sprintf "EntrÃ©es --env ignorÃ©es (format attendu CLE=valeur) : %s" (String.Join(", ", envRejected))
+                        sprintf "Entrées --env ignorées (format attendu CLE=valeur) : %s" (String.Join(", ", envRejected))
                     )
 
                 if not (Array.isEmpty labelsRejected) then
                     output.WriteWarning(
                         sprintf
-                            "EntrÃ©es --label ignorÃ©es (format attendu cle=valeur) : %s"
+                            "Entrées --label ignorées (format attendu cle=valeur) : %s"
                             (String.Join(", ", labelsRejected))
                     )
 
@@ -408,13 +408,13 @@ type CreateContainerCommand(output: IOutputPort, clients: IDiploClients) =
                         ct = ct
                     )
 
-                output.WriteSuccess(sprintf "Conteneur %s crÃ©Ã© (%s)" response.Name (response.State.ToString()))
+                output.WriteSuccess(sprintf "Conteneur %s créé (%s)" response.Name (response.State.ToString()))
                 output.WriteLine(sprintf "  ID      : %s" response.Id)
-                output.WriteLine(sprintf "  CrÃ©Ã©    : %s" response.CreatedAt)
+                output.WriteLine(sprintf "  Créé    : %s" response.CreatedAt)
                 return 0
         }
 
-// â”€â”€ logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── logs ──────────────────────────────────────────────────────────
 type LogsContainerSettings() =
     inherit CommandSettings()
 
@@ -498,7 +498,7 @@ type LogsContainerCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ exec â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── exec ──────────────────────────────────────────────────────────
 type ExecContainerSettings() =
     inherit CommandSettings()
 
@@ -530,7 +530,7 @@ type ExecContainerCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ namespaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── namespaces ────────────────────────────────────────────────────
 type NamespacesSettings() =
     inherit CommandSettings()
 
@@ -544,7 +544,7 @@ type NamespacesCommand(output: IOutputPort, clients: IDiploClients) =
             let! response = client.ListNamespacesAsync(ct = ct)
 
             if response.Namespaces.Count = 0 then
-                output.WriteWarning("Aucun namespace trouvÃ©.")
+                output.WriteWarning("Aucun namespace trouvé.")
             else
                 output.WriteSuccess("Namespaces disponibles :")
 
@@ -554,7 +554,7 @@ type NamespacesCommand(output: IOutputPort, clients: IDiploClients) =
             return 0
         }
 
-// â”€â”€ version â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── version ───────────────────────────────────────────────────────
 type VersionSettings() =
     inherit CommandSettings()
 
@@ -568,12 +568,12 @@ type VersionCommand(output: IOutputPort, clients: IDiploClients) =
             let! v = client.GetVersionAsync(ct = ct)
             output.WriteSuccess("Diplo")
             output.WriteLine(sprintf "  Version   : %s" v.Version)
-            output.WriteLine(sprintf "  RÃ©vision  : %s" v.Revision)
+            output.WriteLine(sprintf "  Révision  : %s" v.Revision)
             output.WriteLine(sprintf "  Go        : %s" v.GoVersion)
             output.WriteLine(sprintf "  OS        : %s" v.Os)
             output.WriteLine(sprintf "  Arch      : %s" v.Arch)
             output.WriteLine("")
-            output.WriteLine("  Licences des dÃ©pendances :")
+            output.WriteLine("  Licences des dépendances :")
 
             output.WriteLine(
                 "    MIT (22)              : Avalonia, FSharp.Core, DiscUtils, Microsoft, Spectre, YamlDotNet, ZstdSharp"
@@ -582,11 +582,11 @@ type VersionCommand(output: IOutputPort, clients: IDiploClients) =
             output.WriteLine("    Apache-2.0 (13)       : gRPC, protobuf-net, Serilog, xunit")
             output.WriteLine("    BSD-3-Clause (1)      : Google.Protobuf")
             output.WriteLine("    LGPL-3.0+ (1)         : Hawkynt.FileFormats.FileSystems")
-            output.WriteLine("  Voir THIRD-PARTY-NOTICES.txt pour le texte intÃ©gral.")
+            output.WriteLine("  Voir THIRD-PARTY-NOTICES.txt pour le texte intégral.")
             return 0
         }
 
-// â”€â”€ rename â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── rename ────────────────────────────────────────────────────────
 type RenameContainerSettings() =
     inherit CommandSettings()
 
@@ -620,7 +620,7 @@ type RenameContainerCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ top â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── top ───────────────────────────────────────────────────────────
 type TopContainerSettings() =
     inherit CommandSettings()
 
@@ -641,7 +641,7 @@ type TopContainerCommand(output: IOutputPort, clients: IDiploClients) =
                 let! response = client.TopContainerAsync(settings.Id, ct = ct)
 
                 if response.Processes.Count = 0 then
-                    output.WriteWarning("Aucun processus trouvÃ© dans le conteneur.")
+                    output.WriteWarning("Aucun processus trouvé dans le conteneur.")
                 else
                     output.WriteTable(
                         response.Processes,
@@ -652,7 +652,7 @@ type TopContainerCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── stats ─────────────────────────────────────────────────────────
 type StatsContainerSettings() =
     inherit CommandSettings()
 
@@ -671,18 +671,18 @@ type StatsContainerCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateContainerClient()
                 let! response = client.GetContainerStatsAsync(settings.Id, ct = ct)
-                output.WriteSuccess(sprintf "MÃ©triques du conteneur %s" settings.Id)
+                output.WriteSuccess(sprintf "Métriques du conteneur %s" settings.Id)
                 output.WriteLine(sprintf "  CPU       : %.2f" response.CpuUsage)
-                output.WriteLine(sprintf "  MÃ©moire   : %d / %d octets" response.MemoryUsage response.MemoryLimit)
-                output.WriteLine(sprintf "  RÃ©seau rx : %d octets" response.NetworkRx)
-                output.WriteLine(sprintf "  RÃ©seau tx : %d octets" response.NetworkTx)
+                output.WriteLine(sprintf "  Mémoire   : %d / %d octets" response.MemoryUsage response.MemoryLimit)
+                output.WriteLine(sprintf "  Réseau rx : %d octets" response.NetworkRx)
+                output.WriteLine(sprintf "  Réseau tx : %d octets" response.NetworkTx)
                 output.WriteLine(sprintf "  Disque r  : %d octets" response.DiskRead)
                 output.WriteLine(sprintf "  Disque w  : %d octets" response.DiskWrite)
                 output.WriteLine(sprintf "  PIDs      : %d" response.Pids)
                 return 0
         }
 
-// â”€â”€ image list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image list ────────────────────────────────────────────────────
 type ImageListSettings() =
     inherit CommandSettings()
 
@@ -700,18 +700,18 @@ type ImageListCommand(output: IOutputPort, clients: IDiploClients) =
             let! response = client.ListImagesAsync(ns, ct = ct)
 
             if response.Images.Count = 0 then
-                output.WriteWarning("Aucune image trouvÃ©e.")
+                output.WriteWarning("Aucune image trouvée.")
             else
                 output.WriteTable(
                     response.Images,
-                    [| "ID"; "RÃ©fÃ©rentiel"; "Tag"; "Taille"; "CrÃ©Ã©" |],
+                    [| "ID"; "Référentiel"; "Tag"; "Taille"; "Créé" |],
                     fun img -> [| img.Id; img.Repository; img.Tag; string img.Size; img.CreatedAt |]
                 )
 
             return 0
         }
 
-// â”€â”€ image search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image search ─────────────────────────────────────────────────
 type ImageSearchSettings() =
     inherit CommandSettings()
 
@@ -731,7 +731,7 @@ type ImageSearchCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Query) then
-                output.WriteError("La requÃªte de recherche est requise")
+                output.WriteError("La requête de recherche est requise")
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -742,11 +742,11 @@ type ImageSearchCommand(output: IOutputPort, clients: IDiploClients) =
                     output.WriteWarning(response.Message)
 
                 if response.Results.Count = 0 then
-                    output.WriteWarning("Aucune image trouvÃ©e dans les catalogues en ligne.")
+                    output.WriteWarning("Aucune image trouvée dans les catalogues en ligne.")
                 else
                     output.WriteTable(
                         response.Results,
-                        [| "Registre"; "RÃ©fÃ©rence"; "Ã‰toiles"; "Description" |],
+                        [| "Registre"; "Référence"; "Étoiles"; "Description" |],
                         fun r ->
                             [| r.Registry
                                r.Ref
@@ -757,7 +757,7 @@ type ImageSearchCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ image inspect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image inspect ─────────────────────────────────────────────────
 type ImageInspectSettings() =
     inherit CommandSettings()
 
@@ -774,7 +774,7 @@ type ImageInspectCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Ref) then
-                output.WriteError("La rÃ©fÃ©rence de l'image est requise")
+                output.WriteError("La référence de l'image est requise")
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -782,10 +782,10 @@ type ImageInspectCommand(output: IOutputPort, clients: IDiploClients) =
                 let! response = client.InspectImageAsync(settings.Ref, ns, ct = ct)
                 output.WriteSuccess(sprintf "Image %s" response.Ref)
                 output.WriteLine(sprintf "  ID           : %s" response.Id)
-                output.WriteLine(sprintf "  RÃ©fÃ©rentiel : %s" response.Repository)
+                output.WriteLine(sprintf "  Référentiel : %s" response.Repository)
                 output.WriteLine(sprintf "  Tag          : %s" response.Tag)
                 output.WriteLine(sprintf "  Taille       : %d octets" response.Size)
-                output.WriteLine(sprintf "  CrÃ©Ã©         : %s" response.CreatedAt)
+                output.WriteLine(sprintf "  Créé         : %s" response.CreatedAt)
 
                 if response.Labels.Count > 0 then
                     for kv in response.Labels do
@@ -794,7 +794,7 @@ type ImageInspectCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ image remove â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image remove ──────────────────────────────────────────────────
 type ImageRemoveSettings() =
     inherit CommandSettings()
 
@@ -811,7 +811,7 @@ type ImageRemoveCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Ref) then
-                output.WriteError("La rÃ©fÃ©rence de l'image est requise")
+                output.WriteError("La référence de l'image est requise")
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -826,7 +826,7 @@ type ImageRemoveCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ image tag â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image tag ─────────────────────────────────────────────────────
 type ImageTagSettings() =
     inherit CommandSettings()
 
@@ -846,10 +846,10 @@ type ImageTagCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Source) then
-                output.WriteError("La rÃ©fÃ©rence source est requise")
+                output.WriteError("La référence source est requise")
                 return 1
             elif String.IsNullOrWhiteSpace(settings.Target) then
-                output.WriteError("La rÃ©fÃ©rence cible est requise")
+                output.WriteError("La référence cible est requise")
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -859,7 +859,7 @@ type ImageTagCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ pause â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── pause ─────────────────────────────────────────────────────────
 type PauseContainerSettings() =
     inherit CommandSettings()
 
@@ -882,7 +882,7 @@ type PauseContainerCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ unpause â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── unpause ───────────────────────────────────────────────────────
 type UnpauseContainerSettings() =
     inherit CommandSettings()
 
@@ -905,7 +905,7 @@ type UnpauseContainerCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ wait â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── wait ──────────────────────────────────────────────────────────
 type WaitContainerSettings() =
     inherit CommandSettings()
 
@@ -929,22 +929,22 @@ type WaitContainerCommand(output: IOutputPort, clients: IDiploClients) =
                 let timeout = if settings.Timeout < 0 then 0 else settings.Timeout
                 let! response = client.WaitAsync(settings.Id, timeout, ct = ct)
 
-                // code -1 = abandon par dÃ©lai d'attente (voir WaitContainer).
+                // code -1 = abandon par délai d'attente (voir WaitContainer).
                 if response.ExitCode = -1 then
                     output.WriteWarning(
                         if String.IsNullOrWhiteSpace(response.Message) then
-                            sprintf "Conteneur %s toujours en cours aprÃ¨s %d s" settings.Id timeout
+                            sprintf "Conteneur %s toujours en cours après %d s" settings.Id timeout
                         else
                             response.Message
                     )
 
                     return 0
                 else
-                    output.WriteSuccess(sprintf "Conteneur %s terminÃ© (code de sortie %d)" settings.Id response.ExitCode)
+                    output.WriteSuccess(sprintf "Conteneur %s terminé (code de sortie %d)" settings.Id response.ExitCode)
                     return 0
         }
 
-// â”€â”€ prune (conteneurs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── prune (conteneurs) ────────────────────────────────────────────
 type PruneContainersSettings() =
     inherit CommandSettings()
 
@@ -958,9 +958,9 @@ type PruneContainersCommand(output: IOutputPort, clients: IDiploClients) =
             let! response = client.PruneContainersAsync(ct = ct)
 
             if response.Deleted.Count = 0 then
-                output.WriteWarning("Aucun conteneur arrÃªtÃ© Ã  supprimer.")
+                output.WriteWarning("Aucun conteneur arrêté à supprimer.")
             else
-                output.WriteSuccess(sprintf "%d conteneur(s) supprimÃ©(s) :" response.Deleted.Count)
+                output.WriteSuccess(sprintf "%d conteneur(s) supprimé(s) :" response.Deleted.Count)
 
                 for id in response.Deleted do
                     output.WriteLine(sprintf "  - %s" id)
@@ -968,7 +968,7 @@ type PruneContainersCommand(output: IOutputPort, clients: IDiploClients) =
             return 0
         }
 
-// â”€â”€ events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── events ────────────────────────────────────────────────────────
 type ContainerEventsSettings() =
     inherit CommandSettings()
 
@@ -1026,7 +1026,7 @@ type ContainerEventsCommand(output: IOutputPort, clients: IDiploClients) =
                 return 1
         }
 
-// â”€â”€ stats-stream â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── stats-stream ──────────────────────────────────────────────────
 type StatsStreamSettings() =
     inherit CommandSettings()
 
@@ -1067,7 +1067,7 @@ type StatsStreamCommand(output: IOutputPort, clients: IDiploClients) =
                                 let s = enumerator.Current
 
                                 output.WriteLine(
-                                    sprintf "CPU %.2f | MÃ©moire %d/%d | rx %d tx %d | disque r %d w %d | %d PID"
+                                    sprintf "CPU %.2f | Mémoire %d/%d | rx %d tx %d | disque r %d w %d | %d PID"
                                         s.CpuUsage
                                         s.MemoryUsage
                                         s.MemoryLimit
@@ -1097,7 +1097,7 @@ type StatsStreamCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ image prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image prune ───────────────────────────────────────────────────
 type ImagePruneSettings() =
     inherit CommandSettings()
 
@@ -1111,9 +1111,9 @@ type ImagePruneCommand(output: IOutputPort, clients: IDiploClients) =
             let! response = client.PruneImagesAsync(ct = ct)
 
             if response.Deleted.Count = 0 then
-                output.WriteWarning("Aucune image inutilisÃ©e Ã  supprimer.")
+                output.WriteWarning("Aucune image inutilisée à supprimer.")
             else
-                output.WriteSuccess(sprintf "%d image(s) supprimÃ©e(s) :" response.Deleted.Count)
+                output.WriteSuccess(sprintf "%d image(s) supprimée(s) :" response.Deleted.Count)
 
                 for id in response.Deleted do
                     output.WriteLine(sprintf "  - %s" id)
@@ -1121,7 +1121,7 @@ type ImagePruneCommand(output: IOutputPort, clients: IDiploClients) =
             return 0
         }
 
-// â”€â”€ image commit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image commit ──────────────────────────────────────────────────
 type ImageCommitSettings() =
     inherit CommandSettings()
 
@@ -1147,7 +1147,7 @@ type ImageCommitCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             elif String.IsNullOrWhiteSpace(settings.ImageRef) then
-                output.WriteError("La rÃ©fÃ©rence de l'image est requise")
+                output.WriteError("La référence de l'image est requise")
                 return 1
             else
                 use client = clients.CreateContainerClient()
@@ -1177,7 +1177,7 @@ type ImageCommitCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ image export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image export ──────────────────────────────────────────────────
 type ImageExportSettings() =
     inherit CommandSettings()
 
@@ -1197,7 +1197,7 @@ type ImageExportCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Ref) then
-                output.WriteError("La rÃ©fÃ©rence de l'image est requise")
+                output.WriteError("La référence de l'image est requise")
                 return 1
             elif String.IsNullOrWhiteSpace(settings.Output) then
                 output.WriteError("Le fichier de sortie est requis (--output)")
@@ -1239,15 +1239,15 @@ type ImageExportCommand(output: IOutputPort, clients: IDiploClients) =
                     output.WriteError(ex.Message)
                     return 1
                 | None ->
-                    output.WriteSuccess(sprintf "Image '%s' exportÃ©e vers %s (%d octets)" settings.Ref settings.Output total)
+                    output.WriteSuccess(sprintf "Image '%s' exportée vers %s (%d octets)" settings.Ref settings.Output total)
                     return 0
         }
 
-// â”€â”€ image import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── image import ──────────────────────────────────────────────────
 
 module private ImageTransfer =
 
-    /// DÃ©coupe un fichier local en morceaux de 64 Ko pour l'import gRPC.
+    /// Découpe un fichier local en morceaux de 64 Ko pour l'import gRPC.
     let imageChunksOfFile (path: string) : IAsyncEnumerable<ImageChunk> =
         { new IAsyncEnumerable<ImageChunk> with
             member _.GetAsyncEnumerator(_ct) =
@@ -1289,7 +1289,7 @@ type ImageImportCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.File) then
-                output.WriteError("Le fichier Ã  importer est requis")
+                output.WriteError("Le fichier à importer est requis")
                 return 1
             elif not (File.Exists settings.File) then
                 output.WriteError(sprintf "Fichier introuvable : %s" settings.File)
@@ -1306,7 +1306,7 @@ type ImageImportCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ read-file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── read-file ─────────────────────────────────────────────────────
 type ReadFileSettings() =
     inherit CommandSettings()
 
@@ -1340,14 +1340,14 @@ type ReadFileCommand(output: IOutputPort, clients: IDiploClients) =
 
                 if response.Success then
                     File.WriteAllBytes(settings.Output, response.Data)
-                    output.WriteSuccess(sprintf "%d octets copiÃ©s vers %s" response.Data.Length settings.Output)
+                    output.WriteSuccess(sprintf "%d octets copiés vers %s" response.Data.Length settings.Output)
                     return 0
                 else
                     output.WriteError(response.Message)
                     return 1
         }
 
-// â”€â”€ write-file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── write-file ────────────────────────────────────────────────────
 type WriteFileSettings() =
     inherit CommandSettings()
 

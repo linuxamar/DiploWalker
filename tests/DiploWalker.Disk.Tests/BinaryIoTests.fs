@@ -8,7 +8,7 @@ module BinaryIoTests =
     open FsUnit.Xunit
     open DiploWalker.Disk
 
-    // â”€â”€ Big-endian read â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Big-endian read ────────────────────────────────────────────────
 
     [<Fact>]
     let ``be16 lit un entier 16 bits big-endian`` () =
@@ -40,7 +40,7 @@ module BinaryIoTests =
         let data = [| 0xFFuy; 0xFFuy; 0xFFuy; 0xFFuy |]
         BinaryIo.be32 data 0 |> should equal -1
 
-    // â”€â”€ Big-endian write â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Big-endian write ───────────────────────────────────────────────
 
     [<Fact>]
     let ``putBe16 ecrit un entier 16 bits big-endian`` () =
@@ -63,7 +63,7 @@ module BinaryIoTests =
         data.[0] |> should equal 0x01uy
         data.[7] |> should equal 0x08uy
 
-    // â”€â”€ Little-endian read â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Little-endian read ─────────────────────────────────────────────
 
     [<Fact>]
     let ``le16 lit un entier 16 bits little-endian`` () =
@@ -90,7 +90,7 @@ module BinaryIoTests =
         let data = [| 0x00uy; 0x00uy |]
         BinaryIo.le16 data 0 |> should equal 0
 
-    // â”€â”€ Little-endian write â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Little-endian write ────────────────────────────────────────────
 
     [<Fact>]
     let ``putLe16 ecrit un entier 16 bits little-endian`` () =
@@ -113,7 +113,7 @@ module BinaryIoTests =
         data.[0] |> should equal 0x08uy
         data.[7] |> should equal 0x01uy
 
-    // â”€â”€ Roundtrip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Roundtrip ──────────────────────────────────────────────────────
 
     [<Fact>]
     let ``be16/putBe16 roundtrip`` () =
@@ -159,7 +159,7 @@ module BinaryIoTests =
         BinaryIo.putLe64 0x0102030405060708L le 0
         BinaryIo.be64 be 0 |> should equal (BinaryIo.le64 le 0)
 
-    // â”€â”€ readFully â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── readFully ──────────────────────────────────────────────────────
 
     [<Fact>]
     let ``readFully lit exactement len octets`` () =
@@ -201,7 +201,7 @@ module BinaryIoTests =
         BinaryIo.readFully stream buf 0 0
         buf |> should equal (Array.zeroCreate<byte> 5)
 
-    // â”€â”€ protect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── protect ────────────────────────────────────────────────────────
 
     [<Fact>]
     let ``protect retourne Ok quand pas d'exception`` () =

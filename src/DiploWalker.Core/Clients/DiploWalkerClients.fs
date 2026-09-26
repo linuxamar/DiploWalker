@@ -1,6 +1,6 @@
 ﻿namespace DiploWalker.Core.Clients
 
-/// ImplÃ©mentation par dÃ©faut d'IDiploClients : connecte les vrais clients gRPC
+/// Implémentation par défaut d'IDiploClients : connecte les vrais clients gRPC
 /// en fonction de la configuration locale.
 type DiploWalkerClients() =
 

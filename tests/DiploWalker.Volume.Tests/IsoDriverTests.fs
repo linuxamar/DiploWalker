@@ -13,13 +13,13 @@ module IsoDriverTests =
 
     do addAllowedVolumeDir (Path.GetTempPath())
 
-    // Les images de test sont construites Ã  la main, octet par octet, en
-    // suivant la norme ECMA-167 3e Ã©dition (et son implÃ©mentation de rÃ©fÃ©rence
-    // dans le noyau Linux, fs/udf/ecma_167.h). Aucun outil de crÃ©ation d'images
-    // (xorriso, mkisofs/genisoimage) n'Ã©tant disponible sur la machine de test
-    // â€” seul 7z.exe est prÃ©sent â€” il n'est pas possible de produire ces images
-    // avec un graveur conforme. La conformitÃ© des images peut Ãªtre vÃ©rifiÃ©e
-    // avec 7-Zip : `7z i image.iso` (dÃ©tection du format UDF) puis
+    // Les images de test sont construites à la main, octet par octet, en
+    // suivant la norme ECMA-167 3e édition (et son implémentation de référence
+    // dans le noyau Linux, fs/udf/ecma_167.h). Aucun outil de création d'images
+    // (xorriso, mkisofs/genisoimage) n'étant disponible sur la machine de test
+    // — seul 7z.exe est présent — il n'est pas possible de produire ces images
+    // avec un graveur conforme. La conformité des images peut être vérifiée
+    // avec 7-Zip : `7z i image.iso` (détection du format UDF) puis
     // `7z l image.iso` (liste du contenu).
 
     let createTempDir () =
@@ -100,10 +100,10 @@ module IsoDriverTests =
         iso.[offset + 2] <- byte ((v >>> 16) &&& 0xFFu)
         iso.[offset + 3] <- byte ((v >>> 24) &&& 0xFFu)
 
-    // Ã‰crit un en-tÃªte de descripteur UDF (3/7.2) : identifiant de balise,
-    // version 2 et emplacement de la balise. Le champ rÃ©servÃ© (octet 5) et le
-    // numÃ©ro de sÃ©rie (octets 6/7) sont mis Ã  zÃ©ro ; le CRC (octets 8/9), la
-    // longueur du CRC (octets 10/11) et la somme de contrÃ´le (octet 4) sont
+    // Écrit un en-tête de descripteur UDF (3/7.2) : identifiant de balise,
+    // version 2 et emplacement de la balise. Le champ réservé (octet 5) et le
+    // numéro de série (octets 6/7) sont mis à zéro ; le CRC (octets 8/9), la
+    // longueur du CRC (octets 10/11) et la somme de contrôle (octet 4) sont
     // remplis par finalizeTag.
     let writeTag (iso: byte[]) offset tagIdent location =
         writeUInt16LE iso offset tagIdent
@@ -112,7 +112,7 @@ module IsoDriverTests =
         writeUInt16LE iso (offset + 6) 0
         writeUInt32LE iso (offset + 12) location
 
-    // CRC-16/CCITT (polynÃ´me 0x1021, valeur initiale 0) du champ
+    // CRC-16/CCITT (polynôme 0x1021, valeur initiale 0) du champ
     // descriptorCRC de la balise UDF (3/7.2).
     let crc16 (iso: byte[]) offset count =
         let mutable crc = 0us
@@ -130,8 +130,8 @@ module IsoDriverTests =
         crc
 
     // Finalise une balise UDF : longueur du CRC (octets 10/11), CRC du
-    // descripteur (octets 8/9) sur crcLen octets Ã  partir de l'octet 16, puis
-    // somme de contrÃ´le (octet 4) = somme modulo 256 des octets 0..15 sauf
+    // descripteur (octets 8/9) sur crcLen octets à partir de l'octet 16, puis
+    // somme de contrôle (octet 4) = somme modulo 256 des octets 0..15 sauf
     // l'octet 4 (3/7.2).
     let finalizeTag (iso: byte[]) offset crcLen =
         writeUInt16LE iso (offset + 10) crcLen
@@ -145,10 +145,10 @@ module IsoDriverTests =
 
         iso.[offset + 4] <- sum
 
-    // Ã‰crit un identifiant de fichier (FID, 4/14.4) : balise 0x0101, version 1,
-    // caractÃ©ristiques, longueur du nom et ICB. Le nom est un d-string dont le
+    // Écrit un identifiant de fichier (FID, 4/14.4) : balise 0x0101, version 1,
+    // caractéristiques, longueur du nom et ICB. Le nom est un d-string dont le
     // premier octet (0x08) indique un codage ASCII. Retourne la longueur
-    // totale du FID, alignÃ©e sur 4 octets.
+    // totale du FID, alignée sur 4 octets.
     let writeFid (iso: byte[]) offset blockLocation characteristics (name: byte[]) icbLen icbLoc =
         writeTag iso offset 0x0101 blockLocation
         writeUInt16LE iso (offset + 16) 1
@@ -164,31 +164,31 @@ module IsoDriverTests =
         finalizeTag iso offset (padded - 16)
         padded
 
-    // Construit une image UDF DVD Ã  un seul fichier, lisible par 7-Zip
-    // (UdfIn.cpp) et conforme Ã  l'ECMA-167. Structure :
-    //   bloc  16 : sÃ©quence de reconnaissance de volume (VRS), descripteur NSR ;
-    //   bloc 256 : pointeur de volume d'ancrage (AVDP) finalisÃ©, VDS et miroir
+    // Construit une image UDF DVD à un seul fichier, lisible par 7-Zip
+    // (UdfIn.cpp) et conforme à l'ECMA-167. Structure :
+    //   bloc  16 : séquence de reconnaissance de volume (VRS), descripteur NSR ;
+    //   bloc 256 : pointeur de volume d'ancrage (AVDP) finalisé, VDS et miroir
     //              de longueur 6144 (trois blocs : PD + LVD + TD) ;
     //   bloc 257 : descripteur de partition (PD) de 300 blocs ;
     //   bloc 258 : descripteur de volume logique (LVD), jeu de fichiers au
     //              bloc 260, carte de partition type 1 au bloc 440 ;
     //   bloc 259 : descripteur de terminaison (TD) ;
     //   bloc 260 : descripteur de jeu de fichiers (FSD), ICB racine au bloc 261 ;
-    //   bloc 261 : entrÃ©e de fichier (FE) du rÃ©pertoire racine, dont les FIDs
-    //              sont stockÃ©s dans le bloc allouÃ© 263 (short_ad) ;
+    //   bloc 261 : entrée de fichier (FE) du répertoire racine, dont les FIDs
+    //              sont stockés dans le bloc alloué 263 (short_ad) ;
     //   bloc 262 : FE du fichier HELLO.TXT (long_ad vers le bloc 264) ;
     //   bloc 263 : descripteurs d'identifiant de fichier (FID) de la racine ;
     //   bloc 264 : contenu du fichier.
-    // Toutes les balises sont finalisÃ©es (CRC + somme de contrÃ´le) comme exigÃ©
+    // Toutes les balises sont finalisées (CRC + somme de contrôle) comme exigé
     // par la lecture 7-Zip. Les FIDs sont des d-strings ASCII (3/7.2.2). Les
-    // rÃ©pertoires sont identifiÃ©s par le type de fichier 4 (4/14.6) et les FIDs
-    // par la balise 0x0101 (4/14.4). L'identifiant NSR est paramÃ©trable pour
+    // répertoires sont identifiés par le type de fichier 4 (4/14.6) et les FIDs
+    // par la balise 0x0101 (4/14.4). L'identifiant NSR est paramétrable pour
     // couvrir UDF 1.x (NSR02) et UDF 2.x (NSR03).
     let buildUdfSingleFile (nsrId: string) =
         let iso = Array.zeroCreate<byte> (267 * 2048)
-        // SÃ©quence de reconnaissance de volume (ECMA-167 3/8.4.1) : descripteur
+        // Séquence de reconnaissance de volume (ECMA-167 3/8.4.1) : descripteur
         // BEA01 au bloc 16, descripteur NSR au bloc 17 et descripteur TEA01 au
-        // bloc 18. L'identifiant NSR est paramÃ©trable (NSR02 pour UDF 1.x,
+        // bloc 18. L'identifiant NSR est paramétrable (NSR02 pour UDF 1.x,
         // NSR03 pour UDF 2.x).
         let vrs = 16 * 2048
         iso.[vrs] <- 0uy
@@ -267,8 +267,8 @@ module IsoDriverTests =
 
         if fidLen1 + fidLen2 <> 88 then
             failwith "FIDs racine : taille inattendue"
-        // Ancre de fin de volume (ECMA-167 3/8.4.2) : l'AVDP du bloc 266, aprÃ¨s
-        // le dernier contenu (bloc 265), permet Ã  7-Zip de trouver la fin
+        // Ancre de fin de volume (ECMA-167 3/8.4.2) : l'AVDP du bloc 266, après
+        // le dernier contenu (bloc 265), permet à 7-Zip de trouver la fin
         // d'archive (NoEndAnchor=false).
         let endAnchor = 266 * 2048
         writeTag iso endAnchor 0x0002 266
@@ -285,18 +285,18 @@ module IsoDriverTests =
     let buildUdfNsr02 () = buildUdfSingleFile "NSR02"
 
     // Construit une image UDF plus riche, lisible par 7-Zip, couvrant :
-    //   - un fichier multi-blocs (BIG.BIN) assemblÃ© via trois short_ad ;
-    //   - des rÃ©pertoires imbriquÃ©s (DOSSIER/SOUS.TXT) ;
-    //   - un ICB de rÃ©pertoire multi-blocs (FIDs rÃ©partis sur deux blocs
-    //     allouÃ©s, 265 et 266, pointÃ©s par deux short_ad) ;
-    //   - des long_ad (ICB du rÃ©pertoire DOSSIER et du fichier SOUS.TXT).
+    //   - un fichier multi-blocs (BIG.BIN) assemblé via trois short_ad ;
+    //   - des répertoires imbriqués (DOSSIER/SOUS.TXT) ;
+    //   - un ICB de répertoire multi-blocs (FIDs répartis sur deux blocs
+    //     alloués, 265 et 266, pointés par deux short_ad) ;
+    //   - des long_ad (ICB du répertoire DOSSIER et du fichier SOUS.TXT).
     // Blocks : 256 AVDP, 257 PD, 258 LVD, 259 TD, 260 FSD, 261 ICB racine,
     // 262 ICB BIG.BIN, 263 ICB DOSSIER, 264 ICB SOUS.TXT, 265 FIDs racine,
-    // 266 FID Â« .. Â» racine, 267 FIDs DOSSIER, 270-272 contenus BIG.BIN,
+    // 266 FID « .. » racine, 267 FIDs DOSSIER, 270-272 contenus BIG.BIN,
     // 273 contenu SOUS.TXT.
     let buildUdfMultiBlock () =
         let iso = Array.zeroCreate<byte> (275 * 2048)
-        // SÃ©quence de reconnaissance de volume (ECMA-167 3/8.4.1) : BEA01 au
+        // Séquence de reconnaissance de volume (ECMA-167 3/8.4.1) : BEA01 au
         // bloc 16, NSR03 au bloc 17, TEA01 au bloc 18.
         let vrs = 16 * 2048
         iso.[vrs] <- 0uy
@@ -347,7 +347,7 @@ module IsoDriverTests =
         writeUInt32LE iso (fsd + 404) 261
         writeUInt16LE iso (fsd + 408) 0
         finalizeTag iso fsd 396
-        // ICB racine : FIDs sur deux blocs allouÃ©s (265 et 266), total 136.
+        // ICB racine : FIDs sur deux blocs alloués (265 et 266), total 136.
         let rootIcb = 261 * 2048
         writeTag iso rootIcb 0x0105 261
         iso.[rootIcb + 27] <- 4uy
@@ -396,7 +396,7 @@ module IsoDriverTests =
         writeUInt32LE iso (sousIcb + 180) 273
         writeUInt16LE iso (sousIcb + 184) 0
         finalizeTag iso sousIcb 180
-        // Bloc 265 : FIDs Â« BIG.BIN Â» et Â« DOSSIER Â».
+        // Bloc 265 : FIDs « BIG.BIN » et « DOSSIER ».
         let rootFid1 = 265 * 2048
         let bigName = Array.append [| 0x08uy |] (Encoding.ASCII.GetBytes("BIG.BIN"))
         let fidLen1 = writeFid iso rootFid1 265 0uy bigName 2048 262
@@ -405,11 +405,11 @@ module IsoDriverTests =
 
         if fidLen1 + fidLen2 <> 96 then
             failwith "FIDs racine : taille inattendue"
-        // Bloc 266 : FID Â« .. Â» de la racine.
+        // Bloc 266 : FID « .. » de la racine.
         let rootFid2 = 266 * 2048
         let parentName = [| 0x08uy; 0x01uy |]
         writeFid iso rootFid2 266 0x08uy parentName 2048 261 |> ignore
-        // Bloc 267 : FIDs de DOSSIER (Â« SOUS.TXT Â» et Â« .. Â»).
+        // Bloc 267 : FIDs de DOSSIER (« SOUS.TXT » et « .. »).
         let dirFid = 267 * 2048
         let sousName = Array.append [| 0x08uy |] (Encoding.ASCII.GetBytes("SOUS.TXT"))
         let fidLen3 = writeFid iso dirFid 267 0uy sousName 2048 264
@@ -417,8 +417,8 @@ module IsoDriverTests =
 
         if fidLen3 + fidLen4 <> 88 then
             failwith "FIDs de DOSSIER : taille inattendue"
-        // Ancre de fin de volume (ECMA-167 3/8.4.2) : l'AVDP du bloc 274, aprÃ¨s
-        // le dernier contenu (bloc 273), matÃ©rialise la fin d'archive pour 7-Zip
+        // Ancre de fin de volume (ECMA-167 3/8.4.2) : l'AVDP du bloc 274, après
+        // le dernier contenu (bloc 273), matérialise la fin d'archive pour 7-Zip
         // (NoEndAnchor=false).
         let endAnchor = 274 * 2048
         writeTag iso endAnchor 0x0002 274
@@ -433,10 +433,10 @@ module IsoDriverTests =
         Array.Copy(sousContent, 0, iso, 273 * 2048, sousContent.Length)
         iso
 
-    // Construit une image UDF dont le fichier HELLO.TXT est dÃ©crit par un
+    // Construit une image UDF dont le fichier HELLO.TXT est décrit par un
     // extended_ad (4/14.13). Ce type de descripteur d'allocation est lu par
-    // Diplo (dÃ©calage 20, emplacement Ã  l'octet 12 du descripteur) mais rejetÃ©
-    // par 7-Zip ; il n'est donc validÃ© que par un test unitaire.
+    // Diplo (décalage 20, emplacement à l'octet 12 du descripteur) mais rejeté
+    // par 7-Zip ; il n'est donc validé que par un test unitaire.
     let buildUdfExtendedAd () =
         let iso = buildUdfSingleFile "NSR03"
         let fileIcb = 262 * 2048

@@ -3,13 +3,13 @@
 open System
 open System.IO
 
-/// Primitives binaires partagÃ©es par les pilotes d'images disque Â« maison Â»
-/// (QCOW1, QCOW2, Parallels). Une seule dÃ©finition pour les lectures/Ã©critures
-/// big-endian et little-endian ainsi que la lecture complÃ¨te d'un flux, afin
-/// d'Ã©viter la duplication entre les pilotes.
+/// Primitives binaires partagées par les pilotes d'images disque « maison »
+/// (QCOW1, QCOW2, Parallels). Une seule définition pour les lectures/écritures
+/// big-endian et little-endian ainsi que la lecture complète d'un flux, afin
+/// d'éviter la duplication entre les pilotes.
 module BinaryIo =
 
-    // â”€â”€ big-endian â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── big-endian ─────────────────────────────────────────────────────────
 
     let be16 (d: byte[]) (o: int) = (int d.[o] <<< 8) ||| int d.[o + 1]
 
@@ -49,7 +49,7 @@ module BinaryIo =
         d.[o + 6] <- byte (v >>> 8)
         d.[o + 7] <- byte v
 
-    // â”€â”€ little-endian â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── little-endian ──────────────────────────────────────────────────────
 
     let le16 (d: byte[]) (o: int) = int d.[o] ||| (int d.[o + 1] <<< 8)
 
@@ -89,13 +89,13 @@ module BinaryIo =
         d.[o + 6] <- byte (v >>> 48)
         d.[o + 7] <- byte (v >>> 56)
 
-    // â”€â”€ lecture complÃ¨te d'un flux â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── lecture complète d'un flux ─────────────────────────────────────────
 
-    /// Lit exactement `len` octets depuis `s` vers `buf` Ã  partir de `off`.
-    /// LÃ¨ve une exception si le flux se termine avant la fin (Â« flux tronquÃ© Â»).
+    /// Lit exactement `len` octets depuis `s` vers `buf` à partir de `off`.
+    /// Lève une exception si le flux se termine avant la fin (« flux tronqué »).
     let readFully (s: Stream) (buf: byte[]) (off: int) (len: int) =
         if len < 0 then
-            invalidArg (nameof len) "La longueur ne peut Ãªtre nÃ©gative"
+            invalidArg (nameof len) "La longueur ne peut être négative"
 
         let mutable doneCount = 0
 
@@ -103,15 +103,15 @@ module BinaryIo =
             let n = s.Read(buf, off + doneCount, len - doneCount)
 
             if n = 0 then
-                failwith "Fin prÃ©maturÃ©e du flux (fichier tronquÃ©)"
+                failwith "Fin prématurée du flux (fichier tronqué)"
 
             doneCount <- doneCount + n
 
-    // â”€â”€ exÃ©cution protÃ©gÃ©e retournant un Result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── exécution protégée retournant un Result ────────────────────────────
 
-    /// ExÃ©cute `f` et convertit toute exception en `Error ex.Message`.
-    /// Centralise le schÃ©ma Â« try â€¦ Ok(â€¦) with e -> Error e.Message Â» des
-    /// pilotes pour Ã©viter la duplication.
+    /// Exécute `f` et convertit toute exception en `Error ex.Message`.
+    /// Centralise le schéma « try … Ok(…) with e -> Error e.Message » des
+    /// pilotes pour éviter la duplication.
     let protect (f: unit -> 'a) : Result<'a, string> =
         try Ok(f()) with ex -> Error ex.Message
 

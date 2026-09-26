@@ -9,8 +9,8 @@ module GrpcClientFactoryTests =
 
     [<Fact>]
     let ``resolveAddress avec une adresse configuree cible cette adresse`` () =
-        // M1 : les canaux sont mutualisÃ©s (cache statique) â€” ne pas les
-        // disposer ici, sinon les tests suivants retrouvent un canal fermÃ©.
+        // M1 : les canaux sont mutualisés (cache statique) — ne pas les
+        // disposer ici, sinon les tests suivants retrouvent un canal fermé.
         let channel = GrpcClientFactory.resolveAddress (Some "http://localhost:7777") DiploWalkerPorts.Container
         channel.Target |> should equal "localhost:7777"
 

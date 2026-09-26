@@ -50,7 +50,7 @@ type MainWindowViewModel() as this =
         let count = outputPort.LogLines.Count
 
         if renderedLineCount > count then
-            // Le journal a Ã©tÃ© vidÃ© en externe (Clear) : on repart de zÃ©ro.
+            // Le journal a été vidé en externe (Clear) : on repart de zéro.
             logText.Clear() |> ignore
             renderedLineCount <- 0
 
@@ -65,8 +65,8 @@ type MainWindowViewModel() as this =
         let excess = outputPort.LogLines.Count - maxLogLines
 
         if excess > 0 then
-            // Les lignes les plus anciennes sont retirÃ©es du texte ET de la
-            // collection pour conserver l'alignement (pas de balayage O(nÂ²)).
+            // Les lignes les plus anciennes sont retirées du texte ET de la
+            // collection pour conserver l'alignement (pas de balayage O(n²)).
             dropFirstLines logText excess
             renderedLineCount <- renderedLineCount - excess
 
@@ -121,8 +121,8 @@ type MainWindowViewModel() as this =
 
     member _.ExportLogCommand: ICommand = exportLogCommand
 
-    /// Ã‰crit l'Ã©tat actuel du journal (lignes horodatÃ©es) dans le fichier donnÃ©.
-    /// SÃ©parÃ©e du sÃ©lecteur de fichier pour Ãªtre testable hors interface.
+    /// Écrit l'état actuel du journal (lignes horodatées) dans le fichier donné.
+    /// Séparée du sélecteur de fichier pour être testable hors interface.
     member _.ExportJournalTo(path: string) : Task<int> =
         task {
             let lines =

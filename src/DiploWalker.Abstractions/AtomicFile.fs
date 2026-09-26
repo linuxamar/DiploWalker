@@ -4,15 +4,15 @@ open System
 open System.IO
 open Serilog
 
-/// Ã‰criture de fichiers avec remplacement atomique : le contenu est d'abord
-/// Ã©crit dans un fichier temporaire du mÃªme rÃ©pertoire, puis remplacÃ© d'un bloc,
-/// afin de ne jamais laisser un fichier tronquÃ© ou partiellement Ã©crit en cas de
-/// panne au cours de l'Ã©criture.
+/// Écriture de fichiers avec remplacement atomique : le contenu est d'abord
+/// écrit dans un fichier temporaire du même répertoire, puis remplacé d'un bloc,
+/// afin de ne jamais laisser un fichier tronqué ou partiellement écrit en cas de
+/// panne au cours de l'écriture.
 [<RequireQualifiedAccess>]
 module AtomicFile =
 
-    /// Ã‰crit `content` dans `path` de faÃ§on atomique (le rÃ©pertoire parent est
-    /// crÃ©Ã© au besoin).
+    /// Écrit `content` dans `path` de façon atomique (le répertoire parent est
+    /// créé au besoin).
     let write (path: string) (content: string) : unit =
         let dir = Path.GetDirectoryName(path)
 
@@ -29,8 +29,8 @@ module AtomicFile =
 
         try
             try
-                // WriteAllText inclus dans la zone protÃ©gÃ©e : un disque plein ne
-                // doit pas laisser de .tmp orphelin dans le rÃ©pertoire cible.
+                // WriteAllText inclus dans la zone protégée : un disque plein ne
+                // doit pas laisser de .tmp orphelin dans le répertoire cible.
                 File.WriteAllText(tmp, content)
                 File.Replace(tmp, path, null)
             with :? FileNotFoundException ->
@@ -39,6 +39,6 @@ module AtomicFile =
         | _ ->
             try
                 File.Delete(tmp)
-            with ex -> Log.Warning(ex, "Ã‰chec de la suppression du fichier temporaire {Tmp}", tmp)
+            with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
             reraise()
 

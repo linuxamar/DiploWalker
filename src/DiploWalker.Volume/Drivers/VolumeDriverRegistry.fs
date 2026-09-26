@@ -16,7 +16,7 @@ type VolumeDriverRegistry() =
         | false, _ ->
             raise (
                 RpcException(
-                    Status(StatusCode.NotFound, sprintf "Aucun driver enregistrÃ© pour le type '%O'" driverType)
+                    Status(StatusCode.NotFound, sprintf "Aucun driver enregistré pour le type '%O'" driverType)
                 )
             )
 

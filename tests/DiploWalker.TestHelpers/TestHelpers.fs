@@ -3,10 +3,10 @@
 open System
 open System.IO
 
-/// Helpers partagÃ©s pour les projets de tests.
+/// Helpers partagés pour les projets de tests.
 module TestHelpers =
 
-    /// CrÃ©e un rÃ©pertoire temporaire unique pour les tests.
+    /// Crée un répertoire temporaire unique pour les tests.
     let createTempDir (prefix: string) =
         let dir =
             Path.Combine(Path.GetTempPath(), sprintf "diplo-%s-%s" prefix (Guid.NewGuid().ToString("N")))
@@ -14,7 +14,7 @@ module TestHelpers =
         Directory.CreateDirectory(dir) |> ignore
         dir
 
-    /// Supprime un rÃ©pertoire de maniÃ¨re sÃ»re.
+    /// Supprime un répertoire de manière sûre.
     let cleanupDir (dir: string) =
         try
             if Directory.Exists(dir) then

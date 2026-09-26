@@ -2,8 +2,8 @@
 
 open System.Collections.Generic
 
-/// Abstraction de sortie pour dÃ©coupler l'affichage du mÃ©tier.
-/// Le CLI Ã©crit dans la console Spectre, le GUI lie au DataGrid/TextBox.
+/// Abstraction de sortie pour découpler l'affichage du métier.
+/// Le CLI écrit dans la console Spectre, le GUI lie au DataGrid/TextBox.
 type IOutputPort =
     abstract WriteLine: text: string -> unit
     abstract WriteError: text: string -> unit

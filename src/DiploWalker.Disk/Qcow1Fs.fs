@@ -18,7 +18,7 @@ module Qcow1 =
 
     let private hostOffsetMask (clusterBits: int) =
         ignore clusterBits
-        // Bits 9-55 de l'entrÃ©e L1 : offset HÃ”TE EN OCTETS du cluster (spec QCOW).
+        // Bits 9-55 de l'entrée L1 : offset HÔTE EN OCTETS du cluster (spec QCOW).
         0x00FFFFFFFFFFFE00L
 
     let private clusterOffsetMask (clusterBits: int) = (1L <<< clusterBits) - 1L
@@ -48,8 +48,8 @@ module Qcow1 =
 
         let clusterBits = be32 buf 20
 
-        // BornÃ© Ã  21 bits (2 Mo) : une image forgÃ©e avec cluster_bits Ã©levÃ©
-        // dÃ©clencherait des allocations d'un Go par cluster Ã©crit.
+        // Borné à 21 bits (2 Mo) : une image forgée avec cluster_bits élevé
+        // déclencherait des allocations d'un Go par cluster écrit.
         if clusterBits < 9 || clusterBits > 21 then
             failwithf "Cluster bits invalide : %d" clusterBits
 
@@ -63,8 +63,8 @@ module Qcow1 =
         let l1TableOffset = be64 buf 40
         let l1Size = be32 buf 48
 
-        // Borne de sÃ©curitÃ© sur une image forgÃ©e : une table L1 dÃ©bordante
-        // provoquerait des parcours Ã©normes (voir readBytesAtCore).
+        // Borne de sécurité sur une image forgée : une table L1 débordante
+        // provoquerait des parcours énormes (voir readBytesAtCore).
         if l1Size < 1 || int64 l1Size > int64 (1 <<< 24) then
             failwithf "Table L1 invalide (l1_size = %d)" l1Size
 
@@ -132,7 +132,7 @@ module Qcow1 =
                     let l1EntryOff = h.L1TableOffset + int64 l1Index * 8L
                     let descriptor = readUInt64At s l1EntryOff
 
-                    // L'entrÃ©e L1 contient un OFFSET EN OCTETS : le dÃ©caler puis
+                    // L'entrée L1 contient un OFFSET EN OCTETS : le décaler puis
                     // re-multiplier par la taille de cluster faussait tout d'un
                     // facteur 2^clusterBits+8 et rendait les images illisibles.
                     let hostOffset = descriptor &&& offMask
@@ -151,10 +151,10 @@ module Qcow1 =
     let readBytesAt (s: Stream) (h: Header) (vOffset: int64) (count: int) (buf: byte[]) (bufOff: int) : Result<unit, string> =
         protect (fun () -> readBytesAtCore s h vOffset count buf bufOff)
 
-    /// Alloue un nouveau cluster hÃ´te : balayer la table L1 pour trouver la plus
-    /// haute allocation RÃ‰ELLE. Un Ã©tat partagÃ© serait nÃ©cessaire sinon ; sans
-    /// lui, retourner systÃ©matiquement Â« le premier cluster libre Â» fait que
-    /// deux Ã©critures Ã©crasent mutuellement leurs donnÃ©es.
+    /// Alloue un nouveau cluster hôte : balayer la table L1 pour trouver la plus
+    /// haute allocation RÉELLE. Un état partagé serait nécessaire sinon ; sans
+    /// lui, retourner systématiquement « le premier cluster libre » fait que
+    /// deux écritures écrasent mutuellement leurs données.
     let private allocateCluster (s: Stream) (h: Header) : int64 =
         let endOfL1 = h.L1TableOffset + int64 h.L1Size * 8L
 
@@ -193,8 +193,8 @@ module Qcow1 =
             let toWrite = min remaining (int (h.ClusterSize - clusterOff))
 
             if hostOffset = 0L then
-                // Nouvelle entrÃ©e : offset hÃ´te en octets, alignÃ© sur le cluster
-                // (les 9 bits bas restent nuls â€” conforme au masque de la spec).
+                // Nouvelle entrée : offset hôte en octets, aligné sur le cluster
+                // (les 9 bits bas restent nuls — conforme au masque de la spec).
                 let newHostOffset = allocateCluster s h
                 writeUInt64At s l1EntryOff newHostOffset
 

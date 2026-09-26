@@ -10,7 +10,7 @@ open DiploWalker.Core.Output
 open DiploWalker.Grpc.Network
 open Spectre.Console.Cli
 
-// â”€â”€ list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── list ──────────────────────────────────────────────────────────
 type ListNetworksSettings() =
     inherit CommandSettings()
 
@@ -24,11 +24,11 @@ type ListNetworksCommand(output: IOutputPort, clients: IDiploClients) =
             let! response = client.ListAsync(ct = ct)
 
             if response.Networks.Count = 0 then
-                output.WriteWarning("Aucun rÃ©seau trouvÃ©.")
+                output.WriteWarning("Aucun réseau trouvé.")
             else
                 output.WriteTable(
                     response.Networks,
-                    [| "ID"; "Nom"; "Driver"; "Sous-rÃ©seau"; "Passerelle"; "Endpoints" |],
+                    [| "ID"; "Nom"; "Driver"; "Sous-réseau"; "Passerelle"; "Endpoints" |],
                     fun n ->
                         [| n.Id
                            n.Name
@@ -41,7 +41,7 @@ type ListNetworksCommand(output: IOutputPort, clients: IDiploClients) =
             return 0
         }
 
-// â”€â”€ inspect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── inspect ───────────────────────────────────────────────────────
 type InspectNetworkSettings() =
     inherit CommandSettings()
 
@@ -55,32 +55,32 @@ type InspectNetworkCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Id) then
-                output.WriteError("L'identifiant du rÃ©seau est requis")
+                output.WriteError("L'identifiant du réseau est requis")
                 return 1
             else
                 use client = clients.CreateNetworkClient()
                 let! response = client.InspectAsync(settings.Id, ct = ct)
 
-                output.WriteSuccess(sprintf "RÃ©seau %s" response.Name)
+                output.WriteSuccess(sprintf "Réseau %s" response.Name)
                 output.WriteLine(sprintf "  ID          : %s" response.Id)
                 output.WriteLine(sprintf "  Driver      : %s" (response.Driver.ToString()))
-                output.WriteLine(sprintf "  Sous-rÃ©seau : %s" response.Subnet)
+                output.WriteLine(sprintf "  Sous-réseau : %s" response.Subnet)
                 output.WriteLine(sprintf "  Passerelle  : %s" response.Gateway)
                 output.WriteLine(sprintf "  Plage IP    : %s" response.IpRange)
-                output.WriteLine(sprintf "  CrÃ©Ã©        : %s" response.CreatedAt)
+                output.WriteLine(sprintf "  Créé        : %s" response.CreatedAt)
 
                 if response.Endpoints.Count > 0 then
                     output.WriteLine("  Endpoints:")
 
                     for ep in response.Endpoints do
                         output.WriteLine(
-                            sprintf "    - %s (%s) â†’ %s" ep.ContainerId ep.Ipv4Address (ep.State.ToString())
+                            sprintf "    - %s (%s) → %s" ep.ContainerId ep.Ipv4Address (ep.State.ToString())
                         )
 
                 return 0
         }
 
-// â”€â”€ create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── create ────────────────────────────────────────────────────────
 type CreateNetworkSettings() =
     inherit CommandSettings()
 
@@ -103,7 +103,7 @@ type CreateNetworkCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Name) then
-                output.WriteError("Le nom du rÃ©seau est requis")
+                output.WriteError("Le nom du réseau est requis")
                 return 1
             elif not (DriverMappings.isValidNetworkDriver settings.Driver) then
                 output.WriteError(sprintf "Driver inconnu: %s. Valeurs: bridge, none, custom_cni, pod" settings.Driver)
@@ -122,11 +122,11 @@ type CreateNetworkCommand(output: IOutputPort, clients: IDiploClients) =
                         ct = ct
                     )
 
-                output.WriteSuccess(sprintf "RÃ©seau %s crÃ©Ã© (ID: %s)" response.Name response.Id)
+                output.WriteSuccess(sprintf "Réseau %s créé (ID: %s)" response.Name response.Id)
                 return 0
         }
 
-// â”€â”€ remove â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── remove ────────────────────────────────────────────────────────
 type RemoveNetworkSettings() =
     inherit CommandSettings()
 
@@ -143,7 +143,7 @@ type RemoveNetworkCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.Id) then
-                output.WriteError("L'identifiant du rÃ©seau est requis")
+                output.WriteError("L'identifiant du réseau est requis")
                 return 1
             else
                 use client = clients.CreateNetworkClient()
@@ -157,7 +157,7 @@ type RemoveNetworkCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ connect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── connect ───────────────────────────────────────────────────────
 type ConnectSettings() =
     inherit CommandSettings()
 
@@ -180,7 +180,7 @@ type ConnectCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.NetworkId) then
-                output.WriteError("L'identifiant du rÃ©seau est requis")
+                output.WriteError("L'identifiant du réseau est requis")
                 return 1
             elif String.IsNullOrWhiteSpace(settings.ContainerId) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
@@ -212,7 +212,7 @@ type ConnectCommand(output: IOutputPort, clients: IDiploClients) =
                 return 0
         }
 
-// â”€â”€ disconnect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── disconnect ────────────────────────────────────────────────────
 type DisconnectSettings() =
     inherit CommandSettings()
 
@@ -235,7 +235,7 @@ type DisconnectCommand(output: IOutputPort, clients: IDiploClients) =
     override _.ExecuteAsync(_ctx, settings, ct) : Task<int> =
         task {
             if String.IsNullOrWhiteSpace(settings.NetworkId) then
-                output.WriteError("L'identifiant du rÃ©seau est requis")
+                output.WriteError("L'identifiant du réseau est requis")
                 return 1
             elif String.IsNullOrWhiteSpace(settings.ContainerId) then
                 output.WriteError(ServiceGuards.ContainerIdRequired)
@@ -269,7 +269,7 @@ type DisconnectCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ run-cni-plugin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── run-cni-plugin ────────────────────────────────────────────────
 type RunCniPluginSettings() =
     inherit CommandSettings()
 
@@ -307,7 +307,7 @@ type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteError("Le chemin du plugin CNI est requis")
                 return 1
             elif not (System.IO.Path.IsPathRooted(settings.PluginPath)) then
-                output.WriteError(sprintf "Le chemin du plugin CNI doit Ãªtre absolu : %s" settings.PluginPath)
+                output.WriteError(sprintf "Le chemin du plugin CNI doit être absolu : %s" settings.PluginPath)
                 return 1
             elif String.IsNullOrWhiteSpace(settings.CniCommand) then
                 output.WriteError("La commande CNI est requise (ADD ou DEL)")
@@ -316,7 +316,7 @@ type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteError(ServiceGuards.ContainerIdRequired)
                 return 1
             elif String.IsNullOrWhiteSpace(settings.NetnsPath) then
-                output.WriteError("Le chemin du namespace rÃ©seau est requis")
+                output.WriteError("Le chemin du namespace réseau est requis")
                 return 1
             else
                 use client = clients.CreateNetworkClient()
@@ -358,7 +358,7 @@ type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
                     )
 
                 if response.Success then
-                    output.WriteSuccess("Plugin CNI exÃ©cutÃ© avec succÃ¨s")
+                    output.WriteSuccess("Plugin CNI exécuté avec succès")
                     output.WriteLine(sprintf "  Interface : %s" response.Ifname)
                     output.WriteLine(sprintf "  IPv4      : %s" response.Ipv4Address)
                     output.WriteLine(sprintf "  Passerelle: %s" response.Gateway)
@@ -368,11 +368,11 @@ type RunCniPluginCommand(output: IOutputPort, clients: IDiploClients) =
 
                     return 0
                 else
-                    output.WriteError(sprintf "Ã‰chec du plugin CNI: %s" response.Message)
+                    output.WriteError(sprintf "Échec du plugin CNI: %s" response.Message)
                     return 1
         }
 
-// â”€â”€ prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── prune ─────────────────────────────────────────────────────────
 type PruneNetworksSettings() =
     inherit CommandSettings()
 
@@ -391,7 +391,7 @@ type PruneNetworksCommand(output: IOutputPort, clients: IDiploClients) =
                 for id in response.NetworksDeleted do
                     output.WriteLine(sprintf "  - %s" id)
             else
-                output.WriteWarning("Aucun rÃ©seau Ã  supprimer.")
+                output.WriteWarning("Aucun réseau à supprimer.")
 
             return 0
         }

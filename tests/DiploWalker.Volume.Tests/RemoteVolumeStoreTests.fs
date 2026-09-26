@@ -24,7 +24,7 @@ module RemoteVolumeStoreTests =
         with _ ->
             ()
 
-    // â”€â”€ CreateVolume â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── CreateVolume ─────────────────────────────────────────────
 
     [<Fact>]
     let ``CreateVolume cree meta.json et retourne id et remotePath`` () =
@@ -55,7 +55,7 @@ module RemoteVolumeStoreTests =
 
             Assert.DoesNotContain("SK-SECRET-123", meta)
             Assert.DoesNotContain("PW-SECRET-456", meta)
-            Assert.Contains("4.1", meta) // option non sensible conservÃ©e
+            Assert.Contains("4.1", meta) // option non sensible conservée
 
             let opts =
                 JsonHelpers.tryGetElement ((store.InspectVolume id).Value) "driverOpts"
@@ -133,7 +133,7 @@ module RemoteVolumeStoreTests =
         finally
             cleanupDir root
 
-    // â”€â”€ InspectVolume / VolumeExists / ListVolumes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── InspectVolume / VolumeExists / ListVolumes ───────────────
 
     [<Fact>]
     let ``InspectVolume retourne None pour un volume inconnu`` () =
@@ -159,7 +159,7 @@ module RemoteVolumeStoreTests =
             cleanupDir root
 
     [<Fact>]
-    let ``VolumeExists reflÃ¨te la presence du volume`` () =
+    let ``VolumeExists reflète la presence du volume`` () =
         let root = createTempDir ()
 
         try
@@ -181,7 +181,7 @@ module RemoteVolumeStoreTests =
             let (id1, _) = store.CreateVolume("a", "pa", Map.empty, Map.empty)
             let (id2, _) = store.CreateVolume("b", "pb", Map.empty, Map.empty)
 
-            // RÃ©pertoire orphelin sans meta.json : doit Ãªtre ignorÃ© par le listing.
+            // Répertoire orphelin sans meta.json : doit être ignoré par le listing.
             Directory.CreateDirectory(Path.Combine(root, "testdrv", "orphelin")) |> ignore
 
             let all = store.ListVolumes()
@@ -194,7 +194,7 @@ module RemoteVolumeStoreTests =
         finally
             cleanupDir root
 
-    // â”€â”€ RemoveVolume / PruneAll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── RemoveVolume / PruneAll ──────────────────────────────────
 
     [<Fact>]
     let ``RemoveVolume supprime le volume puis retourne false`` () =
@@ -229,7 +229,7 @@ module RemoteVolumeStoreTests =
 
         try
             let store = RemoteVolumeStore(root, "testdrv")
-            store.PruneAll() |> should be Empty // vide au dÃ©part
+            store.PruneAll() |> should be Empty // vide au départ
 
             let (id1, _) = store.CreateVolume("a", "pa", Map.empty, Map.empty)
             let (id2, _) = store.CreateVolume("b", "pb", Map.empty, Map.empty)

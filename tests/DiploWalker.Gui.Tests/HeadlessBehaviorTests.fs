@@ -13,9 +13,9 @@ open DiploWalker.Grpc.Network
 open DiploWalker.Grpc.Volume
 open DiploWalker.TestHelpers
 
-// Tests des mÃ©thodes des ViewModels qui ne peuvent s'exÃ©cuter que sur un vrai
+// Tests des méthodes des ViewModels qui ne peuvent s'exécuter que sur un vrai
 // Dispatcher Avalonia : elles remplissent leurs collections via UiThread.Post.
-// Le harnais headless (HeadlessRunner.setupHeadless) possÃ¨de un thread dÃ©diÃ©
+// Le harnais headless (HeadlessRunner.setupHeadless) possède un thread dédié
 // qui pompe le Dispatcher ; waitPump ne fait que poller les collections.
 
 let private waitPump (predicate: unit -> bool) =
@@ -28,7 +28,7 @@ let private waitPump (predicate: unit -> bool) =
 
     ok
 
-// â”€â”€ ContainerTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ContainerTabViewModel ──────────────────────────────────────
 
 let private containerVm (port: MockOutputPort) (fake: FakeContainerClient) =
     new DiploWalker.Gui.ViewModels.ContainerTabViewModel(
@@ -76,7 +76,7 @@ let ``ListImages peuple la collection sur le dispatcher`` () =
     vm.Images.[0].Reference |> should equal "nginx"
     vm.Images.[0].Tag |> should equal "latest"
 
-// â”€â”€ ImagesTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ImagesTabViewModel ─────────────────────────────────────────
 
 let private imagesVm (port: MockOutputPort) (fake: FakeContainerClient) =
     new DiploWalker.Gui.ViewModels.ImagesTabViewModel(
@@ -134,7 +134,7 @@ let ``ImagesTabViewModel SearchImages peuple les resultats sur le dispatcher`` (
     vm.SearchResults.[0].Stars |> should equal "100"
     Assert.Contains("1 résultat(s)", vm.SearchStatus)
 
-// â”€â”€ VolumeTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── VolumeTabViewModel ─────────────────────────────────────────
 
 let private volumeVm (port: MockOutputPort) (fake: FakeVolumeClient) =
     new DiploWalker.Gui.ViewModels.VolumeTabViewModel(
@@ -162,7 +162,7 @@ let ``ListVolumes peuple la collection sur le dispatcher`` () =
     waitPump (fun () -> vm.Volumes.Count = 1) |> should equal true
     vm.Volumes.[0].Nom |> should equal "data"
 
-// â”€â”€ NetworkTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── NetworkTabViewModel ────────────────────────────────────────
 
 let private networkVm (port: MockOutputPort) (fake: FakeNetworkClient) =
     new DiploWalker.Gui.ViewModels.NetworkTabViewModel(
@@ -190,7 +190,7 @@ let ``ListNetworks peuple la collection sur le dispatcher`` () =
     waitPump (fun () -> vm.Networks.Count = 1) |> should equal true
     vm.Networks.[0].Nom |> should equal "bridge"
 
-// â”€â”€ ComposeTabViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ComposeTabViewModel ────────────────────────────────────────
 
 let private composeVm (port: MockOutputPort) (fake: FakeContainerClient) =
     new DiploWalker.Gui.ViewModels.ComposeTabViewModel(
@@ -238,13 +238,13 @@ let ``ComposePs peuple la liste des services du projet`` () =
     finally
         DiploWalker.TestHelpers.TestHelpers.cleanupDir dir
 
-// â”€â”€ MainWindowViewModel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MainWindowViewModel ────────────────────────────────────────
 
 let private mainWindowVm () =
     HeadlessRunner.setupHeadless ()
     new DiploWalker.Gui.ViewModels.MainWindowViewModel()
 
-/// AccÃ¨s au journal brut via le type concret sous-jacent.
+/// Accès au journal brut via le type concret sous-jacent.
 let private mainWindowPort (vm: DiploWalker.Gui.ViewModels.MainWindowViewModel) =
     vm.OutputPort :?> DiploWalker.Gui.Services.AvaloniaOutputPort
 
@@ -287,18 +287,18 @@ let ``MainWindow expose OutputPort en tant qu'IOutputPort non nul`` () =
     vm.OutputPort |> should be instanceOfType<DiploWalker.Core.Output.IOutputPort>
 
 [<Fact>]
-let ``MainWindow LogOutput reflÃ¨te les lignes Ã©crites sur l'OutputPort`` () =
+let ``MainWindow LogOutput reflète les lignes écrites sur l'OutputPort`` () =
     let vm = mainWindowVm ()
     vm.OutputPort.WriteLine("ligne de test")
     waitPump (fun () -> vm.LogOutput.Contains "ligne de test") |> should equal true
     vm.LogOutput.Contains "ligne de test" |> should equal true
 
 [<Fact>]
-let ``MainWindow LogOutput agrÃ¨ge plusieurs lignes avec format horodatÃ©`` () =
+let ``MainWindow LogOutput agrège plusieurs lignes avec format horodaté`` () =
     let vm = mainWindowVm ()
-    vm.OutputPort.WriteLine("premiÃ¨re")
+    vm.OutputPort.WriteLine("première")
     vm.OutputPort.WriteSuccess("seconde")
-    vm.OutputPort.WriteWarning("troisiÃ¨me")
+    vm.OutputPort.WriteWarning("troisième")
     waitPump (fun () -> vm.LogOutput.Contains "troisi") |> should equal true
     vm.LogOutput.Contains "[" |> should equal true
     vm.LogOutput.Contains "premi" |> should equal true
@@ -306,7 +306,7 @@ let ``MainWindow LogOutput agrÃ¨ge plusieurs lignes avec format horodatÃ©`` 
     vm.LogOutput.Contains "troisi" |> should equal true
 
 [<Fact>]
-let ``MainWindow LogOutput est tronquÃ© Ã  500 lignes`` () =
+let ``MainWindow LogOutput est tronqué à 500 lignes`` () =
     let vm = mainWindowVm ()
 
     for i in 1 .. 520 do
@@ -323,7 +323,7 @@ let ``MainWindow LogOutput est tronquÃ© Ã  500 lignes`` () =
     |> should equal "message 520"
 
 [<Fact>]
-let ``MainWindow AboutCommand Ã©crit les deux lignes d'information`` () =
+let ``MainWindow AboutCommand écrit les deux lignes d'information`` () =
     let vm = mainWindowVm ()
     vm.AboutCommand.Execute(null)
 
@@ -333,7 +333,7 @@ let ``MainWindow AboutCommand Ã©crit les deux lignes d'information`` () =
     |> should equal true
 
 [<Fact>]
-let ``MainWindow QuitCommand est exposÃ©`` () =
+let ``MainWindow QuitCommand est exposé`` () =
     let vm = mainWindowVm ()
     vm.QuitCommand |> should not' (be Null)
 
@@ -350,14 +350,14 @@ let ``MainWindow ExportLogCommand sans fournisseur de stockage ecrit un avertiss
 [<Fact>]
 let ``MainWindow ExportLogCommand avec un picker annule reste silencieux`` () =
     let vm = mainWindowVm ()
-    // Fake sans fichier retournÃ© : SaveFilePickerAsync renvoie null.
+    // Fake sans fichier retourné : SaveFilePickerAsync renvoie null.
     vm.SetStorageProvider(new FakeStorageProvider())
     vm.OutputPort.WriteLine("ligne avant export")
     waitPump (fun () -> vm.LogOutput.Contains "ligne avant export") |> should equal true
 
     vm.ExportLogCommand.Execute(null)
 
-    // Aucun succÃ¨s ni erreur : l'annulation n'Ã©crit rien.
+    // Aucun succès ni erreur : l'annulation n'écrit rien.
     waitPump (fun () ->
         (mainWindowPort vm).LogLines
         |> Seq.exists (fun l -> l.Text.Contains "Journal exporté"))
@@ -369,7 +369,7 @@ let ``MainWindow ExportLogCommand avec un picker annule reste silencieux`` () =
     |> should equal false
 
 [<Fact>]
-let ``MainWindow ExportLogCommand avec un fournisseur Ã©crit le journal dans le fichier choisi`` () =
+let ``MainWindow ExportLogCommand avec un fournisseur écrit le journal dans le fichier choisi`` () =
     let vm = mainWindowVm ()
     vm.OutputPort.WriteLine("ligne un")
     vm.OutputPort.WriteSuccess("ligne deux")
@@ -400,7 +400,7 @@ let ``MainWindow ExportLogCommand avec un fournisseur Ã©crit le journal dans l
 [<Fact>]
 let ``MainWindow ExportJournalTo ecrit les lignes du journal dans un fichier`` () =
     let vm = mainWindowVm ()
-    vm.OutputPort.WriteLine("premiÃ¨re ligne")
+    vm.OutputPort.WriteLine("première ligne")
     vm.OutputPort.WriteSuccess("seconde ligne")
     waitPump (fun () -> vm.LogOutput.Contains "seconde ligne") |> should equal true
 

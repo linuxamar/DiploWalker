@@ -13,7 +13,7 @@ let authTokenDir = AppPaths.dataRoot ()
 let private defaultTokenPath = Path.Combine(authTokenDir, "auth-token.json")
 
 /// Chemin du fichier de token, injectable (M8) : plus de global mutable public.
-/// Un verrou garde l'Ã©change pour les redirections de tests concurrents.
+/// Un verrou garde l'échange pour les redirections de tests concurrents.
 let private tokenPathRef = ref defaultTokenPath
 
 /// Redirige le fichier de token (utile pour les tests).
@@ -43,8 +43,8 @@ let saveToken (token: string) =
 
     let json =
         JsonSerializer.Serialize({ Token = token; ExpiresAt = expiresAt }, jsonOptions)
-    // Ã‰criture atomique : d'abord dans un fichier temporaire avec ACL
-    // restrictif, puis remplacement atomique â€” aucune fenÃªtre d'exposition.
+    // Écriture atomique : d'abord dans un fichier temporaire avec ACL
+    // restrictif, puis remplacement atomique — aucune fenêtre d'exposition.
     let tmpPath = tokenPath () + "." + Guid.NewGuid().ToString("N") + ".tmp"
 
     try
@@ -97,10 +97,10 @@ let saveToken (token: string) =
             ()
 
         Log.Error(ex, "Impossible de sauvegarder le token dans {Path}", tokenPath ())
-        failwithf "SÃ©curitÃ© du token compromise: impossible de protÃ©ger %s" (tokenPath ())
+        failwithf "Sécurité du token compromise: impossible de protéger %s" (tokenPath ())
 
-/// Cache du token avec TTL pour Ã©viter les lectures disque rÃ©pÃ©tÃ©es.
-/// Le token est rechargÃ© uniquement quand le cache expire ou que le fichier change.
+/// Cache du token avec TTL pour éviter les lectures disque répétées.
+/// Le token est rechargé uniquement quand le cache expire ou que le fichier change.
 type private TokenCache() =
     let mutable cachedToken: string option = None
     let mutable lastWriteUtc: DateTime = DateTime.MinValue
@@ -115,7 +115,7 @@ type private TokenCache() =
                 let fileInfo = new FileInfo(tokenPath ())
                 let writeTimeUtc = fileInfo.LastWriteTimeUtc
                 let now = DateTime.UtcNow
-                // Recharger si premier accÃ¨s, TTL expirÃ©, ou fichier modifiÃ©
+                // Recharger si premier accès, TTL expiré, ou fichier modifié
                 if
                     cachedToken.IsNone
                     || (now - lastLoadUtc) > cacheTtl
@@ -123,7 +123,7 @@ type private TokenCache() =
                 then
                     let json = File.ReadAllText(tokenPath ())
 
-                    // JsonDocument loue des buffers du pool : Ã  disposer.
+                    // JsonDocument loue des buffers du pool : à disposer.
                     use doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
 
                     let root = doc.RootElement
@@ -134,10 +134,10 @@ type private TokenCache() =
                         let expiresAt = expiresElement.GetDateTime()
 
                         if DateTime.UtcNow > expiresAt then
-                            // Un seul avertissement par minute : sinon chaque requÃªte
-                            // (aprÃ¨s expiration du TTL) inonde les logs et le disque.
+                            // Un seul avertissement par minute : sinon chaque requête
+                            // (après expiration du TTL) inonde les logs et le disque.
                             if (now - lastExpiredLogUtc) > TimeSpan.FromMinutes(1.0) then
-                                Log.Warning("Token expirÃ© le {ExpiresAt}", expiresAt)
+                                Log.Warning("Token expiré le {ExpiresAt}", expiresAt)
                                 lastExpiredLogUtc <- now
 
                             cachedToken <- None
@@ -175,7 +175,7 @@ let verifyToken (provided: string) : bool =
         else
             CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes)
 
-/// GÃ©nÃ¨re un nouveau token et l'enregistre, remplaÃ§ant l'ancien.
+/// Génère un nouveau token et l'enregistre, remplaçant l'ancien.
 /// Retourne le nouveau token.
 let rotateToken () : string =
     let newToken = generateToken ()

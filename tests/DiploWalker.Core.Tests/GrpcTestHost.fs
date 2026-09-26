@@ -15,10 +15,10 @@ open DiploWalker.Grpc.Container
 open DiploWalker.Grpc.Network
 open DiploWalker.Grpc.Volume
 
-/// Infra de test : hÃ´te gRPC (protobuf-net, Kestrel Loopback sur un port
-/// Ã©phÃ©mÃ¨re) avec des stubs de service qui conservent la derniÃ¨re requÃªte
-/// reÃ§ue et renvoient des rÃ©ponses prÃ©visibles. Reproduit le pattern des
-/// tests d'intÃ©gration (DiploWalker.Integration.Tests) sans aucun driver rÃ©el.
+/// Infra de test : hôte gRPC (protobuf-net, Kestrel Loopback sur un port
+/// éphémère) avec des stubs de service qui conservent la dernière requête
+/// reçue et renvoient des réponses prévisibles. Reproduit le pattern des
+/// tests d'intégration (DiploWalker.Integration.Tests) sans aucun driver réel.
 module GrpcTestHost =
 
     let private toAsyncEnumerable (items: seq<'T>) : IAsyncEnumerable<'T> =
@@ -37,9 +37,9 @@ module GrpcTestHost =
                         e.Dispose()
                         ValueTask() } }
 
-    /// Stub IContainerService : les membres exercÃ©s par les wrappers renvoient
-    /// une rÃ©ponse fixe et gardent la derniÃ¨re requÃªte ; le reste lÃ¨ve
-    /// NotImplementedException pour rÃ©vÃ©ler toute dÃ©pendance inattendue.
+    /// Stub IContainerService : les membres exercés par les wrappers renvoient
+    /// une réponse fixe et gardent la dernière requête ; le reste lève
+    /// NotImplementedException pour révéler toute dépendance inattendue.
     [<ServiceContract(Name = "IContainerService")>]
     type ContainerServiceStub() =
 
@@ -114,15 +114,15 @@ module GrpcTestHost =
 
             member _.StartContainer(request, _ct) =
                 lastStart <- Some request
-                Task.FromResult({ StartContainerResponse.State = ContainerState.Running; Message = "DÃ©marrÃ©" })
+                Task.FromResult({ StartContainerResponse.State = ContainerState.Running; Message = "Démarré" })
 
             member _.StopContainer(request, _ct) =
                 lastStop <- Some request
-                Task.FromResult({ StopContainerResponse.State = ContainerState.Stopped; Message = "ArrÃªtÃ©" })
+                Task.FromResult({ StopContainerResponse.State = ContainerState.Stopped; Message = "Arrêté" })
 
             member _.DeleteContainer(request, _ct) =
                 lastDelete <- Some request
-                Task.FromResult({ DeleteContainerResponse.Success = true; Message = "SupprimÃ©" })
+                Task.FromResult({ DeleteContainerResponse.Success = true; Message = "Supprimé" })
 
             member _.InspectContainer(request, _ct) =
                 lastInspect <- Some request
@@ -169,7 +169,7 @@ module GrpcTestHost =
 
             member _.PullImage(request, _ct) =
                 lastPull <- Some request
-                Task.FromResult({ PullImageResponse.Image = request.Image; Message = "Image tÃ©lÃ©chargÃ©e" })
+                Task.FromResult({ PullImageResponse.Image = request.Image; Message = "Image téléchargée" })
 
             member _.GetVersion(_request, _ct) =
                 Task.FromResult(
@@ -187,7 +187,7 @@ module GrpcTestHost =
 
             member _.RenameContainer(request, _ct) =
                 lastRename <- Some request
-                Task.FromResult({ RenameContainerResponse.Success = true; Message = "RenommÃ©" })
+                Task.FromResult({ RenameContainerResponse.Success = true; Message = "Renommé" })
 
             member _.TopContainer(request, _ct) =
                 lastTop <- Some request
@@ -230,11 +230,11 @@ module GrpcTestHost =
 
             member _.RemoveImage(request, _ct) =
                 lastRemoveImage <- Some request
-                Task.FromResult({ RemoveImageResponse.Success = true; Message = "Image supprimÃ©e" })
+                Task.FromResult({ RemoveImageResponse.Success = true; Message = "Image supprimée" })
 
             member _.TagImage(request, _ct) =
                 lastTagImage <- Some request
-                Task.FromResult({ TagImageResponse.Source = request.Source; Target = request.Target; Message = "RÃ©Ã©tiquetÃ©e" })
+                Task.FromResult({ TagImageResponse.Source = request.Source; Target = request.Target; Message = "Réétiquetée" })
 
             member _.SearchRegistry(request, _ct) =
                 Task.FromResult(
@@ -258,16 +258,16 @@ module GrpcTestHost =
 
             member _.LoginRegistry(request, _ct) =
                 lastLogin <- Some request
-                Task.FromResult({ LoginRegistryResponse.Success = true; Message = "Connexion rÃ©ussie" })
+                Task.FromResult({ LoginRegistryResponse.Success = true; Message = "Connexion réussie" })
 
             member _.LogoutRegistry(request, _ct) =
                 lastLogout <- Some request
-                Task.FromResult({ LogoutRegistryResponse.Success = true; Message = "DÃ©connexion rÃ©ussie" })
+                Task.FromResult({ LogoutRegistryResponse.Success = true; Message = "Déconnexion réussie" })
 
             member _.CreateNamespace(_request, _ct) = raise (NotImplementedException())
             member _.DeleteNamespace(_request, _ct) = raise (NotImplementedException())
 
-    /// Stub IVolumeService : mÃªmes conventions que ContainerServiceStub.
+    /// Stub IVolumeService : mêmes conventions que ContainerServiceStub.
     [<ServiceContract(Name = "IVolumeService")>]
     type VolumeServiceStub() =
 
@@ -299,7 +299,7 @@ module GrpcTestHost =
 
             member _.RemoveVolume(request, _ct) =
                 lastRemove <- Some request
-                Task.FromResult({ RemoveVolumeResponse.Success = true; Message = "Volume supprimÃ©" })
+                Task.FromResult({ RemoveVolumeResponse.Success = true; Message = "Volume supprimé" })
 
             member _.InspectVolume(request, _ct) =
                 lastInspect <- Some request
@@ -326,7 +326,7 @@ module GrpcTestHost =
                 Task.FromResult(
                     { MountVolumeResponse.State = MountState.Mounted
                       Mountpoint = "C:\\vol\\" + request.Id
-                      Message = "Volume montÃ©" }
+                      Message = "Volume monté" }
                 )
 
             member _.UnmountVolume(request, _ct) =
@@ -337,10 +337,10 @@ module GrpcTestHost =
                 Task.FromResult(
                     { PruneVolumesResponse.VolumesDeleted = ResizeArray<string>()
                       Count = 0
-                      Message = "0 volume(s) supprimÃ©(s)" }
+                      Message = "0 volume(s) supprimé(s)" }
                 )
 
-    /// Stub INetworkService : mÃªmes conventions que ContainerServiceStub.
+    /// Stub INetworkService : mêmes conventions que ContainerServiceStub.
     [<ServiceContract(Name = "INetworkService")>]
     type NetworkServiceStub() =
 
@@ -375,7 +375,7 @@ module GrpcTestHost =
 
             member _.RemoveNetwork(request, _ct) =
                 lastRemove <- Some request
-                Task.FromResult({ RemoveNetworkResponse.Success = true; Message = "RÃ©seau supprimÃ©" })
+                Task.FromResult({ RemoveNetworkResponse.Success = true; Message = "Réseau supprimé" })
 
             member _.InspectNetwork(request, _ct) =
                 lastInspect <- Some request
@@ -404,12 +404,12 @@ module GrpcTestHost =
                     { ConnectContainerResponse.EndpointId = "ep-" + request.ContainerId
                       Ipv4Address = request.Ipv4Address
                       MacAddress = ""
-                      Message = "ConnectÃ©" }
+                      Message = "Connecté" }
                 )
 
             member _.DisconnectContainer(request, _ct) =
                 lastDisconnect <- Some request
-                Task.FromResult({ DisconnectContainerResponse.Success = true; Message = "DÃ©connectÃ©" })
+                Task.FromResult({ DisconnectContainerResponse.Success = true; Message = "Déconnecté" })
 
             member _.RunCniPlugin(request, _ct) =
                 lastRunCni <- Some request
@@ -419,14 +419,14 @@ module GrpcTestHost =
                       Ifname = "eth0"
                       Ipv4Address = "10.0.0.2"
                       Gateway = "10.0.0.1"
-                      Message = "Plugin exÃ©cutÃ©" }
+                      Message = "Plugin exécuté" }
                 )
 
             member _.PruneNetworks(_request, _ct) =
                 Task.FromResult(
                     { PruneNetworksResponse.NetworksDeleted = ResizeArray<string>()
                       Count = 0
-                      Message = "0 rÃ©seau(x) supprimÃ©(s)" }
+                      Message = "0 réseau(x) supprimé(s)" }
                 )
 
     let private stopApp (app: WebApplication) =
@@ -448,8 +448,8 @@ module GrpcTestHost =
         let address = app.Urls |> Seq.head
         app, address
 
-    /// DÃ©marre un hÃ´te gRPC branchÃ© sur le stub conteneur, exÃ©cute `f` avec
-    /// l'adresse de l'hÃ´te puis arrÃªte proprement l'application.
+    /// Démarre un hôte gRPC branché sur le stub conteneur, exécute `f` avec
+    /// l'adresse de l'hôte puis arrête proprement l'application.
     let withContainerApp (stub: ContainerServiceStub) (f: string -> 'a) =
         let app, address = startApp<ContainerServiceStub> stub ()
 
@@ -458,7 +458,7 @@ module GrpcTestHost =
         finally
             stopApp app
 
-    /// DÃ©marre un hÃ´te gRPC branchÃ© sur le stub volume (cf. withContainerApp).
+    /// Démarre un hôte gRPC branché sur le stub volume (cf. withContainerApp).
     let withVolumeApp (stub: VolumeServiceStub) (f: string -> 'a) =
         let app, address = startApp<VolumeServiceStub> stub ()
 
@@ -467,7 +467,7 @@ module GrpcTestHost =
         finally
             stopApp app
 
-    /// DÃ©marre un hÃ´te gRPC branchÃ© sur le stub rÃ©seau (cf. withContainerApp).
+    /// Démarre un hôte gRPC branché sur le stub réseau (cf. withContainerApp).
     let withNetworkApp (stub: NetworkServiceStub) (f: string -> 'a) =
         let app, address = startApp<NetworkServiceStub> stub ()
 

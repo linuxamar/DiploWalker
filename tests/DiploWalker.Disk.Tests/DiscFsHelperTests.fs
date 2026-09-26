@@ -8,7 +8,7 @@ module DiscFsHelperTests =
     open FsUnit.Xunit
     open DiploWalker.Disk
 
-    // â”€â”€ toRealRel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── toRealRel ──────────────────────────────────────────────────────
 
     [<Fact>]
     let ``toRealRel remplace les slashes avantants par le separateur hote`` () =
@@ -36,7 +36,7 @@ module DiscFsHelperTests =
     let ``toRealRel gere les noms simples`` () =
         DiscFsHelper.toRealRel "file.txt" |> should equal "file.txt"
 
-    // â”€â”€ realFrom : chemins valides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── realFrom : chemins valides ─────────────────────────────────────
 
     [<Fact>]
     let ``realFrom accepte un chemin simple`` () =
@@ -78,7 +78,7 @@ module DiscFsHelperTests =
         finally
             TestImage.cleanupDir root
 
-    // â”€â”€ realFrom : traversal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── realFrom : traversal ───────────────────────────────────────────
 
     [<Fact>]
     let ``realFrom rejette le traversal avec ..`` () =

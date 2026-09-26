@@ -16,8 +16,8 @@ type MainWindow() as this =
 
     let viewModel = new MainWindowViewModel()
 
-    // Antirebond de la recherche en ligne : chaque EntrÃ©e rÃ©arme le minuteur,
-    // la recherche ne part qu'aprÃ¨s ~250 ms sans nouvelle frappe.
+    // Antirebond de la recherche en ligne : chaque Entrée réarme le minuteur,
+    // la recherche ne part qu'après ~250 ms sans nouvelle frappe.
     let searchTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(250.0))
 
     do
@@ -29,7 +29,7 @@ type MainWindow() as this =
             try
                 Assembly.LoadFrom(dll) |> ignore
             with ex ->
-                Serilog.Log.Debug(ex, "Chargement de l'assembly {Dll} ignorÃ©", Path.GetFileName(dll))
+                Serilog.Log.Debug(ex, "Chargement de l'assembly {Dll} ignoré", Path.GetFileName(dll))
 
         let mainStream = assembly.GetManifestResourceStream("DiploWalker.Gui.Views.MainWindow.axaml")
 
@@ -51,9 +51,9 @@ type MainWindow() as this =
         if not (isNull aboutItem) then
             aboutItem.Command <- DiploWalker.Gui.ViewModels.RelayCommand(Action(fun () -> this.OnAbout(null, null)))
         else
-            failwith "ContrÃ´le introuvable dans le XAML : AboutMenuItem"
+            failwith "Contrôle introuvable dans le XAML : AboutMenuItem"
 
-        // Recherche d'images : dÃ©clenchÃ©e par la touche EntrÃ©e (avec antirebond).
+        // Recherche d'images : déclenchée par la touche Entrée (avec antirebond).
         searchTimer.Tick.Add(fun _ ->
             searchTimer.Stop()
             viewModel.ImagesTab.SearchImages() |> ignore)
@@ -67,9 +67,9 @@ type MainWindow() as this =
                     searchTimer.Start()
                     e.Handled <- true)
         else
-            failwith "ContrÃ´le introuvable dans le XAML : ImageSearchBox"
+            failwith "Contrôle introuvable dans le XAML : ImageSearchBox"
 
-        // Recherche d'images : EntrÃ©e dans le champ registre dÃ©clenche aussi la recherche.
+        // Recherche d'images : Entrée dans le champ registre déclenche aussi la recherche.
         let registryBox = this.FindControl<TextBox>("RegistreSearchBox")
 
         if not (isNull registryBox) then
@@ -79,10 +79,10 @@ type MainWindow() as this =
                     searchTimer.Start()
                     e.Handled <- true)
         else
-            failwith "ContrÃ´le introuvable dans le XAML : RegistreSearchBox"
+            failwith "Contrôle introuvable dans le XAML : RegistreSearchBox"
 
-        // Disposer le ViewModel (clients gRPC, CTS de suivi...) Ã  la fermeture :
-        // sinon les flux Â« suivre Â» continuent et les canaux restent ouverts.
+        // Disposer le ViewModel (clients gRPC, CTS de suivi...) à la fermeture :
+        // sinon les flux « suivre » continuent et les canaux restent ouverts.
         this.Closed.Add(fun _ -> (viewModel :> IDisposable).Dispose())
 
     member private this.setUpComposeEditor() =
@@ -110,7 +110,7 @@ type MainWindow() as this =
 
     member private _.OnAbout(_sender: obj, _e: RoutedEventArgs) =
         let dialog = Window()
-        dialog.Title <- "Ã€ propos de Diplo"
+        dialog.Title <- "À propos de Diplo"
         dialog.Width <- 520.0
         dialog.Height <- 420.0
         dialog.WindowStartupLocation <- WindowStartupLocation.CenterOwner
@@ -124,7 +124,7 @@ type MainWindow() as this =
 
         let desc =
             TextBlock(
-                Text = "Gestion de conteneurs Docker via gRPC\nBasÃ© sur Diplo CLI (Spectre.Console)",
+                Text = "Gestion de conteneurs Docker via gRPC\nBasé sur Diplo CLI (Spectre.Console)",
                 TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 FontSize = 13.0,
                 Opacity = 0.8
@@ -137,7 +137,7 @@ type MainWindow() as this =
 
         let licTitle =
             TextBlock(
-                Text = "Licences des dÃ©pendances",
+                Text = "Licences des dépendances",
                 FontWeight = Avalonia.Media.FontWeight.SemiBold,
                 FontSize = 13.0
             )
@@ -153,7 +153,7 @@ type MainWindow() as this =
         for line in licenses do
             let t =
                 TextBlock(
-                    Text = "  â€¢ " + line,
+                    Text = "  • " + line,
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                     FontSize = 12.0,
                     Opacity = 0.75
@@ -166,7 +166,7 @@ type MainWindow() as this =
 
         let notice =
             TextBlock(
-                Text = "Voir THIRD-PARTY-NOTICES.txt pour le texte intÃ©gral des licences.",
+                Text = "Voir THIRD-PARTY-NOTICES.txt pour le texte intégral des licences.",
                 TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 FontSize = 11.0,
                 Opacity = 0.6,

@@ -148,7 +148,7 @@ module DiskMounterTests =
             loaded.Count |> should equal 2
             loaded.["c1"].Head.HostPath |> should equal "C:\\staging-c1")
 
-    // â”€â”€ pruneStaleStaging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── pruneStaleStaging ──────────────────────────────────────────────
 
     [<Fact>]
     let ``pruneStaleStaging supprime les dossiers orphelins anciens`` () =

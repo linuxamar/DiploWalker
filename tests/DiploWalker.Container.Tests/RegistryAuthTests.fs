@@ -14,7 +14,7 @@ module RegistryAuthTests =
 
     let shouldNotContain (substring: string) (text: string) = Assert.DoesNotContain(substring, text)
 
-    /// CrÃ©e un fichier d'Ã©tat temporaire isolÃ© pour chaque test.
+    /// Crée un fichier d'état temporaire isolé pour chaque test.
     let private withStateFile (test: string -> unit) =
         let dir =
             Path.Combine(Path.GetTempPath(), "diplo-registry-tests-" + Guid.NewGuid().ToString("N"))
@@ -67,7 +67,7 @@ module RegistryAuthTests =
             RegistryAuth.tryGetUserArg path "reg.example.com"
             |> should equal (Some "user2:pass2"))
 
-    // â”€â”€ normalizeRegistryHost â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── normalizeRegistryHost ────────────────────────────────────
 
     [<Theory>]
     [<InlineData("")>]
@@ -137,7 +137,7 @@ module RegistryAuthTests =
         finally
             Environment.SetEnvironmentVariable("PATH", saved)
 
-    // â”€â”€ prepareHostsDir / ensureHelper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── prepareHostsDir / ensureHelper ───────────────────────────
 
     [<Fact>]
     let ``prepareHostsDir retourne None pour un registre non exploitable`` () =
@@ -146,7 +146,7 @@ module RegistryAuthTests =
     [<Fact>]
     let ``prepareHostsDir genere hosts.toml deleguant au helper`` () =
         match RegistryAuth.prepareHostsDir "myregistry.azurecr.io" with
-        | None -> failwith "prepareHostsDir aurait dÃ» rÃ©ussir"
+        | None -> failwith "prepareHostsDir aurait dû réussir"
         | Some root ->
             try
                 let tomlPath = Path.Combine(root, "myregistry.azurecr.io", "hosts.toml")
@@ -171,7 +171,7 @@ module RegistryAuthTests =
     [<Fact>]
     let ``prepareHostsDir utilise l'endpoint canonique de docker.io comme repertoire`` () =
         match RegistryAuth.prepareHostsDir "docker.io" with
-        | None -> failwith "prepareHostsDir aurait dÃ» rÃ©ussir"
+        | None -> failwith "prepareHostsDir aurait dû réussir"
         | Some root ->
             try
                 Directory.Exists(Path.Combine(root, "registry-1.docker.io"))
@@ -194,18 +194,18 @@ module RegistryAuthTests =
         File.Exists cmdPath2 |> should be True
         File.ReadAllText ps1Path |> should equal content1
 
-    // â”€â”€ Script du helper (protocole docker-credential) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Script du helper (protocole docker-credential) ──────────
     //
-    // Le vrai script lit le fichier d'Ã©tat et la clÃ© de chiffrement indiquÃ©s
+    // Le vrai script lit le fichier d'état et la clé de chiffrement indiqués
     // par le lanceur : les tests lancent un helper jetable produit par
-    // `RegistryAuth.writeHelperTo` et pointÃ© sur un Ã©tat temporaire, jamais sur
-    // le vrai fichier. Le lanceur de la plateforme est exÃ©cutÃ© tel quel, comme
-    // le ferait containerd d'aprÃ¨s `hosts.toml`.
+    // `RegistryAuth.writeHelperTo` et pointé sur un état temporaire, jamais sur
+    // le vrai fichier. Le lanceur de la plateforme est exécuté tel quel, comme
+    // le ferait containerd d'après `hosts.toml`.
     //
-    // Le mÃªme script PowerShell sert sous les deux plateformes (DPAPI sous
-    // Windows, AES-GCM ailleurs) : nÃ©cessite PowerShell 7 (`pwsh`) dans le PATH
+    // Le même script PowerShell sert sous les deux plateformes (DPAPI sous
+    // Windows, AES-GCM ailleurs) : nécessite PowerShell 7 (`pwsh`) dans le PATH
     // sous Unix.
-    /// ExÃ©cute un lanceur dÃ©jÃ† installÃ© en lui envoyant l'URL du serveur sur
+    /// Exécute un lanceur déjÆ installé en lui envoyant l'URL du serveur sur
     /// stdin (protocole docker-credential) et lit sa sortie standard.
     let private runLauncher (launcher: string) (stdinLine: string option) =
         if OperatingSystem.IsWindows() then
@@ -219,7 +219,7 @@ module RegistryAuthTests =
 
         runLauncher launcher stdinLine
 
-    /// PrÃ©pare la structure <racine>\Diplo\registry-auth.json attendue par le helper.
+    /// Prépare la structure <racine>\Diplo\registry-auth.json attendue par le helper.
     let private withHelperState (test: string -> string -> unit) =
         let root =
             Path.Combine(Path.GetTempPath(), "diplo-helper-tests-" + Guid.NewGuid().ToString("N"))
@@ -238,7 +238,7 @@ module RegistryAuthTests =
     [<Fact>]
     let ``le helper repond Username et Secret pour le registre demande`` () =
         withHelperState (fun root statePath ->
-            // Guillemets et backslash dans l'utilisateur : vÃ©rifie l'Ã©chappement JSON.
+            // Guillemets et backslash dans l'utilisateur : vérifie l'échappement JSON.
             RegistryAuth.add statePath "myregistry.azurecr.io" "us\"er\\x" "s3cret!"
 
             let (code, stdout, _) = runHelperScript root statePath (Some "https://myregistry.azurecr.io/v1/")
@@ -276,9 +276,9 @@ module RegistryAuthTests =
             json.GetProperty("Username").GetString() |> should equal "hubuser"
             json.GetProperty("Secret").GetString() |> should equal "hubpass")
 
-    /// Helper partagÃ©, comme installÃ© par `ensureHelper` : ni le lanceur ni
-    /// l'environnement ne transportent de chemin, le script dÃ©couvre son fichier
-    /// d'Ã©tat et sa clÃ© de chiffrement par rapport Ã  son propre emplacement
+    /// Helper partagé, comme installé par `ensureHelper` : ni le lanceur ni
+    /// l'environnement ne transportent de chemin, le script découvre son fichier
+    /// d'état et sa clé de chiffrement par rapport à son propre emplacement
     /// (`<racine>/cred-helper/..`).
     [<Fact>]
     let ``le helper partage retrouve son etat et sa cle sans chemin fourni`` () =

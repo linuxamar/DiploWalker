@@ -4,7 +4,7 @@ open Xunit
 open FsUnit.Xunit
 open DiploWalker.Gui.Services
 
-// â”€â”€ LogLevel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── LogLevel ──────────────────────────────────────────────────
 
 [<Fact>]
 let ``LogLevel.Info est reconnu`` () = Info |> should equal Info
@@ -27,7 +27,7 @@ let ``LogLevel discriminent sont distincts`` () =
     Success |> should not' (equal Error)
     Warning |> should not' (equal Error)
 
-// â”€â”€ LogEntry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── LogEntry ──────────────────────────────────────────────────
 
 [<Fact>]
 let ``LogEntry.Text retourne le texte fourni`` () =
@@ -40,7 +40,7 @@ let ``LogEntry.Level retourne le niveau fourni`` () =
     entry.Level |> should equal Warning
 
 [<Fact>]
-let ``LogEntry.Timestamp contient 8 caractÃ¨res`` () =
+let ``LogEntry.Timestamp contient 8 caractères`` () =
     let entry = LogEntry("x", Info)
     entry.Timestamp |> should not' (be Null)
     entry.Timestamp.Length |> should equal 8

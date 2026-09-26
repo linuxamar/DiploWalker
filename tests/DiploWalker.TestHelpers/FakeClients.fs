@@ -11,8 +11,8 @@ open DiploWalker.Grpc.Volume
 
 module internal FakeClientsInternals =
 
-    /// Ã‰numÃ©ration asynchrone vide, utilisÃ©e pour les membres streaming des fakes
-    /// non exercÃ©s par les scÃ©narios testÃ©s.
+    /// Énumération asynchrone vide, utilisée pour les membres streaming des fakes
+    /// non exercés par les scénarios testés.
     let emptyAsyncEnumerable<'T> : IAsyncEnumerable<'T> =
         { new IAsyncEnumerable<'T> with
             member _.GetAsyncEnumerator(_ct) =
@@ -21,8 +21,8 @@ module internal FakeClientsInternals =
                     member _.MoveNextAsync() = ValueTask<bool>(false)
                     member _.DisposeAsync() = ValueTask() } }
 
-    /// Ã‰numÃ©ration asynchrone bornÃ©e construite depuis une sÃ©quence, utilisÃ©e
-    /// pour fournir des donnÃ©es aux membres streaming des fakes.
+    /// Énumération asynchrone bornée construite depuis une séquence, utilisée
+    /// pour fournir des données aux membres streaming des fakes.
     let toAsyncEnumerable<'T> (items: seq<'T>) : IAsyncEnumerable<'T> =
         { new IAsyncEnumerable<'T> with
             member _.GetAsyncEnumerator(_ct) =
@@ -35,10 +35,10 @@ module internal FakeClientsInternals =
                         e.Dispose()
                         ValueTask() } }
 
-/// Fake IContainerClient : chaque membre retourne une rÃ©ponse injectable via le
-/// constructeur (paramÃ¨tres nommÃ©s). Les membres non fournis utilisent une
-/// rÃ©ponse bÃ©nigne par dÃ©faut. Des compteurs d'appels permettent de vÃ©rifier
-/// que la commande a contactÃ© le client.
+/// Fake IContainerClient : chaque membre retourne une réponse injectable via le
+/// constructeur (paramètres nommés). Les membres non fournis utilisent une
+/// réponse bénigne par défaut. Des compteurs d'appels permettent de vérifier
+/// que la commande a contacté le client.
 type FakeContainerClient
     (
         ?delete: DeleteContainerResponse,
@@ -361,7 +361,7 @@ type FakeContainerClient
             statsStreamCalls <- statsStreamCalls + 1
             FakeClientsInternals.toAsyncEnumerable statsStreamR
 
-/// Fake INetworkClient : mÃªmes conventions que FakeContainerClient.
+/// Fake INetworkClient : mêmes conventions que FakeContainerClient.
 type FakeNetworkClient
     (
         ?create: CreateNetworkResponse,
@@ -457,7 +457,7 @@ type FakeNetworkClient
             pruneCalls <- pruneCalls + 1
             Task.FromResult(pruneR)
 
-/// Fake IVolumeClient : mÃªmes conventions que FakeContainerClient.
+/// Fake IVolumeClient : mêmes conventions que FakeContainerClient.
 type FakeVolumeClient
     (
         ?create: CreateVolumeResponse,

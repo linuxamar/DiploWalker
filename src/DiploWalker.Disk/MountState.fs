@@ -6,12 +6,12 @@ open System.Text.Json
 open Serilog
 open DiploWalker.Abstractions
 
-/// Persistance de l'Ã©tat des volumes montÃ©s par conteneur : permet de
-/// restaurer le write-back aprÃ¨s un redÃ©marrage du service sans rÃ©-extraire
+/// Persistance de l'état des volumes montés par conteneur : permet de
+/// restaurer le write-back après un redémarrage du service sans ré-extraire
 /// les images disque (voir DiskMounter.rehydrate).
 module MountState =
 
-    /// Un volume montÃ© tel que persistÃ© dans l'Ã©tat.
+    /// Un volume monté tel que persisté dans l'état.
     type MountEntry =
         { Source: string
           HostPath: string
@@ -20,18 +20,18 @@ module MountState =
 
     type ContainerState = { Id: string; Mounts: MountEntry list }
 
-    // MÃªme racine que DiskMounter.stagingRoot() : calculÃ©e localement pour
-    // Ã©viter une dÃ©pendance croisÃ©e entre les deux modules.
+    // Même racine que DiskMounter.stagingRoot() : calculée localement pour
+    // éviter une dépendance croisée entre les deux modules.
     let stateFile () =
         Path.Combine(AppPaths.dataDir "volumes", "mounted-state.json")
 
-    /// Verrou global : les handlers gRPC appellent persistMounts en parallÃ¨le ;
-    /// sans sÃ©rialisation, deux sauvegardes concurrentes s'Ã©crasent et des
-    /// entrÃ©es de montage sont perdues (write-backs jamais exÃ©cutÃ©s aprÃ¨s crash).
+    /// Verrou global : les handlers gRPC appellent persistMounts en parallèle ;
+    /// sans sérialisation, deux sauvegardes concurrentes s'écrasent et des
+    /// entrées de montage sont perdues (write-backs jamais exécutés après crash).
     let private stateLock = obj ()
 
-    /// Charge l'Ã©tat persistÃ© (Map identifiant conteneur -> volumes).
-    /// Retourne un Ã©tat vide si le fichier est absent ou illisible.
+    /// Charge l'état persisté (Map identifiant conteneur -> volumes).
+    /// Retourne un état vide si le fichier est absent ou illisible.
     let load (path: string) : Map<string, MountEntry list> =
         lock stateLock (fun () ->
             try
@@ -41,27 +41,27 @@ module MountState =
                     let json = File.ReadAllText path
 
                     if String.IsNullOrWhiteSpace(json) || json = "null" then
-                        Log.Warning("Fichier d'Ã©tat de montage vide ou null : {Path}", path)
+                        Log.Warning("Fichier d'état de montage vide ou null : {Path}", path)
                         Map.empty
                     else
                         let entries = JsonSerializer.Deserialize<ContainerState list>(json)
 
                         if isNull (box entries) then
-                            Log.Warning("Fichier d'Ã©tat de montage contient null : {Path}", path)
+                            Log.Warning("Fichier d'état de montage contient null : {Path}", path)
                             Map.empty
                         else
                             entries |> Seq.map (fun e -> e.Id, e.Mounts) |> Map.ofSeq
             with
             | :? JsonException as ex ->
-                Log.Warning(ex, "Fichier d'Ã©tat de montage corrompu : {Path}", path)
+                Log.Warning(ex, "Fichier d'état de montage corrompu : {Path}", path)
                 Map.empty
             | ex ->
-                Log.Warning(ex, "Erreur lecture Ã©tat de montage : {Path}", path)
+                Log.Warning(ex, "Erreur lecture état de montage : {Path}", path)
                 Map.empty)
 
-    /// Enregistre l'Ã©tat des volumes montÃ©s (Ã©criture atomique : fichier
-    /// temporaire du mÃªme rÃ©pertoire puis remplacement ; le temporaire est
-    /// supprimÃ© mÃªme en cas d'Ã©chec).
+    /// Enregistre l'état des volumes montés (écriture atomique : fichier
+    /// temporaire du même répertoire puis remplacement ; le temporaire est
+    /// supprimé même en cas d'échec).
     let save (path: string) (mounted: seq<string * MountEntry list>) =
         lock stateLock (fun () ->
             let entries =
@@ -88,6 +88,6 @@ module MountState =
             | _ ->
                 try
                     File.Delete(tmp)
-                with ex -> Log.Warning(ex, "Ã‰chec de la suppression du fichier temporaire {Tmp}", tmp)
+                with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
                 reraise ())
 

@@ -7,19 +7,19 @@
   <Border BorderThickness="1" CornerRadius="4"
           Margin="0,0,0,4">
     <DockPanel>
-      <TextBlock DockPanel.Dock="Top" Text="DÃ©tails du conteneur" FontWeight="Bold"
+      <TextBlock DockPanel.Dock="Top" Text="Détails du conteneur" FontWeight="Bold"
                  Margin="10,8,0,6" FontSize="13" Opacity="0.9"/>
 
-      <!-- Placeholder quand aucun conteneur sÃ©lectionnÃ© -->
-      <TextBlock DockPanel.Dock="Top" Text="SÃ©lectionnez un conteneur dans la liste"
+      <!-- Placeholder quand aucun conteneur sélectionné -->
+      <TextBlock DockPanel.Dock="Top" Text="Sélectionnez un conteneur dans la liste"
                  HorizontalAlignment="Center" Margin="0,30" FontSize="13"
                  Opacity="0.4"
                  IsVisible="{Binding ContainerTab.HasSelection, Converter={x:Static BoolConverters.Not}}"/>
 
-      <!-- Panneau dÃ©tail (visible quand sÃ©lectionnÃ©) -->
+      <!-- Panneau détail (visible quand sélectionné) -->
       <StackPanel IsVisible="{Binding ContainerTab.HasSelection}" Margin="0,0,0,8">
 
-        <!-- PropriÃ©tÃ©s du conteneur -->
+        <!-- Propriétés du conteneur -->
         <Grid ColumnDefinitions="Auto,*,8,Auto,*" RowDefinitions="Auto,Auto,Auto"
               Margin="10,0,10,6">
           <TextBlock Grid.Row="0" Grid.Column="0" Text="ID :" FontWeight="SemiBold"
@@ -42,41 +42,41 @@
                      Margin="0,0,0,3" TextTrimming="CharacterEllipsis"
                      ToolTip.Tip="{Binding ContainerTab.SelectedContainer.Image}"/>
 
-          <TextBlock Grid.Row="1" Grid.Column="3" Text="Ã‰tat :" FontWeight="SemiBold"
+          <TextBlock Grid.Row="1" Grid.Column="3" Text="État :" FontWeight="SemiBold"
                      Opacity="0.7" Margin="0,0,8,3" VerticalAlignment="Center"/>
           <TextBlock Grid.Row="1" Grid.Column="4"
                      Text="{Binding ContainerTab.SelectedContainer.State}"
                      Margin="0,0,0,3"/>
 
-          <TextBlock Grid.Row="2" Grid.Column="0" Text="CrÃ©Ã© le :" FontWeight="SemiBold"
+          <TextBlock Grid.Row="2" Grid.Column="0" Text="Créé le :" FontWeight="SemiBold"
                      Opacity="0.7" Margin="0,0,8,0" VerticalAlignment="Center"/>
           <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="4"
                      Text="{Binding ContainerTab.SelectedContainer.CreatedAt}"
                      Margin="0,0,0,0"/>
         </Grid>
 
-        <!-- SÃ©parateur -->
+        <!-- Séparateur -->
         <Separator Margin="10,4,10,6"/>
 
-        <!-- Actions sur le conteneur sÃ©lectionnÃ© -->
+        <!-- Actions sur le conteneur sélectionné -->
         <WrapPanel Margin="10,0,0,6">
-          <Button Content="â–¶ DÃ©marrer" Command="{Binding ContainerTab.StartContainerCommand}"
+          <Button Content="▶ Démarrer" Command="{Binding ContainerTab.StartContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="â¹ ArrÃªter" Command="{Binding ContainerTab.StopContainerCommand}"
+          <Button Content="⏹ Arrêter" Command="{Binding ContainerTab.StopContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="â¸ Suspendre" Command="{Binding ContainerTab.PauseContainerCommand}"
+          <Button Content="⏸ Suspendre" Command="{Binding ContainerTab.PauseContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="â–¶ Reprendre" Command="{Binding ContainerTab.UnpauseContainerCommand}"
+          <Button Content="▶ Reprendre" Command="{Binding ContainerTab.UnpauseContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="â³ Attendre" Command="{Binding ContainerTab.WaitContainerCommand}"
+          <Button Content="⏳ Attendre" Command="{Binding ContainerTab.WaitContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="ðŸ—‘ Supprimer" Command="{Binding ContainerTab.DeleteContainerCommand}"
+          <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.DeleteContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="âœ Renommer" Command="{Binding ContainerTab.RenameContainerCommand}"
+          <Button Content="✏ Renommer" Command="{Binding ContainerTab.RenameContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="âš™ Processus" Command="{Binding ContainerTab.TopContainerCommand}"
+          <Button Content="⚙ Processus" Command="{Binding ContainerTab.TopContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="ðŸ“Š MÃ©triques" Command="{Binding ContainerTab.StatsContainerCommand}"
+          <Button Content="📊 Métriques" Command="{Binding ContainerTab.StatsContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
         </WrapPanel>
 
@@ -93,12 +93,12 @@
                    PlaceholderText="src=C:\data,dst=/data[,ro]"/>
         </WrapPanel>
 
-        <!-- SÃ©parateur -->
+        <!-- Séparateur -->
         <Separator Margin="10,4,10,6"/>
 
         <!-- Logs & Exec -->
         <WrapPanel Margin="10,0,0,0">
-          <Button Content="ðŸ“œ Journaux" Command="{Binding ContainerTab.GetContainerLogsCommand}"
+          <Button Content="📜 Journaux" Command="{Binding ContainerTab.GetContainerLogsCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
           <CheckBox Content="Suivre" IsChecked="{Binding ContainerTab.ContainerFollow}"
                     Margin="8,0,0,4" VerticalAlignment="Center"/>
@@ -106,20 +106,20 @@
                      Opacity="0.7"/>
           <NumericUpDown Value="{Binding ContainerTab.ContainerTail}" Minimum="10"
                          Maximum="10000" Width="80" Margin="0,0,12,4"/>
-          <Button Content="âš¡ ExÃ©cuter" Command="{Binding ContainerTab.ExecInContainerCommand}"
+          <Button Content="⚡ Exécuter" Command="{Binding ContainerTab.ExecInContainerCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
           <TextBlock Text="Cmd :" VerticalAlignment="Center" Margin="8,0,4,4"
                      Opacity="0.7"/>
           <TextBox Text="{Binding ContainerTab.ContainerExecCommand}" Width="200"
-                   Margin="0,0,0,4" PlaceholderText="commande Ã  exÃ©cuter"/>
+                   Margin="0,0,0,4" PlaceholderText="commande à exécuter"/>
         </WrapPanel>
 
-        <!-- SÃ©parateur -->
+        <!-- Séparateur -->
         <Separator Margin="10,4,10,6"/>
 
         <!-- Images -->
         <WrapPanel Margin="10,0,0,6">
-          <TextBlock Text="RÃ©f. image :" VerticalAlignment="Center" Margin="0,0,4,4"
+          <TextBlock Text="Réf. image :" VerticalAlignment="Center" Margin="0,0,4,4"
                      Opacity="0.7"/>
           <TextBox Text="{Binding ContainerTab.ContainerImageRef}" Width="200"
                    Margin="0,0,12,4" PlaceholderText="image:tag (inspect/remove/tag)"/>
@@ -127,17 +127,17 @@
                      Opacity="0.7"/>
           <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200"
                    Margin="0,0,12,4" PlaceholderText="nouveau:tag (tag/commit)"/>
-          <Button Content="ðŸ“‹ Lister" Command="{Binding ContainerTab.ListImagesCommand}"
+          <Button Content="📋 Lister" Command="{Binding ContainerTab.ListImagesCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="ðŸ” Inspecter" Command="{Binding ContainerTab.InspectImageCommand}"
+          <Button Content="🔍 Inspecter" Command="{Binding ContainerTab.InspectImageCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="ðŸ—‘ Supprimer" Command="{Binding ContainerTab.RemoveImageCommand}"
+          <Button Content="🗑 Supprimer" Command="{Binding ContainerTab.RemoveImageCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="ðŸ· Ã‰tiqueter" Command="{Binding ContainerTab.TagImageCommand}"
+          <Button Content="🏷 Étiqueter" Command="{Binding ContainerTab.TagImageCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="ðŸ“¸ Committer" Command="{Binding ContainerTab.CommitImageCommand}"
+          <Button Content="📸 Committer" Command="{Binding ContainerTab.CommitImageCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="ðŸ§¹ Nettoyer" Command="{Binding ContainerTab.PruneImagesCommand}"
+          <Button Content="🧹 Nettoyer" Command="{Binding ContainerTab.PruneImagesCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
         </WrapPanel>
 
@@ -147,10 +147,10 @@
                     GridLinesVisibility="Horizontal" CanUserResizeColumns="True"
                     CanUserSortColumns="True" MaxHeight="200">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="RÃ©fÃ©rentiel" Binding="{Binding Reference}" Width="280" />
+              <DataGridTextColumn Header="Référentiel" Binding="{Binding Reference}" Width="280" />
               <DataGridTextColumn Header="Tag" Binding="{Binding Tag}" Width="140" />
               <DataGridTextColumn Header="Taille" Binding="{Binding Size}" Width="120" />
-              <DataGridTextColumn Header="CrÃ©Ã© le" Binding="{Binding CreatedAt}" Width="140" />
+              <DataGridTextColumn Header="Créé le" Binding="{Binding CreatedAt}" Width="140" />
             </DataGrid.Columns>
           </DataGrid>
           <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"
@@ -162,25 +162,25 @@
 
         <!-- Catalogue d'images -->
         <WrapPanel Margin="10,0,0,6">
-          <TextBlock Text="RÃ©f. image :" VerticalAlignment="Center" Margin="0,0,4,4"
+          <TextBlock Text="Réf. image :" VerticalAlignment="Center" Margin="0,0,4,4"
                      Opacity="0.7"/>
           <TextBox Text="{Binding ContainerTab.ContainerImageRef}" Width="200"
                    Margin="0,0,12,4" PlaceholderText="image:tag (catalogue)"/>
           <TextBlock Text="Cible :" VerticalAlignment="Center" Margin="0,0,4,4"
                      Opacity="0.7"/>
           <TextBox Text="{Binding ContainerTab.ContainerImageTarget}" Width="200"
-                   Margin="0,0,12,4" PlaceholderText="nouveau:tag (mise Ã  jour)"/>
+                   Margin="0,0,12,4" PlaceholderText="nouveau:tag (mise à jour)"/>
           <TextBlock Text="Note :" VerticalAlignment="Center" Margin="0,0,4,4"
                      Opacity="0.7"/>
           <TextBox Text="{Binding ContainerTab.CatalogNote}" Width="200"
                    Margin="0,0,12,4" PlaceholderText="note optionnelle"/>
-          <Button Content="ðŸ“‹ Lister" Command="{Binding ContainerTab.ListCatalogCommand}"
+          <Button Content="📋 Lister" Command="{Binding ContainerTab.ListCatalogCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="âž• Inscrire" Command="{Binding ContainerTab.AddToCatalogCommand}"
+          <Button Content="➕ Inscrire" Command="{Binding ContainerTab.AddToCatalogCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="âœï¸ Mettre Ã  jour" Command="{Binding ContainerTab.UpdateCatalogCommand}"
+          <Button Content="✏️ Mettre à jour" Command="{Binding ContainerTab.UpdateCatalogCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
-          <Button Content="ðŸ—‘ Retirer" Command="{Binding ContainerTab.RemoveFromCatalogCommand}"
+          <Button Content="🗑 Retirer" Command="{Binding ContainerTab.RemoveFromCatalogCommand}"
                   Margin="0,0,4,4" Padding="8,4"/>
         </WrapPanel>
 
@@ -190,9 +190,9 @@
                     GridLinesVisibility="Horizontal" CanUserResizeColumns="True"
                     CanUserSortColumns="True" MaxHeight="200">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="RÃ©fÃ©rence" Binding="{Binding Ref}" Width="280" />
+              <DataGridTextColumn Header="Référence" Binding="{Binding Ref}" Width="280" />
               <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="200" />
-              <DataGridTextColumn Header="AjoutÃ©" Binding="{Binding AddedAt}" Width="140" />
+              <DataGridTextColumn Header="Ajouté" Binding="{Binding AddedAt}" Width="140" />
             </DataGrid.Columns>
           </DataGrid>
           <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"

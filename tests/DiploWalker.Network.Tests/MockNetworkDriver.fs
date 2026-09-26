@@ -32,33 +32,33 @@ type MockNetworkDriver() =
                 networks <- networks |> Map.remove id
                 Ok()
             else
-                Error(sprintf "RÃ©seau '%s' introuvable" id)
+                Error(sprintf "Réseau '%s' introuvable" id)
 
         member _.Inspect(id) =
             match networks |> Map.tryFind id with
             | Some info -> Ok info
-            | None -> Error(sprintf "RÃ©seau '%s' introuvable" id)
+            | None -> Error(sprintf "Réseau '%s' introuvable" id)
 
         member _.List() =
             networks |> Map.toList |> List.map snd |> Ok
 
         member _.Connect(networkId, containerId, endpointId, ipv4Address, _options) =
             if networks |> Map.containsKey networkId |> not then
-                Error(sprintf "RÃ©seau '%s' introuvable" networkId)
+                Error(sprintf "Réseau '%s' introuvable" networkId)
             else
                 let epInfo =
                     { EndpointId = endpointId
                       ContainerId = containerId
                       Ipv4Address = ipv4Address |> Option.defaultValue "172.17.0.2"
                       MacAddress = "02:42:ac:11:00:02"
-                      Message = sprintf "ConnectÃ© Ã  %s" containerId }
+                      Message = sprintf "Connecté à %s" containerId }
 
                 endpoints <- endpoints |> Map.add endpointId epInfo
                 Ok epInfo
 
         member _.Disconnect(networkId, containerId, endpointId, _force) =
             if networks |> Map.containsKey networkId |> not then
-                Error(sprintf "RÃ©seau '%s' introuvable" networkId)
+                Error(sprintf "Réseau '%s' introuvable" networkId)
             else
                 endpoints <- endpoints |> Map.remove endpointId
                 Ok()

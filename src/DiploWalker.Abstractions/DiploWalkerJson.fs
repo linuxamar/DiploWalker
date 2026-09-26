@@ -2,7 +2,7 @@
 
 open System.Text.Json
 
-/// Options de sÃ©rialisation JSON centralisÃ©es pour tout le projet.
+/// Options de sérialisation JSON centralisées pour tout le projet.
 [<RequireQualifiedAccess>]
 module DiploWalkerJson =
 

@@ -8,7 +8,7 @@ open DiploWalker.Core.Clients
 open DiploWalker.Grpc.Container
 
 /// Lecture abstraite des journaux d'un conteneur : permet de tester le
-/// ViewModel sans serveur gRPC (le flux est simulÃ© par un faux).
+/// ViewModel sans serveur gRPC (le flux est simulé par un faux).
 type IContainerLogsSource =
     inherit IDisposable
 
@@ -18,7 +18,7 @@ type IContainerLogsSource =
 
     abstract GetSnapshot: id: string * tail: int * since: string * ct: CancellationToken -> Task<seq<ContainerLogEntry>>
 
-/// ImplÃ©mentation par dÃ©faut reposant sur le client gRPC rÃ©el.
+/// Implémentation par défaut reposant sur le client gRPC réel.
 type GrpcContainerLogsSource() =
     let client = new ContainerClient()
     let mutable disposed = false
@@ -32,7 +32,7 @@ type GrpcContainerLogsSource() =
 
     interface IDisposable with
         member _.Dispose() =
-            // Disposition idempotente et atomique : une seule exÃ©cution mÃªme
+            // Disposition idempotente et atomique : une seule exécution même
             // sous concurrence (Interlocked.Exchange), pas de double Dispose.
             if Interlocked.Exchange(&disposed, true) = false then
                 (client :> IDisposable).Dispose()

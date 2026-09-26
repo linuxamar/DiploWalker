@@ -27,8 +27,8 @@ type SmbDriver(dataRoot: string) =
 
         match user, password with
         | Some user, Some password ->
-            // Le mot de passe est passÃ© via stdin (pas en ligne de commande)
-            // pour Ã©viter l'exposition via WMI/Task Manager.
+            // Le mot de passe est passé via stdin (pas en ligne de commande)
+            // pour éviter l'exposition via WMI/Task Manager.
             ProcessExec.runUnit
                 "net"
                 [ "use"; targetPath; remotePath; "/user:" + user; "/persistent:no" ]

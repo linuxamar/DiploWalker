@@ -1,6 +1,6 @@
 ﻿namespace DiploWalker.Cli.Tests
 
-/// Codes de sortie complÃ©mentaires : chemins de validation (arguments
+/// Codes de sortie complémentaires : chemins de validation (arguments
 /// manquants, format inconnu, etc.) non couverts dans ExitCodeTests.fs.
 module ExitCodeCoverageTests =
 
@@ -15,7 +15,7 @@ module ExitCodeCoverageTests =
     let private run (cmd: ICommand<'T>) (settings: 'T) : int =
         cmd.ExecuteAsync(Unchecked.defaultof<CommandContext>, settings, CancellationToken.None).Result
 
-    // â”€â”€â”€ Conteneurs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Conteneurs ───────────────────────────────────────────────────
     open DiploWalker.Cli.Container
 
     [<Fact>]
@@ -85,14 +85,14 @@ module ExitCodeCoverageTests =
         output.Errors |> should not' (be Empty)
 
     [<Fact>]
-    let ``image inspect sans rÃ©fÃ©rence retourne 1`` () =
+    let ``image inspect sans référence retourne 1`` () =
         let output = MockOutputPort()
         let code = run (ImageInspectCommand(output)) (ImageInspectSettings(Ref = null))
         code |> should equal 1
         output.Errors |> should not' (be Empty)
 
     [<Fact>]
-    let ``image remove sans rÃ©fÃ©rence retourne 1`` () =
+    let ``image remove sans référence retourne 1`` () =
         let output = MockOutputPort()
         let code = run (ImageRemoveCommand(output)) (ImageRemoveSettings(Ref = null))
         code |> should equal 1
@@ -155,14 +155,14 @@ module ExitCodeCoverageTests =
         output.Errors |> should not' (be Empty)
 
     [<Fact>]
-    let ``image commit sans rÃ©fÃ©rence retourne 1`` () =
+    let ``image commit sans référence retourne 1`` () =
         let output = MockOutputPort()
         let code = run (ImageCommitCommand(output)) (ImageCommitSettings(ContainerId = "c1", ImageRef = null))
         code |> should equal 1
         output.Errors |> should not' (be Empty)
 
     [<Fact>]
-    let ``image export sans rÃ©fÃ©rence retourne 1`` () =
+    let ``image export sans référence retourne 1`` () =
         let output = MockOutputPort()
         let code = run (ImageExportCommand(output)) (ImageExportSettings(Ref = null, Output = "x.tar"))
         code |> should equal 1
@@ -225,13 +225,13 @@ module ExitCodeCoverageTests =
         output.Errors |> should not' (be Empty)
 
     [<Fact>]
-    let ``container write-file sans entrÃ©e retourne 1`` () =
+    let ``container write-file sans entrée retourne 1`` () =
         let output = MockOutputPort()
         let code = run (WriteFileCommand(output)) (WriteFileSettings(Id = "c1", Path = "/tmp/f", Input = null))
         code |> should equal 1
         output.Errors |> should not' (be Empty)
 
-    // â”€â”€â”€ RÃ©seaux â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Réseaux ──────────────────────────────────────────────────────
     open DiploWalker.Cli.Network
 
     [<Fact>]
@@ -244,7 +244,7 @@ module ExitCodeCoverageTests =
         code |> should equal 1
         output.Errors |> should not' (be Empty)
 
-    // â”€â”€â”€ Disk â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Disk ─────────────────────────────────────────────────────────
     open DiploWalker.Cli.Disk
 
     [<Fact>]

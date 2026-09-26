@@ -15,7 +15,7 @@ type StatusCommand(output: IOutputPort, clients: IDiploClients) =
 
     override _.ExecuteAsync(_ctx, _settings, _ct) =
         task {
-            output.WriteLine("VÃ©rification de l'Ã©tat des services DiploWalker...")
+            output.WriteLine("Vérification de l'état des services DiploWalker...")
             output.WriteLine("")
 
             use containerClient = clients.CreateContainerClient()
@@ -51,16 +51,16 @@ type StatusCommand(output: IOutputPort, clients: IDiploClients) =
                 task {
                     try
                         let! n = networkClient.ListAsync()
-                        return (true, sprintf "%d rÃ©seau(x)" n.Networks.Count)
+                        return (true, sprintf "%d réseau(x)" n.Networks.Count)
                     with ex ->
                         return (false, ex.Message)
                 }
 
             let print name (ok, info) =
                 if ok then
-                    output.WriteSuccess(sprintf "  âœ“ %s: %s" name info)
+                    output.WriteSuccess(sprintf "  ✓ %s: %s" name info)
                 else
-                    output.WriteError(sprintf "  âœ— %s: %s" name info)
+                    output.WriteError(sprintf "  ✗ %s: %s" name info)
 
             print "Container" containerStatus
             print "Volume" volumeStatus
@@ -71,12 +71,12 @@ type StatusCommand(output: IOutputPort, clients: IDiploClients) =
             let allOk = [ containerStatus; volumeStatus; networkStatus ] |> List.forall fst
 
             if allOk then
-                output.WriteSuccess("Tous les services sont opÃ©rationnels.")
+                output.WriteSuccess("Tous les services sont opérationnels.")
                 return 0
             else
                 output.WriteWarning("Certains services ne sont pas disponibles.")
-                // Un status check qui rÃ©pond 0 avec des services down est
-                // inutilisable pour la supervision scriptÃ©e.
+                // Un status check qui répond 0 avec des services down est
+                // inutilisable pour la supervision scriptée.
                 return 1
         }
 

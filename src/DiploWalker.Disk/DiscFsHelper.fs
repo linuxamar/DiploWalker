@@ -5,18 +5,18 @@ open System.IO
 open System.Text
 open DiscUtils
 
-/// OpÃ©rations communes sur les systÃ¨mes de fichiers DiscUtils (extraction,
-/// rÃ©Ã©criture, suppression) partagÃ©es par les adaptateurs VDI, DMG et le
-/// fallback gÃ©nÃ©rique de FsImage.
+/// Opérations communes sur les systèmes de fichiers DiscUtils (extraction,
+/// réécriture, suppression) partagées par les adaptateurs VDI, DMG et le
+/// fallback générique de FsImage.
 ///
-/// La rÃ©solution des chemins HÃ”TES est confinÃ©e au rÃ©pertoire de staging via
-/// `realFrom` : les noms internes Ã  l'image ne sont pas fiables (ils peuvent
-/// contenir Â« .. Â» ou des prÃ©fixes enracinÃ©s type Â« C:\x Â») ; sans ce garde-fou,
-/// un service (LocalSystem) Ã©crirait n'importe oÃ¹ sur l'hÃ´te. Tous les
-/// adaptateurs passent donc par `toHostPath`, jamais par une concatÃ©nation brute.
+/// La résolution des chemins HÔTES est confinée au répertoire de staging via
+/// `realFrom` : les noms internes à l'image ne sont pas fiables (ils peuvent
+/// contenir « .. » ou des préfixes enracinés type « C:\x ») ; sans ce garde-fou,
+/// un service (LocalSystem) écrirait n'importe où sur l'hôte. Tous les
+/// adaptateurs passent donc par `toHostPath`, jamais par une concaténation brute.
 module DiscFsHelper =
 
-    /// Nettoie un chemin interne au FS image en sÃ©parateur hÃ´te.
+    /// Nettoie un chemin interne au FS image en séparateur hôte.
     let toRealRel (fsPath: string) =
         let isSeparator (c: char) = c = '\\' || c = '/'
         let buffer = StringBuilder(fsPath.Length)
@@ -47,9 +47,9 @@ module DiscFsHelper =
         && fsPath[1] = ':'
         && (fsPath[2] = '\\' || fsPath[2] = '/')
 
-    /// Convertit un chemin INTERNE au systÃ¨me de fichiers image en chemin hÃ´te,
-    /// confinÃ© Ã  `realRoot`. LÃ¨ve une exception en cas de nom enracinÃ©, de
-    /// traversal Â« .. Â» ou si le rÃ©sultat sort du rÃ©pertoire de staging.
+    /// Convertit un chemin INTERNE au système de fichiers image en chemin hôte,
+    /// confiné à `realRoot`. Lève une exception en cas de nom enraciné, de
+    /// traversal « .. » ou si le résultat sort du répertoire de staging.
     let realFrom (realRoot: string) (fsPath: string) =
         let rel = toRealRel fsPath
 
@@ -79,19 +79,19 @@ module DiscFsHelper =
         let rootWithSep =
             realRoot.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
 
-        // Le chemin doit rester dans le staging ; la RACINE elle-mÃªme est
-        // autorisÃ©e (l'extraction dÃ©marre par Â« \ Â»).
+        // Le chemin doit rester dans le staging ; la RACINE elle-même est
+        // autorisée (l'extraction démarre par « \ »).
         let inside =
             combined.Equals(rootFull, StringComparison.OrdinalIgnoreCase)
             || combined.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase)
 
         if not inside then
-            invalidArg "fsPath" (sprintf "Le chemin interne sort du rÃ©pertoire de staging : '%s'" fsPath)
+            invalidArg "fsPath" (sprintf "Le chemin interne sort du répertoire de staging : '%s'" fsPath)
 
         combined
 
-    /// Retrouve le systÃ¨me de fichiers d'un disque virtuel : volumes logiques
-    /// puis physiques, dÃ©tectÃ©s automatiquement. Retourne None si aucun FS.
+    /// Retrouve le système de fichiers d'un disque virtuel : volumes logiques
+    /// puis physiques, détectés automatiquement. Retourne None si aucun FS.
     let openFileSystem (disk: VirtualDisk) : DiscFileSystem option =
         let vm = new VolumeManager(disk)
         let logical = vm.GetLogicalVolumes() |> Seq.cast<VolumeInfo>
@@ -106,8 +106,8 @@ module DiscFsHelper =
             | Some(volume, fsi) -> Some(fsi.Open volume)
             | None -> None
 
-    /// Copie rÃ©cursivement `fsDir` (FS image) vers l'hÃ´te. `toHostPath` convertit
-    /// un chemin image en chemin hÃ´te confinÃ©. IncrÃ©mente `counter` par fichier.
+    /// Copie récursivement `fsDir` (FS image) vers l'hôte. `toHostPath` convertit
+    /// un chemin image en chemin hôte confiné. Incrémente `counter` par fichier.
     let rec copyDirectory (toHostPath: string -> string) (fs: DiscFileSystem) (fsDir: string) (counter: int ref) =
         Directory.CreateDirectory(toHostPath fsDir) |> ignore
 
@@ -122,7 +122,7 @@ module DiscFsHelper =
         for sub in fs.GetDirectories fsDir |> Seq.toArray do
             copyDirectory toHostPath fs sub counter
 
-    /// Copie rÃ©cursivement `realDir` (hÃ´te) vers `fsDir` (FS image).
+    /// Copie récursivement `realDir` (hôte) vers `fsDir` (FS image).
     let rec copyIntoFs (fs: DiscFileSystem) (fsDir: string) (realDir: string) =
         for file in Directory.GetFiles realDir do
             let fsPath = fsDir.TrimEnd('\\', '/') + "\\" + Path.GetFileName file
@@ -138,8 +138,8 @@ module DiscFsHelper =
 
             copyIntoFs fs fsPath dir
 
-    /// Supprime les entrÃ©es du FS image absentes de l'hÃ´te. `toHostPath`
-    /// convertit et confine un chemin image en chemin hÃ´te.
+    /// Supprime les entrées du FS image absentes de l'hôte. `toHostPath`
+    /// convertit et confine un chemin image en chemin hôte.
     let rec deleteFsEntries (toHostPath: string -> string) (fs: DiscFileSystem) (fsDir: string) =
         for file in fs.GetFiles fsDir |> Seq.toArray do
             if not (File.Exists(toHostPath file)) then

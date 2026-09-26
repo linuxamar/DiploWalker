@@ -20,9 +20,9 @@ open DiploWalker.Abstractions.TokenAuthMiddleware
 
 /// Taille maximale des messages gRPC en octets (64 Mo).
 ///
-/// Doit rester alignÃ©e sur le client (GrpcClientFactory.MaxMessageSize) : les
-/// lectures/Ã©critures de fichiers sont bornÃ©es Ã  50 Mo cÃ´tÃ© API (M14), un
-/// plafond serveur de 4 Mo les ferait Ã©chouer en ResourceExhausted.
+/// Doit rester alignée sur le client (GrpcClientFactory.MaxMessageSize) : les
+/// lectures/écritures de fichiers sont bornées à 50 Mo côté API (M14), un
+/// plafond serveur de 4 Mo les ferait échouer en ResourceExhausted.
 let private grpcMaxMessageSize = 64 * 1024 * 1024
 
 let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
@@ -32,29 +32,29 @@ let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
     let usePipes = config.GetValue<bool>("ServiceSettings:UseNamedPipes")
 
     if not useTcp && not usePipes then
-        failwith "Configuration invalide : ni ServiceSettings:UseTcp ni ServiceSettings:UseNamedPipes sont activÃ©s"
+        failwith "Configuration invalide : ni ServiceSettings:UseTcp ni ServiceSettings:UseNamedPipes sont activés"
 
     if useTcp then
-        Log.Information("Ã‰coute TCP sur localhost:{Port}", grpcPort)
+        Log.Information("Écoute TCP sur localhost:{Port}", grpcPort)
 
         opts.Listen(IPAddress.Loopback, grpcPort, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
         |> ignore
 
     if usePipes then
-        Log.Information("Ã‰coute Named Pipe: {PipeName}", pipeName)
+        Log.Information("Écoute Named Pipe: {PipeName}", pipeName)
 
         opts.ListenNamedPipe(pipeName, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
         |> ignore
 
 let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
-    // Kestrel active CurrentUserOnly par dÃ©faut ; il faut le dÃ©sactiver pour
+    // Kestrel active CurrentUserOnly par défaut ; il faut le désactiver pour
     // fournir une PipeSecurity explicite (utilisateur courant uniquement).
-    // NB : une rÃ¨gle "Deny Everyone" bloquerait aussi l'utilisateur courant
-    // (sur Windows, les rÃ¨gles Deny priment sur les rÃ¨gles Allow).
+    // NB : une règle "Deny Everyone" bloquerait aussi l'utilisateur courant
+    // (sur Windows, les règles Deny priment sur les règles Allow).
     opts.CurrentUserOnly <- false
     let pipeSecurity = PipeSecurity()
 
-    // WindowsIdentity dÃ©tient un handle de token : Ã  disposer.
+    // WindowsIdentity détient un handle de token : à disposer.
     do
         use currentUser = WindowsIdentity.GetCurrent()
 
@@ -89,13 +89,13 @@ let runGrpcHost
         loggerConfig.CreateLogger()
 
     try
-        Log.Information("DÃ©marrage du service {ServiceName}", serviceName)
+        Log.Information("Démarrage du service {ServiceName}", serviceName)
         let builder = WebApplication.CreateBuilder(args)
 
-        // Environnement par dÃ©faut alignÃ© sur la configuration de build :
-        // sans lui, `dotnet run` dÃ©marre en Production et chargerait
-        // appsettings.json (ports Release) mÃªme en Debug â€” incohÃ©rent avec
-        // les clients compilÃ©s en Debug (5001-5003).
+        // Environnement par défaut aligné sur la configuration de build :
+        // sans lui, `dotnet run` démarre en Production et chargerait
+        // appsettings.json (ports Release) même en Debug — incohérent avec
+        // les clients compilés en Debug (5001-5003).
 #if DEBUG
         if isNull (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"))
            && isNull (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")) then
@@ -134,22 +134,22 @@ let runGrpcHost
 
         let lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>()
 
-        lifetime.ApplicationStarted.Register(fun () -> Log.Information("Service {ServiceName} dÃ©marrÃ©", serviceName))
+        lifetime.ApplicationStarted.Register(fun () -> Log.Information("Service {ServiceName} démarré", serviceName))
         |> ignore
 
         lifetime.ApplicationStopping.Register(fun () ->
-            // M9 : lÃ¢cher le Timer de purge du rate limiter (au lieu de laisser
-            // un Timer racine actif aprÃ¨s l'arrÃªt).
+            // M9 : lâcher le Timer de purge du rate limiter (au lieu de laisser
+            // un Timer racine actif après l'arrêt).
             TokenAuthMiddleware.disposePurge ()
-            Log.Information("Service {ServiceName} arrÃªt en cours...", serviceName))
+            Log.Information("Service {ServiceName} arrêt en cours...", serviceName))
         |> ignore
 
-        lifetime.ApplicationStopped.Register(fun () -> Log.Information("Service {ServiceName} arrÃªtÃ©", serviceName))
+        lifetime.ApplicationStopped.Register(fun () -> Log.Information("Service {ServiceName} arrêté", serviceName))
         |> ignore
 
         app.Run()
         0
     with ex ->
-        Log.Fatal(ex, "Le service {ServiceName} a Ã©chouÃ© au dÃ©marrage", serviceName)
+        Log.Fatal(ex, "Le service {ServiceName} a échoué au démarrage", serviceName)
         1
 

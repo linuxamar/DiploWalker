@@ -11,8 +11,8 @@ open DiploWalker.Core.Output
 open DiploWalker.Grpc.Container
 open DiploWalker.TestHelpers
 
-// Tests de l'onglet Images (lister, tÃ©lÃ©charger, Ã©tiqueter, supprimer,
-// inspecter, nettoyer) via l'injection d'un FakeContainerClient. Les rÃ©ponses
+// Tests de l'onglet Images (lister, télécharger, étiqueter, supprimer,
+// inspecter, nettoyer) via l'injection d'un FakeContainerClient. Les réponses
 // gRPC sont des enregistrements [<CLIMutable>] : construction avec syntaxe { }.
 
 let private waitUntil (predicate: unit -> bool) =
@@ -123,7 +123,7 @@ let ``ImagesTabViewModel SearchImages relaie le message du serveur`` () =
         new FakeContainerClient(
             searchImages =
                 { Results = List<RegistrySearchResult>()
-                  Message = "Registre Â« zz Â» non autorisÃ© : recherche sur tous les registres" }
+                  Message = "Registre « zz » non autorisé : recherche sur tous les registres" }
         )
 
     let vm = imagesVm port fake

@@ -7,12 +7,12 @@ open Avalonia
 open Avalonia.Threading
 open DiploWalker.Core.Output
 
-/// Acheminement des actions devant s'exÃ©cuter sur le thread UI.
+/// Acheminement des actions devant s'exécuter sur le thread UI.
 type UiThread =
 
-    /// ExÃ©cute l'action sur le thread UI du Dispatcher quand une application
-    /// Avalonia est initialisÃ©e ; sinon l'exÃ©cute immÃ©diatement sur le thread
-    /// courant. Ã‰vite ainsi de crÃ©er le Dispatcher dans les tests non-headless
+    /// Exécute l'action sur le thread UI du Dispatcher quand une application
+    /// Avalonia est initialisée ; sinon l'exécute immédiatement sur le thread
+    /// courant. Évite ainsi de créer le Dispatcher dans les tests non-headless
     /// qui exercent les ViewModels hors de tout contexte Avalonia.
     static member Post(action: unit -> unit) =
         if isNull Application.Current then

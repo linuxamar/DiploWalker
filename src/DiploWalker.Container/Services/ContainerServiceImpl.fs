@@ -21,12 +21,12 @@ open DiploWalker.Abstractions
 open DiploWalker.Disk
 open DiploWalker.Container
 
-/// Aides au streaming gRPC basÃ©es sur System.Threading.Channels.
+/// Aides au streaming gRPC basées sur System.Threading.Channels.
 module private ContainerStreaming =
 
-    /// Flux basÃ© sur un canal de SEGMENTS (byte[]) : connecte un flux entrant
-    /// gRPC et les flux sortants. Le dÃ©coupage par segments Ã©vite le coÃ»t d'un
-    /// WriteAsync par octet, et la lecture rend les donnÃ©es dÃ¨s qu'un segment
+    /// Flux basé sur un canal de SEGMENTS (byte[]) : connecte un flux entrant
+    /// gRPC et les flux sortants. Le découpage par segments évite le coût d'un
+    /// WriteAsync par octet, et la lecture rend les données dès qu'un segment
     /// est disponible (une sortie interactive courte n'attend plus 8 Ko).
     type ChannelStream() =
         inherit Stream()
@@ -38,15 +38,15 @@ module private ContainerStreaming =
         let writer = channel.Writer
 
         // Segment en cours de consommation (lecture partielle entre deux appels).
-        // `pending` est partagÃ© entre Read (sync), ReadAsync et Write : l'accÃ¨s
-        // est sÃ©rialisÃ© par `gate` pour Ã©viter toute race.
+        // `pending` est partagé entre Read (sync), ReadAsync et Write : l'accès
+        // est sérialisé par `gate` pour éviter toute race.
         let gate = obj ()
         let mutable pending: (byte[] * int) option = None
 
         /// Lit au plus `count` octets : consomme d'abord le segment partiel
-        /// restant, puis attend un nouveau segment ; retourne dÃ¨s que `count`
-        /// octets sont rÃ©unis OU que tous les segments disponibles sont Ã©puisÃ©s.
-        /// CÅ“ur asynchrone pur (aucun blocage synchrone dessus).
+        /// restant, puis attend un nouveau segment ; retourne dès que `count`
+        /// octets sont réunis OU que tous les segments disponibles sont épuisés.
+        /// Cœur asynchrone pur (aucun blocage synchrone dessus).
         let readIntoCore (buffer: byte[]) (offset: int) (count: int) (ct: System.Threading.CancellationToken) : Task<int> =
             task {
                 let mutable total = 0
@@ -71,7 +71,7 @@ module private ContainerStreaming =
                         if total >= count then cont <- false
                     | None ->
                         if total > 0 then
-                            // Des octets dÃ©jÃ  lus : ne pas bloquer sur un nouveau
+                            // Des octets déjà lus : ne pas bloquer sur un nouveau
                             // segment, livrer ce qui est disponible maintenant.
                             cont <- false
                         else
@@ -109,15 +109,15 @@ module private ContainerStreaming =
 
         override _.Read(buffer: byte[], offset: int, count: int) : int =
             if SynchronizationContext.Current = null then
-                // Aucun contexte applicatif (thread gRPC) : exÃ©cution directe du
-                // cÅ“ur asynchrone, sans saut de thread inutile.
+                // Aucun contexte applicatif (thread gRPC) : exécution directe du
+                // cœur asynchrone, sans saut de thread inutile.
                 (readIntoCore buffer offset count System.Threading.CancellationToken.None)
                     .GetAwaiter()
                     .GetResult()
             else
                 // Chemin synchrone (client StartExec) : on le fait tourner sur un
-                // thread de pool via le cÅ“ur asynchrone pour ne jamais bloquer le
-                // SynchronizationContext du caller (H2), puis on attend le rÃ©sultat
+                // thread de pool via le cœur asynchrone pour ne jamais bloquer le
+                // SynchronizationContext du caller (H2), puis on attend le résultat
                 // ici sans capturer le contexte.
                 let work: Func<Task<int>> =
                     Func<Task<int>>(fun () ->
@@ -130,11 +130,11 @@ module private ContainerStreaming =
                 let chunk = Array.sub buffer offset count
 
                 if SynchronizationContext.Current = null then
-                    // Aucun contexte applicatif : Ã©criture directe, sans saut de thread.
+                    // Aucun contexte applicatif : écriture directe, sans saut de thread.
                     writer.WriteAsync(chunk).AsTask().GetAwaiter().GetResult()
                 else
                     // Attente sur un thread de pool pour ne jamais bloquer le
-                    // SynchronizationContext du caller, sans perdre de donnÃ©es.
+                    // SynchronizationContext du caller, sans perdre de données.
                     let work: Func<Task> =
                         Func<Task>(fun () -> writer.WriteAsync(chunk).AsTask())
 
@@ -175,13 +175,13 @@ module private ContainerStreaming =
 
                     member _.DisposeAsync() = ValueTask() } }
 
-    /// Lance un producer task et observe ses exceptions pour Ã©viter
-    /// UnobservedTaskException quand le GC finalise un Task faultÃ©.
+    /// Lance un producer task et observe ses exceptions pour éviter
+    /// UnobservedTaskException quand le GC finalise un Task faulté.
     let observeProducerTask (name: string) (task: Task) =
         task.ContinueWith(
             (fun (t: Task) ->
                 if t.IsFaulted then
-                    Log.Warning(t.Exception, "Producer task terminÃ© en erreur: {TaskName}", name)),
+                    Log.Warning(t.Exception, "Producer task terminé en erreur: {TaskName}", name)),
             TaskContinuationOptions.OnlyOnFaulted
         )
         |> ignore
@@ -194,8 +194,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
     [<Literal>]
     static let DefaultNamespace = "default"
 
-    /// Volumes montÃ©s par conteneur : retenus jusqu'Ã  la suppression du
-    /// conteneur, oÃ¹ les modifications sont rÃ©Ã©crites dans l'image source.
+    /// Volumes montés par conteneur : retenus jusqu'à la suppression du
+    /// conteneur, où les modifications sont réécrites dans l'image source.
     let mountedVolumes = ConcurrentDictionary<string, MountedVolume list>()
 
     let persistMounts () =
@@ -214,11 +214,11 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
         try
             persistMounts ()
         with ex ->
-            Log.Warning(ex, "Erreur lors de la persistance de l'Ã©tat des volumes montÃ©s")
+            Log.Warning(ex, "Erreur lors de la persistance de l'état des volumes montés")
 
     do
-        // Restauration des volumes montÃ©s persistÃ©s aprÃ¨s un redÃ©marrage du
-        // service : le write-back redevient actif sans rÃ©-extraire l'image.
+        // Restauration des volumes montés persistés après un redémarrage du
+        // service : le write-back redevient actif sans ré-extraire l'image.
         try
             MountState.load (MountState.stateFile ())
             |> Map.iter (fun id entries ->
@@ -228,13 +228,13 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                         try
                             Some(DiskMounter.rehydrate e.Source e.HostPath e.Destination e.ReadOnly)
                         with ex ->
-                            Log.Warning(ex, "Erreur lors de la rÃ©hydratation du volume {HostPath}", e.HostPath)
+                            Log.Warning(ex, "Erreur lors de la réhydratation du volume {HostPath}", e.HostPath)
                             None)
 
                 if not (List.isEmpty volumes) then
                     mountedVolumes[id] <- volumes)
         with ex ->
-            Log.Warning(ex, "Erreur lors de la restauration des volumes montÃ©s au dÃ©marrage")
+            Log.Warning(ex, "Erreur lors de la restauration des volumes montés au démarrage")
 
     let tryGetString (el: JsonElement) (prop: string) = JsonHelpers.tryGetString el prop
     let tryGetInt64 (el: JsonElement) (prop: string) = JsonHelpers.tryGetInt64 el prop
@@ -271,7 +271,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                 else
                     0L, 0L
             with ex ->
-                Log.Warning(ex, "Erreur lors du parsing mÃ©moire")
+                Log.Warning(ex, "Erreur lors du parsing mémoire")
                 0L, 0L
 
         let pids =
@@ -397,8 +397,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                 return
                     { CreateContainerResponse.Id = id
 
-                      // Renvoyer le nom RÃ‰SOLU : un nom auto-gÃ©nÃ©rÃ© (vide dans
-                      // la requÃªte) doit Ãªtre connu du client.
+                      // Renvoyer le nom RÉSOLU : un nom auto-généré (vide dans
+                      // la requête) doit être connu du client.
                       Name = name
                       State = ContainerState.Created
                       CreatedAt = DateTime.UtcNow.ToString("o") }
@@ -415,7 +415,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { StartContainerResponse.State = ContainerState.Running
-                      Message = "Conteneur dÃ©marrÃ©" }
+                      Message = "Conteneur démarré" }
             }
 
         member _.StopContainer(request, _context) =
@@ -432,7 +432,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { StopContainerResponse.State = ContainerState.Stopped
-                      Message = "Conteneur arrÃªtÃ©" }
+                      Message = "Conteneur arrêté" }
             }
 
         member _.DeleteContainer(request, _context) =
@@ -448,7 +448,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                         with ex ->
                             Log.Warning(
                                 ex,
-                                "Erreur lors de la libÃ©ration du volume du conteneur {ContainerId}",
+                                "Erreur lors de la libération du volume du conteneur {ContainerId}",
                                 request.Id
                             )
                 | false, _ -> ()
@@ -457,7 +457,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { DeleteContainerResponse.Success = true
-                      Message = "Conteneur supprimÃ©" }
+                      Message = "Conteneur supprimé" }
             }
 
         member _.InspectContainer(request, _context) =
@@ -502,7 +502,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                         let f = tryGetString taskInfo "exited_at"
                         s, p, f
                     with ex ->
-                        Log.Warning(ex, "Erreur lors du parsing de la tÃ¢che")
+                        Log.Warning(ex, "Erreur lors du parsing de la tâche")
                         ContainerState.Unknown, 0, ""
 
                 let mountPaths =
@@ -538,12 +538,12 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 let allIds = client.ListContainers(ns, request.All) |> Seq.toArray
 
-                // M14 : borne de liste serveur â€” une rÃ©ponse dÃ©mesurÃ©e saturerait
-                // la mÃ©moire du client et le plafond de message gRPC (64 Mo).
+                // M14 : borne de liste serveur — une réponse démesurée saturerait
+                // la mémoire du client et le plafond de message gRPC (64 Mo).
                 let ids =
                     if allIds.Length > ServiceGuards.MaxListItems then
                         Log.Warning(
-                            "Liste des conteneurs tronquÃ©e Ã  {Limit} Ã©lÃ©ments (reÃ§u {Count})",
+                            "Liste des conteneurs tronquée à {Limit} éléments (reçu {Count})",
                             ServiceGuards.MaxListItems,
                             allIds.Length
                         )
@@ -577,10 +577,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                           CreatedAt = ""
                           Labels = Dictionary<string, string>() }
 
-                // Concurrence bornÃ©e (M2) : chaque inspection lance des
-                // processus ctr â€” Array.Parallel.map non bornÃ© saturerait le
+                // Concurrence bornée (M2) : chaque inspection lance des
+                // processus ctr — Array.Parallel.map non borné saturerait le
                 // CPU et le pool de threads. L'annulation du contexte est aussi
-                // respectÃ©e.
+                // respectée.
                 let opts = ParallelOptions()
                 opts.MaxDegreeOfParallelism <- max 4 Environment.ProcessorCount
                 opts.CancellationToken <- _context
@@ -639,7 +639,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
         member _.PullImage(request, _context) =
             task {
-                ServiceGuards.requireNonEmpty request.Image "L'image Ã  tÃ©lÃ©charger"
+                ServiceGuards.requireNonEmpty request.Image "L'image à télécharger"
 
                 let userArg =
                     if String.IsNullOrEmpty request.User then
@@ -699,7 +699,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { RenameContainerResponse.Success = true
-                      Message = sprintf "Conteneur renommÃ© en '%s'" request.NewName }
+                      Message = sprintf "Conteneur renommé en '%s'" request.NewName }
             }
 
         member _.TopContainer(request, _context) =
@@ -759,7 +759,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                 let images =
                     if allImages.Length > ServiceGuards.MaxListItems then
                         Log.Warning(
-                            "Liste des images tronquÃ©e Ã  {Limit} Ã©lÃ©ments (reÃ§u {Count})",
+                            "Liste des images tronquée à {Limit} éléments (reçu {Count})",
                             ServiceGuards.MaxListItems,
                             allImages.Length
                         )
@@ -776,8 +776,8 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                       Size = tryGetInt64 imgJson "size"
                       CreatedAt = tryGetString imgJson "created_at" }
 
-                // Concurrence bornÃ©e (M2) : Ã©vite un Array.Parallel.map non
-                // bornÃ© et respecte l'annulation du contexte.
+                // Concurrence bornée (M2) : évite un Array.Parallel.map non
+                // borné et respecte l'annulation du contexte.
                 let opts = ParallelOptions()
                 opts.MaxDegreeOfParallelism <- max 4 Environment.ProcessorCount
                 opts.CancellationToken <- _context
@@ -798,7 +798,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
         member _.InspectImage(request, _context) =
             task {
-                ServiceGuards.requireNonEmpty request.Ref "La rÃ©fÃ©rence de l'image"
+                ServiceGuards.requireNonEmpty request.Ref "La référence de l'image"
 
                 let ns =
                     if String.IsNullOrEmpty(request.NamespaceName) then
@@ -830,7 +830,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
         member _.RemoveImage(request, _context) =
             task {
-                ServiceGuards.requireNonEmpty request.Ref "La rÃ©fÃ©rence de l'image"
+                ServiceGuards.requireNonEmpty request.Ref "La référence de l'image"
 
                 let ns =
                     if String.IsNullOrEmpty(request.NamespaceName) then
@@ -861,14 +861,14 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                 return
                     { TagImageResponse.Source = request.Source
                       Target = request.Target
-                      Message = sprintf "Image marquÃ©e de '%s' vers '%s'" request.Source request.Target }
+                      Message = sprintf "Image marquée de '%s' vers '%s'" request.Source request.Target }
             }
 
-        // â”€â”€â”€ Recherche d'images dans les catalogues en ligne â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Recherche d'images dans les catalogues en ligne ────────────────
 
         member _.SearchRegistry(request, ct) =
             task {
-                ServiceGuards.requireNonEmpty request.Query "La requÃªte de recherche"
+                ServiceGuards.requireNonEmpty request.Query "La requête de recherche"
 
                 let limit = if request.Limit <= 0 then 25 else min request.Limit 100
 
@@ -880,7 +880,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                         | Some host -> Some host, ""
                         | None ->
                             None,
-                            sprintf "Registre Â« %s Â» non autorisÃ© : recherche sur tous les registres" request.Registry
+                            sprintf "Registre « %s » non autorisé : recherche sur tous les registres" request.Registry
 
                 let! hits =
                     match registrySearchClient with
@@ -900,7 +900,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                       Message = message }
             }
 
-        // â”€â”€â”€ Pause / Unpause â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Pause / Unpause ────────────────────────────────────────────────
 
         member _.PauseContainer(request, _context) =
             task {
@@ -922,7 +922,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                       Message = "Conteneur repris" }
             }
 
-        // â”€â”€â”€ Wait â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Wait ───────────────────────────────────────────────────────────
 
         member _.WaitContainer(request, _context) =
             task {
@@ -942,16 +942,16 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                             let info = client.InspectContainer(DefaultNamespace, request.Id)
                             tryGetInt64 info "exit_code" |> int
                         with ex ->
-                            Log.Warning(ex, "Impossible de rÃ©cupÃ©rer le code de sortie de {ContainerId}", request.Id)
+                            Log.Warning(ex, "Impossible de récupérer le code de sortie de {ContainerId}", request.Id)
                             exitCode
 
                     return
                         { WaitContainerResponse.ExitCode = exitCodeFinal
                           State = ContainerState.Stopped
-                          Message = "Conteneur terminÃ©" }
+                          Message = "Conteneur terminé" }
             }
 
-        // â”€â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Update ─────────────────────────────────────────────────────────
 
         member _.UpdateContainer(request, _context) =
             task {
@@ -967,10 +967,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { UpdateContainerResponse.Success = true
-                      Message = "Conteneur mis Ã  jour" }
+                      Message = "Conteneur mis à jour" }
             }
 
-        // â”€â”€â”€ Prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Prune ──────────────────────────────────────────────────────────
 
         member _.PruneContainers(request, _context) =
             task {
@@ -1013,7 +1013,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                 return { PruneImagesResponse.Deleted = deleted }
             }
 
-        // â”€â”€â”€ Stats streaming â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Stats streaming ────────────────────────────────────────────────
 
         member _.GetContainerStatsStream(request, _context) =
             ServiceGuards.requireContainerId request.Id
@@ -1046,7 +1046,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
             toAsyncEnumerable channel.Reader
 
-        // â”€â”€â”€ Ã‰vÃ©nements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Événements ─────────────────────────────────────────────────────
 
         member _.WatchEvents(request, _context) =
             let channel = Channel.CreateUnbounded<ContainerEvent>()
@@ -1064,7 +1064,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                                     try
                                         mapState (tryGetString (client.TaskInfo(DefaultNamespace, id)) "status")
                                     with ex ->
-                                        Log.Debug(ex, "Impossible de lire l'Ã©tat de {ContainerId}", id)
+                                        Log.Debug(ex, "Impossible de lire l'état de {ContainerId}", id)
                                         ContainerState.Unknown
 
                                 current[id] <- state
@@ -1121,7 +1121,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                     with
                     | :? OperationCanceledException -> channel.Writer.TryComplete() |> ignore
                     | ex ->
-                        Log.Error(ex, "Erreur lors du suivi des Ã©vÃ©nements")
+                        Log.Error(ex, "Erreur lors du suivi des événements")
                         channel.Writer.TryComplete(ex) |> ignore
                 }
 
@@ -1130,7 +1130,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
             toAsyncEnumerable channel.Reader
 
-        // â”€â”€â”€ Exec bidirectionnel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Exec bidirectionnel ────────────────────────────────────────────
 
         member _.ExecContainerStream(requests, _context) =
             let channel = Channel.CreateUnbounded<ExecOutput>()
@@ -1240,7 +1240,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                     finally
                         try
                             // Pas de .Wait() bloquant (M6) : la disposition est
-                            // dÃ©marrÃ©e et se termine en arriÃ¨re-plan.
+                            // démarrée et se termine en arrière-plan.
                             enumerator.DisposeAsync().AsTask() |> ignore
                         with _ ->
                             ()
@@ -1252,7 +1252,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
             toAsyncEnumerable channel.Reader
 
-        // â”€â”€â”€ Copie de fichiers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Copie de fichiers ──────────────────────────────────────────────
 
         member _.ReadFile(request, _context) =
             task {
@@ -1263,9 +1263,9 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                 SecurityValidation.validateCommand command
 
                 try
-                    // ExecInContainer propage dÃ©sormais les erreurs : pas de
-                    // sentinelle textuelle, et une sortie vide est traitÃ©e comme
-                    // un Ã©chec (conteneur sans base64 â†’ donnÃ©es vides trompeuses).
+                    // ExecInContainer propage désormais les erreurs : pas de
+                    // sentinelle textuelle, et une sortie vide est traitée comme
+                    // un échec (conteneur sans base64 → données vides trompeuses).
                     let output = client.ExecInContainer(DefaultNamespace, request.Id, command)
                     let trimmed = output.Trim()
 
@@ -1278,16 +1278,16 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                         let data = Convert.FromBase64String(trimmed)
 
                         // M14 : un fichier trop volumineux ne doit pas grossir la
-                        // rÃ©ponse gRPC au-delÃ  de la limite contractuelle (50 Mo,
-                        // ServerConfig.grpcMaxMessageSize = 64 Mo) â€” message explicite
-                        // au lieu d'un ResourceExhausted opaque cÃ´tÃ© client.
+                        // réponse gRPC au-delà de la limite contractuelle (50 Mo,
+                        // ServerConfig.grpcMaxMessageSize = 64 Mo) — message explicite
+                        // au lieu d'un ResourceExhausted opaque côté client.
                         if data.LongLength > int64 ServiceGuards.MaxFileTransferBytes then
                             return
                                 { ReadFileResponse.Data = Array.empty
                                   Success = false
                                   Message =
                                     sprintf
-                                        "Le fichier dÃ©passe la limite de %.0f Mo"
+                                        "Le fichier dépasse la limite de %.0f Mo"
                                         (float ServiceGuards.MaxFileTransferBytes / (1024. * 1024.)) }
                         else
                             return
@@ -1314,14 +1314,14 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                 ServiceGuards.requireNonEmpty request.Path "Le chemin du fichier"
                 SecurityValidation.validateContainerPath request.Path "Le chemin du fichier"
 
-                // M14 : bornÃ©e ici aussi (le client la refuse dÃ©jÃ ) â€” Ã©vite un
-                // encodage base64 (+33 %) et un StartExec disproportionnÃ©s et
-                // protÃ¨ge le plafond de message gRPC configurÃ© cÃ´tÃ© serveur.
+                // M14 : bornée ici aussi (le client la refuse déjà) — évite un
+                // encodage base64 (+33 %) et un StartExec disproportionnés et
+                // protège le plafond de message gRPC configuré côté serveur.
                 ServiceGuards.requireFileTransferWithinLimit request.Data "Le fichier"
 
-                // H5 : le chemin est passÃ© en paramÃ¨tre positionnel ("$1", reliÃ©
-                // par le shell) et non interpolÃ© dans le script : aucune entrÃ©e
-                // utilisateur ne transite par la chaÃ®ne de commande.
+                // H5 : le chemin est passé en paramètre positionnel ("$1", relié
+                // par le shell) et non interpolé dans le script : aucune entrée
+                // utilisateur ne transite par la chaîne de commande.
                 let command = [| "sh"; "-c"; "base64 -d > \"$1\""; "sh"; "--"; request.Path |]
 
                 try
@@ -1336,32 +1336,32 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                     if exitCode = 0 then
                         return
                             { WriteFileResponse.Success = true
-                              Message = "Fichier Ã©crit" }
+                              Message = "Fichier écrit" }
                     else
                         let err = Encoding.UTF8.GetString(stderr.ToArray())
 
                         return
                             { WriteFileResponse.Success = false
-                              Message = sprintf "Ã‰chec de l'Ã©criture du fichier (code %d) : %s" exitCode err }
+                              Message = sprintf "Échec de l'écriture du fichier (code %d) : %s" exitCode err }
                 with ex ->
                     Log.Warning(
                         ex,
-                        "Impossible d'Ã©crire le fichier {Path} dans le conteneur {ContainerId}",
+                        "Impossible d'écrire le fichier {Path} dans le conteneur {ContainerId}",
                         request.Path,
                         request.Id
                     )
 
                     return
                         { WriteFileResponse.Success = false
-                          Message = "Impossible d'Ã©crire le fichier : " + ex.Message }
+                          Message = "Impossible d'écrire le fichier : " + ex.Message }
             }
 
-        // â”€â”€â”€ Commit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Commit ─────────────────────────────────────────────────────────
 
         member _.CommitImage(request, _context) =
             task {
                 ServiceGuards.requireContainerId request.ContainerId
-                ServiceGuards.requireNonEmpty request.ImageRef "La rÃ©fÃ©rence de l'image"
+                ServiceGuards.requireNonEmpty request.ImageRef "La référence de l'image"
                 SecurityValidation.validateImage request.ImageRef
 
                 // Le write-back des volumes n'a lieu qu'au Dispose (suppression
@@ -1373,9 +1373,9 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                         { CommitImageResponse.ImageRef = ""
                           Success = false
                           Message =
-                              "Commit impossible : des volumes sont montÃ©s et leurs modifications ne seront "
-                              + "rÃ©Ã©crites dans l'image qu'Ã  la suppression du conteneur. Supprimez le "
-                              + "conteneur puis recrÃ©ez l'image depuis celle-ci." }
+                              "Commit impossible : des volumes sont montés et leurs modifications ne seront "
+                              + "réécrites dans l'image qu'à la suppression du conteneur. Supprimez le "
+                              + "conteneur puis recréez l'image depuis celle-ci." }
                 | _ ->
                     try
                         let info = client.InspectContainer(DefaultNamespace, request.ContainerId)
@@ -1385,7 +1385,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                             return
                                 { CommitImageResponse.ImageRef = ""
                                   Success = false
-                                  Message = "Aucune image source trouvÃ©e pour le conteneur" }
+                                  Message = "Aucune image source trouvée pour le conteneur" }
                         else
                             let tmp =
                                 Path.Combine(Path.GetTempPath(), "diplo-commit-" + Guid.NewGuid().ToString("N") + ".tar")
@@ -1398,7 +1398,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                                 return
                                     { CommitImageResponse.ImageRef = request.ImageRef
                                       Success = true
-                                      Message = sprintf "Image '%s' crÃ©Ã©e depuis le conteneur" request.ImageRef }
+                                      Message = sprintf "Image '%s' créée depuis le conteneur" request.ImageRef }
                             finally
                                 try
                                     File.Delete(tmp)
@@ -1417,10 +1417,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                               Message = "Erreur lors du commit : " + ex.Message }
             }
 
-        // â”€â”€â”€ Export / Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Export / Import ────────────────────────────────────────────────
 
         member _.ExportImage(request, _context) =
-            ServiceGuards.requireNonEmpty request.ImageRef "La rÃ©fÃ©rence de l'image"
+            ServiceGuards.requireNonEmpty request.ImageRef "La référence de l'image"
 
             let ns =
                 if String.IsNullOrEmpty(request.NamespaceName) then
@@ -1498,7 +1498,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                         finally
                             try
                                 // Pas de .Wait() bloquant (M6) : la disposition est
-                                // dÃ©marrÃ©e et se termine en arriÃ¨re-plan.
+                                // démarrée et se termine en arrière-plan.
                                 enumerator.DisposeAsync().AsTask() |> ignore
                             with _ ->
                                 ()
@@ -1511,7 +1511,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                     return
                         { ImportImageResponse.ImageRefs = List<string>(refs)
-                          Message = sprintf "%d image(s) importÃ©e(s)" refs.Length }
+                          Message = sprintf "%d image(s) importée(s)" refs.Length }
                 finally
                     try
                         File.Delete(tmp)
@@ -1519,7 +1519,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                         ()
             }
 
-        // â”€â”€â”€ Registres â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Registres ──────────────────────────────────────────────────────
 
         member _.LoginRegistry(request, _context) =
             task {
@@ -1539,7 +1539,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                                 Status(
                                     StatusCode.InvalidArgument,
                                     sprintf
-                                        "Registre non pris en charge : '%s'. Fournisseurs autorisÃ©s : %s"
+                                        "Registre non pris en charge : '%s'. Fournisseurs autorisés : %s"
                                         request.Registry
                                         RegistryProviders.label
                                 )
@@ -1550,7 +1550,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { LoginRegistryResponse.Success = true
-                      Message = sprintf "Authentification configurÃ©e pour le registre '%s'" registry }
+                      Message = sprintf "Authentification configurée pour le registre '%s'" registry }
             }
 
         member _.LogoutRegistry(request, _context) =
@@ -1566,7 +1566,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
                                 Status(
                                     StatusCode.InvalidArgument,
                                     sprintf
-                                        "Registre non pris en charge : '%s'. Fournisseurs autorisÃ©s : %s"
+                                        "Registre non pris en charge : '%s'. Fournisseurs autorisés : %s"
                                         request.Registry
                                         RegistryProviders.label
                                 )
@@ -1577,10 +1577,10 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { LogoutRegistryResponse.Success = true
-                      Message = sprintf "DÃ©connexion du registre '%s' effectuÃ©e" registry }
+                      Message = sprintf "Déconnexion du registre '%s' effectuée" registry }
             }
 
-        // â”€â”€â”€ Namespaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Namespaces ─────────────────────────────────────────────────────
 
         member _.CreateNamespace(request, _context) =
             task {
@@ -1590,7 +1590,7 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { CreateNamespaceResponse.Success = true
-                      Message = sprintf "Namespace '%s' crÃ©Ã©" request.Name }
+                      Message = sprintf "Namespace '%s' créé" request.Name }
             }
 
         member _.DeleteNamespace(request, _context) =
@@ -1601,6 +1601,6 @@ type ContainerServiceImpl(client: IContainerdClient, mounter: IDiskMounter, ?reg
 
                 return
                     { DeleteNamespaceResponse.Success = true
-                      Message = sprintf "Namespace '%s' supprimÃ©" request.Name }
+                      Message = sprintf "Namespace '%s' supprimé" request.Name }
             }
 

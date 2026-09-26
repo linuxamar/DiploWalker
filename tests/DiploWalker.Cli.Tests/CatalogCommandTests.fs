@@ -1,8 +1,8 @@
 ﻿namespace DiploWalker.Cli.Tests
 
-/// Tests des commandes `container catalog-*` (clip, insertion, mise Ã  jour,
-/// suppression) via fakes injectÃ©s. Un fichier catalogue temporaire est fourni
-/// via l'option `--catalog` pour ne pas toucher au rÃ©pertoire de travail.
+/// Tests des commandes `container catalog-*` (clip, insertion, mise à jour,
+/// suppression) via fakes injectés. Un fichier catalogue temporaire est fourni
+/// via l'option `--catalog` pour ne pas toucher au répertoire de travail.
 module CatalogCommandTests =
 
     open System
@@ -28,10 +28,10 @@ module CatalogCommandTests =
         let path = Path.Combine(dir, "diplo-catalog.json")
         (dir, path)
 
-    // â”€â”€â”€ list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── list ──────────────────────────────────────────────────────
 
     [<Fact>]
-    let ``catalog list vide retourne 0 et prÃ©vient`` () =
+    let ``catalog list vide retourne 0 et prévient`` () =
         let output = MockOutputPort()
         let dir, path = catalogDir ()
 
@@ -43,7 +43,7 @@ module CatalogCommandTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``catalog list avec entrÃ©es retourne 0 et Ã©crit une table`` () =
+    let ``catalog list avec entrées retourne 0 et écrit une table`` () =
         let output = MockOutputPort()
         let dir, path = catalogDir ()
         ImageCatalog.add path "nginx:latest" (Some "web") |> ignore
@@ -56,10 +56,10 @@ module CatalogCommandTests =
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€â”€ add â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── add ───────────────────────────────────────────────────────
 
     [<Fact>]
-    let ``catalog add tÃ©lÃ©charge puis inscrit au catalogue`` () =
+    let ``catalog add télécharge puis inscrit au catalogue`` () =
         let output = MockOutputPort()
         let c = container()
         let dir, path = catalogDir ()
@@ -95,7 +95,7 @@ module CatalogCommandTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``catalog add un doublon prÃ©vient et laisse le catalogue inchangÃ©`` () =
+    let ``catalog add un doublon prévient et laisse le catalogue inchangé`` () =
         let output = MockOutputPort()
         let c = container()
         let dir, path = catalogDir ()
@@ -107,27 +107,27 @@ module CatalogCommandTests =
                     (CatalogAddSettings(Ref = "alpine:3.19", CatalogPath = path))
 
             code |> should equal 0
-            output.Warnings |> should contain "L'image alpine:3.19 est dÃ©jÃ  au catalogue"
+            output.Warnings |> should contain "L'image alpine:3.19 est déjà au catalogue"
             ImageCatalog.load path |> should haveLength 1
         finally
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``catalog add sans rÃ©fÃ©rence retourne 1`` () =
+    let ``catalog add sans référence retourne 1`` () =
         let output = MockOutputPort()
         let dir, path = catalogDir ()
 
         try
             let code = run (CatalogAddCommand(output, clients(container()))) (CatalogAddSettings(CatalogPath = path))
             code |> should equal 1
-            output.Errors |> should contain "La rÃ©fÃ©rence de l'image est requise"
+            output.Errors |> should contain "La référence de l'image est requise"
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€â”€ update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── update ────────────────────────────────────────────────────
 
     [<Fact>]
-    let ``catalog update Ã©tiquette puis met Ã  jour le catalogue`` () =
+    let ``catalog update étiquette puis met à jour le catalogue`` () =
         let output = MockOutputPort()
         let c = container()
         let dir, path = catalogDir ()
@@ -146,7 +146,7 @@ module CatalogCommandTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``catalog update d'une rÃ©fÃ©rence absente retourne 1`` () =
+    let ``catalog update d'une référence absente retourne 1`` () =
         let output = MockOutputPort()
         let dir, path = catalogDir ()
 
@@ -160,7 +160,7 @@ module CatalogCommandTests =
         finally
             Directory.Delete(dir, true)
 
-    // â”€â”€â”€ delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── delete ────────────────────────────────────────────────────
 
     [<Fact>]
     let ``catalog delete supprime l'image puis la retire du catalogue`` () =
@@ -199,7 +199,7 @@ module CatalogCommandTests =
             Directory.Delete(dir, true)
 
     [<Fact>]
-    let ``catalog delete d'une rÃ©fÃ©rence absente prÃ©vient et retourne 0`` () =
+    let ``catalog delete d'une référence absente prévient et retourne 0`` () =
         let output = MockOutputPort()
         let dir, path = catalogDir ()
 

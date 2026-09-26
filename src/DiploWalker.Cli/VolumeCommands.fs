@@ -10,7 +10,7 @@ open DiploWalker.Core.Output
 open DiploWalker.Grpc.Volume
 open Spectre.Console.Cli
 
-// â”€â”€ list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── list ──────────────────────────────────────────────────────────
 type ListVolumesSettings() =
     inherit CommandSettings()
 
@@ -24,18 +24,18 @@ type ListVolumesCommand(output: IOutputPort, clients: IDiploClients) =
             let! response = client.ListAsync(ct = ct)
 
             if response.Volumes.Count = 0 then
-                output.WriteWarning("Aucun volume trouvÃ©.")
+                output.WriteWarning("Aucun volume trouvé.")
             else
                 output.WriteTable(
                     response.Volumes,
-                    [| "ID"; "Nom"; "Driver"; "Point de montage"; "Ã‰tat" |],
+                    [| "ID"; "Nom"; "Driver"; "Point de montage"; "État" |],
                     fun v -> [| v.Id; v.Name; v.Driver.ToString(); v.Mountpoint; v.State.ToString() |]
                 )
 
             return 0
         }
 
-// â”€â”€ inspect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── inspect ───────────────────────────────────────────────────────
 type InspectVolumeSettings() =
     inherit CommandSettings()
 
@@ -59,13 +59,13 @@ type InspectVolumeCommand(output: IOutputPort, clients: IDiploClients) =
                 output.WriteLine(sprintf "  ID        : %s" response.Id)
                 output.WriteLine(sprintf "  Driver    : %s" (response.Driver.ToString()))
                 output.WriteLine(sprintf "  Montage   : %s" response.Mountpoint)
-                output.WriteLine(sprintf "  Ã‰tat      : %s" (response.State.ToString()))
+                output.WriteLine(sprintf "  État      : %s" (response.State.ToString()))
                 output.WriteLine(sprintf "  Taille    : %d octets" response.SizeBytes)
-                output.WriteLine(sprintf "  CrÃ©Ã©      : %s" response.CreatedAt)
+                output.WriteLine(sprintf "  Créé      : %s" response.CreatedAt)
                 return 0
         }
 
-// â”€â”€ create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── create ────────────────────────────────────────────────────────
 type CreateVolumeSettings() =
     inherit CommandSettings()
 
@@ -157,11 +157,11 @@ type CreateVolumeCommand(output: IOutputPort, clients: IDiploClients) =
                         ct = ct
                     )
 
-                output.WriteSuccess(sprintf "Volume %s crÃ©Ã© (ID: %s)" response.Name response.Id)
+                output.WriteSuccess(sprintf "Volume %s créé (ID: %s)" response.Name response.Id)
                 return 0
         }
 
-// â”€â”€ remove â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── remove ────────────────────────────────────────────────────────
 type RemoveVolumeSettings() =
     inherit CommandSettings()
 
@@ -192,7 +192,7 @@ type RemoveVolumeCommand(output: IOutputPort, clients: IDiploClients) =
                     return 1
         }
 
-// â”€â”€ mount â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── mount ─────────────────────────────────────────────────────────
 type MountSettings() =
     inherit CommandSettings()
 
@@ -216,13 +216,13 @@ type MountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
                 let! response = client.MountAsync(settings.Id, settings.Target, ct = ct)
 
                 output.WriteSuccess(
-                    sprintf "Volume %s montÃ© sur %s (%s)" settings.Id settings.Target response.Mountpoint
+                    sprintf "Volume %s monté sur %s (%s)" settings.Id settings.Target response.Mountpoint
                 )
 
                 return 0
         }
 
-// â”€â”€ unmount â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── unmount ───────────────────────────────────────────────────────
 type UnmountSettings() =
     inherit CommandSettings()
 
@@ -244,11 +244,11 @@ type UnmountVolumeCommand(output: IOutputPort, clients: IDiploClients) =
             else
                 use client = clients.CreateVolumeClient()
                 let! response = client.UnmountAsync(settings.Id, settings.Target, ct = ct)
-                output.WriteSuccess(sprintf "Volume %s dÃ©montÃ© de %s" settings.Id settings.Target)
+                output.WriteSuccess(sprintf "Volume %s démonté de %s" settings.Id settings.Target)
                 return 0
         }
 
-// â”€â”€ prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── prune ─────────────────────────────────────────────────────────
 type PruneVolumesSettings() =
     inherit CommandSettings()
 
@@ -267,7 +267,7 @@ type PruneVolumesCommand(output: IOutputPort, clients: IDiploClients) =
                 for id in response.VolumesDeleted do
                     output.WriteLine(sprintf "  - %s" id)
             else
-                output.WriteWarning("Aucun volume Ã  supprimer.")
+                output.WriteWarning("Aucun volume à supprimer.")
 
             return 0
         }

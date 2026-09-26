@@ -63,21 +63,21 @@ module NetworkIntegrationTests =
 
             member _.Connect(networkId, containerId, endpointId, ipv4Address, _options) =
                 if networks |> Map.containsKey networkId |> not then
-                    Error "rÃ©seau introuvable"
+                    Error "réseau introuvable"
                 else
                     let ep =
                         { EndpointId = endpointId
                           ContainerId = containerId
                           Ipv4Address = ipv4Address |> Option.defaultValue "172.17.0.2"
                           MacAddress = "02:42:ac:11:00:02"
-                          Message = sprintf "ConnectÃ© Ã  %s" containerId }
+                          Message = sprintf "Connecté à %s" containerId }
 
                     endpoints <- endpoints |> Map.add endpointId ep
                     Ok ep
 
             member _.Disconnect(networkId, _containerId, endpointId, _force) =
                 if networks |> Map.containsKey networkId |> not then
-                    Error "rÃ©seau introuvable"
+                    Error "réseau introuvable"
                 else
                     endpoints <- endpoints |> Map.remove endpointId
                     Ok()
@@ -166,7 +166,7 @@ module NetworkIntegrationTests =
             let removeReq: RemoveNetworkRequest = { Id = createResult.Id; Force = false }
             let removeResult = client.RemoveNetwork(removeReq, CancellationToken.None).Result
             removeResult.Success |> should equal true
-            removeResult.Message |> should equal "RÃ©seau supprimÃ©")
+            removeResult.Message |> should equal "Réseau supprimé")
 
     [<Fact>]
     let ``InspectNetwork via gRPC`` () =
@@ -280,6 +280,6 @@ module NetworkIntegrationTests =
                 Assert.Throws<AggregateException>(fun () ->
                     client.CreateNetwork(req, CancellationToken.None).Result |> ignore)
 
-            ex.InnerException.Message |> should haveSubstring "Le nom du rÃ©seau")
+            ex.InnerException.Message |> should haveSubstring "Le nom du réseau")
 
 

@@ -164,7 +164,7 @@ module NetworkClientTests =
             use c = newClient address
             let response = c.PruneNetworksAsync() |> run
             response.Count |> should equal 0
-            response.Message |> should equal "0 rÃ©seau(x) supprimÃ©(s)")
+            response.Message |> should equal "0 réseau(x) supprimé(s)")
 
     [<Fact>]
     let ``Les gardes rejettent nome et identifiants vides`` () =

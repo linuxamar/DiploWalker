@@ -8,10 +8,10 @@ open Avalonia.Platform.Storage
 
 /// Fakes des interfaces Avalonia.Platform.Storage (Avalonia.Base) : les
 /// ViewModels ne consomment que Path.LocalPath (et OpenWriteAsync pour
-/// l'export du journal). Les autres membres retournent des valeurs bÃ©nignes
+/// l'export du journal). Les autres membres retournent des valeurs bénignes
 /// ou null.
 
-/// Fake IStorageItem : seul Path (et Name) est rÃ©ellement utilisÃ© par les
+/// Fake IStorageItem : seul Path (et Name) est réellement utilisé par les
 /// ViewModels.
 type FakeStorageItem(path: string, name: string) =
 
@@ -38,7 +38,7 @@ type FakeStorageItem(path: string, name: string) =
         member _.Dispose() = ()
 
 /// Fake IStorageFile : OpenWriteAsync retourne un vrai flux sur le fichier,
-/// ce qui permet de vÃ©rifier le contenu Ã©crit par l'export du journal.
+/// ce qui permet de vérifier le contenu écrit par l'export du journal.
 type FakeStorageFile(path: string) =
     inherit FakeStorageItem(path, Path.GetFileName(path))
 
@@ -64,8 +64,8 @@ type FakeStorageFolder(path: string) =
         member _.CreateFileAsync(_name) = Task.FromResult<IStorageFile>(null)
         member _.CreateFolderAsync(_name) = Task.FromResult<IStorageFolder>(null)
 
-/// Fake IStorageProvider : les pickers retournent au plus un Ã©lÃ©ment injectÃ©.
-/// Sans Ã©lÃ©ment, SaveFilePickerAsync retourne null (annulation de l'utilisateur)
+/// Fake IStorageProvider : les pickers retournent au plus un élément injecté.
+/// Sans élément, SaveFilePickerAsync retourne null (annulation de l'utilisateur)
 /// et les pickers d'ouverture retournent une liste vide.
 type FakeStorageProvider(?file: IStorageFile, ?folder: IStorageFolder, ?saveFile: IStorageFile) =
 

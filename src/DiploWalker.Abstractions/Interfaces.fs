@@ -5,7 +5,7 @@ open System.Text.Json
 /// Interfaces des clients pour les services DiploWalker.
 module Interfaces =
 
-    /// ExÃ©cuteur de processus (abstraction pour le test)
+    /// Exécuteur de processus (abstraction pour le test)
     type IProcessRunner =
         abstract member RunWithArgs: fileName: string * args: string list -> string
 
@@ -26,8 +26,8 @@ module Interfaces =
                 string
 
         abstract member StartContainer: namespaceName: string * id: string * detach: bool -> unit
-        /// DÃ©marre le conteneur en attachÃ© et capture sa sortie standard dans
-        /// le fichier de logs donnÃ© (processus en arriÃ¨re-plan).
+        /// Démarre le conteneur en attaché et capture sa sortie standard dans
+        /// le fichier de logs donné (processus en arrière-plan).
         abstract member StartContainerWithLogs: namespaceName: string * id: string * logFile: string -> unit
 
         abstract member StopContainer:
@@ -37,7 +37,7 @@ module Interfaces =
         abstract member PauseContainer: namespaceName: string * id: string -> unit
         abstract member ResumeContainer: namespaceName: string * id: string -> unit
         /// Attend la sortie du conteneur et retourne son code de sortie
-        /// (0 si sorti, -1 en cas de timeout, 0 si dÃ©jÃ  arrÃªtÃ©).
+        /// (0 si sorti, -1 en cas de timeout, 0 si déjà arrêté).
         abstract member WaitForContainerExit:
             namespaceName: string * id: string * timeoutSeconds: int * ct: System.Threading.CancellationToken ->
                 System.Threading.Tasks.Task<int>
@@ -52,9 +52,9 @@ module Interfaces =
         abstract member GetContainerLogs:
             namespaceName: string * id: string * tail: int * follow: bool * since: string -> string list
 
-        /// Suit les journaux d'un conteneur en continu : Ã©met l'instantanÃ©
-        /// (tail/since) puis les nouvelles lignes au fil de leur Ã©criture,
-        /// jusqu'Ã  la sortie du conteneur ou l'annulation.
+        /// Suit les journaux d'un conteneur en continu : émet l'instantané
+        /// (tail/since) puis les nouvelles lignes au fil de leur écriture,
+        /// jusqu'à la sortie du conteneur ou l'annulation.
         abstract member GetContainerLogsStream:
             namespaceName: string * id: string * tail: int * since: string * ct: System.Threading.CancellationToken ->
                 System.Collections.Generic.IAsyncEnumerable<string>
@@ -75,8 +75,8 @@ module Interfaces =
         abstract member ExportImage: namespaceName: string * imageRef: string * tarFile: string -> unit
         abstract member ImportImage: namespaceName: string * tarFile: string -> string list
 
-        /// ExÃ©cute une commande dans le conteneur avec redirection des flux
-        /// (entrÃ©e, sortie, erreur) et retourne le code de sortie.
+        /// Exécute une commande dans le conteneur avec redirection des flux
+        /// (entrée, sortie, erreur) et retourne le code de sortie.
         abstract member StartExec:
             namespaceName: string *
             id: string *

@@ -11,7 +11,7 @@ module CniParsing =
             use doc = JsonDocument.Parse(json, JsonDocumentOptions(MaxDepth = 32))
             let root = doc.RootElement
 
-            // Racine non-objet (tableau/scalar) : TryGetProperty lÃ¨verait une
+            // Racine non-objet (tableau/scalar) : TryGetProperty lèverait une
             // InvalidOperationException et annulerait tout le parsing.
             if root.ValueKind <> JsonValueKind.Object then
                 ("", "", "")
@@ -40,7 +40,7 @@ module CniParsing =
                             if ipInfo.TryGetProperty("address", &av) then
                                 ipv4 <- av.GetString()
 
-                            // SPEC CNI : la passerelle est dans ips[].gateway â€”
+                            // SPEC CNI : la passerelle est dans ips[].gateway —
                             // dns.nameservers est un serveur DNS, pas une
                             // passerelle ; l'utiliser pose des routes fausses.
                             if ipInfo.TryGetProperty("gateway", &av) then
@@ -48,6 +48,6 @@ module CniParsing =
 
                 (ifname, ipv4, gw)
         with ex ->
-            Log.Warning(ex, "Erreur lors du parsing du rÃ©sultat CNI")
+            Log.Warning(ex, "Erreur lors du parsing du résultat CNI")
             ("", "", "")
 

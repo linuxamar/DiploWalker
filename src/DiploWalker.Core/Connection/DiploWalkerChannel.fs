@@ -2,7 +2,7 @@
 
 open DiploWalker.Core
 
-/// Canal gRPC â€” dÃ©lÃ¨gue la construction au GrpcClientFactory mutualisÃ©.
+/// Canal gRPC — délègue la construction au GrpcClientFactory mutualisé.
 [<RequireQualifiedAccess>]
 module DiploWalkerChannel =
 
