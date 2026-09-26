@@ -3,6 +3,10 @@ name: CI
 on:
   push:
     branches: [ dev, main ]
+    # Sans cette ligne, un push de tag ne déclenche RIEN : le job `release`
+    # ne verrait jamais le ref du tag, et son `if` sur refs/tags/v ne pourrait
+    # pas s'exécuter. `branches` et `tags` sont cumulés (OU logique).
+    tags: [ 'v*' ]
   pull_request:
     branches: [ dev, main ]
   workflow_dispatch:
@@ -10,6 +14,10 @@ on:
 jobs:
   test:
     name: Build + tests
+    # Sur un push de tag, c'est le job `release` qui fait autorité : il exécute
+    # lui-même `-DoTests` avant de publier. Relancer la suite ici doublerait
+    # environ huit minutes de calcul pour rien.
+    if: github.ref_type != 'tag'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,10 +27,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restauration NuGet
-        run: dotnet restore Diplo.slnx
-      - name: Tests (11 projets, Release)
+        run: dotnet restore DiploWalker.slnx
+      - name: Tests (10 projets, Release)
         shell: pwsh
-        run: ./pipeline.ps1 -DoTests -Restore
+        # -NoSignTests : ce job n'a pas la clé git-crypt, et les PFX versionnés
+        # sont donc chiffrés. Sans ce drapeau, signtool tente de les charger et
+        # le build échoue. La signature n'apporte rien aux tests.
+        run: ./pipeline.ps1 -DoTests -Restore -NoSignTests
 
   release:
     name: Publication (tag v*)
@@ -35,14 +46,84 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Installer NSIS
+      - name: Outils de publication (NSIS + git-crypt)
         shell: pwsh
-        run: choco install nsis -y --no-progress
+        run: |
+          choco install nsis -y --no-progress
+          # Ni community.chocolatey.org (aucun paquet `git-crypt`) ni Scoop
+          # (absent du PATH du runner) ne fournissent l'outil. On prend le
+          # binaire Windows officiel, version épinglée : la 0.8.0 ne publie
+          # aucun asset Windows, et la 0.7.0 est exactement la version validée
+          # en local sur la PKI de ce dépôt.
+          $version = "0.7.0"
+          $exe = Join-Path $env:RUNNER_TEMP "git-crypt.exe"
+          Invoke-WebRequest -Uri "https://github.com/AGWA/git-crypt/releases/download/$version/git-crypt-$version-x86_64.exe" -OutFile $exe
+          # Refuse une page d'erreur HTML enregistrée sous le nom de l'exécutable
+          if ((Get-Item $exe).Length -lt 1000000) {
+            throw "git-crypt.exe téléchargée est trop petite : $(Get-Item $exe).Length octets"
+          }
+          # git-crypt écrit --version sur stderr, pas stdout : sans le
+          # redirection, $reported est vide et l'assertion passe pour la
+          # mauvaise raison.
+          $reported = (& $exe --version 2>&1 | Out-String).Trim()
+          if ($reported -notmatch "0\.7\.0") {
+            throw "Version git-crypt inattendue : $reported"
+          }
+          Write-Host "  git-crypt : $reported"
+          # $env:PATH ne survit pas d'un step à l'autre : c'est $GITHUB_PATH
+          # qui propage le chemin aux étapes suivantes, dont le déchiffrement.
+          $env:PATH = "$(Split-Path $exe);$env:PATH"
+          Add-Content -Path $env:GITHUB_PATH -Value (Split-Path $exe)
+
+          # Chocolatey installe bien NSIS (son log le confirme) mais ne rend pas
+          # makensis visible des étapes suivantes, pour la même raison que
+          # ci-dessus. build.ps1 échoue alors sur « NSIS (makensis) introuvable »
+          # après une publication pourtant réussie. Le répertoire est cherché
+          # plutôt que supposé : l'emplacement du paquet a déjà varié.
+          $searched = @(
+            (Join-Path ${env:ProgramFiles(x86)} "NSIS")
+            (Join-Path $env:ProgramFiles "NSIS")
+            "C:\ProgramData\chocolatey\lib\nsis"
+          )
+          $nsisDir = $searched | Where-Object { Test-Path (Join-Path $_ "makensis.exe") } | Select-Object -First 1
+          if (-not $nsisDir) {
+            $found = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Filter "makensis.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $nsisDir = $found.DirectoryName }
+          }
+          if (-not $nsisDir) {
+            throw "makensis.exe introuvable après installation de NSIS. Chemins testés : $($searched -join ', ')"
+          }
+          Write-Host "  NSIS : $nsisDir"
+          $env:PATH = "$nsisDir;$env:PATH"
+          Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
+      - name: Déchiffrement de la PKI (git-crypt)
+        shell: pwsh
+        env:
+          GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
+        run: |
+          if (-not $env:GIT_CRYPT_KEY) {
+            throw "Secret GIT_CRYPT_KEY absent : impossible de signer. C'est attendu pour une PR depuis une fork, mais pas pour une publication."
+          }
+          $keyFile = Join-Path $env:RUNNER_TEMP "git-crypt.key"
+          # Le secret est la clé symétrique encodée en base64 (cf. git-crypt keygen).
+          [System.IO.File]::WriteAllBytes($keyFile, [System.Convert]::FromBase64String($env:GIT_CRYPT_KEY))
+          # "unlock" installe le filtre ET déchiffre : il n'existe pas de
+          # sous-commande "install" (cf. git-crypt help). Appeler "init" ici
+          # serait contre-productif : cela générait une clé qui ne correspond
+          # pas au dépôt existant.
+          git-crypt unlock $keyFile
+          Remove-Item $keyFile -Force
+          # Contrôle que la chaîne de signature est bien exploitable.
+          $pfx = "certificates/codesigning/leaves/DiploWalker.Installer/DiploWalker.Installer.pfx"
+          if (-not (Test-Path $pfx)) { throw "PFX de signature absent après déchiffrement : $pfx" }
       - name: Restauration NuGet
-        run: dotnet restore Diplo.slnx
+        run: dotnet restore DiploWalker.slnx
       - name: Tests
         shell: pwsh
-        run: ./pipeline.ps1 -DoTests -Restore
+        # -NoSignTests : la clé est disponible ici (déchiffrement ci-dessus),
+        # mais signer les binaires de test n'apporte rien et ne fait que
+        # ralentir. La publication qui suit reste signée.
+        run: ./pipeline.ps1 -DoTests -Restore -NoSignTests
       - name: Publication self-contained (x64 + x86) + setup NSIS
         shell: pwsh
         run: ./pipeline.ps1 -DoPublish

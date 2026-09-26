@@ -81,19 +81,26 @@ publish-cli/
 # Raccourci de lancement local de l'agent (non versionné)
 ai.cmd
 
-# PKI locale : les clés privées et CSR ne doivent jamais être versionnées
-certificates/**/private/
+# PKI : clés privées et PFX sont versionnés, mais CHIFFRÉS par git-crypt
+# (voir .gitattributes et certificates/README.md). Ils sont indispensables à la
+# CI, qui signe les binaires et l'installateur : sans eux, -DoPublish échoue.
+# La clé de chiffrement est un secret hors dépôt — elle n'a pas vocation à être
+# versionnée, ni celle-ci ni les fichiers de clé qu'OpenSSL ou git-crypt
+# pourraient produire à la racine.
+#
+# Sont en revanche toujours ignorés : les CSR (aucun secret, mais sans
+# intérêt pour le build) et la comptabilité interne des autorités, qui est
+# propre à chaque poste qui émet.
 certificates/**/csr/
+certificates/codesigning/leaves/**/*.csr.pem
 certificates/**/db/newcerts/
 certificates/**/db/index.txt
 certificates/**/db/index.txt.*
 certificates/**/db/*.old
 
-# Certificats de signature de code : clés privées, CSR et PFX non versionnés
-certificates/codesigning/leaves/**/*.key.pem
-certificates/codesigning/leaves/**/*.csr.pem
-certificates/codesigning/leaves/**/*.pfx
-certificates/**/*.pfx
+# Fichiers de clés git-crypt (le secret lui-même, jamais versionné)
+*.key
+git-crypt.key
 
 # Node.js
 node_modules/

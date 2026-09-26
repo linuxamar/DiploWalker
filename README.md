@@ -209,8 +209,11 @@ Options disponibles :
 - `-DoPublish` : Publication des exécutables
 - `-SignCert <pfx> [-SignPassword <mot-de-passe>]` : signe les installateurs avec un certificat PFX
 - `-SignThumbprint <empreinte>` : signe avec un certificat du magasin (par empreinte SHA-1/SHA-256)
+- `-TimestampUrl <url>` : horodate les binaires publiés (RFC 3161, ex. `http://timestamp.digicert.com`)
 
 `signtool.exe` est recherché dans le PATH puis dans les Windows Kits installés. Sans certificat disponible, la signature est ignorée (simple avertissement).
+
+Les clés de signature de la PKI sont versionnées mais chiffrées par git-crypt : un poste neuf doit d'abord `git-crypt unlock <clé>`, faute de quoi la publication produit des binaires non signés. Voir `certificates/README.md`.
 
 ### Structure du projet
 

@@ -3,10 +3,110 @@
 Chaîne de certificats à usage de démonstration, générée avec OpenSSL 3.
 Toutes les clés sont du **RSA 8192 bits** et les signatures utilisent **SHA-384**.
 
-> ⚠️ **Démonstration uniquement.** Les clés privées sont générées **sans phrase de passe**
-> et ne sont **jamais versionnées** (voir `.gitignore`). Pour une exploitation réelle :
-> protéger les clés par phrase de passe ou un HSM, et prévoir la révocation (CRL/OCSP)
-> ainsi qu'un suivi des expirations.
+> ⚠️ **Démonstration uniquement.** Les clés privées sont générées **sans phrase de passe**.
+> Elles sont **versionnées, mais chiffrées** par git-crypt (voir « Chiffrer et
+> versionner le dépôt » ci-dessous) : le dépôt ne contient que du ciphertext, et la
+> clé qui le déchiffre est un secret hors dépôt. Pour une exploitation réelle :
+> protéger les clés par phrase de passe ou un HSM, et prévoir la révocation
+> (CRL/OCSP) ainsi qu'un suivi des expirations.
+
+## Chiffrer et versionner le dépôt
+
+Les clés privées et les PFX **sont versionnés**, sans quoi la CI ne pourrait pas
+signer et aucun artefact signé ne pourrait être produit ailleurs que sur le poste
+d'origine. Pour que cela reste acceptable, ces 50 fichiers sont **chiffrés au repos
+par [git-crypt](https://github.com/AGL/git-crypt)** (mode symétrique).
+
+| Élément                        | Traitement                                    |
+| ------------------------------ | --------------------------------------------- |
+| 28 clés `*.key.pem`            | versionnées, chiffrées                        |
+| 22 PFX `*.pfx`                 | versionnés, chiffrés                          |
+| 27 CSR `*.csr.pem`             | ignorés (aucun intérêt pour le build)         |
+| `db/newcerts/`, `db/index.txt*` | ignorés (propres au poste qui émet)          |
+| clé symétrique git-crypt       | **jamais** versionnée — secret GitHub + coffre |
+
+Les motifs du filtre sont dans `.gitattributes` (`certificates/**/*.key.pem` et
+`certificates/**/*.pfx`). Ils ne chevauchent pas les règles Git LFS du dépôt :
+`*.pem` et `*.pfx` n'y figurent pas, donc les deux filtres ne se disputent jamais
+un même fichier.
+
+### Premier poste
+
+```powershell
+git-crypt unlock C:\chemin\vers\diplo-git-crypt.key
+```
+
+C'est tout : `unlock` installe le filtre **et** déchiffre. Il n'existe pas de
+sous-commande `git-crypt install` (`git-crypt help` ne propose que `init`, `status`,
+`lock`, `unlock`, `export-key`, `keygen`, `migrate-key`), et `init` est inutile ici :
+il génère une clé qui ne correspond pas au dépôt existant. La même commande sert
+donc au poste de développement et à la CI.
+
+### Ce que fait réellement git-crypt
+
+Le chiffrement est branché sur les filtres `clean`/`smudge` de Git :
+
+- au `git add`, le filtre `clean` écrit du **ciphertext** dans l'objet Git ;
+- à l'extraction, le filtre `smudge` réécrit du **clair** dans le worktree.
+
+Un poste de développement a donc **les clés en clair sur son disque** ; git-crypt
+protège le dépôt et les clones, pas le poste. Sur un runner éphémère c'est sans
+conséquence, sur un poste volé c'est insuffisant. `git-crypt lock` reverrouille le
+worktree.
+
+### Publication en CI
+
+Le job `release` de `.github/workflows/ci.yml` déverrouille le dépôt, car il
+déchiffre au début et supprime la clé :
+
+```powershell
+[System.IO.File]::WriteAllBytes($keyFile, [System.Convert]::FromBase64String($env:GIT_CRYPT_KEY))
+git-crypt unlock $keyFile
+```
+
+Le job `test` ne déverrouille rien : sans PFX, `Directory.Build.targets` dégrade la
+publication en binaires non signés, ce qui suffit pour les tests. Le job `release`
+échoue volontairement si le secret est absent, plutôt que de publier des
+artefacts non signés.
+
+Le secret GitHub `GIT_CRYPT_KEY` contient la clé **encodée en base64** (la clé
+fichée par `git-crypt keygen` est binaire) :
+
+```powershell
+$b64 = [System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes("diplo-git-crypt.key"))
+```
+
+### Faire évoluer la clé symétrique
+
+```powershell
+git-crypt export-key nouvelle-cle.key   # exporte la clé actuelle du dépôt
+```
+
+## Rotation
+
+`git-crypt` chiffre le dépôt, il ne gère pas le cycle de vie des certificats.
+Une clé compromise se traite comme une clé compromise.
+
+**Divulgation de la clé symétrique** — situation la plus grave, elle expose les 50
+fichiers :
+
+1. Régénérer la PKI (§ « Régénération ») et committer les nouveaux fichiers
+   chiffrés, **y compris** dans l'historique : retirer les fichiers des commits
+   récents ne suffit pas, il faut réécrire l'historique (`git filter-repo`) ou
+   repartir d'une nouvelle branche.
+2. Révoquer et réémettre tous les certificats concernés.
+3. Régénérer la clé symétrique et la redéployer en CI.
+
+**Divulgation d'une seule clé de feuille** — par exemple un PFX d'un poste de
+développement compromis :
+
+1. Supprimer `certificates/codesigning/leaves/<Projet>/`.
+2. Relancer `regenerate-leaves.ps1` (il régénère le projet absent).
+3. Commiter ; la CI resigne avec le nouveau certificat.
+
+> `-Force` n'est pas anodin : il régénère clés, certificats et PFX, et les
+> fichiers étant versionnés, cela produit un commit contenant des secrets
+> chiffrés. Vérifiez le diff avant de commiter.
 
 ## Structure de la chaîne
 
@@ -64,17 +164,18 @@ et `[ ca ]`, une base (`db/index.txt`, `db/serial`) et un dossier `certs/`.
 
 Dans chaque répertoire :
 
-- `private/*.key.pem` — clé privée (non versionnée)
-- `csr/*.csr.pem` — demande de signature (non versionnée)
+- `private/*.key.pem` — clé privée (versionnée, chiffrée)
+- `csr/*.csr.pem` — demande de signature (ignorée)
 - `certs/*.crt.pem` — certificat émis
 - `certs/*.chain.crt.pem` — chaîne complète feuille → racine
 
 Dans chaque répertoire `codesigning/leaves/<Projet>/` :
 
-- `<Projet>.key.pem` — clé privée (non versionnée)
-- `<Projet>.csr.pem` — demande de signature (non versionnée)
+- `<Projet>.key.pem` — clé privée (versionnée, chiffrée)
+- `<Projet>.csr.pem` — demande de signature (ignorée)
 - `<Projet>.crt.pem` — certificat émis (EKU `codeSigning`)
-- `<Projet>.pfx` — clé privée + certificat pour signtool (sans mot de passe, non versionné)
+- `<Projet>.pfx` — clé privée + certificat pour signtool, sans mot de passe
+  (versionné, chiffré)
 
 ## Utilisation avec OpenSSL
 
@@ -136,8 +237,8 @@ Le fichier racine `Directory.Build.targets` exécute, après chaque `Build`, la 
 
 Comportement :
 
-- **PFX du projet absent** (poste non initialisé, CI sans clés privées) → binaire
-  non signé, simple message d'information. Le build n'échoue pas.
+- **PFX du projet absent** (poste non déverrouillé) → binaire non signé, simple
+  message d'information. Le build n'échoue pas.
 - **PFX présent et signtool introuvable** → erreur de build (signature obligatoire).
 - signtool est recherché dans `Windows Kits\10\bin\<version>\x64\` (la plus récente
   installée est utilisée) ; la CI GitHub Windows (`windows-latest`) le fournit.
@@ -234,6 +335,26 @@ En .NET, charger le certificat privé depuis le PFX ou le magasin, puis utiliser
 > validateur).
 
 ## Régénération complète
+
+### Via le script d'amorçage (recommandé)
+
+```powershell
+# Toute la PKI : racine, intermédiaires, feuilles système et feuilles de signature
+.\certificates\regenerate-pki.ps1 -Force
+
+# Autorités seules, sans toucher aux 22 feuilles de signature de code
+.\certificates\regenerate-pki.ps1 -SkipProjectLeaves -Force
+```
+
+Le script détecte `openssl.exe` dans le `PATH`, puis dans les installations Git
+standard et Git Scoop (`-OpenSSLPath` pour forcer un chemin). Sans `-Force`, il
+refuse de révoquer un certificat existant. Comme les clés et les PFX sont versionnés
+(chiffrés), la régénération les modifie et se voit dans le diff : c'est le mécanisme
+normal de rotation, à commiter après vérification. Pour repartir de zéro sur une
+seule autorité, supprimer son répertoire plutôt que d'effacer `certificates/`, sinon
+toute la chaîne est à réémettre.
+
+### Procédure manuelle
 
 1. Effacer le contenu de `certificates/` (ou d'un sous-répertoire).
 2. Suivre l'ordre ci-dessous, en exécutant chaque commande depuis le répertoire

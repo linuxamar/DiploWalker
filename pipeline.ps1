@@ -10,9 +10,11 @@
 #    .\pipeline.ps1 -Restore         # restaure les packages NuGet en 1er
 #    .\pipeline.ps1 -Clean           # supprime bin/ obj/ avant publication
 #    .\pipeline.ps1 -DoTests         # lance uniquement les tests
+#    .\pipeline.ps1 -DoTests -NoSignTests   # tests sans signer les binaires
 #    .\pipeline.ps1 -DoPublish       # publie uniquement (sans tests)
 #    .\pipeline.ps1 -DoPublish -SignCert C:\certs\code.pfx -SignPassword "***"
 #    .\pipeline.ps1 -DoPublish -SignThumbprint <SHA1-du-certificat>
+#    .\pipeline.ps1 -DoPublish -TimestampUrl http://timestamp.digicert.com
 # ---------------------------------------------------------------------------
 
 [CmdletBinding()]
@@ -26,7 +28,9 @@ param(
     [string]$SignCert,
     [string]$SignPassword,
     [string]$SignThumbprint,
-    [string]$TestLogDir
+    [string]$TimestampUrl,
+    [string]$TestLogDir,
+    [switch]$NoSignTests
 )
 
 # -DoTests et -DoPublish peuvent être combinés :
@@ -109,6 +113,15 @@ function Publish-Project {
 
     $rid = "win-$Plat"
 
+    # Horodatage Authenticode facultatif, transmis à Directory.Build.targets.
+    # Sans lui, signtool signe sans "/tr" : la signature est considérée comme
+    # expiree par le systeme a la premiere rotation de la cle signataire.
+    $extraPublishArgs = @()
+    if ($TimestampUrl) {
+        Write-Host "  Horodatage : $TimestampUrl"
+        $extraPublishArgs = @("-p:DiploCodeSigningTimestampUrl=$TimestampUrl")
+    }
+
     Write-Host ""
     Write-Host "═══ $ProjectName  ($Plat) ═══" -ForegroundColor Cyan
     Write-Host "  Source  : $projectPath"
@@ -125,7 +138,8 @@ function Publish-Project {
         -p:PublishSingleFile=false `
         -p:IncludeNativeLibrariesForSelfExtract=true `
         -p:DebugType=None `
-        -p:DebugSymbols=false
+        -p:DebugSymbols=false `
+        @extraPublishArgs
 
     if ($LASTEXITCODE -ne 0) {
         throw "Échec de la publication de $ProjectName ($Plat)."
@@ -211,6 +225,9 @@ if ($Restore) {
 if ($runTests) {
     Write-Host "═══ Tests unitaires ═══" -ForegroundColor Cyan
 
+    # Signature désactivée pendant les tests (-NoSignTests) : voir la
+    # construction de $testArgs plus bas.
+
     # Libère les verrous de fichiers de sortie (obj/bin) détenus par les
     # serveurs MSBuild / compilateur laissés par des exécutions précédentes.
     # Sans cela, `dotnet test` peut échouer en cascade sur une collision de
@@ -268,6 +285,16 @@ if ($runTests) {
         # exclus sur les autres systèmes, où ils échoueraient. Sur Windows
         # toute la suite est exécutée.
         $testArgs = @("--project", $testPath, "--configuration", "Release", "--no-restore")
+        # -NoSignTests : aucun test n'examine la signature Authenticode d'un
+        # binaire compilé (ArtifactSigningTests forge ses clés RSA en mémoire),
+        # donc signer les DLL de test n'apporte rien. Pire, cela fait échouer le
+        # build d'un runner CI : les PFX sont versionnés, donc présents, et
+        # signtool tente de charger du ciphertext git-crypt, qu'il refuse.
+        # La signature de la publication reste inchangée : -p: n'est posé que
+        # sur la commande `dotnet test`, jamais sur `dotnet publish`.
+        if ($NoSignTests) {
+            $testArgs += "-p:DiploSignOutputAfterBuild=false"
+        }
         if ($onWindows) {
             Write-Host "    Plateforme Windows : toute la suite est exécutée." -ForegroundColor DarkGray
         } else {

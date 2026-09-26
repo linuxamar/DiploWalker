@@ -17,7 +17,8 @@
 [CmdletBinding()]
 param(
     [switch]$Force,
-    [string]$Projects
+    [string]$Projects,
+    [string]$OpenSSLPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,13 +27,39 @@ $repoRoot  = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
 $leavesDir = $PSScriptRoot
 $caDir     = Resolve-Path (Join-Path $PSScriptRoot "..")
 
-# Binaire OpenSSL : Git pour Windows par défaut, sinon le PATH.
-$openssl = "C:\Program Files\Git\usr\bin\openssl.exe"
-if (-not (Test-Path $openssl)) {
+# Binaire OpenSSL : -OpenSSLPath, puis le PATH, puis les installations
+# connues de Git pour Windows. La recherche ne doit pas dependre du prefixe
+# d'installation : scoop place Git sous %USERPROFILE%\scoop\apps\git\<version>\
+# et y fournit openssl.exe, que le chemin code en dur ne trouve pas.
+function Resolve-OpenSsl {
+    if ($OpenSSLPath) {
+        if (-not (Test-Path $OpenSSLPath)) { throw "OpenSSL introuvable : $OpenSSLPath" }
+        return (Resolve-Path $OpenSSLPath).Path
+    }
+
     $cmd = Get-Command "openssl" -ErrorAction SilentlyContinue
-    if (-not $cmd) { throw "OpenSSL introuvable (Git pour Windows requis)." }
-    $openssl = $cmd.Source
+    if ($cmd) { return $cmd.Source }
+
+    $candidates = @(
+        (Join-Path $env:ProgramFiles "Git\usr\bin\openssl.exe")
+        (Join-Path ${env:ProgramFiles(x86)} "Git\usr\bin\openssl.exe")
+        (Join-Path $env:LOCALAPPDATA "Programs\Git\usr\bin\openssl.exe")
+    )
+
+    $scoop = Get-ChildItem -Path "$env:USERPROFILE\scoop\apps\git\*\usr\bin\openssl.exe" `
+                          -ErrorAction SilentlyContinue |
+                 Sort-Object FullName -Descending
+    if ($scoop) { $candidates += $scoop.FullName }
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) { return $candidate }
+    }
+
+    throw "OpenSSL introuvable (installez Git pour Windows, ou passez -OpenSSLPath <chemin>)."
 }
+
+$openssl = Resolve-OpenSsl
+Write-Host "==> OpenSSL : $openssl" -ForegroundColor Cyan
 
 # --- Projets de la solution (parsing de DiploWalker.slnx) -------------------------
 $slnx = Join-Path $repoRoot "DiploWalker.slnx"
@@ -92,7 +119,31 @@ keyUsage          = critical, digitalSignature
 extendedKeyUsage  = codeSigning
 "@
 
-    Set-Content -Path (Join-Path $Dir "openssl.cnf") -Value $config -Encoding utf8
+    # UTF-8 sans BOM : `Set-Content -Encoding utf8` en PowerShell 5.1 ajoute un
+    # BOM, inutile dans une configuration OpenSSL et source de diff parasites.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText((Join-Path $Dir "openssl.cnf"), $config, $utf8NoBom)
+}
+
+# --- Exécution d'openssl -----------------------------------------------------
+# `openssl req`/`ca` écrivent leur barre de progression sur stderr : sous
+# $ErrorActionPreference = "Stop", PowerShell 5.1 convertit chaque ligne stderr
+# en NativeCommandError terminant. On abaisse la préférence le temps de l'appel
+# et on juge sur le code de sortie, seul indicateur fiable ici.
+function Invoke-OpenSsl {
+    param([string[]]$Arguments, [string]$WorkingDirectory, [string]$What)
+
+    Push-Location $WorkingDirectory
+    try {
+        $ErrorActionPreference = "Continue"
+        & $openssl @Arguments 2> $null
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = "Stop"
+        Pop-Location
+    }
+
+    if ($code -ne 0) { throw "Échec openssl ($What) — code $code." }
 }
 
 # --- Génération --------------------------------------------------------------
@@ -110,29 +161,30 @@ foreach ($name in $names) {
 
     if ($Force -or -not (Test-Path $key)) {
         Write-Host "  clé RSA 8192..."
-        & $openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:8192 -out $key 2>$null
-        if ($LASTEXITCODE -ne 0) { throw "Échec de la génération de la clé ($name)." }
+        Invoke-OpenSsl -Arguments @("genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:8192", "-out", $key) `
+                       -WorkingDirectory $dir -What "clé $name"
     }
 
-    Push-Location $dir
-    try {
-        & $openssl req -new -config openssl.cnf -key $key -out $csr
-        if ($LASTEXITCODE -ne 0) { throw "Échec de la CSR ($name)." }
-    } finally {
-        Pop-Location
-    }
+    # `openssl ca` résout `dir = .` et `certificate`/`private_key` par rapport au
+    # répertoire courant : on se place donc dans l'autorité signataire, avec les
+    # chemins -in/-out absolus.
+    Invoke-OpenSsl -Arguments @("req", "-new", "-config", "openssl.cnf", "-key", $key, "-out", $csr) `
+                   -WorkingDirectory $dir -What "CSR $name"
 
-    Push-Location $caDir
-    try {
-        & $openssl ca -config openssl.cnf -extensions leaf_cert -batch -notext `
-            -md sha384 -in $csr -out $crt -days 825
-        if ($LASTEXITCODE -ne 0) { throw "Échec de la signature ($name)." }
-    } finally {
-        Pop-Location
-    }
+    Invoke-OpenSsl -Arguments @("ca", "-config", "openssl.cnf", "-extensions", "leaf_cert", "-batch", "-notext",
+                                "-md", "sha384", "-in", $csr, "-out", $crt, "-days", "825") `
+                   -WorkingDirectory $caDir -What "signature $name"
 
-    & $openssl pkcs12 -export -out $pfx -inkey $key -in $crt -passout pass:
-    if ($LASTEXITCODE -ne 0) { throw "Échec de la création du PFX ($name)." }
+    # La chaîne (CodeSigning + racine) est embarquée dans le PFX : signtool la
+    # recopie dans la signature Authenticode, ce qui rend l'origine vérifiable
+    # même sans magasin de confiance (cf. certificates\README.md). Elle ne sert
+    # pas à signer — seule la feuille porte la clé privée.
+    $pkcs12 = @("pkcs12", "-export", "-out", $pfx, "-inkey", $key, "-in", $crt)
+    $caChain = Join-Path $caDir "certs\codesigning.chain.crt.pem"
+    if (Test-Path $caChain) { $pkcs12 += @("-certfile", $caChain) }
+    $pkcs12 += @("-passout", "pass:")
+
+    Invoke-OpenSsl -Arguments $pkcs12 -WorkingDirectory $dir -What "PFX $name"
 
     Write-Host "  ✓ $name (pfx : $pfx)" -ForegroundColor Green
 }

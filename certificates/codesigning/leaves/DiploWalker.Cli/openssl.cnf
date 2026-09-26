@@ -1,13 +1,13 @@
-# Configuration du certificat de signature de code du projet Diplo.Cli.
+# Configuration du certificat de signature de code du projet DiploWalker.Cli.
 # Parent : l'intermédiaire "CodeSigning" (certificates/codesigning/).
 # Clé RSA 8192 bits, usage étendu : codeSigning.
 #
 # Exemples :
-#   openssl req -new -config openssl.cnf -key Diplo.Cli.key.pem -out Diplo.Cli.csr.pem
+#   openssl req -new -config openssl.cnf -key DiploWalker.Cli.key.pem -out DiploWalker.Cli.csr.pem
 #   # Signature par CodeSigning (exécutée depuis codesigning/)
 #   openssl ca -config ../openssl.cnf -extensions leaf_cert -batch -notext 
-#              -in ../leaves/Diplo.Cli/Diplo.Cli.csr.pem 
-#              -out ../leaves/Diplo.Cli/Diplo.Cli.crt.pem
+#              -in ../leaves/DiploWalker.Cli/DiploWalker.Cli.csr.pem 
+#              -out ../leaves/DiploWalker.Cli/DiploWalker.Cli.crt.pem
 
 [ req ]
 default_bits       = 8192
@@ -21,7 +21,7 @@ req_extensions     = v3_req
 countryName            = FR
 organizationName       = Diplo
 organizationalUnitName = Diplo Signature de code
-commonName             = Diplo.Cli
+commonName             = DiploWalker.Cli
 
 # Extensions demandées dans la CSR : recopiées dans le certificat grâce à
 # copy_extensions = copy dans la configuration de l'autorité signataire.

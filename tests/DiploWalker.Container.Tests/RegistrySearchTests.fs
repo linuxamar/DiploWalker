@@ -262,17 +262,45 @@ let ``searchWith interroge les fournisseurs en parallele`` () =
                 } }
 
     use client = new HttpClient(handler)
-    let sw = System.Diagnostics.Stopwatch.StartNew()
 
-    let hits =
-        run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None)
+    // Échauffement : la première exécution paie la compilation JIT des machines
+    // à états F#, de HttpClient et du moindre dagree. Sans cela, la mesure
+    // encadrait surtout ce coût là, ce qui la rendait imprévisible.
+    run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None) |> ignore
 
-    sw.Stop()
+    let measure work =
+        let sw = System.Diagnostics.Stopwatch.StartNew()
+        let result = work ()
+        sw.Stop()
+        result, sw.ElapsedMilliseconds
 
-    // Trois fournisseurs à 250 ms chacun : en parallèle la durée reste proche
-    // de 250 ms, très en dessous de la somme séquentielle (~750 ms).
-    hits.Length |> should equal 3
-    sw.ElapsedMilliseconds < 600L |> should equal true
+    // Référence séquentielle : les trois fournisseurs réellement interrogés, un
+    // après l'autre, par la même API et le même handler. Passer par un appel
+    // ciblé par registre est indispensable : collectionner les tâches puis les
+    // awaiting une à une ne sérialiserait rien, les `task` F# démarrant dès
+    // l'appel et non à l'await.
+    let sequentialHits, sequentialMs =
+        measure (fun () ->
+            [ "docker.io"; "quay.io"; "mcr.microsoft.com" ]
+            |> List.map (fun registry -> run (RegistrySearch.searchWith client (Some registry) "nginx" 25 CancellationToken.None))
+            |> List.concat)
+
+    let hits, parallelMs =
+        measure (fun () -> run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None))
+
+    hits |> should equal sequentialHits
+
+    // Comparaison RELATIVE et non seuil absolu : les deux mesures traversent le
+    // même handler et les mêmes délais de 250 ms, elles absorbent donc ensemble
+    // la charge de la machine. Le seuil de 600 ms d'auparavant était franchi dès
+    // que le poste était occupé, alors même que les fournisseurs étaient bien
+    // interrogés en parallèle — le test échouait au hasard, pas à juste titre.
+    // Une régression vers du séquentiel porterait le rapport vers 1 ; le
+    // parallélisme le laisse nettement en dessous de 0,75.
+    Assert.True(
+        double parallelMs < double sequentialMs * 0.75,
+        $"Fournisseurs non interrogés en parallèle : {parallelMs} ms en parallèle contre {sequentialMs} ms en séquentiel."
+    )
 
 [<Fact>]
 let ``mcrSearch borne la requete catalogue a n=limit`` () =
