@@ -2,13 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [ dev, main ]
+    # La CI ne se déclenche que sur `main`. Conséquence assumée : `dev` n'est
+    # plus validée avant promotion, la validation a lieu après la fusion.
+    branches: [ main ]
     # Sans cette ligne, un push de tag ne déclenche RIEN : le job `release`
     # ne verrait jamais le ref du tag, et son `if` sur refs/tags/v ne pourrait
-    # pas s'exécuter. `branches` et `tags` sont cumulés (OU logique).
+    # pas s'exécuter. `branches` et `tags` sont cumulés (OU logique) : restreindre
+    # `branches` à `main` n'affecte donc pas le chemin de publication.
     tags: [ 'v*' ]
   pull_request:
-    branches: [ dev, main ]
+    # Même filtre que `push` : seules les PR visant `main` sont validées.
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
