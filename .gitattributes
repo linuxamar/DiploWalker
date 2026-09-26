@@ -45,3 +45,14 @@
 src/DiploWalker.Installer/assets/artifacts.manifest      text eol=lf
 src/DiploWalker.Installer/assets/artifacts.manifest.sig  text eol=lf
 src/DiploWalker.Installer/assets/DiploWalker-release.pub text eol=lf
+
+# --- PKI X509 : matériel secret chiffré par git-crypt ------------------------
+# Les clés privées et les PFX de signature sont versionnés pour que la CI
+# (job `release`) puisse signer les binaires et l'installateur. git-crypt les
+# chiffre au repos dans l'index et le worktree : le dépôt ne contient que du
+# ciphertext, la clé de déchiffrement est un secret hors dépôt.
+# Aucun recouvrement avec les motifs Git LFS ci-dessus (*.pem et *.pfx n'y
+# figurent pas) : les deux filtres ne se disputent jamais un même fichier.
+# Voir certificates/README.md pour la distribution de la clé.
+certificates/**/*.key.pem   filter=git-crypt diff=git-crypt merge=git-crypt
+certificates/**/*.pfx       filter=git-crypt diff=git-crypt merge=git-crypt
