@@ -3,6 +3,10 @@ name: CI
 on:
   push:
     branches: [ dev, main ]
+    # Sans cette ligne, un push de tag ne déclenche RIEN : le job `release`
+    # ne verrait jamais le ref du tag, et son `if` sur refs/tags/v ne pourrait
+    # pas s'exécuter. `branches` et `tags` sont cumulés (OU logique).
+    tags: [ 'v*' ]
   pull_request:
     branches: [ dev, main ]
   workflow_dispatch:
@@ -10,6 +14,10 @@ on:
 jobs:
   test:
     name: Build + tests
+    # Sur un push de tag, c'est le job `release` qui fait autorité : il exécute
+    # lui-même `-DoTests` avant de publier. Relancer la suite ici doublerait
+    # environ huit minutes de calcul pour rien.
+    if: github.ref_type != 'tag'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
