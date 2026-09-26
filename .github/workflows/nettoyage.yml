@@ -27,5 +27,13 @@ jobs:
           # Conserver uniquement les résultats des 30 derniers jours
           retain_days: 30
 
-          # Garder au minimum les 6 exécutions les plus récentes (sécurité)
-          keep_minimum_runs: 6
+          # Doit rester à 0. L'action applique ce minimum à la liste DÉJÀ filtrée
+          # par âge (index.js : candidates.slice(-keep_minimum_runs)), et non à
+          # l'historique complet : la rétention effective est donc
+          # max(retain_days, keep_minimum_runs) et le nombre de runs vieux ne peut
+          # jamais descendre sous cette valeur. Avec 6, et 6 runs de plus de 30
+          # jours, runsToDelete vaut slice(0, 0) et rien n'est jamais supprimé.
+          # Le plancher de sécurité est déjà assuré par retain_days, qui protège
+          # les runs récents : ce réglage est donc redondant, et seulement nuisible.
+          # 0 est indispensable — l'entrée omise retombe sur 6 (défaut de l'action).
+          keep_minimum_runs: 0
