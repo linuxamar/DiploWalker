@@ -14,6 +14,12 @@ module RegistryAuthTests =
 
     let shouldNotContain (substring: string) (text: string) = Assert.DoesNotContain(substring, text)
 
+    /// Exécutable témoin du PATH, présent sur les deux plateformes. Sous Windows
+    /// l'extension est obligatoire : `tryFindOnPath` teste `File.Exists` sur le
+    /// chemin composé, et .NET n'applique pas la résolution PATHEXT du shell —
+    /// `cmd` seul ne correspond à aucun fichier.
+    let private pathWitness = if OperatingSystem.IsWindows() then "cmd.exe" else "pwsh"
+
     /// Crée un fichier d'état temporaire isolé pour chaque test.
     let private withStateFile (test: string -> unit) =
         let dir =
@@ -112,7 +118,7 @@ module RegistryAuthTests =
     [<Fact>]
     let ``tryFindOnPath trouve un executable present dans le PATH`` () =
         // Le lanceur Unix du helper execute pwsh : il doit etre trouvable.
-        RegistryAuth.tryFindOnPath (if OperatingSystem.IsWindows() then "cmd" else "pwsh")
+        RegistryAuth.tryFindOnPath pathWitness
         |> Option.isSome
         |> should equal true
 
@@ -125,13 +131,19 @@ module RegistryAuthTests =
         // Une entree vide vaut "." pour un shell POSIX ; on l'ecarte plutot,
         // resoudre le helper depuis le repertoire courant serait une fuite.
         // Le nom cherche doit rester trouvable malgre les entrees vides.
+        //
+        // Les entrees vides sont produites avec le separateur de la plateforme
+        // (« ; » sous Windows) : un « :: » ne creerait aucune entree vide sous
+        // Windows, mais agglutinerait « ::C:\WINDOWS\system32 » en un seul
+        // repertoire inexistant.
         let saved = Environment.GetEnvironmentVariable "PATH"
+        let sep = string Path.PathSeparator
+        let withBlanks = sep + sep + (if isNull saved then "" else saved) + sep + sep
 
         try
-            Environment.SetEnvironmentVariable("PATH", "::" + saved + "::")
+            Environment.SetEnvironmentVariable("PATH", withBlanks)
 
-            RegistryAuth.tryFindOnPath
-                (if OperatingSystem.IsWindows() then "cmd" else "pwsh")
+            RegistryAuth.tryFindOnPath pathWitness
             |> Option.isSome
             |> should equal true
         finally
@@ -287,7 +299,14 @@ module RegistryAuthTests =
             // cle sont donc directement sous <root> (le script les decouvre
             // un niveau au-dessus), et non dans <root>/Diplo.
             let sharedState = Path.Combine(root, "registry-auth.json")
-            File.Copy(RegistryAuth.keyFile (), Path.Combine(root, "registry-key.bin"), true)
+
+            // La cle AES-GCM n'existe que hors Windows : sous Windows le mot de
+            // passe est scelle par DPAPI et le script ignore entierement
+            // DIPLO_REGISTRY_KEY_FILE (cf. helperScript). La copier ici
+            // echouerait avec un FileNotFoundException sous Windows.
+            if not (OperatingSystem.IsWindows()) then
+                File.Copy(RegistryAuth.keyFile (), Path.Combine(root, "registry-key.bin"), true)
+
             RegistryAuth.add sharedState "shared.example.com" "shareduser" "sharedpass"
 
             let launcher = RegistryAuth.writeHelperTo (Path.Combine(root, "cred-helper")) "" ""
