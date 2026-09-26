@@ -13,6 +13,7 @@
 #    .\pipeline.ps1 -DoPublish       # publie uniquement (sans tests)
 #    .\pipeline.ps1 -DoPublish -SignCert C:\certs\code.pfx -SignPassword "***"
 #    .\pipeline.ps1 -DoPublish -SignThumbprint <SHA1-du-certificat>
+#    .\pipeline.ps1 -DoPublish -TimestampUrl http://timestamp.digicert.com
 # ---------------------------------------------------------------------------
 
 [CmdletBinding()]
@@ -26,6 +27,7 @@ param(
     [string]$SignCert,
     [string]$SignPassword,
     [string]$SignThumbprint,
+    [string]$TimestampUrl,
     [string]$TestLogDir
 )
 
@@ -109,6 +111,15 @@ function Publish-Project {
 
     $rid = "win-$Plat"
 
+    # Horodatage Authenticode facultatif, transmis à Directory.Build.targets.
+    # Sans lui, signtool signe sans "/tr" : la signature est considérée comme
+    # expiree par le systeme a la premiere rotation de la cle signataire.
+    $extraPublishArgs = @()
+    if ($TimestampUrl) {
+        Write-Host "  Horodatage : $TimestampUrl"
+        $extraPublishArgs = @("-p:DiploCodeSigningTimestampUrl=$TimestampUrl")
+    }
+
     Write-Host ""
     Write-Host "═══ $ProjectName  ($Plat) ═══" -ForegroundColor Cyan
     Write-Host "  Source  : $projectPath"
@@ -125,7 +136,8 @@ function Publish-Project {
         -p:PublishSingleFile=false `
         -p:IncludeNativeLibrariesForSelfExtract=true `
         -p:DebugType=None `
-        -p:DebugSymbols=false
+        -p:DebugSymbols=false `
+        @extraPublishArgs
 
     if ($LASTEXITCODE -ne 0) {
         throw "Échec de la publication de $ProjectName ($Plat)."

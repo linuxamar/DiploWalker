@@ -19,8 +19,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restauration NuGet
-        run: dotnet restore Diplo.slnx
-      - name: Tests (11 projets, Release)
+        run: dotnet restore DiploWalker.slnx
+      - name: Tests (10 projets, Release)
         shell: pwsh
         run: ./pipeline.ps1 -DoTests -Restore
 
@@ -35,11 +35,31 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Installer NSIS
+      - name: Outils de publication (NSIS + git-crypt)
         shell: pwsh
-        run: choco install nsis -y --no-progress
+        run: choco install nsis git-crypt -y --no-progress
+      - name: Déchiffrement de la PKI (git-crypt)
+        shell: pwsh
+        env:
+          GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
+        run: |
+          if (-not $env:GIT_CRYPT_KEY) {
+            throw "Secret GIT_CRYPT_KEY absent : impossible de signer. C'est attendu pour une PR depuis une fork, mais pas pour une publication."
+          }
+          $keyFile = Join-Path $env:RUNNER_TEMP "git-crypt.key"
+          # Le secret est la clé symétrique encodée en base64 (cf. git-crypt keygen).
+          [System.IO.File]::WriteAllBytes($keyFile, [System.Convert]::FromBase64String($env:GIT_CRYPT_KEY))
+          # "unlock" installe le filtre ET déchiffre : il n'existe pas de
+          # sous-commande "install" (cf. git-crypt help). Appeler "init" ici
+          # serait contre-productif : cela générait une clé qui ne correspond
+          # pas au dépôt existant.
+          git-crypt unlock $keyFile
+          Remove-Item $keyFile -Force
+          # Contrôle que la chaîne de signature est bien exploitable.
+          $pfx = "certificates/codesigning/leaves/DiploWalker.Installer/DiploWalker.Installer.pfx"
+          if (-not (Test-Path $pfx)) { throw "PFX de signature absent après déchiffrement : $pfx" }
       - name: Restauration NuGet
-        run: dotnet restore Diplo.slnx
+        run: dotnet restore DiploWalker.slnx
       - name: Tests
         shell: pwsh
         run: ./pipeline.ps1 -DoTests -Restore
