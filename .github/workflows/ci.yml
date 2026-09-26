@@ -71,6 +71,28 @@ jobs:
           # qui propage le chemin aux étapes suivantes, dont le déchiffrement.
           $env:PATH = "$(Split-Path $exe);$env:PATH"
           Add-Content -Path $env:GITHUB_PATH -Value (Split-Path $exe)
+
+          # Chocolatey installe bien NSIS (son log le confirme) mais ne rend pas
+          # makensis visible des étapes suivantes, pour la même raison que
+          # ci-dessus. build.ps1 échoue alors sur « NSIS (makensis) introuvable »
+          # après une publication pourtant réussie. Le répertoire est cherché
+          # plutôt que supposé : l'emplacement du paquet a déjà varié.
+          $searched = @(
+            (Join-Path ${env:ProgramFiles(x86)} "NSIS")
+            (Join-Path $env:ProgramFiles "NSIS")
+            "C:\ProgramData\chocolatey\lib\nsis"
+          )
+          $nsisDir = $searched | Where-Object { Test-Path (Join-Path $_ "makensis.exe") } | Select-Object -First 1
+          if (-not $nsisDir) {
+            $found = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Filter "makensis.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $nsisDir = $found.DirectoryName }
+          }
+          if (-not $nsisDir) {
+            throw "makensis.exe introuvable après installation de NSIS. Chemins testés : $($searched -join ', ')"
+          }
+          Write-Host "  NSIS : $nsisDir"
+          $env:PATH = "$nsisDir;$env:PATH"
+          Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
       - name: Déchiffrement de la PKI (git-crypt)
         shell: pwsh
         env:
