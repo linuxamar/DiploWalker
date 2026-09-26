@@ -133,6 +133,41 @@ Toutes les entrées non bornées sont plafonnées côté serveur **et** côté c
 
 Les index L1/L2 des images disque (qcow2, qcow1, parallels) sont validés **avant** tout cast `int` : une image aux dimensions extrêmes est rejetée proprement (pas de dépassement entier, pas de crash). `findFreeCluster` refuse toute allocation dépassant le budget de refcounts (image saturée).
 
+## Clés de la PKI de démonstration (git-crypt)
+
+La PKI de `certificates/` (28 clés privées, 22 PFX de signature) est **versionnée
+pour être utilisable en CI**, mais **chiffrée au repos** par git-crypt en mode
+symétrique. Le dépôt ne contient que du ciphertext ; un clone sans la clé produit
+des fichiers illisibles.
+
+Deux secrets distincts, à ne pas confondre :
+
+| Secret                        | Stockage                                                              |
+| ----------------------------- | --------------------------------------------------------------------- |
+| Clé symétrique git-crypt     | Secret GitHub `GIT_CRYPT_KEY` (base64) + gestionnaire de mots de passe |
+| Clé de signature du manifeste | **Hors bande**, `~/.diplo/diplo-release.key`, jamais versionnée        |
+
+La clé de signature du manifeste (`assets/artifacts.manifest`) reste **hors bande**
+et n'a **pas** été inclut dans git-crypt : c'est la seule clé dont la perte ou la
+divulgation n'est pas récupérable par une simple rotation de certificat.
+
+Points de vigilance :
+
+- **Le worktree d'un poste déverrouillé est en clair.** git-crypt chiffre au `git add`
+  et relit à l'extraction ; il protège le dépôt et les clones, pas le disque du poste.
+  `git-crypt lock` reverrouille.
+- **Une clé committée reste dans l'historique.** Une divulgation future ne se répare
+  pas en supprimant des fichiers : il faut réécrire l'historique ou réémettre les
+  certificats (procédure de rotation dans `certificates/README.md`).
+- **La clé symétrique est le point de défaillance unique** : la perdre rend tous les
+  clones illisibles, la divulgant expose les 50 fichiers. Elle n'est jamais versionnée
+  (`.gitignore` exclut `*.key` et `git-crypt.key`).
+- **PFX sans mot de passe** : aucune protection au-delà du chiffrement du dépôt.
+  Acceptable pour une PKI de démonstration, pas pour de la production.
+- Le job `test` de la CI ne déverrouille rien (les binaires sont alors produits non
+  signés, ce qui suffit aux tests) ; seul le job `release` déverrouille, et il échoue
+  explicitement si le secret est absent plutôt que de publier des artefacts non signés.
+
 ## Recommandations
 
 - Ne jamais committer `auth-token.json` dans un dépôt git.
