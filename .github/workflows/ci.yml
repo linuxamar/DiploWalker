@@ -48,7 +48,20 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Outils de publication (NSIS + git-crypt)
         shell: pwsh
-        run: choco install nsis git-crypt -y --no-progress
+        run: |
+          choco install nsis -y --no-progress
+          # community.chocolatey.org ne publie aucun paquet `git-crypt`
+          # (« The package was not found », vérifié sur runner). Scoop en
+          # publie un, et c'est par là que les postes de l'équipe l'installent.
+          scoop install git-crypt
+          # Le shims de Scoop est déjà dans le PATH de l'image runner ; on le
+          # ajoute quand même, puis on échoue bruyamment si le binaire manque,
+          # plutôt que de laisser l'étape de déchiffrement échouer plus loin.
+          $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
+          if (-not (Get-Command git-crypt -ErrorAction SilentlyContinue)) {
+            throw "git-crypt introuvable dans le PATH après installation Scoop"
+          }
+          git-crypt --version
       - name: Déchiffrement de la PKI (git-crypt)
         shell: pwsh
         env:
