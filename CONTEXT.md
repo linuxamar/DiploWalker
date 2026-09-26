@@ -29,9 +29,13 @@ MÃ©moire de travail de session (Ã  rÃ©Ã©crire Ã  chaque session). Les 
 
 ## Reste Ã  faire
 
-- **Test named pipe** : `VolumeIntegrationTests.CreateVolume via named pipe fonctionne de bout en bout` reste taguÃ© Windows. Il exerce `ListenNamedPipe` / `NamedPipeClientStream`, un transport que la production n'utilise que sous Windows ; le porter supposerait un socket de domaine Unix que le code n'exerce pas. DÃ©cision Ã  prendre : garder ce test de fonctionnalitÃ© Windows, ou ajouter un Ã©quivalent `ListenUnixSocket` Ã  but de couverture.
-- **PrÃ©requis `pwsh`** : le dÃ©ploiement cible Windows Server (prÃ©requis du `README.md`), oÃ¹ `powershell` 5.1 est toujours prÃ©sent et `ensureHelperRuntime` est sans effet. `pwsh` ne concerne que les hÃ´tes Linux (dÃ©veloppement, CI) ; ne pas l'ajouter aux prÃ©requis d'installation Windows.
 - **Mojibake** : `CONTEXT.md`, `SECURITY.md` et les `.fs` contiennent du texte doublement encodÃ© (UTF-8 relu en Latin-1). Conserver la convention existante dans les Ã©ditions ciblÃ©es plutÃ´t que de tout rÃ©encoder. Un script de rÃ©Ã©criture de ce fichier applique le mÃªme doublement au texte rÃ©digÃ© : c'est ainsi que le fichier reste homogÃ¨ne.
+
+## DÃ©cisions actÃ©es
+
+- **Le test named pipe reste taguÃ© Windows, dÃ©libÃ©rÃ©ment.** `VolumeIntegrationTests.CreateVolume via named pipe fonctionne de bout en bout` est le seul test d'end-to-end qui ne passe pas par TCP : il exerce `ListenNamedPipe` cÃ´tÃ© serveur et `NamedPipeClientStream` via `SocketsHttpHandler.ConnectCallback` cÃ´tÃ© client, donc toute la chaÃ®ne du transport alternatif. Ce n'est pas du code mort : le CLI l'expose (`config init --transport pipe`, valeurs `tcp` et `pipe` en `ConfigCommands.fs`) et les `appsettings.json` activent `UseTcp` et `UseNamedPipes` ensemble. Le tag est un marqueur de couverture, pas une dette. Le porter sur socket de domaine Unix exigerait d'ajouter un vÃ©ritable transport au produit (`UseUnixSocket` dans `ServerConfig.configureKestrel`, branche `unix://` dans `GrpcClientFactory`, choix de transport dans le CLI) alors que le dÃ©ploiement cible Windows Server : ce serait une dÃ©cision produit, pas un chantier de test. Les 9 autres tests e2e du fichier passent par TCP et couvrent le service ; ne pas proposer d'Ã©liminer ce tag sans que `--transport pipe` reste supportÃ©.
+
+- **`pwsh` n'entre pas dans les prÃ©requis d'installation.** Le dÃ©ploiement cible Windows Server, oÃ¹ `powershell` 5.1 est toujours prÃ©sent ; `pwsh` ne concerne que les hÃ´tes Linux (dÃ©veloppement, CI) et `ensureHelperRuntime` y est le filet de sÃ©curitÃ©.
 
 ## Connaissance tribale
 
