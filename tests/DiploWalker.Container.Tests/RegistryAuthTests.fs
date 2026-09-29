@@ -209,27 +209,70 @@ module RegistryAuthTests =
     // ── Script du helper (protocole docker-credential) ──────────
     //
     // Le vrai script lit le fichier d'état et la clé de chiffrement indiqués
-    // par le lanceur : les tests lancent un helper jetable produit par
-    // `RegistryAuth.writeHelperTo` et pointé sur un état temporaire, jamais sur
-    // le vrai fichier. Le lanceur de la plateforme est exécuté tel quel, comme
-    // le ferait containerd d'après `hosts.toml`.
+    // par l'environnement : les tests exécutent le script d'un helper jetable
+    // produit par `RegistryAuth.writeHelperTo` et pointé sur un état temporaire,
+    // jamais sur le vrai fichier.
     //
     // Le même script PowerShell sert sous les deux plateformes (DPAPI sous
     // Windows, AES-GCM ailleurs) : nécessite PowerShell 7 (`pwsh`) dans le PATH
     // sous Unix.
-    /// Exécute un lanceur déjÆ installé en lui envoyant l'URL du serveur sur
-    /// stdin (protocole docker-credential) et lit sa sortie standard.
-    let private runLauncher (launcher: string) (stdinLine: string option) =
-        if OperatingSystem.IsWindows() then
-            ProcessExec.runWithResult "cmd.exe" [ "/c"; launcher ] (Some 30000) stdinLine None
-        else
-            ProcessExec.runWithResult launcher [] (Some 30000) stdinLine None
+    //
+    // Le script est invoqué DIRECTEMENT, et non par le lanceur. Celui-ci est un
+    // wrapper de trois lignes (`cmd.exe` → `powershell -ExecutionPolicy Bypass
+    // -File %~dp0\...`) : l'exécuter depuis les tests produisait une chaîne
+    // comportementale — dépôt d'un script en répertoire temporaire, lancement
+    // via cmd.exe, contournement de la stratégie d'exécution, déchiffrement
+    // puis restitution d'un identifiant — que les moteurs heuristiques des
+    // antivirus (Avira) signalent comme un vol d'identifiants, à raison. Ce qui
+    // mérite réellement d'être couvert est préservé : protocole stdin, DPAPI /
+    // AES-GCM, découverte des chemins par le script. Le lanceur reste couvert
+    // par `ensureHelper` et `prepareHostsDir`, qui vérifient son contenu sans
+    // l'exécuter ; son seul rôle est de poser les deux variables ci-dessous
+    // puis d'appeler le script.
+    //
+    // `-ExecutionPolicy` est donc volontairement absent : c'est la stratégie
+    // d'exécution de la machine qui s'applique. Le test échouerait sur une
+    // machine en `Restricted` ou `AllSigned`, ce qu'aucune machine de
+    // développement ou de CI ne définit par défaut (`RemoteSigned` est la
+    // valeur par défaut de Windows).
+    /// `Environment.SetEnvironmentVariable` est global au processus : le verrou
+    /// sérialise le couple set / Process.Start / restore. Sans lui, deux tests
+    /// visant deux états différents pourraient lire l'un le chemin posé par
+    /// l'autre.
+    let private helperEnvLock = obj ()
 
-    let private runHelperScript (root: string) (statePath: string) (stdinLine: string option) =
-        let launcher =
-            RegistryAuth.writeHelperTo (Path.Combine(root, "helper")) statePath (RegistryAuth.keyFile ())
+    /// Exécute le script du helper en lui envoyant l'URL du serveur sur stdin
+    /// (protocole docker-credential) et lit sa sortie standard. `env` reproduit
+    /// ce que le lanceur poserait ; les entrées vides sont ignorées, comme le
+    /// fait `writeHelperTo`.
+    let private runHelperScript (ps1Path: string) (env: (string * string) list) (stdinLine: string option) =
+        let exe = if OperatingSystem.IsWindows() then "powershell" else "pwsh"
 
-        runLauncher launcher stdinLine
+        let vars =
+            env
+            |> List.filter (fun (_, value) -> not (String.IsNullOrEmpty value))
+            |> List.map (fun (name, value) -> name, value)
+
+        lock helperEnvLock (fun () ->
+            let saved = vars |> List.map (fun (name, _) -> name, Environment.GetEnvironmentVariable name)
+
+            try
+                for name, value in vars do
+                    Environment.SetEnvironmentVariable(name, value)
+
+                ProcessExec.runWithResult exe [ "-NoProfile"; "-File"; ps1Path ] (Some 30000) stdinLine None
+            finally
+                for name, previous in saved do
+                    Environment.SetEnvironmentVariable(name, previous))
+
+    /// Helper jetable pointé sur un état temporaire : reproduit ce que le
+    /// lanceur poserait pour un helper dédié, dont `writeHelperTo` reçoit les
+    /// deux chemins explicites.
+    let private runTempHelperScript (root: string) (statePath: string) (stdinLine: string option) =
+        let keyPath = RegistryAuth.keyFile ()
+        let launcher = RegistryAuth.writeHelperTo (Path.Combine(root, "helper")) statePath keyPath
+        let ps1Path = Path.Combine(Path.GetDirectoryName launcher, "diplo-cred-helper.ps1")
+        runHelperScript ps1Path [ "DIPLO_REGISTRY_AUTH_STATE", statePath; "DIPLO_REGISTRY_KEY_FILE", keyPath ] stdinLine
 
     /// Prépare la structure <racine>\Diplo\registry-auth.json attendue par le helper.
     let private withHelperState (test: string -> string -> unit) =
@@ -253,7 +296,7 @@ module RegistryAuthTests =
             // Guillemets et backslash dans l'utilisateur : vérifie l'échappement JSON.
             RegistryAuth.add statePath "myregistry.azurecr.io" "us\"er\\x" "s3cret!"
 
-            let (code, stdout, _) = runHelperScript root statePath (Some "https://myregistry.azurecr.io/v1/")
+            let (code, stdout, _) = runTempHelperScript root statePath (Some "https://myregistry.azurecr.io/v1/")
 
             code |> should equal 0
 
@@ -269,7 +312,7 @@ module RegistryAuthTests =
         withHelperState (fun root statePath ->
             RegistryAuth.add statePath "known.example.com" "user" "pass"
 
-            let (code, stdout, _) = runHelperScript root statePath (Some "https://nothere.tld/v1/")
+            let (code, stdout, _) = runTempHelperScript root statePath (Some "https://nothere.tld/v1/")
 
             Assert.NotEqual(0, code)
             stdout.Trim() |> should equal "")
@@ -279,7 +322,7 @@ module RegistryAuthTests =
         withHelperState (fun root statePath ->
             RegistryAuth.add statePath "docker.io" "hubuser" "hubpass"
 
-            let (code, stdout, _) = runHelperScript root statePath (Some "https://registry-1.docker.io/v1/")
+            let (code, stdout, _) = runTempHelperScript root statePath (Some "https://registry-1.docker.io/v1/")
 
             code |> should equal 0
 
@@ -310,7 +353,8 @@ module RegistryAuthTests =
             RegistryAuth.add sharedState "shared.example.com" "shareduser" "sharedpass"
 
             let launcher = RegistryAuth.writeHelperTo (Path.Combine(root, "cred-helper")) "" ""
-            let (code, stdout, _) = runLauncher launcher (Some "https://shared.example.com/v1/")
+            let ps1Path = Path.Combine(Path.GetDirectoryName launcher, "diplo-cred-helper.ps1")
+            let (code, stdout, _) = runHelperScript ps1Path [] (Some "https://shared.example.com/v1/")
 
             code |> should equal 0
 

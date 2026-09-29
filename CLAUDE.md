@@ -62,7 +62,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - Solution : **`DiploWalker.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
 - **GUI** : Avalonia 12.1.2 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate). Menu **Fichier** → *Exporter le journal…* (écrit les lignes horodatées du journal dans un `.txt` via le sélecteur de fichier).
-- **Tests** : xUnit v4 + FsUnit.xUnit — 1 612 tests au total (dont 1 ignoré dans `DiploWalker.Disk.Tests` faute de privilège de création de liens symboliques NTFS).
+- **Tests** : xUnit v4 + FsUnit.xUnit — **1 627** tests au total sur Windows (1 626 réussis ; 1 ignoré dans `DiploWalker.Disk.Tests` faute de privilège de création de liens symboliques NTFS). Hors Windows, l'unique test `Platform=Windows` (tube nommé, `VolumeIntegrationTests.fs`) est exclu : **1 626** tests, 0 ignoré. Ne pas confondre 1 626 (total Linux) et 1 626 (tests réussis sous Windows) : c'est la même valeur pour deux raisons différentes.
 
 ## Consignes impératives pour les agents
 
@@ -76,6 +76,24 @@ Les fakes des interfaces `Avalonia.Platform.Storage` (`FakeStorageProvider.fs`) 
 ### Flaky connu (à ne pas « corriger » à la hâte)
 
 `tests/DiploWalker.Gui.Tests/OptionalBehaviorTests.fs` (~ligne 156) « VolumeTabViewModel CreateImage cree une image raw depuis le repertoire source » : intermittente en suite complète ou sous charge disque (timeout du `waitUntil` ≈ 5 s), **passe systématiquement en isolation et au re-run**. Ne pas rejouer/patch sur un seul échec — relancer le run concerné avant d'investiguer.
+
+### Tests du helper de credentials (ne pas passer par le lanceur)
+
+`RegistryAuthTests` invoquent le script PowerShell du helper **directement**
+(`powershell -NoProfile -File <ps1>`, avec `DIPLO_REGISTRY_AUTH_STATE` /
+`DIPLO_REGISTRY_KEY_FILE` posées par le test et restaurées après), et non le lanceur
+installé par `RegistryAuth.writeHelperTo`. Exécuter le lanceur produisait la chaîne
+`cmd.exe` → `powershell -ExecutionPolicy Bypass -File %~dp0\...`, précédée du dépôt d'un
+script dans un répertoire temporaire : une signature comportementale — contournement de la
+stratégie d'exécution, déchiffrement puis restitution d'un identifiant — que les moteurs
+heuristiques (Avira) signalent à raison comme un vol d'identifiants. Ce qui compte reste
+couvert sans le lanceur : protocole stdin, DPAPI/AES-GCM, découverte des chemins par
+`$PSScriptRoot`. Le lanceur lui-même reste couvert sans être exécuté, par `ensureHelper`
+(idempotence du contenu) et `prepareHostsDir` (présence dans `hosts.toml`). `-ExecutionPolicy`
+est volontairement **absent** des tests : la stratégie d'exécution de la machine s'applique
+(échec attendu sur une machine en `Restricted`/`AllSigned`, cas qu'aucun poste de dev ou de
+CI ne définit par défaut). `Environment.SetEnvironmentVariable` étant global au processus,
+un verrou sérialise set / `Process.Start` / restore.
 
 ### Ports gRPC (Debug / Release)
 
@@ -117,7 +135,8 @@ dotnet build DiploWalker.slnx                       # Build complète
 > déchiffre en DPAPI sous Windows et en AES-GCM ailleurs, via le lanceur installé dans
 > le répertoire de données (`.cmd` sous Windows, `sh` ailleurs) que containerd exécute
 > d'après `hosts.toml`. Sous Unix, PowerShell 7 (`pwsh`) doit être présent sur l'hôte,
-> et les tests du helper l'exécutent réellement.
+> et les tests du helper exécutent réellement le script PowerShell (cf. « Tests du helper
+> de credentials » ci-dessous).
 >
 > Tout le reste doit être portable : chemins construits avec `Path.Combine` /
 > `Path.GetPathRoot` plutôt qu'en dur, exécution via l'interpréteur de la plateforme

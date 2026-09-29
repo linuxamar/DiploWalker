@@ -1,6 +1,109 @@
 ﻿# Diplo
 
-Système distribué de microservices gRPC pour la gestion de conteneurs Windows.
+**Diplo est un système distribué d'hébergement et de gestion de microservices
+dans un ou plusieurs conteneurs Windows.** Le système couvre la chaîne
+complète, de la préparation de l'image jusqu'à l'exploitation quotidienne :
+création des conteneurs, réseau, volumes persistants, images disque,
+supervision et mise à jour.
+
+Le principe est celui d'une plateforme de service : le poste de travail
+n'héberge que l'interface d'administration, tandis que les services qui
+exercent réellement l'autorité sur les conteneurs sont déployés sur la ou les
+machines Windows Server. Rien ne s'exécute sur le poste de l'administrateur :
+celui-ci n'émet que des requêtes.
+
+### Le conteneur est l'hôte des microservices
+
+Le conteneur est le point d'exécution des microservices : c'est lui qui les
+héberge et qui porte leur cycle de vie. Une image de conteneur Windows Server
+Core ou Nano Server contient les microservices empaquetés, généralement
+self-contained, enregistrés comme services Windows auprès du Service Control
+Manager (`sc.exe create/start/stop`) afin d'être démarrés automatiquement
+avec le conteneur.
+
+Ce choix a des conséquences directes :
+
+- **Un conteneur = un ensemble cohérent de microservices.** Ils partagent le
+  même système de fichiers, la même configuration et le même cycle de vie.
+- **Le redémarrage du conteneur redémarre les microservices.** Aucune
+  orchestration tierce n'est nécessaire pour les remettre en route.
+- **L'isolation est celle du processus**, pas de l'hyperviseur (`runhcs.v1`) :
+  aucun Hyper-V requis, démarrage rapide, mais noyau partagé avec l'hôte.
+- **Le format d'image est standard.** Les images s'échangent via les
+  registres publics et privés (`docker.io`, `quay.io`, `mcr.microsoft.com`,
+  `ghcr.io`).
+
+Diplo n'intervient pas dans le code des microservices : c'est une plateforme
+d'exécution et d'exploitation, pas un framework applicatif.
+
+### Le conteneur se pilote depuis un client installé sur le poste
+
+L'administration ne se fait pas sur la machine qui porte les conteneurs. Elle
+se fait depuis le poste de travail, au moyen d'un **client installé
+localement** qui dialogue avec les services distants en gRPC.
+
+- **Le client se compose de deux interfaces** : la CLI `diplo`
+  (`DiploWalker.Cli`, Spectre.Console) et une interface graphique native
+  (`DiploWalker.Gui`, Avalonia, MVVM). Elles exposent les mêmes opérations.
+- **Le poste de travail ne contient aucun conteneur.** Il ne porte ni
+  containerd, ni images, ni services Diplo : c'est un poste d'administration,
+  éventuellement plusieurs, pouvant tous cibler le même hôte.
+- **La cible est configurable par service** dans `DiploWalker.json`
+  (adresses, `namespace`, `logLevel`), ce qui permet d'administrer un hôte
+  distant comme un hôte local.
+- **Deux transports sont disponibles** : TCP (`localhost:5001-5003` en
+  Debug, `6001-6003` en Release) et named pipes (`diplo-container`,
+  `diplo-volume`, `diplo-network`), ce dernier privilégié pour un usage
+  strictement local.
+- **L'état est consultable à tout moment** : `diplo status check`, liste des
+  conteneurs, inspection, journaux, métriques et processus.
+
+### Le contenu du conteneur est géré par des outils centralisés et dédiés
+
+Ce qui fait autorité sur le contenu des conteneurs — leur identité, leur
+réseau, leurs volumes, leurs images — n'est pas porté par le client, mais par
+des **outils centralisés et dédiés à une seule fonction**, déployés sur
+l'hôte :
+
+| Outil dédié                 | Nature              | Rôle                                                                                                                     |
+| --------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **DiploWalker.Container**   | Service gRPC :5001/6001 | Cycle de vie des conteneurs via containerd : création, démarrage, arrêt, suppression, montage de volumes, journaux, `exec` |
+| **DiploWalker.Volume**      | Service gRPC :5002/6002 | Volumes persistants, sous forme de répertoires de l'hôte ou d'images disque                                                  |
+| **DiploWalker.Network**     | Service gRPC :5003/6003 | Réseaux de conteneurs (NAT, overlay, l2bridge) et plugins CNI                                                               |
+| **DiploWalker.Disk**        | Bibliothèque embarquée | Création, montage et réécriture des images disque (vhd, vhdx, vmdk, vdi, raw, iso)                                         |
+
+Les trois premiers sont des services Windows indépendants, joignables à
+distance ; le dernier est une bibliothèque intégrée à ces services, qui
+n'expose donc pas de point d'entrée propre.
+
+Ce découpage a trois effets :
+
+- **Une seule autorité par fonction.** Le client ne modifie jamais le système
+  de fichiers de l'hôte : il émet une requête, le service dédié décide.
+- **Une configuration uniformisée.** Les mêmes règles — registres autorisés,
+  chemins de montage restreints, limites de taille, volumes de contrôle — s'appliquent
+  quelle que soit l'interface utilisée, CLI ou GUI.
+- **Un déploiement standardisé.** `DiploWalker.Installer` installe et configure
+  ces services comme services Windows, ce qui rend le déploiement d'un hôte
+  reproductible d'un serveur à l'autre.
+
+### Vue d'ensemble
+
+`````
+Poste de travail (client)               Hôte Windows Server (autorité)
+┌──────────────────────────────┐        ┌──────────────────────────────────────┐
+│  diplo (CLI)                 │        │  DiploWalker.Container   :5001/6001  │
+│  DiploWalker.Gui (Avalonia)  │──gRPC─▶│  DiploWalker.Volume      :5002/6002  │
+│                              │        │  DiploWalker.Network     :5003/6003  │
+│  DiploWalker.json            │        │  DiploWalker.Installer               │
+└──────────────────────────────┘ pipes  │                                      │
+                                        │  containerd → runhcs.v1              │
+                                        │  ┌────────────────────────────────┐  │
+                                        │  ┆ Conteneur : microservices .NET ┆  │
+                                        │  ┆ services Windows (sc.exe)      ┆  │
+                                        │  └────────────────────────────────┘  │
+                                        └──────────────────────────────────────┘
+``
 
 ## Architecture
 
@@ -28,7 +131,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit v4 (1 608 tests)
+- **Tests** : xUnit v4 (1 627 tests sous Windows, dont 1 ignoré ; 1 626 hors Windows, le test `Platform=Windows` étant exclu)
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
