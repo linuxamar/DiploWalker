@@ -4,10 +4,9 @@ Mémoire de travail de session (à réécrire à chaque session). Les règles st
 
 ## Session en cours
 
-- **Date :** 2026-09-26
-- **Branches :** `dev` (`6a640ed`, branche active) et `main` (`3fac21e`). Tout est poussé.
-- **Objectif :** faire aboutir `.\pipeline.ps1 -DoPublish`, qui échouait sur une erreur SignTool faute de certificat de signature de code. **Livré, commité, poussé, promu sur `main`, et publié** (voir « Signature de code et PKI », « Chiffrement git-crypt » et « CI et publication »).
-- **Vingt commits dans cette session**, de `84e9c3f` (invalidation du cache de token) à `6a640ed` (renommage du workflow), plus 4 commits de fusion sur `main`. Le tag `v1.0.1` a porté `96acb1e` et a déclenché le premier run de publication entièrement vert ; il a ensuite été supprimé sur demande, comme `v1.0.0`. **Aucun tag ne subsiste, et plus aucun run ni artefact** : l'installateur 1.0.1 n'est plus récupérable (voir « CI et publication »).
+- **Date :** 2026-09-29
+- **Branches :** `dev` (`dd38489`, branche active, au niveau d'`origin/dev`) et `main` (`3fac21e`).
+- **Objectif :** supprimer l'alerte antivirus déclenchée par `dotnet test`. **Livré, non commité** : les tests du helper de credentials n'exécutent plus le lanceur, mais le script PowerShell directement (voir « Décisions actées » et « Connaissance tribale »). La session précédente (signature de code, PKI, git-crypt, CI) reste décrite plus bas.
 
 ## État Git
 
@@ -24,7 +23,7 @@ Mémoire de travail de session (à réécrire à chaque session). Les règles st
 - **Trois lots, trois validations** : documentation (331 lignes, 4 fichiers), commentaires (2485 lignes, 154 fichiers, dont 100 lignes de contrôles C1 dans les messages gRPC), libellés de tests (139 lignes). Chaque lot est un commit autonome, annulable indépendamment.
 - **Amorçage régressif du BOM** : un script qui décode en `utf-8` sans retirer le BOM puis le réécrit devant **cumule un second BOM** à chaque passage. Le symptôme est invisible dans un diff de contenu et ne se voit qu'en comparant les octets (`efbbbfefbbbf`). Décoder en `utf-8-sig` et vérifier la présence du BOM après écriture.
 - **Deux cas hors traitement automatique.** `MessageSerializationTests.fs` portait `prï¿½serve` : le `é` perdu puis corrompu, que le décodeur remplaçait par U+FFFD — libellé réécrit à la main. `FsImageTests.fs` vérifie la conservation de noms de fichiers CJK ; ses littéraux sont des données de test volontaires et le test a été **laissé strictement intact**, y compris une ligne de relecture qu'un premier passage avait corrigée sans son pendant d'écriture, ce qui cassait la cohérence write/read du test.
-- **Validation** : build Release à 0 erreur / 0 avertissement, suite complète à 1 626 tests sans échec ni ignoré. Aucun `U+FFFD` ni marqueur résiduel hors des exclusions assumées, `git diff --check` propre, `~/.local/share/Diplo` toujours absent donc l'isolation des tests intacte.
+- **Validation** : build Release à 0 erreur / 0 avertissement, suite complète à 1 626 tests réussis, 0 échec (1 seul ignoré, et uniquement sous Windows : `DiploWalker.Disk.Tests`, privilège de liens symboliques NTFS absent). Aucun `U+FFFD` ni marqueur résiduel hors des exclusions assumées, `git diff --check` propre, `~/.local/share/Diplo` toujours absent donc l'isolation des tests intacte.
 
 ## Signature de code et PKI (livré, commité et promu)
 
@@ -72,6 +71,8 @@ Mémoire de travail de session (à réécrire à chaque session). Les règles st
 
 - **Le nom de test `préserve les collections renseignées` est réécrit à la main, pas décodé.** C'est le seul caractère définitivement perdu du dépôt ; l'automatisation l'aurait transformé en U+FFFD.
 
+- **Les tests du helper de credentials n'exécutent pas le lanceur.** `RegistryAuthTests` invoquent le script PowerShell du helper directement (`powershell -NoProfile -File <ps1>`), les deux variables d'environnement étant posées par le test puis restaurées. Le lanceur de production (`cmd.exe` → `powershell -ExecutionPolicy Bypass -File`) reste **inchangé** : c'est le produit, et son `Bypass` est nécessaire sur un hôte dont la stratégie d'exécution bloquerait le script — le modifier pour satisfaire une heuristique d'antivirus aurait dégradé le produit. Sa couverture est assurée sans l'exécuter, par `ensureHelper` (idempotence du contenu) et `prepareHostsDir` (présence du lanceur dans `hosts.toml`).
+
 ## Connaissance tribale
 
 - F# : pas de `try/with/finally` combiné (imbrication), pas de `do!` en `finally`, protocoles CTS (Cancel sous verrou + null, Dispose par le worker), debounce UI 250 ms (DispatcherTimer).
@@ -86,6 +87,8 @@ Mémoire de travail de session (à réécrire à chaque session). Les règles st
 - **`core.autocrlf=true` est configuré globalement** : 362 fichiers ont un worktree CRLF pour un index LF, alors que `.gitattributes` épingle les assets signés en LF. `artifacts.manifest` s'est ainsi retrouvé en CRLF alors que sa signature couvre les octets LF. **Pour restaurer un fichier à LF : le supprimer puis `git checkout --`, pas `git checkout-index -f`** — cette dernière n'applique pas les filtres de smudge et réécrit le contenu de l'index tel quel. Le symptôme est un manifeste ou une clé qui « ne correspondent plus » sans aucun diff visible.
 - **PowerShell 5.1, deux pièges récurrents** : la progression d'`openssl.exe` arrive sur stderr et devient une `NativeCommandError` dès que `$ErrorActionPreference = "Stop"` — abaisser la préférence autour de l'appel et tester `$LASTEXITCODE` ; et `Set-Content -Encoding utf8` ajoute un BOM, qu'il faut écrire à la main (`[System.IO.File]::WriteAllText` + `UTF8Encoding($false)`) pour un fichier de config ou un `.pem`. Le BOM dans un `openssl.cnf` fonctionne mais pollue le diff.
 - **Les clés privées et les PFX de la PKI sont versionnées mais chiffrées** (git-crypt, cf. « Chiffrement git-crypt ») : un poste neuf fait `git-crypt unlock <clé>`, et `-DoPublish` signe alors sans avoir à régénérer quoi que ce soit. `signtool verify /pa` renvoie `0x800B010A` (`CERT_E_UNTRUSTEDROOT`) tant que la racine de démo n'est pas dans le magasin de confiance de la machine — comportement attendu et documenté, pas une régression ; la chaîne embarquée et l'horodatage se vérifient dans la sortie.
+- **Avira signale la chaîne `cmd.exe` → `powershell -ExecutionPolicy Bypass -File` lancée depuis un script fraîchement déposé en `%TEMP%`.** Le motif se lit comme un vol d'identifiants : contournement de la stratégie d'exécution, déchiffrement (DPAPI/AES-GCM) puis restitution d'un `Secret` sur stdout. Le diagnostic par Defender est **négatif et trompeur** : Avira Security est l'antivirus actif, Defender est en mode passif (`Get-MpPreference` indisponible) et ne journalise **aucun** événement 1116/1117 — `Microsoft-Windows-Windows Defender/Operational` ne montre que des 5007 (rechargements de moteur). « Aucune détection Defender » ne disculpe donc pas la suite : c'est `Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct` qui révèle l'antivirus réellement actif.
+- **Poser une variable d'environnement pour un processus enfant sans API dédiée.** `ProcessExec.runWithResult` ne prend pas d'environnement et `ProcessStartInfo` n'expose pas de surcharge ; on mute donc le processus courant (`Environment.SetEnvironmentVariable`) autour de l'appel, puis on restaure la valeur précédente. La mutation étant globale, elle exige un verrou : les tests d'une même classe xUnit s'exécutent séquentiellement, mais s'y fier serait fragile dès qu'une collection serait partagée. `DIPLO_REGISTRY_AUTH_STATE` / `DIPLO_REGISTRY_KEY_FILE` ne sont lus que par le script PowerShell, jamais par du code F#, donc la mutation ne peut pas fuir vers un autre test.
 
 ## Chiffrement git-crypt (livré)
 
