@@ -280,7 +280,9 @@ Test-NetConnection -ComputerName localhost -Port 5001  # 5001 en Debug, 6001 en 
 #### « L'adresse gRPC n'est pas autorisée »
 
 La validation de sécurité impose que les connexions gRPC pointent vers
-`localhost`, `127.0.0.1`, `::1` ou un named pipe (`http://pipe:/<nom>`).
+`localhost`, `127.0.0.1`, `::1` ou un named pipe (`http://pipe:/<nom>` : ici `http://`
+est une enveloppe et `pipe` est l'hôte qui sélectionne le transport, pas le
+schéma — le tube est la partie qui suit `pipe:/`).
 
 ```powershell
 # Vérifier la configuration de connexion
@@ -290,6 +292,7 @@ Get-Content "$env:ProgramFiles\Diplo\DiploWalker.Container\appsettings.json"
 #   http://localhost:5001 (Debug) | http://localhost:6001 (Release)
 #   http://127.0.0.1:5001 (Debug) | http://127.0.0.1:6001 (Release)
 #   http://pipe:/diplo-container
+#     (enveloppe http://, hote pipe, tube diplo-container)
 ```
 
 #### « Token d'authentification invalide ou expiré »
@@ -310,7 +313,9 @@ sc.exe restart "DiploWalker.Network"
 
 #### « Le nom du pipe est invalide »
 
-Le format attendu est `http://pipe:/<nom>` sans caractères spéciaux.
+Le format attendu est `http://pipe:/<nom>` sans caractères spéciaux. Attention :
+ne retirez pas le préfixe `http://`, il rend l'adresse valide ; `pipe` est
+l'hôte et non le schéma, et le tube est la partie qui suit `pipe:/`.
 
 ```powershell
 # Configuration correcte dans appsettings.json :

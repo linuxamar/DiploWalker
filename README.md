@@ -299,7 +299,12 @@ diplo config init --path C:\etc\DiploWalker.json --transport pipe
 
 - `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
 - `pipe` : adresses `http://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplo-container`, `diplo-volume`, `diplo-network`).
-- Les adresses `http://pipe:/...` sont validées (hôte local uniquement, nom de tube sans `\` ni `..`).
+- **Lecture de `http://pipe:/<nom>`** : ce n'est pas une URL web, et les deux parties ne se mélangent jamais.
+  - `http://` est une enveloppe imposée. `pipe` n'est pas le schéma mais **l'hôte**, et c'est cet hôte qui aiguille la connexion vers le named pipe plutôt que vers TCP.
+  - Le tube réel est le **chemin** (`/diplo-container`) : c'est le seul segment que le client ouvre.
+  - `http://pipe:/<nom>` est ce qu'on écrit dans la configuration ; `pipe://<nom>` est ce que le client construit à l'exécution pour désigner le tube.
+  - Conséquence : ni `pipe:/<nom>` ni `pipe://<nom>` ne sont acceptés dans la configuration — le premier n'a pas d'hôte, le second porte un schéma rejeté. C'est aussi exactement la forme qu'écrit `diplo config init --transport pipe` ci-dessus.
+- Les adresses `http://pipe:/...` sont validées à part : leur hôte étant `pipe`, elles sont traitées comme un canal local et n'ont pas à figurer parmi les hôtes autorisés ; seul le nom de tube est contrôlé (ni `\`, ni `..`, ni caractère nul).
 - La GUI propose un onglet **Paramètres** pour éditer ces adresses (écriture de `DiploWalker.json`, champs `namespace` et `logLevel` conservés) ; la configuration est appliquée dès les opérations suivantes, sans redémarrage.
 
 ## Développement
