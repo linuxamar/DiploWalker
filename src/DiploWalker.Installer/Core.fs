@@ -765,7 +765,12 @@ let createConfigFiles () =
     let pipeCertificatePath = deployPipeCertificate ()
 
     for (serviceName, _, port) in services do
-        let pipeName = serviceName.ToLowerInvariant().Replace(".", "-")
+        let pipeName =
+            match serviceName with
+            | "DiploWalker.Container" -> DiploWalkerPorts.ContainerPipe
+            | "DiploWalker.Volume" -> DiploWalkerPorts.VolumePipe
+            | "DiploWalker.Network" -> DiploWalkerPorts.NetworkPipe
+            | _ -> serviceName.ToLowerInvariant().Replace(".", "-")
 
         let isolationType =
             if serviceName = "DiploWalker.Container" then

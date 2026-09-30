@@ -54,8 +54,9 @@ localement** qui dialogue avec les services distants en gRPC.
   (adresses, `namespace`, `logLevel`), ce qui permet d'administrer un hôte
   distant comme un hôte local.
 - **Deux transports sont disponibles** : TCP (`localhost:5001-5003` en
-  Debug, `6001-6003` en Release) et named pipes (`diplowalker-container`,
-  `diplowalker-volume`, `diplowalker-network`), ce dernier privilégié pour un usage
+  Debug, `6001-6003` en Release) et named pipes (`diplowalker-container-debug`,
+  `diplowalker-volume-debug`, `diplowalker-network-debug` en Debug ;
+  `diplowalker-container`, `diplowalker-volume`, `diplowalker-network` en Release), ce dernier privilégié pour un usage
   strictement local.
 - **L'état est consultable à tout moment** : `diplo status check`, liste des
   conteneurs, inspection, journaux, métriques et processus.
@@ -123,7 +124,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 | **DiploWalker.Installer** | —    | Installation et configuration de l'ensemble du système                                                     |
 
-> **Ports Debug / Release** : en configuration **Debug**, les services écoutent sur 5001-5003 ; en **Release** (+ installation via l'installateur), sur **6001-6003**. Les deux plages permettent une exécution simultanée. Les named pipes (`diplowalker-container`, `diplowalker-volume`, `diplowalker-network`) sont identiques dans les deux configurations.
+> **Ports Debug / Release** : en configuration **Debug**, les services écoutent sur 5001-5003 ; en **Release** (+ installation via l'installateur), sur **6001-6003**. Les deux plages permettent une exécution simultanée. Les named pipes diffèrent selon la configuration : `diplowalker-container-debug`, `diplowalker-volume-debug`, `diplowalker-network-debug` en Debug, et `diplowalker-container`, `diplowalker-volume`, `diplowalker-network` en Release.
 
 ### Clients
 
@@ -298,10 +299,10 @@ diplo config init --path C:\etc\DiploWalker.json --transport pipe
 ```
 
 - `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
-- `pipe` : adresses `https://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplowalker-container`, `diplowalker-volume`, `diplowalker-network`).
+- `pipe` : adresses `https://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur : `diplowalker-container-debug`, `diplowalker-volume-debug`, `diplowalker-network-debug` en Debug, et `diplowalker-container`, `diplowalker-volume`, `diplowalker-network` en Release.
 - **Lecture de `https://pipe:/<nom>`** : ce n'est pas une URL web, et les deux parties ne se mélangent jamais.
   - `https://` est une enveloppe imposée. `pipe` n'est pas le schéma mais **l'hôte**, et c'est cet hôte qui aiguille la connexion vers le named pipe plutôt que vers TCP.
-  - Le tube réel est le **chemin** (`/diplowalker-container`) : c'est le seul segment que le client ouvre.
+  - Le tube réel est le **chemin** (ex. `/diplowalker-container` en Release, `/diplowalker-container-debug` en Debug) : c'est le seul segment que le client ouvre.
   - `https://pipe:/<nom>` est ce qu'on écrit dans la configuration ; `pipe://<nom>` est ce que le client construit à l'exécution pour désigner le tube.
   - Conséquence : ni `pipe:/<nom>` ni `pipe://<nom>` ne sont acceptés dans la configuration — le premier n'a pas d'hôte, le second porte un schéma rejeté. C'est aussi exactement la forme qu'écrit `diplo config init --transport pipe` ci-dessus.
 - Les adresses `https://pipe:/...` sont validées à part : leur hôte étant `pipe`, elles sont traitées comme un canal local et n'ont pas à figurer parmi les hôtes autorisés ; seul le nom de tube est contrôlé (ni `\`, ni `..`, ni caractère nul).
