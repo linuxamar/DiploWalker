@@ -72,7 +72,7 @@ l'hôte :
 | **DiploWalker.Container**   | Service gRPC :5001/6001 | Cycle de vie des conteneurs via containerd : création, démarrage, arrêt, suppression, montage de volumes, journaux, `exec` |
 | **DiploWalker.Volume**      | Service gRPC :5002/6002 | Volumes persistants, sous forme de répertoires de l'hôte ou d'images disque                                                  |
 | **DiploWalker.Network**     | Service gRPC :5003/6003 | Réseaux de conteneurs (NAT, overlay, l2bridge) et plugins CNI                                                               |
-| **DiploWalker.Disk**        | Bibliothèque, sans service | Images disque : création (raw, vhd, vhdx, vmdk, vdi), montage et réécriture (qcow2, qcow1, parallels), lecture seule (iso, dmg) |
+| **DiploWalker.Disk**        | Bibliothèque, sans service | Images disque : création (raw, vhd, vhdx, vmdk, vdi), montage et réécriture (qcow2, qcow1, parallels, vdi, dmg) ; l'ISO se monte en lecture seule |
 
 Les trois premiers sont des **services Windows** indépendants, joignables à
 distance par le client. Le quatrième est une **bibliothèque** : il n'a ni port ni
@@ -410,7 +410,6 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 | **VDI**       | `.vdi`                         | R/W           | DiscUtils                                    |
 | **Raw**       | `.img`, `.raw`, `.bin`         | R/W           | DiscUtils (FAT, NTFS, ext)                   |
 | **DMG**       | `.dmg`                         | Lecture seule | DiscUtils                                    |
-| **ISO**       | `.iso`                         | Lecture seule | Parseur maison (`IsoFs`)                      |
 | **Parallels** | `.hdd`, `.hds`                 | R/W           | Pilote maison (`ParallelsStream`)            |
 | **ISO**       | `.iso`, `.udf`                 | Lecture seule | Parseur maison (`IsoFs.fs`) ISO9660/UDF      |
 | **Btrfs**     | (via Hawkynt)                  | R/W           | Hawkynt.FileFormats.FileSystems (seuil 2 Go) |

@@ -452,7 +452,7 @@ diplo network remove <RESEAU_ID>
 Diplo supporte les formats suivants :
 
 - **Lecture/écriture** : VHD, VHDX, VMDK, VDI, QCOW2, QCOW1, Parallels, Raw
-- **Lecture seule** : DMG (Apple)
+- **Lecture seule** : ISO, DMG (Apple)
 
 ```powershell
 # Créer une image à partir d'un répertoire source
