@@ -46,14 +46,14 @@ type InitConfigCommand(output: IOutputPort) =
         // d'authentification en clair.
         """{
   "container": {
-    "address": "https://pipe:/diplo-container",
+    "address": "https://pipe:/diplowalker-container",
     "namespace": "default"
   },
   "volume": {
-    "address": "https://pipe:/diplo-volume"
+    "address": "https://pipe:/diplowalker-volume"
   },
   "network": {
-    "address": "https://pipe:/diplo-network"
+    "address": "https://pipe:/diplowalker-network"
   },
   "logLevel": "Information"
 }"""
