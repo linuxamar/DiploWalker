@@ -33,6 +33,7 @@
     <Compile Include="AuthToken.fs" />
     <Compile Include="TokenAuthMiddleware.fs" />
     <Compile Include="TokenInterceptor.fs" />
+    <Compile Include="PipeTls.fs" />
     <Compile Include="ServerConfig.fs" />
     <Compile Include="NetworkConfig.fs" />
     <Compile Include="RegistryProviders.fs" />

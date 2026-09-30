@@ -10,7 +10,7 @@
 #
 #  Chaine generee :
 #    root-ca (auto-signe, pathlen:2)
-#      |- authentification  (pathlen:0)  - feuilles d'authentification
+#      |- authentification  (pathlen:0)  - leaf-tls-server (TLS des named pipes)
 #      |- system            (pathlen:0)  - leaf-dll-validation,
 #      |                                  leaf-config-encryption
 #      |- codesigning       (pathlen:0)  - une feuille par projet
@@ -23,6 +23,7 @@
 #    .\certificates\regenerate-pki.ps1                        # bootstrapping
 #    .\certificates\regenerate-pki.ps1 -Force                # regenere les cles
 #    .\certificates\regenerate-pki.ps1 -SkipProjectLeaves     # seulement les CAs
+#    .\certificates\regenerate-pki.ps1 -OnlyTlsLeaf           # seulement la feuille TLS
 #    .\certificates\regenerate-pki.ps1 -OpenSSLPath D:\...\openssl.exe
 #
 #  Les cles et PFX produits sont sans phrase de passe (usage demonstration
@@ -33,6 +34,7 @@
 param(
     [switch]$Force,
     [switch]$SkipProjectLeaves,
+    [switch]$OnlyTlsLeaf,
     [string]$OpenSSLPath
 )
 
@@ -218,11 +220,39 @@ function New-ExtraLeaf {
     [System.IO.File]::WriteAllText($crt.Replace(".crt.pem", ".chain.crt.pem"),
                                   (Get-Content $crt -Raw) + (Get-Content $parentCrt -Raw))
 
+    # PFX : la chaîne complète (intermediaire + racine) y est embarquee, afin
+    # que le consommateur n'ait pas besoin du magasin de confiance de la machine.
+    # La service qui charge ce PFX n'exploite que la feuille (cle + certificat) ;
+    # la chaine ne sert qu'a rendre l'origine verifiable hors magasin.
+    $pfx = Join-Path $dir "$Name.pfx"
+
+    if ($Force -or -not (Test-Path $pfx)) {
+        Write-Host "  PFX..."
+        $pkcs12 = @("pkcs12", "-export", "-out", $pfx, "-inkey", $key, "-in", $crt)
+        $caChain = Join-Path $certDir "$Parent\certs\$Parent.chain.crt.pem"
+
+        if (Test-Path $caChain) { $pkcs12 += @("-certfile", $caChain) }
+
+        $pkcs12 += @("-passout", "pass:")
+        Invoke-OpenSsl -Arguments $pkcs12 -WorkingDirectory $dir -What "PFX $Name"
+    } else {
+        Write-Host "  PFX existant, conserve (-Force pour regenerer)" -ForegroundColor DarkGray
+    }
+
     Write-Host "  OK $Name" -ForegroundColor Green
 }
 
 # --- Deroulement -------------------------------------------------------------
 Write-Host "==> OpenSSL : $openssl" -ForegroundColor Cyan
+
+# Cible : n'emettre que la feuille TLS serveur. Les CAs et les autres feuilles
+# restent intacts, ce qui evite de regenerer des certificats deja signes (la
+# signature de code exige que la feuille Codesigning reste inchangee).
+if ($OnlyTlsLeaf) {
+    Write-Host "==> Feuille TLS serveur" -ForegroundColor Yellow
+    New-ExtraLeaf -Name "leaf-tls-server" -Parent "authentification" -Days 825
+    return
+}
 
 Write-Host "==> Racine" -ForegroundColor Yellow
 New-Authority -Name "root-ca" -Parent $null -Days 3650 -Extensions $null
@@ -237,6 +267,9 @@ foreach ($name in $intermediates) {
 Write-Host "==> Feuilles sous System" -ForegroundColor Yellow
 New-ExtraLeaf -Name "leaf-dll-validation"   -Parent "system" -Days 825
 New-ExtraLeaf -Name "leaf-config-encryption" -Parent "system" -Days 825
+
+Write-Host "==> Feuilles sous Authentification" -ForegroundColor Yellow
+New-ExtraLeaf -Name "leaf-tls-server"        -Parent "authentification" -Days 825
 
 # --- Feuilles de signature de code par projet -------------------------------
 if (-not $SkipProjectLeaves) {

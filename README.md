@@ -288,23 +288,32 @@ diplo config init --path C:\etc\DiploWalker.json --transport pipe
 ```json
 {
     "container": {
-        "address": "http://pipe:/diplo-container",
+        "address": "https://pipe:/diplo-container",
         "namespace": "default"
     },
-    "volume": { "address": "http://pipe:/diplo-volume" },
-    "network": { "address": "http://pipe:/diplo-network" },
+    "volume": { "address": "https://pipe:/diplo-volume" },
+    "network": { "address": "https://pipe:/diplo-network" },
     "logLevel": "Information"
 }
 ```
 
 - `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
-- `pipe` : adresses `http://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplo-container`, `diplo-volume`, `diplo-network`).
-- **Lecture de `http://pipe:/<nom>`** : ce n'est pas une URL web, et les deux parties ne se mélangent jamais.
-  - `http://` est une enveloppe imposée. `pipe` n'est pas le schéma mais **l'hôte**, et c'est cet hôte qui aiguille la connexion vers le named pipe plutôt que vers TCP.
+- `pipe` : adresses `https://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplo-container`, `diplo-volume`, `diplo-network`).
+- **Lecture de `https://pipe:/<nom>`** : ce n'est pas une URL web, et les deux parties ne se mélangent jamais.
+  - `https://` est une enveloppe imposée. `pipe` n'est pas le schéma mais **l'hôte**, et c'est cet hôte qui aiguille la connexion vers le named pipe plutôt que vers TCP.
   - Le tube réel est le **chemin** (`/diplo-container`) : c'est le seul segment que le client ouvre.
-  - `http://pipe:/<nom>` est ce qu'on écrit dans la configuration ; `pipe://<nom>` est ce que le client construit à l'exécution pour désigner le tube.
+  - `https://pipe:/<nom>` est ce qu'on écrit dans la configuration ; `pipe://<nom>` est ce que le client construit à l'exécution pour désigner le tube.
   - Conséquence : ni `pipe:/<nom>` ni `pipe://<nom>` ne sont acceptés dans la configuration — le premier n'a pas d'hôte, le second porte un schéma rejeté. C'est aussi exactement la forme qu'écrit `diplo config init --transport pipe` ci-dessus.
-- Les adresses `http://pipe:/...` sont validées à part : leur hôte étant `pipe`, elles sont traitées comme un canal local et n'ont pas à figurer parmi les hôtes autorisés ; seul le nom de tube est contrôlé (ni `\`, ni `..`, ni caractère nul).
+- Les adresses `https://pipe:/...` sont validées à part : leur hôte étant `pipe`, elles sont traitées comme un canal local et n'ont pas à figurer parmi les hôtes autorisés ; seul le nom de tube est contrôlé (ni `\`, ni `..`, ni caractère nul).
+
+### Chiffrement des named pipes
+
+Le transport pipe est chiffré par défaut. Le serveur (s'il est lancé par l'installateur) active TLS sur le tube dès que `ServiceSettings:PipeCertificatePath` désigne un PFX, et le client épingle l'empreinte attendue du certificat serveur au lieu de faire confiance à n'importe quelle autorité.
+
+- L'installateur dépose `leaf-tls-server.pfx` dans `<configDir>\certs\`, en restreint l'ACL (clé privée) et écrit le chemin dans chaque `*.appsettings.json`. Sans ce PFX, les tubes restent en clair et l'installeur le signale.
+- L'empreinte attendue est compilée dans le client (`PipeTls.ExpectedServerThumbprint`) et vérifiée à chaque connexion : un tube présentant un autre certificat est refusé.
+- `http://pipe:/<nom>` reste accepté pour la compatibilité (pipes en clair, sans authentification du serveur) ; `https://pipe:/<nom>` est la forme à utiliser.
+
 - La GUI propose un onglet **Paramètres** pour éditer ces adresses (écriture de `DiploWalker.json`, champs `namespace` et `logLevel` conservés) ; la configuration est appliquée dès les opérations suivantes, sans redémarrage.
 
 ## Développement
@@ -631,7 +640,7 @@ diplo version
 | `ServiceGuards`              | Abstractions | Guards de validation d'entrée (RpcException)                         |
 | `CachedConfig<'T>`           | Abstractions | Cache générique avec invalidation manuelle                           |
 | `DriverMappings`             | Grpc         | Mapping type↔string pour drivers volume et réseau                    |
-| `GrpcClientFactory`          | Core         | Construction canaux gRPC TCP/pipe avec retry                         |
+| `GrpcClientFactory`          | Core         | Construction canaux gRPC TCP/pipe (TLS + épinglage sur pipe) avec retry  |
 | `TestHelpers`                | TestHelpers  | Helpers temp dir pour les tests                                      |
 | `HawkyntFs`                  | Disk         | Adaptateur Hawkynt pour Btrfs/XFS/HFS+ R/W                           |
 | `IsoFs`                      | Disk         | Parseur ISO9660/UDF + générateur ISO9660 niveau 1                    |

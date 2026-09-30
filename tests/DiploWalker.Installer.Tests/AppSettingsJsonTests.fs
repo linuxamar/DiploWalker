@@ -1,4 +1,4 @@
-﻿namespace DiploWalker.Installer.Tests
+namespace DiploWalker.Installer.Tests
 
 module AppSettingsJsonTests =
 
@@ -11,27 +11,27 @@ module AppSettingsJsonTests =
 
     [<Fact>]
     let ``buildAppSettingsJson returns valid JSON with all required sections`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker")
+        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker") None
         let doc = parseJson json
         doc.ToString().Length |> should be (greaterThan 0)
 
     [<Fact>]
     let ``buildAppSettingsJson contains ServiceSettings with GrpcPort`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker")
+        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker") None
         let doc = parseJson json :?> JsonObject
         let serviceSettings = doc["ServiceSettings"] :?> JsonObject
         serviceSettings["GrpcPort"].GetValue<int>() |> should equal 5000
 
     [<Fact>]
     let ``buildAppSettingsJson contains ServiceSettings with NamedPipeName`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker")
+        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker") None
         let doc = parseJson json :?> JsonObject
         let serviceSettings = doc["ServiceSettings"] :?> JsonObject
         serviceSettings["NamedPipeName"].GetValue<string>() |> should equal "TestPipe"
 
     [<Fact>]
     let ``buildAppSettingsJson contains ServiceSettings with UseTcp and UseNamedPipes`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker")
+        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker") None
         let doc = parseJson json :?> JsonObject
         let serviceSettings = doc["ServiceSettings"] :?> JsonObject
         serviceSettings["UseTcp"].GetValue<bool>() |> should equal true
@@ -39,19 +39,19 @@ module AppSettingsJsonTests =
 
     [<Fact>]
     let ``buildAppSettingsJson with Some isolationType contains IsolationType`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker")
+        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker") None
         let doc = parseJson json :?> JsonObject
         doc["IsolationType"].GetValue<string>() |> should equal "Docker"
 
     [<Fact>]
     let ``buildAppSettingsJson with None isolationType omits IsolationType`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" None
+        let json = buildAppSettingsJson 5000 "TestPipe" None None
         let doc = parseJson json :?> JsonObject
         doc.ContainsKey("IsolationType") |> should equal false
 
     [<Fact>]
     let ``buildAppSettingsJson contains Logging with LogLevel section`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker")
+        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker") None
         let doc = parseJson json :?> JsonObject
         let logging = doc["Logging"] :?> JsonObject
         let logLevel = logging["LogLevel"] :?> JsonObject
@@ -59,7 +59,7 @@ module AppSettingsJsonTests =
 
     [<Fact>]
     let ``buildAppSettingsJson contains Logging with Microsoft.Hosting.Lifetime`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker")
+        let json = buildAppSettingsJson 5000 "TestPipe" (Some "Docker") None
         let doc = parseJson json :?> JsonObject
         let logging = doc["Logging"] :?> JsonObject
         let logLevel = logging["LogLevel"] :?> JsonObject
@@ -69,7 +69,7 @@ module AppSettingsJsonTests =
 
     [<Fact>]
     let ``buildAppSettingsJson uses different ports correctly`` () =
-        let json = buildAppSettingsJson 9999 "MyPipe" None
+        let json = buildAppSettingsJson 9999 "MyPipe" None None
         let doc = parseJson json :?> JsonObject
         let serviceSettings = doc["ServiceSettings"] :?> JsonObject
         serviceSettings["GrpcPort"].GetValue<int>() |> should equal 9999
@@ -77,6 +77,34 @@ module AppSettingsJsonTests =
 
     [<Fact>]
     let ``buildAppSettingsJson produces indented output`` () =
-        let json = buildAppSettingsJson 5000 "TestPipe" None
+        let json = buildAppSettingsJson 5000 "TestPipe" None None
         json.Contains("\n") |> should equal true
+
+    [<Fact>]
+    let ``buildAppSettingsJson with a certificate path enables TLS on the pipe`` () =
+        let json =
+            buildAppSettingsJson
+                5000
+                "TestPipe"
+                None
+                (Some "C:\\Program Files\\DiploWalker\\config\\certs\\leaf-tls-server.pfx")
+
+        let doc = parseJson json :?> JsonObject
+        let serviceSettings = doc["ServiceSettings"] :?> JsonObject
+
+        serviceSettings["PipeCertificatePath"].GetValue<string>()
+        |> should equal "C:\\Program Files\\DiploWalker\\config\\certs\\leaf-tls-server.pfx"
+
+    [<Fact>]
+    /// Omettre la clé laisse le pipe en clair : `ServerConfig` n'active `UseHttps`
+    /// que si `ServiceSettings:PipeCertificatePath` est non vide.
+    let ``buildAppSettingsJson without a certificate path omits PipeCertificatePath`` () =
+        let json = buildAppSettingsJson 5000 "TestPipe" None None
+        let doc = parseJson json :?> JsonObject
+        let serviceSettings = doc["ServiceSettings"] :?> JsonObject
+        isNull serviceSettings["PipeCertificatePath"] |> should equal true
+
+    [<Fact>]
+    let ``pipeCertificateFileName matches the PKI artefact`` () =
+        pipeCertificateFileName |> should equal "leaf-tls-server.pfx"
 

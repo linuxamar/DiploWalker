@@ -40,16 +40,20 @@ type InitConfigCommand(output: IOutputPort) =
             DiploWalkerPorts.Network
 
     let pipeConfig =
+        // TLS par défaut : le client épingle l'empreinte de
+        // `certificates\leaf-tls-server` (cf. PipeTls). `http://pipe:/` reste
+        // accepté pour les déploiements existants, mais il transmet le token
+        // d'authentification en clair.
         """{
   "container": {
-    "address": "http://pipe:/diplo-container",
+    "address": "https://pipe:/diplo-container",
     "namespace": "default"
   },
   "volume": {
-    "address": "http://pipe:/diplo-volume"
+    "address": "https://pipe:/diplo-volume"
   },
   "network": {
-    "address": "http://pipe:/diplo-network"
+    "address": "https://pipe:/diplo-network"
   },
   "logLevel": "Information"
 }"""

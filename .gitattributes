@@ -56,3 +56,10 @@ src/DiploWalker.Installer/assets/DiploWalker-release.pub text eol=lf
 # Voir certificates/README.md pour la distribution de la clé.
 certificates/**/*.key.pem   filter=git-crypt diff=git-crypt merge=git-crypt
 certificates/**/*.pfx       filter=git-crypt diff=git-crypt merge=git-crypt
+
+# --- Certificats TLS leaf-tls-server : LF obligatoire ---------------------
+# Comme pour les assets signés, les fichiers de la PKI TLS doivent rester en LF
+# pour éviter les problèmes avec OpenSSL et la vérification d'empreinte.
+certificates/leaf-tls-server/**    text eol=lf
+
+.gitattributes    text eol=lf

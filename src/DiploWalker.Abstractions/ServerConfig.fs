@@ -31,6 +31,12 @@ let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
     let useTcp = config.GetValue<bool>("ServiceSettings:UseTcp")
     let usePipes = config.GetValue<bool>("ServiceSettings:UseNamedPipes")
 
+    // Un chemin de certificat renseigne = transport chiffre sur le pipe. La
+    // presence du chemin est l'unique source de verite : un booleen
+    // supplementaire pourrait desynchroniser l'intention du chiffrement et le
+    // certificat reellement charge.
+    let pipeCertificatePath = config.GetValue<string>("ServiceSettings:PipeCertificatePath")
+
     if not useTcp && not usePipes then
         failwith "Configuration invalide : ni ServiceSettings:UseTcp ni ServiceSettings:UseNamedPipes sont activés"
 
@@ -41,10 +47,27 @@ let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
         |> ignore
 
     if usePipes then
-        Log.Information("Écoute Named Pipe: {PipeName}", pipeName)
+        if String.IsNullOrWhiteSpace pipeCertificatePath then
+            Log.Information("Écoute Named Pipe: {PipeName}", pipeName)
 
-        opts.ListenNamedPipe(pipeName, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
-        |> ignore
+            opts.ListenNamedPipe(pipeName, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
+            |> ignore
+        else
+            let certificate = PipeTls.loadServerCertificate pipeCertificatePath
+
+            Log.Information(
+                "Écoute Named Pipe TLS: {PipeName} (certificat {Thumbprint})",
+                pipeName,
+                certificate.Thumbprint
+            )
+
+            // UseHttps fonctionne sur un endpoint de tube : Kestrel négocie TLS
+            // puis ALPN « h2 » par-dessus la tubulure, ce que gRPC exige.
+            let configurePipeTls (listenOpts: ListenOptions) : unit =
+                listenOpts.Protocols <- HttpProtocols.Http2
+                listenOpts.UseHttps(certificate) |> ignore
+
+            opts.ListenNamedPipe(pipeName, configurePipeTls) |> ignore
 
 let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
     // Kestrel active CurrentUserOnly par défaut ; il faut le désactiver pour
