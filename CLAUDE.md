@@ -31,7 +31,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 | Module                       | Projet             | Rôle                                                                                                                                                                                                                                                                                   |
 | ---------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `JsonHelpers`                | DiploWalker.Abstractions | Extraction typée de propriétés depuis `JsonElement` (`tryGetString`, `tryGetInt64`, `tryGetDouble`, `tryGetBool`, `tryGetElement`, `tryGetStringValue`). Module `[<RequireQualifiedAccess>]` — appeler via `JsonHelpers.tryGetString`.                                                 |
-| `DiploJson`                  | DiploWalker.Abstractions | Options de sérialisation JSON centralisées (`defaultOptions`, `snakeCaseOptions`, `caseInsensitiveOptions`, `withMaxDepth`, `documentOptions`).                                                                                                                                        |
+| `DiploWalkerJson`                  | DiploWalker.Abstractions | Options de sérialisation JSON centralisées (`defaultOptions`, `snakeCaseOptions`, `caseInsensitiveOptions`, `withMaxDepth`, `documentOptions`).                                                                                                                                        |
 | `ProcessExec`                | DiploWalker.Abstractions | Exécution de processus externes (`run`, `runWithResult`, `runUnit`) et commandes PowerShell (`runPowerShell`, `runPowerShellScript`). Gère le timeout, le Kill, et la lecture asynchrone stdout/stderr. `runUnit` exécute sans retourner la sortie standard (usage montage/démontage). |
 | `ServiceGuards`              | DiploWalker.Abstractions | Guards de validation d'entrée réutilisables (`requireNonEmpty`, `requireId`, `requirePositive`, `requireInRange`, `requireSafePath`, `requireLocalAddress`, `requireSafeCommand`). Lèvent `RpcException(InvalidArgument)`.                                                             |
 | `CachedConfig<'T>`           | DiploWalker.Abstractions | Cache générique avec invalidation manuelle, protégé par un verrou. Chargement paresseux via `Value`, invalidation via `Invalidate()`.                                                                                                                                                  |
@@ -142,7 +142,7 @@ dotnet build DiploWalker.slnx                       # Build complète
 > `Path.GetPathRoot` plutôt qu'en dur, exécution via l'interpréteur de la plateforme
 > (`sh -c` ou `cmd.exe /c`), casse respectée dans les assertions. La racine des
 > données partagées passe par `AppPaths` (`src/DiploWalker.Abstractions/AppPaths.fs`)
-> et vaut `%ProgramData%\Diplo` sous Windows, `$XDG_DATA_HOME/Diplo` ailleurs ; elle est
+> et vaut `%ProgramData%\DiploWalker` sous Windows, `$XDG_DATA_HOME/DiploWalker` ailleurs ; elle est
 > redirigée vers un répertoire temporaire pour tous les projets de test via
 > `tests/TestDataRoot.fs` (fixture d'assembly xUnit).
 
@@ -192,6 +192,6 @@ Le montage réel des images disque et la communication gRPC ont été validés e
 
 ### Logs
 
-Les logs sont capturés par le service lors du démarrage détaché dans `%ProgramData%\Diplo\logs\<id>.log` et relus par `container logs` (`tail`, `since` ; `--follow` suit le fichier et émet les nouvelles lignes au fil de l'eau).
+Les logs sont capturés par le service lors du démarrage détaché dans `%ProgramData%\DiploWalker\logs\<id>.log` et relus par `container logs` (`tail`, `since` ; `--follow` suit le fichier et émet les nouvelles lignes au fil de l'eau).
 
 
