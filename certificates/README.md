@@ -119,6 +119,11 @@ développement compromis :
 │ pathlen:0  │ pathlen:0 │ pathlen:0               │
 │ (feuilles  │ (auth.   │ (signature de code)     │
 │  auth.)    │ systèmes)│                         │
+│  ├─────────┤          │                         │
+│  │leaf-tls-│          │                         │
+│  │server   │          │                         │
+│  │(TLS des │          │                         │
+│  │ tubes)  │          │                         │
 │            ├──────────┤                         │
 │            │leaf-dll- │                         │
 │            │validation│                         │
@@ -146,6 +151,8 @@ développement compromis :
 - Sous « System » : `leaf-dll-validation` (signature des DLL chargées dynamiquement,
   voir « Validation des DLL ») et `leaf-config-encryption` (chiffrement des fichiers
   de configuration, voir « Chiffrement des fichiers de configuration »).
+- Sous « Authentification » : `leaf-tls-server` (chiffrement des named pipes,
+  voir « Chiffrement des named pipes »).
 
 ## Contenu des répertoires
 
@@ -334,6 +341,48 @@ En .NET, charger le certificat privé depuis le PFX ou le magasin, puis utiliser
 > soient installés dans les magasins de confiance (ou fournis explicitement au
 > validateur).
 
+## Chiffrement des named pipes
+
+`leaf-tls-server` est la feuille qui chiffre le transport local par named pipe.
+Elle est émise sous l'autorité « Authentification » avec un EKU `serverAuth`
+uniquement (jamais `codeSigning`), un SAN `localhost`, une RSA 8192 et SHA-384.
+
+L'installateur dépose le PFX dans `<configDir>\certs\leaf-tls-server.pfx`, en
+restreint l'ACL (il contient la clé privée), puis écrit ce chemin dans
+`ServiceSettings:PipeCertificatePath` de chaque `*.appsettings.json`.
+`ServerConfig.configureKestrel` bascule alors le tube en `UseHttps`. Sans ce
+chemin, les tubes restent en clair — le mode de compatibilité historique.
+
+Côté client, l'adresse `https://pipe:/<nom>` n'accepte aucune autorité : le
+canal est construit avec un `SocketsHttpHandler` dont la validation exige
+l'empreinte compilée dans `PipeTls.ExpectedServerThumbprint`. Un tube présentant
+un autre certificat est donc refusé, sans distribution de la racine et sans
+manipulation des magasins Windows.
+
+Le PFX est versionné **chiffré** par git-crypt, comme les autres clés privées. Le
+job `test` de la CI ne déverrouille pas le dépôt : les tests TLS génèrent un
+certificat à l'exécution et n'utilisent pas ce fichier. `PipeTlsFingerprintTests`
+compare en revanche l'empreinte compilée au certificat **public** en clair
+(`certs/leaf-tls-server.crt.pem`), de sorte qu'une divergence entre le code et la
+PKI versionnée est détectée même sans accès à la clé privée.
+
+### Régénérer uniquement cette feuille
+
+```powershell
+# Recrée leaf-tls-server sans toucher aux autres feuilles de la PKI
+.\certificates\regenerate-pki.ps1 -OnlyTlsLeaf
+
+# Vérifier la chaîne
+openssl verify -CAfile certificates\root-ca\certs\root-ca.crt.pem `
+  -untrusted certificates\authentification\certs\authentification.crt.pem `
+  certificates\leaf-tls-server\certs\leaf-tls-server.crt.pem
+```
+
+Toute régénération change l'empreinte : il faut alors mettre à jour
+`PipeTls.ExpectedServerThumbprint`, puis régénérer le PFX avec un mot de passe
+vide (`leaf-tls-server.pfx`, sans secret additionnel) car l'installateur le copie
+et le lit sans invite.
+
 ## Régénération complète
 
 ### Via le script d'amorçage (recommandé)
@@ -344,6 +393,9 @@ En .NET, charger le certificat privé depuis le PFX ou le magasin, puis utiliser
 
 # Autorités seules, sans toucher aux 22 feuilles de signature de code
 .\certificates\regenerate-pki.ps1 -SkipProjectLeaves -Force
+
+# Feuille TLS des named pipes seule (voir « Chiffrement des named pipes »)
+.\certificates\regenerate-pki.ps1 -OnlyTlsLeaf
 ```
 
 Le script détecte `openssl.exe` dans le `PATH`, puis dans les installations Git

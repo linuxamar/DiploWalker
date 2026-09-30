@@ -621,14 +621,77 @@ let createCniConfig () =
     else
         printfn "  [=] config CNI existe déjà, ignoré"
 
+// ─── Certificat TLS des named pipes ────────────────────────────────────────
+
+/// Nom du PFX déposé dans `configDir\certs`. Doit correspondre au contenu de
+/// `certificates\leaf-tls-server\leaf-tls-server.pfx`, dont l'empreinte est
+/// ancrée côté client (cf. PipeTls.ExpectedServerThumbprint).
+[<Literal>]
+let pipeCertificateFileName = "leaf-tls-server.pfx"
+
+let private pipeCertificateSourcePath =
+    Path.Combine(AppContext.BaseDirectory, pipeCertificateFileName)
+
+/// Dépose le certificat serveur dans `configDir\certs` et retourne son chemin.
+///
+/// Retourne `None` lorsque le PFX n'accompagne pas l'installeur (publication
+/// réalisée sans git-crypt, poste non initialisé) : les pipes restent alors en
+/// clair et l'installeur le dit, plutôt que d'écrire une configuration pointant
+/// vers un fichier absent — les services échoueraient au démarrage.
+let deployPipeCertificate () =
+    if not (File.Exists pipeCertificateSourcePath) then
+        printfn "  [!] Certificat TLS absent (%s) : named pipes en CLAIR." pipeCertificateFileName
+        None
+    else
+        try
+            let certDir = Path.Combine(configDir, "certs")
+            Directory.CreateDirectory(certDir) |> ignore
+            let destPath = Path.Combine(certDir, pipeCertificateFileName)
+            File.Copy(pipeCertificateSourcePath, destPath, true)
+
+            // Les services tournent en LocalSystem : sans droit de lecture pour
+            // SYSTEM, le chargement du PFX échoue en AccessDenied juste après
+            // l'installation. L'ACL est protégée (plus d'héritage) car le PFX
+            // contient la clé privée.
+            let fileInfo = FileInfo(destPath)
+            let acl = fileInfo.GetAccessControl()
+
+            for account in [ "SYSTEM"; "Administrators"; Environment.UserName ] do
+                try
+                    acl.AddAccessRule(
+                        System.Security.AccessControl.FileSystemAccessRule(
+                            account,
+                            System.Security.AccessControl.FileSystemRights.Read,
+                            System.Security.AccessControl.AccessControlType.Allow
+                        )
+                    )
+                with ex ->
+                    printfn "  [!] Octroi de lecture à '%s' impossible : %s" account ex.Message
+
+            acl.SetAccessRuleProtection(true, false)
+            fileInfo.SetAccessControl(acl)
+
+            printfn "  [+] certs\\%s (chiffrement TLS des named pipes)" pipeCertificateFileName
+            Some destPath
+        with ex ->
+            printfn "  [!] Déploiement du certificat TLS impossible : %s" ex.Message
+            printfn "  [!] Named pipes maintenus en CLAIR."
+            None
+
 // ─── Configuration services ───────────────────────────────────────────────
 
-let buildAppSettingsJson (grpcPort: int) (pipeName: string) (isolationType: string option) =
+/// `pipeCertificatePath` = `None` → pipes en clair (compatibilité) ; `Some p` →
+/// `ServerConfig.configureKestrel` active `UseHttps` sur le tube.
+let buildAppSettingsJson (grpcPort: int) (pipeName: string) (isolationType: string option) (pipeCertificatePath: string option) =
     let serviceSettings = JsonObject()
     serviceSettings.["GrpcPort"] <- JsonValue.Create(grpcPort)
     serviceSettings.["NamedPipeName"] <- JsonValue.Create(pipeName)
     serviceSettings.["UseTcp"] <- JsonValue.Create(true)
     serviceSettings.["UseNamedPipes"] <- JsonValue.Create(true)
+
+    match pipeCertificatePath with
+    | Some path -> serviceSettings.["PipeCertificatePath"] <- JsonValue.Create(path)
+    | None -> ()
 
     let logLevel = JsonObject()
     logLevel.["Default"] <- JsonValue.Create("Information")
@@ -699,6 +762,8 @@ let createConfigFiles () =
     else
         printfn "  [=] auth-token.json existe déjà, ignoré"
 
+    let pipeCertificatePath = deployPipeCertificate ()
+
     for (serviceName, _, port) in services do
         let pipeName = serviceName.ToLowerInvariant().Replace(".", "-")
 
@@ -708,7 +773,7 @@ let createConfigFiles () =
             else
                 None
 
-        let settings = buildAppSettingsJson port pipeName isolationType
+        let settings = buildAppSettingsJson port pipeName isolationType pipeCertificatePath
 
         let settingsPath =
             Path.Combine(configDir, sprintf "%s.appsettings.json" serviceName)

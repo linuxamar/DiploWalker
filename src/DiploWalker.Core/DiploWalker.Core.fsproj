@@ -34,5 +34,13 @@
     <ProjectReference Include="..\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
   </ItemGroup>
 
+  <!-- `GrpcClientFactory.forAddressPinnedTo` est une couture de test : elle
+       permet d'ancrer un certificat généré à l'exécution, la PKI du dépôt
+       étant chiffrée par git-crypt et illisible sur le job `test` de la CI. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiploWalker.Integration.Tests" />
+    <InternalsVisibleTo Include="DiploWalker.Core.Tests" />
+  </ItemGroup>
+
 </Project>
 

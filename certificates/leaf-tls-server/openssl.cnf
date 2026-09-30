@@ -1,0 +1,46 @@
+# Configuration du certificat serveur TLS "leaf-tls-server".
+# Parent : l'intermédiaire "Authentification" (certificates/authentification/).
+# Usage : prouver l'identité du service qui expose un named pipe, afin que le
+# client refuse de se connecter à un pipe usurpé (chaîne
+# leaf-tls-server → Authentification → Diplo Root CA).
+#
+# Le transport des named pipes étant un tube local sans nom d'hôte, le client
+# n'ancre pas le certificat par validation de nom mais par empreinte SHA-1
+# (cf. DiploWalker.PipeTls.ExpectedServerThumbprint). Les SAN ci-dessous
+# couvre néanmoins localhost/loopback pour que le certificat soit cohérent
+# avec un usage TLS standard.
+#
+# Clé RSA 8192 bits, usage étendu : serverAuth.
+#
+# Exemples :
+#   openssl req -new -config openssl.cnf -key private/leaf-tls-server.key.pem -out csr/leaf-tls-server.csr.pem
+#   # Signature par Authentification (exécutée depuis authentification/)
+#   openssl ca -config ../authentification/openssl.cnf -extensions leaf_cert -batch -notext `
+#              -in ../leaf-tls-server/csr/leaf-tls-server.csr.pem `
+#              -out ../leaf-tls-server/certs/leaf-tls-server.crt.pem
+
+[ req ]
+default_bits       = 8192
+default_md         = sha384
+distinguished_name = req_distinguished_name
+string_mask        = utf8only
+prompt             = no
+req_extensions     = v3_req
+
+[ req_distinguished_name ]
+countryName            = FR
+organizationName       = Diplo
+organizationalUnitName = Diplo Transport
+commonName             = leaf-tls-server
+
+# Extensions demandées dans la CSR : recopiées dans le certificat grâce à
+# copy_extensions = copy dans la configuration de l'autorité signataire.
+[ v3_req ]
+keyUsage          = critical, digitalSignature, keyEncipherment
+extendedKeyUsage  = serverAuth
+subjectAltName    = @alt_names
+
+[ alt_names ]
+DNS.1 = localhost
+IP.1  = 127.0.0.1
+IP.2  = ::1

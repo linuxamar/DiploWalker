@@ -1000,7 +1000,7 @@ module CommandCoverageTests =
 
             code |> should equal 0
             let content = File.ReadAllText(file, Encoding.UTF8)
-            content |> should haveSubstring "http://pipe:/diplo-container"
+            content |> should haveSubstring "https://pipe:/diplo-container"
         finally
             TestHelpers.cleanupDir root
 

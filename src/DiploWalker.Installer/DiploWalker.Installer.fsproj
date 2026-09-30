@@ -19,6 +19,17 @@
     <EmbeddedResource Include="assets\DiploWalker-release.pub" LogicalName="DiploWalker.Installer.assets.DiploWalker-release.pub" />
   </ItemGroup>
 
+  <!-- Certificat serveur des named pipes, déposé dans `configDir\certs` par
+       `Core.deployPipeCertificate`. Le PFX est chiffré par git-crypt : absent
+       des archives du dépôt, il n'est simplement pas copié et l'installeur
+       bascule en pipes clairs avec un avertissement. -->
+  <ItemGroup>
+    <Content Include="..\..\certificates\leaf-tls-server\leaf-tls-server.pfx"
+             Link="leaf-tls-server.pfx"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
   </ItemGroup>
