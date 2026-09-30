@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <!-- Désactive les optimisations de sécurité .NET qui peuvent déclencher des vérifications réseau -->
+    <AppContextSwitchOverrides value="Switch.System.Net.DontEnableSchUseStrongCrypto=true;Switch.System.Security.Cryptography.DontUseNativeCng=true" />
+  </RunConfiguration>
+  <TestRunParameters>
+    <Parameter name="ParallelizeAssemblies" value="false" />
+    <Parameter name="ParallelizeTestCollections" value="false" />
+  </TestRunParameters>
+</RunSettings>
