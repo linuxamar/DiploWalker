@@ -3,14 +3,15 @@
 **Diplo est un système distribué d'hébergement et de gestion de microservices
 dans un ou plusieurs conteneurs Windows.** Le système couvre la chaîne
 complète, de la préparation de l'image jusqu'à l'exploitation quotidienne :
-création des conteneurs, réseau, volumes persistants, images disque,
-supervision et mise à jour.
+création des conteneurs, réseau, volumes persistants et images disque.
 
 Le principe est celui d'une plateforme de service : le poste de travail
-n'héberge que l'interface d'administration, tandis que les services qui
-exercent réellement l'autorité sur les conteneurs sont déployés sur la ou les
-machines Windows Server. Rien ne s'exécute sur le poste de l'administrateur :
-celui-ci n'émet que des requêtes.
+n'héberge **ni runtime de conteneurs ni état**, il ne porte que le client
+d'administration. Les services qui exercent réellement l'autorité sur les
+conteneurs sont déployés sur la ou les machines Windows Server, et le client
+n'émet que des requêtes. Une seule opération échappe à cette règle : la
+création d'une image disque s'exécute dans le processus du client (voir « Le
+contenu du conteneur est géré par des outils centralisés et dédiés »).
 
 ### Le conteneur est l'hôte des microservices
 
@@ -46,8 +47,9 @@ localement** qui dialogue avec les services distants en gRPC.
   (`DiploWalker.Cli`, Spectre.Console) et une interface graphique native
   (`DiploWalker.Gui`, Avalonia, MVVM). Elles exposent les mêmes opérations.
 - **Le poste de travail ne contient aucun conteneur.** Il ne porte ni
-  containerd, ni images, ni services Diplo : c'est un poste d'administration,
-  éventuellement plusieurs, pouvant tous cibler le même hôte.
+  containerd, ni service Diplo, et les images qu'il produit ne sont pas sous
+  son autorité : c'est un poste d'administration, éventuellement plusieurs,
+  pouvant tous cibler le même hôte.
 - **La cible est configurable par service** dans `DiploWalker.json`
   (adresses, `namespace`, `logLevel`), ce qui permet d'administrer un hôte
   distant comme un hôte local.
@@ -70,11 +72,15 @@ l'hôte :
 | **DiploWalker.Container**   | Service gRPC :5001/6001 | Cycle de vie des conteneurs via containerd : création, démarrage, arrêt, suppression, montage de volumes, journaux, `exec` |
 | **DiploWalker.Volume**      | Service gRPC :5002/6002 | Volumes persistants, sous forme de répertoires de l'hôte ou d'images disque                                                  |
 | **DiploWalker.Network**     | Service gRPC :5003/6003 | Réseaux de conteneurs (NAT, overlay, l2bridge) et plugins CNI                                                               |
-| **DiploWalker.Disk**        | Bibliothèque embarquée | Création, montage et réécriture des images disque (vhd, vhdx, vmdk, vdi, raw, iso)                                         |
+| **DiploWalker.Disk**        | Bibliothèque, sans service | Images disque : création (raw, vhd, vhdx, vmdk, vdi), montage et réécriture (qcow2, qcow1, parallels, vdi, dmg) ; l'ISO se monte en lecture seule |
 
-Les trois premiers sont des services Windows indépendants, joignables à
-distance ; le dernier est une bibliothèque intégrée à ces services, qui
-n'expose donc pas de point d'entrée propre.
+Les trois premiers sont des **services Windows** indépendants, joignables à
+distance par le client. Le quatrième est une **bibliothèque** : il n'a ni port ni
+processus propre, et Diplo n'expose aucun service pour lui. Il est référencé par
+les services comme par le client lui-même, ce qui a une conséquence :
+`diplo disk create-image` s'exécute dans le processus du client, alors que le
+montage et la réécriture d'une image dans un conteneur relèvent du service
+Volume, sur l'hôte.
 
 Ce découpage a trois effets :
 
@@ -89,7 +95,7 @@ Ce découpage a trois effets :
 
 ### Vue d'ensemble
 
-`````
+```
 Poste de travail (client)               Hôte Windows Server (autorité)
 ┌──────────────────────────────┐        ┌──────────────────────────────────────┐
 │  diplo (CLI)                 │        │  DiploWalker.Container   :5001/6001  │
@@ -103,7 +109,7 @@ Poste de travail (client)               Hôte Windows Server (autorité)
                                         │  ┆ services Windows (sc.exe)      ┆  │
                                         │  └────────────────────────────────┘  │
                                         └──────────────────────────────────────┘
-``
+```
 
 ## Architecture
 
@@ -186,9 +192,9 @@ Le choix de l'image de base Windows est crucial pour le fonctionnement de Diplo 
 
 ### Installation automatique
 
-``powershell
+```powershell
 DiploWalker.Installer.exe install
-``
+```
 
 L'installateur effectue automatiquement :
 
@@ -224,10 +230,10 @@ Le dépôt fournit le script officiel Microsoft
 d'installer et de configurer containerd et nerdctl de manière autonome, sans
 l'installateur Diplo :
 
-``powershell
+```powershell
 # Élevé (PowerShell administrateur)
 .\setup\install-containerd-runtime.ps1
-``
+```
 
 Le script, exécuté en tant qu'administrateur :
 
@@ -250,19 +256,19 @@ Paramètres notables : `-ExternalNetAdapter` (réseau DHCP), `-ContainerBaseImag
 
 ### Commandes
 
-``powershell
+```powershell
 DiploWalker.Installer.exe install      # Installation complète
 DiploWalker.Installer.exe uninstall    # Suppression des services
 DiploWalker.Installer.exe status       # État des services
-``
+```
 
 ### Démarrage des services
 
-``powershell
+```powershell
 sc.exe start "DiploWalker.Container"
 sc.exe start "DiploWalker.Volume"
 sc.exe start "DiploWalker.Network"
-``
+```
 
 ### Configuration du client (DiploWalker.json)
 
@@ -273,13 +279,13 @@ Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `
 
 S'il est absent ou mal formé, les clients retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003` en Debug, `localhost:6001`/`6002`/`6003` en Release).
 
-``powershell
+```powershell
 diplo config init                       # génère DiploWalker.json avec le transport TCP par défaut
 diplo config init --transport pipe      # génère DiploWalker.json avec des adresses par named pipes
 diplo config init --path C:\etc\DiploWalker.json --transport pipe
-``
+```
 
-``json
+```json
 {
     "container": {
         "address": "http://pipe:/diplo-container",
@@ -289,7 +295,7 @@ diplo config init --path C:\etc\DiploWalker.json --transport pipe
     "network": { "address": "http://pipe:/diplo-network" },
     "logLevel": "Information"
 }
-``
+```
 
 - `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
 - `pipe` : adresses `http://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur (`diplo-container`, `diplo-volume`, `diplo-network`).
@@ -300,9 +306,9 @@ diplo config init --path C:\etc\DiploWalker.json --transport pipe
 
 ### Build
 
-``powershell
+```powershell
 .\pipeline.ps1
-``
+```
 
 Options disponibles :
 
@@ -320,7 +326,7 @@ Les clés de signature de la PKI sont versionnées mais chiffrées par git-crypt
 
 ### Structure du projet
 
-``
+```
 Diplo/
 ├── src/
 │   ├── DiploWalker.Abstractions/     # Interfaces, validation, sécurité, modules mutualisés
@@ -367,7 +373,7 @@ Diplo/
 │   └── DiploWalker.Volume.Tests/
 ├── pipeline.ps1                # Pipeline de build et déploiement
 └── README.md
-``
+```
 
 ## Aperçu technique
 
@@ -412,10 +418,10 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 
 ### CLI
 
-``powershell
+```powershell
 diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees"
 diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees,ro"
-``
+```
 
 - `src` : répertoire de l'hôte ou chemin vers une image disque
 - `dst` : destination dans le conteneur
@@ -425,9 +431,9 @@ Les sources sont restreintes aux répertoires autorisés par la validation de s�
 
 ### Création d'images disque
 
-``powershell
-diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw|iso]
-``
+```powershell
+diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw]
+```
 
 | Format   | Extension                      | Moteur    | Note                           |
 | -------- | ------------------------------ | --------- | ------------------------------ |
@@ -436,7 +442,9 @@ diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|
 | **VHDX** | `.vhdx`                        | DiscUtils | Virtual Hard Disk v2 (dynamic) |
 | **VMDK** | `.vmdk`                        | DiscUtils | Virtual Machine Disk (dynamic) |
 | **VDI**  | `.vdi`                         | DiscUtils | VirtualBox Disk Image          |
-| **ISO**  | `.iso`                         | Parseur maison | ISO9660 niveau 1 (8.3, ASCII) |
+
+Le format ISO peut être produit par la bibliothèque (`FsImage.create`), mais la
+commande ne l'expose pas : `iso` fait partie des formats refusés.
 
 La commande crée une image disque contenant une copie NTFS du répertoire source. La taille virtuelle est calculée automatiquement (taille des fichiers + 10 %, minimum 64 Mo). Les fichiers existants dans le répertoire de destination sont écrasés. En cas d'erreur lors du formatage ou de la copie, le fichier partiel est automatiquement supprimé (rollback).
 
@@ -537,7 +545,7 @@ L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de pas
 
 ## Référence CLI
 
-``powershell
+```powershell
 # Statut
 diplo status check
 
@@ -606,7 +614,7 @@ diplo config init [--path <chemin>] [--transport tcp|pipe]
 
 # Version
 diplo version
-``
+```
 
 ### Modules mutualisés
 
