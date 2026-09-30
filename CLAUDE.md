@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Projet
 
-**Diplo** — système distribué de microservices gRPC pour la gestion de conteneurs Windows (cf. `README.md`).
+**Diplo** — système distribué d'hébergement et de gestion de **microservices dans un ou plusieurs conteneurs Windows** (cf. `README.md`). L'autorité est sur l'hôte : `DiploWalker.Container`, `DiploWalker.Volume` et `DiploWalker.Network` y sont déployés comme services Windows, et le poste de travail n'héberge qu'un client (CLI ou GUI) qui les pilote.
 
 ## Architecture
 
@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | DiploWalker.Grpc         | Types messages et interfaces de service gRPC (protobuf-net, code-first), mappings de drivers                                                                                                                                                                  |
 | DiploWalker.Contracts    | Types partagés entre services                                                                                                                                                                                                                                 |
 | DiploWalker.Core         | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `DiploWalker.json` et support des named pipes (`http://pipe:/<nom>`), factory gRPC mutualisée                                                                 |
-| DiploWalker.Disk         | Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels, iso) via DiscUtils/pilotes maison + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems. Création d'images disque (VHD, VHDX, VMDK, VDI, Raw, ISO) via `FsImage.create` ; detection/extraction ISO9660/UDF via le parseur maison `IsoFs`. Référencé par `DiploWalker.Volume` (façade `IsoDriver`). |
+| DiploWalker.Disk         | Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels, iso) via DiscUtils/pilotes maison + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems. Création d'images disque (VHD, VHDX, VMDK, VDI, Raw, ISO) via `FsImage.create` ; detection/extraction ISO9660/UDF via le parseur maison `IsoFs`. **Bibliothèque, sans service ni port propre** : référencée par `DiploWalker.Volume` (façade `IsoDriver`), `DiploWalker.Container`, `DiploWalker.Cli` et `DiploWalker.Gui`. Conséquence : `diplo disk create-image` s'exécute dans le processus du client, sans appel gRPC, et `iso` n'est pas exposed par la commande alors que `FsImage.create` le sait produire. |
 | DiploWalker.Cli          | Client CLI (Spectre.Console)                                                                                                                                                                                                                                  |
 | DiploWalker.Gui          | Interface graphique Avalonia                                                                                                                                                                                                                                  |
 
@@ -157,6 +157,7 @@ La configuration **globale** d'opencode (`~/.config/opencode/opencode.jsonc`) d�
 - **Commits** : ne jamais ajouter de trailer `Co-Authored-By` ni de mention de co-auteur ; l'auteur
   reste seul auteur. Pas de mention « Generated with Claude Code » dans les PR/issues sauf demande explicite.
 - **Merge vers `main`** : ne jamais merger `dev` vers `main` sans demande explicite de l'utilisateur.
+- **Promotion vers `main`** : une fois la demande obtenue, la fusion se fait en `--no-ff` — `dev` étant l'ancêtre strict de `main`, un merge simple serait un fast-forward silencieux. `git checkout main` puis `git merge --no-ff dev -m "Fusion de dev : <sujet>"`, avec le premier parent sur l'ancien `main` et le second sur le tip de `dev`, soit un commit de fusion explicite par campagne. Après le push, `dev` reste en retard d'un commit de fusion : c'est structurel, pas une perte de travail — l'indicateur de contenu fiable est `git diff dev main` (vide), jamais `rev-list --count`. Recaler `dev` (`git merge --ff-only main`) au début de la session suivante.
 
 ## Langue
 
