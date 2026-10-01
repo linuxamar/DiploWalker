@@ -19,6 +19,40 @@ type StubHttpHandler(reply: Uri -> string) =
         response.Content <- new StringContent(reply request.RequestUri, Encoding.UTF8, "application/json")
         Task.FromResult(response)
 
+/// Handler qui mesure le chevauchement de requêtes (concurrence maximale).
+type ConcurrencyCountingHandler(sleepMs: int) =
+    inherit HttpMessageHandler()
+
+    let inFlight = ref 0
+    let maxInFlight = ref 0
+    let lockObj = obj ()
+
+    member _.MaxInFlight = !maxInFlight
+
+    override _.SendAsync(request: HttpRequestMessage, ct: CancellationToken) =
+        task {
+            lock lockObj (fun () ->
+                inFlight := !inFlight + 1
+                if !inFlight > !maxInFlight then maxInFlight := !inFlight)
+
+            try
+                if sleepMs > 0 then
+                    do! Task.Delay(sleepMs, ct)
+
+                let body =
+                    match request.RequestUri.Host with
+                    | "hub.docker.com" -> """{ "results": [ { "repo_name": "nginx" } ] }"""
+                    | "quay.io" -> """{ "results": [ { "name": "team/app" } ] }"""
+                    | "mcr.microsoft.com" -> """{ "repositories": [ "azure/nginx" ] }"""
+                    | _ -> "{}"
+
+                let response = new HttpResponseMessage(HttpStatusCode.OK)
+                response.Content <- new StringContent(body, Encoding.UTF8, "application/json")
+                return response
+            finally
+                lock lockObj (fun () -> inFlight := !inFlight - 1)
+        }
+
 /// Handler qui renvoie toujours le code d'état demandé (erreurs serveur simulées).
 type ErrorHttpHandler(status: HttpStatusCode) =
     inherit HttpMessageHandler()
@@ -243,63 +277,24 @@ let ``searchWith borne le total des resultats fusionnes a limit`` () =
 
 [<Fact>]
 let ``searchWith interroge les fournisseurs en parallele`` () =
-    let handler =
-        { new HttpMessageHandler() with
-            member _.SendAsync(request: HttpRequestMessage, _ct: CancellationToken) =
-                task {
-                    do! Task.Delay 250
-
-                    let body =
-                        match request.RequestUri.Host with
-                        | "hub.docker.com" -> """{ "results": [ { "repo_name": "nginx" } ] }"""
-                        | "quay.io" -> """{ "results": [ { "name": "team/app" } ] }"""
-                        | "mcr.microsoft.com" -> """{ "repositories": [ "azure/nginx" ] }"""
-                        | _ -> "{}"
-
-                    let response = new HttpResponseMessage(HttpStatusCode.OK)
-                    response.Content <- new StringContent(body, Encoding.UTF8, "application/json")
-                    return response
-                } }
-
+    let handler = new ConcurrencyCountingHandler(25)
     use client = new HttpClient(handler)
 
-    // Échauffement : la première exécution paie la compilation JIT des machines
-    // à états F#, de HttpClient et du moindre dagree. Sans cela, la mesure
-    // encadrait surtout ce coût là, ce qui la rendait imprévisible.
+    // Échauffement pour stabiliser le JIT/HttpClient (non mesuré).
     run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None) |> ignore
 
-    let measure work =
-        let sw = System.Diagnostics.Stopwatch.StartNew()
-        let result = work ()
-        sw.Stop()
-        result, sw.ElapsedMilliseconds
+    let hits = run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None)
 
-    // Référence séquentielle : les trois fournisseurs réellement interrogés, un
-    // après l'autre, par la même API et le même handler. Passer par un appel
-    // ciblé par registre est indispensable : collectionner les tâches puis les
-    // awaiting une à une ne sérialiserait rien, les `task` F# démarrant dès
-    // l'appel et non à l'await.
-    let sequentialHits, sequentialMs =
-        measure (fun () ->
-            [ "docker.io"; "quay.io"; "mcr.microsoft.com" ]
-            |> List.map (fun registry -> run (RegistrySearch.searchWith client (Some registry) "nginx" 25 CancellationToken.None))
-            |> List.concat)
+    hits.Length |> should equal 3
+    hits |> List.exists (fun h -> h.Registry = "docker.io") |> should equal true
+    hits |> List.exists (fun h -> h.Registry = "quay.io") |> should equal true
+    hits |> List.exists (fun h -> h.Registry = "mcr.microsoft.com") |> should equal true
 
-    let hits, parallelMs =
-        measure (fun () -> run (RegistrySearch.searchWith client None "nginx" 25 CancellationToken.None))
-
-    hits |> should equal sequentialHits
-
-    // Comparaison RELATIVE et non seuil absolu : les deux mesures traversent le
-    // même handler et les mêmes délais de 250 ms, elles absorbent donc ensemble
-    // la charge de la machine. Le seuil de 600 ms d'auparavant était franchi dès
-    // que le poste était occupé, alors même que les fournisseurs étaient bien
-    // interrogés en parallèle — le test échouait au hasard, pas à juste titre.
-    // Une régression vers du séquentiel porterait le rapport vers 1 ; le
-    // parallélisme le laisse nettement en dessous de 0,75.
+    // Les trois fournisseurs sont interrogés dans la même fenêtre : la concurrence
+    // maximale doit être >= 2 (sinon ils sont bien appelés, mais pas chevauchés).
     Assert.True(
-        double parallelMs < double sequentialMs * 0.75,
-        $"Fournisseurs non interrogés en parallèle : {parallelMs} ms en parallèle contre {sequentialMs} ms en séquentiel."
+        handler.MaxInFlight >= 2,
+        $"Les fournisseurs ne sont pas interrogés en parallèle (concurrence maximale = {handler.MaxInFlight})."
     )
 
 [<Fact>]
