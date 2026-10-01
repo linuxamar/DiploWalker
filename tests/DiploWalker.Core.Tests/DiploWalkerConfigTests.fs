@@ -1,5 +1,11 @@
 ﻿namespace DiploWalker.Core.Tests
 
+// Sérialisé avec ImageCatalogTests : les deux redirigent la variable
+// d'environnement globale DIPLO_CONFIG_HOME et partagent le cache global de
+// DiploWalkerConfig. En exécution parallèle, l'un restaure le chemin précédent
+// pendant que l'autre teste encore — d'où l'échec aléatoire observé sur
+// `invalidate vide le cache et relit la configuration`.
+[<Xunit.Collection("config-globale")>]
 module DiploWalkerConfigTests =
 
     open System

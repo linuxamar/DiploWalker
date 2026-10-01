@@ -1,5 +1,9 @@
 ﻿namespace DiploWalker.Core.Tests
 
+// Sérialisé avec DiploWalkerConfigTests : les deux redirigent la variable
+// d'environnement globale DIPLO_CONFIG_HOME et partagent le cache global de
+// DiploWalkerConfig (voir DiploWalkerConfigTests.fs).
+[<Xunit.Collection("config-globale")>]
 module ImageCatalogTests =
 
     open System
