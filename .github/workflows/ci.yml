@@ -30,6 +30,9 @@ jobs:
     name: Publication (tag v*)
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
+    # gh release create publie la page de release et televerse les installeurs.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -101,3 +104,110 @@ jobs:
             Diplo-Setup-*.exe
             publish/WindowsServices/x64
             publish/WindowsServices/x86
+      - name: Créer la GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = "${{ github.ref_name }}"
+
+          # La version des artefacts vient de Directory.Build.props, pas du tag :
+          # un tag sans bump produirait des installeurs mal nommes. On refuse donc
+          # de publier des binaires dont le nom contredit le tag.
+          $props = [xml](Get-Content "Directory.Build.props" -Raw)
+          $version = ($props.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1)
+          if (-not $version) { $version = "" } else { $version = $version.Trim() }
+          $expected = "v$version"
+          if ($tag -ne $expected) {
+            throw "Tag $tag incoherent avec Directory.Build.props (Version = $version). Attendu : $expected. Bump la version avant de taguer, sinon l'installeur sera mal nomme."
+          }
+          Write-Host "  Version declaree : $version (tag $tag)"
+
+          $installers = @(Get-ChildItem -Path . -Filter "Diplo-Setup-*.exe" -File)
+          if ($installers.Count -eq 0) {
+            throw "Aucun installeur Diplo-Setup-*.exe n'a ete produit pour $tag."
+          }
+          foreach ($i in $installers) {
+            Write-Host ("  {0} ({1:N1} Mo)" -f $i.Name, ($i.Length / 1MB))
+          }
+
+          # Table des assets construite hors du here-string : PowerShell n'a pas de
+          # « if » en expression, donc $((if ...)) serait invalide.
+          $rows = @()
+          foreach ($i in $installers) {
+            $arch = if ($i.Name -match 'x86') { 'x86' } else { 'x64' }
+            $rows += "| ``$($i.Name)`` | $arch |"
+          }
+          $table = $rows -join "`n"
+
+          # Notes de version generees sur place : pas de fichier a maintenir
+          # dans l'arbre, et le contenu reflecte toujours ce qui a ete publie.
+          $notes = @"
+          ## DiploWalker $version
+
+          Installeur Windows signe et horodate.
+
+          | Asset | Architecture |
+          | --- | --- |
+          $table
+
+          La charge utile des services Windows (x64 et x86) est jointe aux
+          artefacts du run de workflow.
+
+          ### Verification
+
+          - Signatures Authenticode emises par la feuille de chaque projet,
+            avec horodatage.
+          - Cle de signature symetrique et certificats PKI chiffres par
+            git-crypt au repos ; ils sont dechiffres sur le runner pour la
+            seule duree de la publication.
+          - Racine de demonstration non installee dans le magasin de
+            confiance : `signtool verify /pa` signale `0x800B010A`
+            (`CERT_E_UNTRUSTEDROOT`), ce qui est attendu. La chaine
+            embarquee et l'horodatage restent presents.
+
+          Installateur signe par une PKI de demonstration : aConsiderer comme
+          un canal de test, pas comme une distribution de confiance.
+          "@
+          $notesFile = Join-Path $env:RUNNER_TEMP "notes.md"
+          [System.IO.File]::WriteAllText($notesFile, $notes, (New-Object System.Text.UTF8Encoding($false)))
+
+          # Reexecution d'un tag deja publie : on met a jour la page au lieu
+          # d'echouer sur "release already exists". Le probe tourne avec
+          # ErrorActionPreference = Continue : sous PowerShell 7, un appel natif
+          # qui ecrit sur stderr declenche une erreur TERMINANTE sous 'Stop', donc
+          # l'absence de release interromprait le script au lieu de renvoyer un
+          # code de sortie a tester.
+          $exists = $false
+          $ErrorActionPreference = 'Continue'
+          gh release view $tag *> $null
+          $exists = ($LASTEXITCODE -eq 0)
+          $ErrorActionPreference = 'Stop'
+
+          if ($exists) {
+            Write-Host "  Release $tag deja presente : mise a jour des notes et des assets."
+            gh release edit $tag --title "DiploWalker $version" --notes-file $notesFile *> $null
+            foreach ($i in $installers) {
+              gh release upload $tag $i.FullName --clobber *> $null
+            }
+          } else {
+            gh release create $tag `
+              --title "DiploWalker $version" `
+              --notes-file $notesFile `
+              --verify-tag `
+              @($installers | ForEach-Object { $_.FullName })
+          }
+
+          # Le tag seul ne donne aucune page : on verifie que la release existe
+          # vraiment et que l'installeur est telechargeable.
+          $url = gh release view $tag --json url --jq .url
+          if (-not $url) { throw "La release $tag n'a pas ete creee." }
+          $assets = @(gh release view $tag --json assets --jq ".assets[].name")
+          foreach ($i in $installers) {
+            if ($assets -notcontains $i.Name) {
+              throw "Asset manquant sur la release $tag : $($i.Name)"
+            }
+          }
+          Write-Host "  Release : $url"
+          Write-Host "  Assets  : $($assets -join ', ')"
