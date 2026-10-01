@@ -119,7 +119,7 @@ function Publish-Project {
     $extraPublishArgs = @()
     if ($TimestampUrl) {
         Write-Host "  Horodatage : $TimestampUrl"
-        $extraPublishArgs = @("-p:DiploCodeSigningTimestampUrl=$TimestampUrl")
+        $extraPublishArgs = @("-p:DiploWalkerCodeSigningTimestampUrl=$TimestampUrl")
     }
 
     Write-Host ""
@@ -183,7 +183,7 @@ if ($Clean) {
     $currentStep++
     Write-Host ""
     Write-Host "═══ Nettoyage bin/ obj/ ═══" -ForegroundColor Cyan
-    Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Nettoyage..." -PercentComplete (($currentStep / $totalSteps) * 100)
+    Write-Progress -Id 1 -Activity "Publication DiploWalker" -Status "Nettoyage..." -PercentComplete (($currentStep / $totalSteps) * 100)
     $dirs = @("src", "tests")
     foreach ($dir in $dirs) {
         $base = Join-Path $PSScriptRoot $dir
@@ -208,7 +208,7 @@ if ($Restore) {
     $currentStep++
     Write-Host ""
     Write-Host "═══ Restauration NuGet ═══" -ForegroundColor Cyan
-    Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Restauration NuGet..." -PercentComplete (($currentStep / $totalSteps) * 100)
+    Write-Progress -Id 1 -Activity "Publication DiploWalker" -Status "Restauration NuGet..." -PercentComplete (($currentStep / $totalSteps) * 100)
     $solutionPath = Join-Path $PSScriptRoot "DiploWalker.slnx"
     if (-not (Test-Path $solutionPath)) {
         $solutionPath = Join-Path $PSScriptRoot "DiploWalker.sln"
@@ -265,7 +265,7 @@ if ($runTests) {
 
         Write-Host ""
         Write-Host "  ▸ $test" -ForegroundColor Yellow
-        Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Tests : $test ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
+        Write-Progress -Id 1 -Activity "Publication DiploWalker" -Status "Tests : $test ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
         # Tue les testhosts orphelins du projet précédent : ils retiennent les
         # verrous sur les DLL de sortie partagées et font échouer le projet
         # suivant en cascade (collision de remplacement de fichier).
@@ -293,7 +293,7 @@ if ($runTests) {
         # La signature de la publication reste inchangée : -p: n'est posé que
         # sur la commande `dotnet test`, jamais sur `dotnet publish`.
         if ($NoSignTests) {
-            $testArgs += "-p:DiploSignOutputAfterBuild=false"
+            $testArgs += "-p:DiploWalkerSignOutputAfterBuild=false"
         }
         if ($onWindows) {
             Write-Host "    Plateforme Windows : toute la suite est exécutée." -ForegroundColor DarkGray
@@ -327,7 +327,7 @@ if ($runPublish) {
 foreach ($plat in $Platforms) {
     foreach ($project in $Projects) {
         $currentStep++
-        Write-Progress -Id 1 -Activity "Publication Diplo" -Status "Publication : $project $plat ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
+        Write-Progress -Id 1 -Activity "Publication DiploWalker" -Status "Publication : $project $plat ($currentStep/$totalSteps)" -PercentComplete (($currentStep / $totalSteps) * 100)
         Publish-Project -ProjectName $project -Plat $plat
     }
 }
@@ -360,10 +360,10 @@ if ($runPublish) {
 
 $timer.Stop()
 
-Write-Progress -Id 1 -Activity "Publication Diplo" -Completed
+Write-Progress -Id 1 -Activity "Publication DiploWalker" -Completed
 
 Write-Host ""
 Write-Host "══════════════════════════════════════" -ForegroundColor Green
-Write-Host " Diplo terminé en $($timer.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
+Write-Host " DiploWalker terminé en $($timer.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
 Write-Host "══════════════════════════════════════" -ForegroundColor Green
 

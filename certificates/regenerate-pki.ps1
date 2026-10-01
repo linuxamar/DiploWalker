@@ -108,6 +108,42 @@ function Invoke-OpenSsl {
     }
 }
 
+# --- Empreinte SHA-1 d'un certificat PEM -------------------------------------
+# Le client DiploWalker epingle cette empreinte (PipeTls.ExpectedServerThumbprint) :
+# la regenere ci-dessous doit donc rester lisible apres coup.
+function Get-Sha1Thumbprint {
+    param([string]$CertificatePath)
+
+    $dir  = Split-Path -Parent $CertificatePath
+    $leaf = Split-Path -Leaf $CertificatePath
+    $log  = [System.IO.Path]::GetTempFileName()
+
+    try {
+        Push-Location $dir
+        try {
+            # Meme raison que Invoke-OpenSsl : stderr de openssl ne doit pas
+            # terminer le script sous $ErrorActionPreference = "Stop".
+            $ErrorActionPreference = "Continue"
+            $out  = & $openssl x509 -in $leaf -noout -fingerprint -sha1 2> $log
+            $code = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = "Stop"
+            Pop-Location
+        }
+
+        if ($code -ne 0) {
+            $detail = Get-Content $log -Raw
+            if ([string]::IsNullOrWhiteSpace($detail)) { $detail = "(aucune sortie)" }
+            throw "Echec openssl (empreinte de $leaf, code $code) : $detail"
+        }
+
+        # "sha1 Fingerprint=AB:CD:..." -> "ABCD..."
+        return (($out -join "").Split("=")[-1]).Replace(":", "").Trim().ToUpperInvariant()
+    } finally {
+        Remove-Item $log -Force -ErrorAction SilentlyContinue
+    }
+}
+
 # --- Preparation des repertoires d'une autorite ------------------------------
 function Initialize-Authority {
     param([string]$Dir)
@@ -194,8 +230,20 @@ function New-ExtraLeaf {
     $key  = Join-Path $dir "private\$Name.key.pem"
     $csr  = Join-Path $dir "csr\$Name.csr.pem"
     $crt  = Join-Path $dir "certs\$Name.crt.pem"
+    $pfx  = Join-Path $dir "$Name.pfx"
 
     Initialize-Authority -Dir $dir
+
+    # Idempotence : cle, certificat et PFX deja presents, on ne touche a rien.
+    # Re-signer incrementerait le serial, donc l'empreinte SHA-1 du
+    # certificat, alors que le PFX resterait celui d'avant : les deux
+    # divergeraient en silence, et le test de garde verifierait un certificat
+    # que la production n'utilise pas. Pour reemettre, -Force.
+    if ((-not $Force) -and (Test-Path $key) -and (Test-Path $crt) -and (Test-Path $pfx)) {
+        Write-Host "  cle, certificat et PFX existants, conserves (-Force pour regenerer)" -ForegroundColor DarkGray
+        Write-Host "  OK $Name (inchange)" -ForegroundColor Green
+        return
+    }
 
     if ($Force -or -not (Test-Path $key)) {
         Write-Host "  cle RSA 8192..."
@@ -224,22 +272,28 @@ function New-ExtraLeaf {
     # que le consommateur n'ait pas besoin du magasin de confiance de la machine.
     # La service qui charge ce PFX n'exploite que la feuille (cle + certificat) ;
     # la chaine ne sert qu'a rendre l'origine verifiable hors magasin.
-    $pfx = Join-Path $dir "$Name.pfx"
+    # Export inconditionnel dans ce chemin : le certificat vient d'etre signe,
+    # le PFX doit donc TOUJOURS le reproduire — c'est lui que l'installateur
+    # deploie et que le serveur charge.
+    Write-Host "  PFX..."
+    $pkcs12 = @("pkcs12", "-export", "-out", $pfx, "-inkey", $key, "-in", $crt)
+    $caChain = Join-Path $certDir "$Parent\certs\$Parent.chain.crt.pem"
 
-    if ($Force -or -not (Test-Path $pfx)) {
-        Write-Host "  PFX..."
-        $pkcs12 = @("pkcs12", "-export", "-out", $pfx, "-inkey", $key, "-in", $crt)
-        $caChain = Join-Path $certDir "$Parent\certs\$Parent.chain.crt.pem"
+    if (Test-Path $caChain) { $pkcs12 += @("-certfile", $caChain) }
 
-        if (Test-Path $caChain) { $pkcs12 += @("-certfile", $caChain) }
-
-        $pkcs12 += @("-passout", "pass:")
-        Invoke-OpenSsl -Arguments $pkcs12 -WorkingDirectory $dir -What "PFX $Name"
-    } else {
-        Write-Host "  PFX existant, conserve (-Force pour regenerer)" -ForegroundColor DarkGray
-    }
+    $pkcs12 += @("-passout", "pass:")
+    Invoke-OpenSsl -Arguments $pkcs12 -WorkingDirectory $dir -What "PFX $Name"
 
     Write-Host "  OK $Name" -ForegroundColor Green
+
+    # Avertissement specifique a la feuille TLS : son empreinte est compilee
+    # dans le client, une regeneration casse donc toute installation en place.
+    if ($Name -eq "leaf-tls-server") {
+        Write-Host "  empreinte SHA-1 : $(Get-Sha1Thumbprint -CertificatePath $crt)" -ForegroundColor Yellow
+        Write-Host "  [!] Mettez a jour ExpectedServerThumbprint dans" -ForegroundColor Yellow
+        Write-Host "      src\DiploWalker.Abstractions\PipeTls.fs, sinon les clients" -ForegroundColor Yellow
+        Write-Host "      epingles refuseront ce tube." -ForegroundColor Yellow
+    }
 }
 
 # --- Deroulement -------------------------------------------------------------

@@ -1,4 +1,4 @@
-﻿# Sécurité — Diplo
+﻿# Sécurité — DiploWalker
 
 ## Authentification par token
 
@@ -25,7 +25,7 @@ Les réponses d'échec d'authentification (401) et de dépassement du rate limit
 Pour remplacer le token en cours :
 
 1. Appeler `AuthToken.rotateToken()` en F# (génère et enregistre un nouveau token).
-2. Ou manuellement : modifier le champ `Token` dans `C:\ProgramData\Diplo\auth-token.json`.
+2. Ou manuellement : modifier le champ `Token` dans `C:\ProgramData\DiploWalker\auth-token.json`.
 3. Redémarrer les services Container, Volume et Network.
 4. Mettre à jour le token côté client (fichier `auth-token.json` du client).
 
@@ -98,7 +98,7 @@ Les mots de passe de registres sont chiffrés au repos :
 
 Lors des opérations `pull`/`push` avec authentification, les identifiants sont résolus via **`hosts.toml`/credential helper** y compris en mode `--user` explicite : le mot de passe ne transite **jamais** par la ligne de commande (invisible dans la liste des processus).
 
-Le helper est un script PowerShell **unique** et portable, installé dans `<racine>/cred-helper/` avec un lanceur adapté à la plateforme (`diplo-cred-helper.cmd` sous Windows, `diplo-cred-helper` en `sh` ailleurs) — c'est ce lanceur que containerd exécute. Il se limite à transmettre au script les chemins du fichier d'état et de la clé, puis le script déchiffre : DPAPI sous Windows, AES-GCM ailleurs. Sous Unix, le lanceur est posé en `0755` et l'hôte doit disposer de PowerShell 7 (`pwsh`). Ni l'état ni la clé ne transitent par la ligne de commande.
+Le helper est un script PowerShell **unique** et portable, installé dans `<racine>/cred-helper/` avec un lanceur adapté à la plateforme (`diplowalker-cred-helper.cmd` sous Windows, `diplowalker-cred-helper` en `sh` ailleurs) — c'est ce lanceur que containerd exécute. Il se limite à transmettre au script les chemins du fichier d'état et de la clé, puis le script déchiffre : DPAPI sous Windows, AES-GCM ailleurs. Sous Unix, le lanceur est posé en `0755` et l'hôte doit disposer de PowerShell 7 (`pwsh`). Ni l'état ni la clé ne transitent par la ligne de commande.
 
 ## Limites de conteneurs
 
@@ -145,7 +145,7 @@ Deux secrets distincts, à ne pas confondre :
 | Secret                        | Stockage                                                              |
 | ----------------------------- | --------------------------------------------------------------------- |
 | Clé symétrique git-crypt     | Secret GitHub `GIT_CRYPT_KEY` (base64) + gestionnaire de mots de passe |
-| Clé de signature du manifeste | **Hors bande**, `~/.diplo/diplo-release.key`, jamais versionnée        |
+| Clé de signature du manifeste | **Hors bande**, `~/.diplowalker/diplowalker-release.key`, jamais versionnée        |
 
 La clé de signature du manifeste (`assets/artifacts.manifest`) reste **hors bande**
 et n'a **pas** été inclut dans git-crypt : c'est la seule clé dont la perte ou la
@@ -171,10 +171,10 @@ Points de vigilance :
 ## Recommandations
 
 - Ne jamais committer `auth-token.json` dans un dépôt git.
-- Utiliser des permissions NTFS restrictives sur `C:\ProgramData\Diplo\`.
+- Utiliser des permissions NTFS restrictives sur `C:\ProgramData\DiploWalker\`.
 - Rotation du token régulière en production.
 - Utiliser des images de conteneurs signées et provenant de registries fiables.
 - La recherche et le pull d'images en ligne sont limités à une liste blanche de registres : docker.io, quay.io, mcr.microsoft.com, ghcr.io (`RegistrySearch.fs`).
 - Limiter les ressources des conteneurs en production pour éviter les dénis de service.
-- **Procédure de renouvellement des checksums des artefacts** : éditer `assets/artifacts.manifest` (fins de ligne LF), lancer `tools/sign-artifacts.ps1` (signe avec la clé privée hors bande, vérifie avec la clé publique, réécrit `artifacts.manifest.sig` en base64), puis commiter le manifeste et la signature. Si la paire de clés est régénérée, mettre à jour `assets/diplo-release.pub` ET garantir sa cohérence entre le dépôt et l'emplacement de la clé privée (une clé publique embarquée qui ne correspond plus à la clé de signature fait échouer `sign-artifacts.ps1`).
+- **Procédure de renouvellement des checksums des artefacts** : éditer `assets/artifacts.manifest` (fins de ligne LF), lancer `tools/sign-artifacts.ps1` (signe avec la clé privée hors bande, vérifie avec la clé publique, réécrit `artifacts.manifest.sig` en base64), puis commiter le manifeste et la signature. Si la paire de clés est régénérée, mettre à jour `assets/diplowalker-release.pub` ET garantir sa cohérence entre le dépôt et l'emplacement de la clé privée (une clé publique embarquée qui ne correspond plus à la clé de signature fait échouer `sign-artifacts.ps1`).
 

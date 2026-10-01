@@ -1,6 +1,6 @@
-﻿# Diplo
+﻿# DiploWalker
 
-**Diplo est un système distribué d'hébergement et de gestion de microservices
+**DiploWalker est un système distribué d'hébergement et de gestion de microservices
 dans un ou plusieurs conteneurs Windows.** Le système couvre la chaîne
 complète, de la préparation de l'image jusqu'à l'exploitation quotidienne :
 création des conteneurs, réseau, volumes persistants et images disque.
@@ -34,7 +34,7 @@ Ce choix a des conséquences directes :
   registres publics et privés (`docker.io`, `quay.io`, `mcr.microsoft.com`,
   `ghcr.io`).
 
-Diplo n'intervient pas dans le code des microservices : c'est une plateforme
+DiploWalker n'intervient pas dans le code des microservices : c'est une plateforme
 d'exécution et d'exploitation, pas un framework applicatif.
 
 ### Le conteneur se pilote depuis un client installé sur le poste
@@ -43,11 +43,11 @@ L'administration ne se fait pas sur la machine qui porte les conteneurs. Elle
 se fait depuis le poste de travail, au moyen d'un **client installé
 localement** qui dialogue avec les services distants en gRPC.
 
-- **Le client se compose de deux interfaces** : la CLI `diplo`
+- **Le client se compose de deux interfaces** : la CLI `diplowalker`
   (`DiploWalker.Cli`, Spectre.Console) et une interface graphique native
   (`DiploWalker.Gui`, Avalonia, MVVM). Elles exposent les mêmes opérations.
 - **Le poste de travail ne contient aucun conteneur.** Il ne porte ni
-  containerd, ni service Diplo, et les images qu'il produit ne sont pas sous
+  containerd, ni service DiploWalker, et les images qu'il produit ne sont pas sous
   son autorité : c'est un poste d'administration, éventuellement plusieurs,
   pouvant tous cibler le même hôte.
 - **La cible est configurable par service** dans `DiploWalker.json`
@@ -58,7 +58,7 @@ localement** qui dialogue avec les services distants en gRPC.
   `diplowalker-volume-debug`, `diplowalker-network-debug` en Debug ;
   `diplowalker-container`, `diplowalker-volume`, `diplowalker-network` en Release), ce dernier privilégié pour un usage
   strictement local.
-- **L'état est consultable à tout moment** : `diplo status check`, liste des
+- **L'état est consultable à tout moment** : `diplowalker status check`, liste des
   conteneurs, inspection, journaux, métriques et processus.
 
 ### Le contenu du conteneur est géré par des outils centralisés et dédiés
@@ -77,9 +77,9 @@ l'hôte :
 
 Les trois premiers sont des **services Windows** indépendants, joignables à
 distance par le client. Le quatrième est une **bibliothèque** : il n'a ni port ni
-processus propre, et Diplo n'expose aucun service pour lui. Il est référencé par
+processus propre, et DiploWalker n'expose aucun service pour lui. Il est référencé par
 les services comme par le client lui-même, ce qui a une conséquence :
-`diplo disk create-image` s'exécute dans le processus du client, alors que le
+`diplowalker disk create-image` s'exécute dans le processus du client, alors que le
 montage et la réécriture d'une image dans un conteneur relèvent du service
 Volume, sur l'hôte.
 
@@ -99,7 +99,7 @@ Ce découpage a trois effets :
 ```
 Poste de travail (client)               Hôte Windows Server (autorité)
 ┌──────────────────────────────┐        ┌──────────────────────────────────────┐
-│  diplo (CLI)                 │        │  DiploWalker.Container   :5001/6001  │
+│  diplowalker (CLI)                 │        │  DiploWalker.Container   :5001/6001  │
 │  DiploWalker.Gui (Avalonia)  │──gRPC─▶│  DiploWalker.Volume      :5002/6002  │
 │                              │        │  DiploWalker.Network     :5003/6003  │
 │  DiploWalker.json            │        │  DiploWalker.Installer               │
@@ -114,7 +114,7 @@ Poste de travail (client)               Hôte Windows Server (autorité)
 
 ## Architecture
 
-Diplo est composé de quatre services principaux communiquant via gRPC :
+DiploWalker est composé de quatre services principaux communiquant via gRPC :
 
 | Service             | Port | Description                                                                                                |
 | ------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
@@ -130,7 +130,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 - **CLI** : `DiploWalker.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux, images disque (`disk create-image`) et recherche d'images en ligne
 - **GUI** : `DiploWalker.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
-- **Résilience** : les canaux gRPC (`DiploChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
+- **Résilience** : les canaux gRPC (`DiploWalkerChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
 
 ## Stack technique
 
@@ -154,7 +154,7 @@ Diplo est composé de quatre services principaux communiquant via gRPC :
 
 ### Nano Server vs Server Core
 
-Le choix de l'image de base Windows est crucial pour le fonctionnement de Diplo :
+Le choix de l'image de base Windows est crucial pour le fonctionnement de DiploWalker :
 
 | Capacité                                 | Server Core                                                                                                                                          | Nano Server                                                                                                                                                                                                                                                                              |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -168,7 +168,7 @@ Le choix de l'image de base Windows est crucial pour le fonctionnement de Diplo 
 
 ### Recommandation
 
-**Server Core** est recommandé pour Diplo lorsque :
+**Server Core** est recommandé pour DiploWalker lorsque :
 
 - Le planificateur de tâches (`schtasks`) est nécessaire pour des automatisations
 - Des services Windows robustes avec dépendances système sont requis
@@ -180,7 +180,7 @@ Le choix de l'image de base Windows est crucial pour le fonctionnement de Diplo 
 - Le planificateur de tâches n'est pas requis
 - La taille minimale de l'image est prioritaire
 
-> **Note** : Diplo utilise principalement `sc.exe create/start/stop` pour la gestion des services, ce qui fonctionne sur les deux images. Cependant, si des automatisations basées sur le planificateur de tâches sont ajoutées ultérieurement, Server Core devient indispensable.
+> **Note** : DiploWalker utilise principalement `sc.exe create/start/stop` pour la gestion des services, ce qui fonctionne sur les deux images. Cependant, si des automatisations basées sur le planificateur de tâches sont ajoutées ultérieurement, Server Core devient indispensable.
 
 ## Installation
 
@@ -210,16 +210,16 @@ L'installateur effectue automatiquement :
 
 #### Certificats PKI
 
-L'installateur NSIS embarque les certificats de la PKI Diplo et les importe automatiquement dans les magasins de certificats de la machine Windows :
+L'installateur NSIS embarque les certificats de la PKI DiploWalker et les importe automatiquement dans les magasins de certificats de la machine Windows :
 
 | Certificat         | Magasin                     | Rôle                                         |
 | ------------------ | --------------------------- | -------------------------------------------- |
-| `Diplo Root CA`    | Racines de confiance (Root) | Autorité racine de la PKI                    |
+| `DiploWalker Root CA`    | Racines de confiance (Root) | Autorité racine de la PKI                    |
 | `Authentification` | CA intermédiaires           | Authentification de services                 |
 | `CodeSigning`      | CA intermédiaires           | Signature de code (assemblies, installateur) |
 | `System`           | CA intermédiaires           | Certificats système (TLS, config)            |
 
-Cette importation permet la **validation automatique des chaînes de signature** sans manipulation manuelle — les binaires signés par la PKI Diplo sont reconnus nativement par Windows.
+Cette importation permet la **validation automatique des chaînes de signature** sans manipulation manuelle — les binaires signés par la PKI DiploWalker sont reconnus nativement par Windows.
 
 Le désinstalleur retire les certificats des magasins machine et supprime les fichiers `.crt.pem` déposés dans le dossier d'installation.
 
@@ -229,7 +229,7 @@ Le dépôt fournit le script officiel Microsoft
 [`install-containerd-runtime.ps1`](https://github.com/microsoft/Windows-Containers/blob/Main/helpful_tools/Install-ContainerdRuntime/install-containerd-runtime.ps1)
 (microsoft/Windows-Containers), vendoré tel quel dans `setup/`. Il permet
 d'installer et de configurer containerd et nerdctl de manière autonome, sans
-l'installateur Diplo :
+l'installateur DiploWalker :
 
 ```powershell
 # Élevé (PowerShell administrateur)
@@ -251,8 +251,8 @@ Paramètres notables : `-ExternalNetAdapter` (réseau DHCP), `-ContainerBaseImag
 
 > **Remarque** : ce script installe dans `C:\Program Files\containerd` et
 > `C:\Program Files\nerdctl` et enregistre containerd comme service Windows,
-> mais **ne crée pas** les services Diplo ni leur configuration. Pour une
-> installation Diplo complète (services + `config.toml` Diplo), privilégiez
+> mais **ne crée pas** les services DiploWalker ni leur configuration. Pour une
+> installation DiploWalker complète (services + `config.toml` DiploWalker), privilégiez
 > `DiploWalker.Installer.exe install`.
 
 ### Commandes
@@ -281,9 +281,9 @@ Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `
 S'il est absent ou mal formé, les clients retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003` en Debug, `localhost:6001`/`6002`/`6003` en Release).
 
 ```powershell
-diplo config init                       # génère DiploWalker.json avec le transport TCP par défaut
-diplo config init --transport pipe      # génère DiploWalker.json avec des adresses par named pipes
-diplo config init --path C:\etc\DiploWalker.json --transport pipe
+diplowalker config init                       # génère DiploWalker.json avec le transport TCP par défaut
+diplowalker config init --transport pipe      # génère DiploWalker.json avec des adresses par named pipes
+diplowalker config init --path C:\etc\DiploWalker.json --transport pipe
 ```
 
 ```json
@@ -304,7 +304,7 @@ diplo config init --path C:\etc\DiploWalker.json --transport pipe
   - `https://` est une enveloppe imposée. `pipe` n'est pas le schéma mais **l'hôte**, et c'est cet hôte qui aiguille la connexion vers le named pipe plutôt que vers TCP.
   - Le tube réel est le **chemin** (ex. `/diplowalker-container` en Release, `/diplowalker-container-debug` en Debug) : c'est le seul segment que le client ouvre.
   - `https://pipe:/<nom>` est ce qu'on écrit dans la configuration ; `pipe://<nom>` est ce que le client construit à l'exécution pour désigner le tube.
-  - Conséquence : ni `pipe:/<nom>` ni `pipe://<nom>` ne sont acceptés dans la configuration — le premier n'a pas d'hôte, le second porte un schéma rejeté. C'est aussi exactement la forme qu'écrit `diplo config init --transport pipe` ci-dessus.
+  - Conséquence : ni `pipe:/<nom>` ni `pipe://<nom>` ne sont acceptés dans la configuration — le premier n'a pas d'hôte, le second porte un schéma rejeté. C'est aussi exactement la forme qu'écrit `diplowalker config init --transport pipe` ci-dessus.
 - Les adresses `https://pipe:/...` sont validées à part : leur hôte étant `pipe`, elles sont traitées comme un canal local et n'ont pas à figurer parmi les hôtes autorisés ; seul le nom de tube est contrôlé (ni `\`, ni `..`, ni caractère nul).
 
 ### Chiffrement des named pipes
@@ -342,7 +342,7 @@ Les clés de signature de la PKI sont versionnées mais chiffrées par git-crypt
 ### Structure du projet
 
 ```
-Diplo/
+DiploWalker/
 ├── src/
 │   ├── DiploWalker.Abstractions/     # Interfaces, validation, sécurité, modules mutualisés
 │   │   ├── JsonHelpers.fs      # Extraction typée de propriétés JSON
@@ -404,7 +404,7 @@ Le fichier `config.toml` est généré automatiquement par l'installateur avec :
 
 ### Isolation
 
-Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
+DiploWalker utilise l'**isolation process** (pas d'isolation Hyper-V) :
 
 - Plus léger et plus rapide à démarrer
 - Compatible avec Windows Server 2016+
@@ -434,20 +434,20 @@ Diplo utilise l'**isolation process** (pas d'isolation Hyper-V) :
 ### CLI
 
 ```powershell
-diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees"
-diplo container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees,ro"
+diplowalker container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees"
+diplowalker container create <image> <nom> --mount "src=C:\donnees,dst=C:\conteneur\donnees,ro"
 ```
 
 - `src` : répertoire de l'hôte ou chemin vers une image disque
 - `dst` : destination dans le conteneur
 - `ro` (optionnel) : montage en lecture seule
 
-Les sources sont restreintes aux répertoires autorisés par la validation de sécurité (`%TEMP%`, `%ProgramData%\Diplo`, `%ProgramFiles%\Diplo`). Une image disque est montée via un répertoire de préparation pour la durée de vie du conteneur, puis réécrite à la suppression.
+Les sources sont restreintes aux répertoires autorisés par la validation de sécurité (`%TEMP%`, `%ProgramData%\DiploWalker`, `%ProgramFiles%\DiploWalker`). Une image disque est montée via un répertoire de préparation pour la durée de vie du conteneur, puis réécrite à la suppression.
 
 ### Création d'images disque
 
 ```powershell
-diplo disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw]
+diplowalker disk create-image <RÉPERTOIRE_SOURCE> <CHEMIN_DESTINATION> [--format vhd|vhdx|vmdk|vdi|raw]
 ```
 
 | Format   | Extension                      | Moteur    | Note                           |
@@ -506,7 +506,7 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
     - Actions : Démarrer, Arrêter, Supprimer, Renommer, Processus, Métriques
     - Configuration : Nouveau nom, Montages
     - Journaux & Exec : Suivre, Lignes, Depuis, Commande
-    - **Catalogue d'images** : liste locale persistante (`diplo-catalog.json`) avec Lister, Inscrire (pull), Mettre à jour (tag) et Retirer (rmi)
+    - **Catalogue d'images** : liste locale persistante (`diplowalker-catalog.json`) avec Lister, Inscrire (pull), Mettre à jour (tag) et Retirer (rmi)
 
 **Onglet Volumes** — Liste + création d'images disque (sélection dossier/fichier, format)
 
@@ -520,7 +520,7 @@ L'interface graphique Avalonia utilise un thème système par défaut avec des o
 
 ## Recherche d'images en ligne
 
-La recherche d'images interroge les catalogues en ligne depuis le CLI (`diplo container image-search`) ou l'onglet **Images** de la GUI (champ de recherche validé par Entrée ; les résultats se tirent via « Tirer la sélection »). Elle est limitée aux **quatre registres autorisés** et ne nécessite **aucun identifiant** (catalogues publics) ; le pull d'un résultat utilise ensuite l'identifiant enregistré pour le registre concerné.
+La recherche d'images interroge les catalogues en ligne depuis le CLI (`diplowalker container image-search`) ou l'onglet **Images** de la GUI (champ de recherche validé par Entrée ; les résultats se tirent via « Tirer la sélection »). Elle est limitée aux **quatre registres autorisés** et ne nécessite **aucun identifiant** (catalogues publics) ; le pull d'un résultat utilise ensuite l'identifiant enregistré pour le registre concerné.
 
 | Registre | Mécanisme de recherche |
 | --- | --- |
@@ -535,7 +535,7 @@ Sans registre ciblé, les quatre fournisseurs sont interrogés dans l'ordre de l
 
 Les extractions d'images (CLI, GUI) sont limitées à **quatre fournisseurs** : `ghcr.io`, `docker.io`, `quay.io` et `mcr.microsoft.com`. Des alias courts sont acceptés pour `login`/`logout` : `ghcr`, `dockerhub` (ou `docker`), `quay`, `mcr`. Toute autre source est refusée par le serveur, et **toute extraction anonyme est impossible** : un compte doit être enregistré pour le registre concerné (sauf `--user utilisateur:secret` sur la ligne de commande, qui prime sur l'identifiant enregistré).
 
-Les identifiants sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) sous Windows et en AES-GCM avec une clé par utilisateur ailleurs, dans le fichier `registry-auth.json` du répertoire de données (`%ProgramData%\Diplo` sous Windows, `$XDG_DATA_HOME/Diplo` ailleurs). Ils ne transitent **jamais** par la ligne de commande de `ctr` : lors d'un `pull`, le service génère un **helper d'identification** conforme au protocole `docker-credential` (`%ProgramData%\Diplo\cred-helper\`) qui retourne les identifiants via stdin, et un répertoire hosts temporaire pointant vers ce helper (nettoyé en fin d'opération). Les identifiants sont automatiquement fournis à containerd pour l'image tirée (`docker.io` redirigé vers `registry-1.docker.io`).
+Les identifiants sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) sous Windows et en AES-GCM avec une clé par utilisateur ailleurs, dans le fichier `registry-auth.json` du répertoire de données (`%ProgramData%\DiploWalker` sous Windows, `$XDG_DATA_HOME/DiploWalker` ailleurs). Ils ne transitent **jamais** par la ligne de commande de `ctr` : lors d'un `pull`, le service génère un **helper d'identification** conforme au protocole `docker-credential` (`%ProgramData%\DiploWalker\cred-helper\`) qui retourne les identifiants via stdin, et un répertoire hosts temporaire pointant vers ce helper (nettoyé en fin d'opération). Les identifiants sont automatiquement fournis à containerd pour l'image tirée (`docker.io` redirigé vers `registry-1.docker.io`).
 
 ### Obtention des jetons par fournisseur
 
@@ -547,11 +547,11 @@ Les identifiants sont stockés côté serveur, chiffrés avec DPAPI (portée uti
 ### CLI
 
 ```powershell
-diplo container login ghcr.io --username user          # le mot de passe est demandé en mode masqué
-diplo container login ghcr --username user --password secret   # alias accepté
-diplo container logout ghcr                             # alias accepté
-diplo container pull ghcr.io/org/app:latest             # utilise l'identifiant enregistré
-diplo container pull ghcr.io/org/app:latest --user user:secret   # identifiant explicite (prime sur l'enregistré)
+diplowalker container login ghcr.io --username user          # le mot de passe est demandé en mode masqué
+diplowalker container login ghcr --username user --password secret   # alias accepté
+diplowalker container logout ghcr                             # alias accepté
+diplowalker container pull ghcr.io/org/app:latest             # utilise l'identifiant enregistré
+diplowalker container pull ghcr.io/org/app:latest --user user:secret   # identifiant explicite (prime sur l'enregistré)
 ```
 
 ### GUI
@@ -562,73 +562,73 @@ L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de pas
 
 ```powershell
 # Statut
-diplo status check
+diplowalker status check
 
 # Conteneurs
-diplo container list [--all] [-n <namespace>]
-diplo container create <image> <nom> --mount "src=...,dst=...[;ro]"
-diplo container delete <id> [-f]
-diplo container start <id>
-diplo container stop <id> [--timeout <sec>]
-diplo container inspect <id>
-diplo container rename <id> <nouveau_nom>
-diplo container logs <id> [--follow] [--tail <n>]
-diplo container exec <id> <cmd> [args...]
-diplo container top <id>
-diplo container stats <id>
-diplo container namespaces
+diplowalker container list [--all] [-n <namespace>]
+diplowalker container create <image> <nom> --mount "src=...,dst=...[;ro]"
+diplowalker container delete <id> [-f]
+diplowalker container start <id>
+diplowalker container stop <id> [--timeout <sec>]
+diplowalker container inspect <id>
+diplowalker container rename <id> <nouveau_nom>
+diplowalker container logs <id> [--follow] [--tail <n>]
+diplowalker container exec <id> <cmd> [args...]
+diplowalker container top <id>
+diplowalker container stats <id>
+diplowalker container namespaces
 
 # Images
-diplo container image-list [-n <namespace>]
-diplo container image-inspect <ref>
-diplo container image-remove <ref>
-diplo container image-tag <source> <cible>
-diplo container pull <ref> [--user <utilisateur>]
-diplo container image-search <terme> [--registry <registre>] [--limit <n>]   # docker.io, quay.io, mcr.microsoft.com ; ghcr.io : aucun résultat (alias <registre> acceptés)
-diplo container login <registre> --username <u> [--password <p>]   # ghcr.io, docker.io, quay.io, mcr.microsoft.com (alias : ghcr, dockerhub, quay, mcr)
-diplo container logout <registre>
+diplowalker container image-list [-n <namespace>]
+diplowalker container image-inspect <ref>
+diplowalker container image-remove <ref>
+diplowalker container image-tag <source> <cible>
+diplowalker container pull <ref> [--user <utilisateur>]
+diplowalker container image-search <terme> [--registry <registre>] [--limit <n>]   # docker.io, quay.io, mcr.microsoft.com ; ghcr.io : aucun résultat (alias <registre> acceptés)
+diplowalker container login <registre> --username <u> [--password <p>]   # ghcr.io, docker.io, quay.io, mcr.microsoft.com (alias : ghcr, dockerhub, quay, mcr)
+diplowalker container logout <registre>
 
 # Catalogue d'images
-diplo container catalog-list [--catalog <fichier>]
-diplo container catalog-add <ref> [--note <texte>] [--no-pull] [--catalog <fichier>]
-diplo container catalog-update <ref> [--target <nouvelle_ref>] [--note <texte>] [--catalog <fichier>]
-diplo container catalog-delete <ref> [--no-docker] [--catalog <fichier>]
+diplowalker container catalog-list [--catalog <fichier>]
+diplowalker container catalog-add <ref> [--note <texte>] [--no-pull] [--catalog <fichier>]
+diplowalker container catalog-update <ref> [--target <nouvelle_ref>] [--note <texte>] [--catalog <fichier>]
+diplowalker container catalog-delete <ref> [--no-docker] [--catalog <fichier>]
 
 # Volumes
-diplo volume list
-diplo volume create <nom> [--driver local|smb|nfs]
-diplo volume inspect <id>
-diplo volume remove <id> [-f]
-diplo volume mount <id> <cible>
-diplo volume unmount <id> <cible>
-diplo volume prune
+diplowalker volume list
+diplowalker volume create <nom> [--driver local|smb|nfs]
+diplowalker volume inspect <id>
+diplowalker volume remove <id> [-f]
+diplowalker volume mount <id> <cible>
+diplowalker volume unmount <id> <cible>
+diplowalker volume prune
 
 # Réseaux
-diplo network list
-diplo network create <nom> [--driver bridge|none|custom_cni|pod]
-diplo network inspect <id>
-diplo network remove <id> [-f]
-diplo network connect <réseau> <conteneur>
-diplo network disconnect <réseau> <conteneur> [-f]
-diplo network run-cni-plugin <plugin> <cmd> <conteneur> <netns>
-diplo network prune
+diplowalker network list
+diplowalker network create <nom> [--driver bridge|none|custom_cni|pod]
+diplowalker network inspect <id>
+diplowalker network remove <id> [-f]
+diplowalker network connect <réseau> <conteneur>
+diplowalker network disconnect <réseau> <conteneur> [-f]
+diplowalker network run-cni-plugin <plugin> <cmd> <conteneur> <netns>
+diplowalker network prune
 
 # Images disque
-diplo disk create-image <source> <dest> [--format vhd|vhdx|vmdk|vdi|raw]
+diplowalker disk create-image <source> <dest> [--format vhd|vhdx|vmdk|vdi|raw]
 
 # Compose
-diplo compose up <fichier>
-diplo compose down <fichier>
-diplo compose ps <fichier>
-diplo compose logs <fichier> [-s <service>]
-diplo compose pull <fichier>
-diplo compose build <fichier>
+diplowalker compose up <fichier>
+diplowalker compose down <fichier>
+diplowalker compose ps <fichier>
+diplowalker compose logs <fichier> [-s <service>]
+diplowalker compose pull <fichier>
+diplowalker compose build <fichier>
 
 # Configuration
-diplo config init [--path <chemin>] [--transport tcp|pipe]
+diplowalker config init [--path <chemin>] [--transport tcp|pipe]
 
 # Version
-diplo version
+diplowalker version
 ```
 
 ### Modules mutualisés
@@ -636,7 +636,7 @@ diplo version
 | Module                       | Projet       | Rôle                                                                 |
 | ---------------------------- | ------------ | -------------------------------------------------------------------- |
 | `JsonHelpers`                | Abstractions | Extraction typée de propriétés `JsonElement`                         |
-| `DiploJson`                  | Abstractions | Options sérialisation JSON centralisées                              |
+| `DiploWalkerJson`                  | Abstractions | Options sérialisation JSON centralisées                              |
 | `ProcessExec`                | Abstractions | Exécution processus externes + PowerShell                            |
 | `ServiceGuards`              | Abstractions | Guards de validation d'entrée (RpcException)                         |
 | `CachedConfig<'T>`           | Abstractions | Cache générique avec invalidation manuelle                           |
@@ -665,7 +665,7 @@ Le montage réel des images disque et la communication gRPC ont été validés e
 - `--namespace`/`-n` est une option **globale** (avant la sous-commande).
 - `container create` attend `<IMAGE> <CONTAINER>` et ne produit aucune sortie en cas de succès.
 - `exec` est `tasks exec` ; `task info` et `task logs` ont été supprimés en v2.
-- Les logs sont capturés par le service dans `%ProgramData%\Diplo\logs\<id>.log` et relus par `container logs --follow`.
+- Les logs sont capturés par le service dans `%ProgramData%\DiploWalker\logs\<id>.log` et relus par `container logs --follow`.
 
 Résultats validés : montage bind R/W bidirectionnel, `container logs --follow` en streaming, named pipes et TCP, suppression idempotente (`delete -f`), et write-back d'images disque.
 
