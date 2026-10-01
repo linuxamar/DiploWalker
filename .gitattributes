@@ -46,20 +46,32 @@ src/DiploWalker.Installer/assets/artifacts.manifest      text eol=lf
 src/DiploWalker.Installer/assets/artifacts.manifest.sig  text eol=lf
 src/DiploWalker.Installer/assets/DiploWalker-release.pub text eol=lf
 
+# --- Certificats TLS leaf-tls-server : LF obligatoire ---------------------
+# Comme pour les assets signés, les fichiers de la PKI TLS doivent rester en LF
+# pour éviter les problèmes avec OpenSSL et la vérification d'empreinte.
+certificates/leaf-tls-server/**    text eol=lf
+
 # --- PKI X509 : matériel secret chiffré par git-crypt ------------------------
 # Les clés privées et les PFX de signature sont versionnés pour que la CI
 # (job `release`) puisse signer les binaires et l'installateur. git-crypt les
 # chiffre au repos dans l'index et le worktree : le dépôt ne contient que du
 # ciphertext, la clé de déchiffrement est un secret hors dépôt.
-# Aucun recouvrement avec les motifs Git LFS ci-dessus (*.pem et *.pfx n'y
-# figurent pas) : les deux filtres ne se disputent jamais un même fichier.
 # Voir certificates/README.md pour la distribution de la clé.
-certificates/**/*.key.pem   filter=git-crypt diff=git-crypt merge=git-crypt
-certificates/**/*.pfx       filter=git-crypt diff=git-crypt merge=git-crypt
-
-# --- Certificats TLS leaf-tls-server : LF obligatoire ---------------------
-# Comme pour les assets signés, les fichiers de la PKI TLS doivent rester en LF
-# pour éviter les problèmes avec OpenSSL et la vérification d'empreinte.
-certificates/leaf-tls-server/**    text eol=lf
+#
+# Ce bloc doit rester APRÈS `certificates/leaf-tls-server/**` : en gitattributes
+# le dernier motif qui correspond l'emporte, or la règle TLS ci-dessus fixe
+# `text eol=lf` sur tout ce répertoire, y compris sur la clé privée qui est
+# elle-même chiffrée. Le ciphertext étant binaire, il contient au moins une
+# séquence CRLF : sans `-text`, `git status` normalise CRLF->LF, calcule un
+# hash différent de celui de l'index et déclare le fichier modifié. `git-crypt
+# unlock` refuse alors de démarrer (« Error: Working directory not clean. »).
+# `-text` coupe toute conversion de fin de ligne sur les fichiers chiffrés ;
+# git-crypt réécrit le contenu déchiffré à l'octet près, la normalisation n'a
+# donc rien à faire ici. La même protection vaut pour les autres clés, qui ne
+# portent pas `text` et héritent donc de core.autocrlf sur le runner.
+# Aucun recouvrement avec les motifs Git LFS (*.pem et *.pfx n'y figurent pas) :
+# les deux filtres ne se disputent jamais un même fichier.
+certificates/**/*.key.pem   filter=git-crypt diff=git-crypt merge=git-crypt -text
+certificates/**/*.pfx       filter=git-crypt diff=git-crypt merge=git-crypt -text
 
 .gitattributes    text eol=lf
