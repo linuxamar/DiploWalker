@@ -9,6 +9,13 @@
 
     Comportement :
       - PFX du projet absent  → binaire non signé (message d'information).
+      - PFX présent ET lisible (en-tête DER 0x30 0x82) → signature.
+      - PFX présent MAIS illisible (ex. chiffré git-crypt non déchiffré : le
+        fichier existe sur le disque mais contient du ciphertext ou le message
+        d'erreur en clair) → ERREUR de build explicite. On teste la CHARGE
+        UTILE du PFX (magic DER), pas son existence : un `Exists()` seul
+        considère un ciphertext comme valide et laisse signtool échouer de
+        façon opaque sur les octets chiffrés.
       - PFX présent, signtool introuvable → ERREUR de build (exigence stricte).
       - Désactivation : -p:DiploWalkerSignOutputAfterBuild=false (ex. CI sans clés).
       - Horodatage : -p:DiploWalkerCodeSigningTimestampUrl=http://timestamp.digicert.com
@@ -32,22 +39,85 @@
     <DiploWalkerSigntoolCandidates Include="$(DiploWalkerSigntoolExe)" Condition="'$(DiploWalkerSigntoolExe)' != ''" />
   </ItemGroup>
 
+  <!--
+    Vérifie la charge utile d'un PFX (PKCS#12) AVANT de tenter de signer.
+    Un PFX en clair commence par la balise DER SEQUENCE 0x30 0x82. Un fichier
+    chiffré par git-crypt (non déchiffré), son message d'erreur en clair, ou un
+    fichier corrompu ne commence PAS par ces octets.
+
+    Distingue trois états pour que l'appelant puisse décider :
+      - PfxMissing    = true  : le certificat est absent (build non signé toléré).
+      - PfxIsValidDer = true  : PFX en clair exploitable.
+      - sinon                     : présent mais illisible (ERREUR de build).
+
+    Les sorties sont recâblées via <Output TaskParameter=... PropertyName=.../> :
+    les affecter directement en attribut de la tâche (<Task POut="$(X)"/>) est
+    silencieusement IGNORÉ par MSBuild, ce qui faisait passer un PFX valide pour
+    illisible.
+  -->
+  <UsingTask TaskName="DiploWalkerInspectPfx"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <PfxPath ParameterType="System.String" Required="true" />
+      <PfxIsValidDer ParameterType="System.Boolean" Output="true" />
+      <PfxMissing ParameterType="System.Boolean" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        PfxMissing = false;
+        PfxIsValidDer = false;
+
+        try
+        {
+            using (var stream = System.IO.File.Open(PfxPath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite))
+            {
+                var head = new byte[2];
+                int read = stream.Read(head, 0, 2);
+                PfxIsValidDer = (read == 2 && head[0] == 0x30 && head[1] == 0x82);
+            }
+        }
+        catch (System.IO.FileNotFoundException) { PfxMissing = true; }
+        catch (System.IO.DirectoryNotFoundException) { PfxMissing = true; }
+        // Un acces refuse n'est PAS une absence : le fichier existe mais reste
+        // illisible, donc PfxMissing reste false et le garde le signalera.
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
   <Target Name="DiploWalkerSignBinary" AfterTargets="Build"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(DiploWalkerSignOutputAfterBuild)' == 'true' and '$(TargetPath)' != ''">
 
     <!-- Certificat de signature propre au projet en cours de compilation -->
     <PropertyGroup>
       <DiploWalkerCodeSigningPfx>$(DiploWalkerCodeSigningLeaves)\$(MSBuildProjectName)\$(MSBuildProjectName).pfx</DiploWalkerCodeSigningPfx>
+      <DiploWalkerCodeSigningDisabled>false</DiploWalkerCodeSigningDisabled>
+      <DiploWalkerCodeSigningUnreadable>false</DiploWalkerCodeSigningUnreadable>
     </PropertyGroup>
 
-    <!-- Pas de PFX (poste non initialisé ou CI) : pas de signature -->
+    <!-- Absent (poste non initialisé ou CI) : pas de signature, message d'information -->
     <PropertyGroup Condition="!Exists('$(DiploWalkerCodeSigningPfx)')">
       <DiploWalkerCodeSigningDisabled>true</DiploWalkerCodeSigningDisabled>
+    </PropertyGroup>
+
+    <!-- Présent : valider la charge utile (magic DER) avant de tenter de signer -->
+    <DiploWalkerInspectPfx Condition="'$(DiploWalkerCodeSigningDisabled)' != 'true'"
+                           PfxPath="$(DiploWalkerCodeSigningPfx)">
+      <Output TaskParameter="PfxIsValidDer" PropertyName="DiploWalkerPfxIsValidDer" />
+      <Output TaskParameter="PfxMissing" PropertyName="DiploWalkerPfxMissing" />
+    </DiploWalkerInspectPfx>
+
+    <PropertyGroup Condition="'$(DiploWalkerCodeSigningDisabled)' != 'true' and '$(DiploWalkerPfxIsValidDer)' != 'True'">
+      <DiploWalkerCodeSigningUnreadable>true</DiploWalkerCodeSigningUnreadable>
     </PropertyGroup>
 
     <Message Condition="'$(DiploWalkerCodeSigningDisabled)' == 'true'"
              Importance="normal"
              Text="DiploWalker : certificat de signature absent — $(DiploWalkerCodeSigningPfx). Binaire NON signé. Générer avec certificates\codesigning\leaves\regenerate-leaves.ps1." />
+
+    <!-- Présent mais illisible (git-crypt non déchiffré, accès refusé, corrompu) : échec bruyant -->
+    <Error Condition="'$(DiploWalkerCodeSigningUnreadable)' == 'true'"
+           Text="Signature de code : $(DiploWalkerCodeSigningPfx) est présent mais illisible (ce n'est pas un PFX en clair). S'il est chiffré par git-crypt, exécutez 'git crypt unlock' pour le déchiffrer. On refuse de produire un binaire non signé en silence." />
 
     <!-- Résolution de signtool : la dernière version installée est préférée -->
     <PropertyGroup Condition="'$(DiploWalkerCodeSigningDisabled)' != 'true' and '$(DiploWalkerSigntool)' == '' and '@(DiploWalkerSigntoolCandidates)' != ''">
@@ -74,20 +144,35 @@
     publiés restaient non signés. Cette cible signe après Publish tous les
     binaires Diplo* avec le certificat du projet publié.
     -->
-  <Target Name="DiploWalkerSignPublishOutput" AfterTargets="Publish"
+<Target Name="DiploWalkerSignPublishOutput" AfterTargets="Publish"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(DiploWalkerSignOutputAfterBuild)' == 'true' and '$(PublishDir)' != ''">
 
     <PropertyGroup>
       <DiploWalkerCodeSigningPfx>$(DiploWalkerCodeSigningLeaves)\$(MSBuildProjectName)\$(MSBuildProjectName).pfx</DiploWalkerCodeSigningPfx>
+      <DiploWalkerCodeSigningDisabled>false</DiploWalkerCodeSigningDisabled>
+      <DiploWalkerCodeSigningUnreadable>false</DiploWalkerCodeSigningUnreadable>
     </PropertyGroup>
 
     <PropertyGroup Condition="!Exists('$(DiploWalkerCodeSigningPfx)')">
       <DiploWalkerCodeSigningDisabled>true</DiploWalkerCodeSigningDisabled>
     </PropertyGroup>
 
+    <DiploWalkerInspectPfx Condition="'$(DiploWalkerCodeSigningDisabled)' != 'true'"
+                           PfxPath="$(DiploWalkerCodeSigningPfx)">
+      <Output TaskParameter="PfxIsValidDer" PropertyName="DiploWalkerPfxIsValidDer" />
+      <Output TaskParameter="PfxMissing" PropertyName="DiploWalkerPfxMissing" />
+    </DiploWalkerInspectPfx>
+
+    <PropertyGroup Condition="'$(DiploWalkerCodeSigningDisabled)' != 'true' and '$(DiploWalkerPfxIsValidDer)' != 'True'">
+      <DiploWalkerCodeSigningUnreadable>true</DiploWalkerCodeSigningUnreadable>
+    </PropertyGroup>
+
     <Message Condition="'$(DiploWalkerCodeSigningDisabled)' == 'true'"
              Importance="normal"
              Text="DiploWalker : certificat de signature absent — publication non signée." />
+
+    <Error Condition="'$(DiploWalkerCodeSigningUnreadable)' == 'true'"
+           Text="Signature de code : $(DiploWalkerCodeSigningPfx) est présent mais illisible (ce n'est pas un PFX en clair). S'il est chiffré par git-crypt, exécutez 'git crypt unlock' pour le déchiffrer. On refuse de publier des binaires non signés en silence." />
 
     <PropertyGroup Condition="'$(DiploWalkerCodeSigningDisabled)' != 'true' and '$(DiploWalkerSigntool)' == '' and '@(DiploWalkerSigntoolCandidates)' != ''">
       <DiploWalkerSigntoolList>@(DiploWalkerSigntoolCandidates, ';')</DiploWalkerSigntoolList>
