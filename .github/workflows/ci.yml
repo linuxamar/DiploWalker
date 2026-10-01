@@ -8,6 +8,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Moindre privilège par défaut : les jobs n'obtiennent que la lecture du
+# contenu. Le job `release` élève ensuite à `contents: write` pour publier la
+# page de release. Sans ce bloc, le jeton reçoit les permissions par défaut du
+# dépôt et CodeQL signale `actions/missing-workflow-permissions`.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Build + tests
