@@ -148,60 +148,53 @@ module DiskMounterTests =
             loaded.Count |> should equal 2
             loaded.["c1"].Head.HostPath |> should equal "C:\\staging-c1")
 
-    // ── pruneStaleStaging ──────────────────────────────────────────────
+    // ── Isolation du staging partagé ────────────────────────────────────
+    //
+    // `stagingRoot` est un dossier de PROCESSUS partagé : `DiskMounter.mount`
+    // y crée un sous-dossier GUID par volume monté. Les tests de prune ne
+    // doivent donc supprimer QUE le dossier qu'ils ont eux-mêmes créé — un
+    // `Directory.GetDirectories staging` (tout effacer) supprime les
+    // stagings des tests concurrents, car xunit exécute les classes en
+    // parallèle. Le write-back de ces tests échoue alors en silence
+    // (`MountedVolume.Dispose` avale l'exception via `Log.Error`) et le
+    // contenu relu dans l'image reste l'ancien : un échec aléatoire,
+    // reproductible uniquement en exécution parallèle.
+    let private withStagingDir (name: string) (f: string -> unit) =
+        let staging = DiskMounter.stagingRoot ()
+        let dir = Path.Combine(staging, name)
+        Directory.CreateDirectory dir |> ignore
+
+        try
+            f dir
+        finally
+            // Uniquement CE dossier : les stagings voisins appartiennent à
+            // d'autres tests éventuellement exécutés en parallèle.
+            try
+                if Directory.Exists dir then
+                    Directory.Delete(dir, true)
+            with _ ->
+                ()
 
     [<Fact>]
     let ``pruneStaleStaging supprime les dossiers orphelins anciens`` () =
-        let staging = DiskMounter.stagingRoot ()
-
-        try
-            let guid = Guid.NewGuid().ToString("N")
-            let dir = Path.Combine(staging, guid)
-            Directory.CreateDirectory dir |> ignore
+        withStagingDir (Guid.NewGuid().ToString("N")) (fun dir ->
             // Forcer une date de creation ancienne (>24h)
             let old = DateTime.UtcNow - TimeSpan.FromHours 25.0
             Directory.SetCreationTimeUtc(dir, old)
             DiskMounter.pruneStaleStaging (TimeSpan.FromHours 24.0)
-            Directory.Exists dir |> should equal false
-        finally
-            if Directory.Exists staging then
-                for d in Directory.GetDirectories staging do
-                    try
-                        Directory.Delete(d, true)
-                    with _ -> ()
+            Directory.Exists dir |> should equal false)
 
     [<Fact>]
     let ``pruneStaleStaging conserve les dossiers recents`` () =
-        let staging = DiskMounter.stagingRoot ()
-
-        try
-            let guid = Guid.NewGuid().ToString("N")
-            let dir = Path.Combine(staging, guid)
-            Directory.CreateDirectory dir |> ignore
+        withStagingDir (Guid.NewGuid().ToString("N")) (fun dir ->
             DiskMounter.pruneStaleStaging (TimeSpan.FromHours 24.0)
-            Directory.Exists dir |> should equal true
-        finally
-            if Directory.Exists staging then
-                for d in Directory.GetDirectories staging do
-                    try
-                        Directory.Delete(d, true)
-                    with _ -> ()
+            Directory.Exists dir |> should equal true)
 
     [<Fact>]
     let ``pruneStaleStaging ne supprime pas les dossiers non-GUID`` () =
-        let staging = DiskMounter.stagingRoot ()
-
-        try
-            let dir = Path.Combine(staging, "not-a-guid")
-            Directory.CreateDirectory dir |> ignore
+        withStagingDir "not-a-guid" (fun dir ->
             let old = DateTime.UtcNow - TimeSpan.FromHours 48.0
             Directory.SetCreationTimeUtc(dir, old)
             DiskMounter.pruneStaleStaging (TimeSpan.FromHours 24.0)
-            Directory.Exists dir |> should equal true
-        finally
-            if Directory.Exists staging then
-                for d in Directory.GetDirectories staging do
-                    try
-                        Directory.Delete(d, true)
-                    with _ -> ()
+            Directory.Exists dir |> should equal true)
 

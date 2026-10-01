@@ -1,4 +1,4 @@
-# CONTEXT.md
+﻿# CONTEXT.md
 
 Mémoire de travail de session (à réécrire à chaque session). Les règles stables vivent dans `AGENTS.md` et `CLAUDE.md` ; ici uniquement l'état présent et la connaissance non écrite ailleurs.
 
