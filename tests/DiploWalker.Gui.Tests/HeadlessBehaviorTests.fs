@@ -18,15 +18,30 @@ open DiploWalker.TestHelpers
 // Le harnais headless (HeadlessRunner.setupHeadless) possède un thread dédié
 // qui pompe le Dispatcher ; waitPump ne fait que poller les collections.
 
+// waitPump se contente de poller les collections. Certains prédicats énumèrent
+// LogLines pendant que le thread du Dispatcher y ajoute une ligne, or
+// ObservableCollection lève alors « Collection was modified ; enumeration
+// operation may not execute ». Cette exception est transitoire et signifie
+// seulement « pas encore prêt » : on retente jusqu'au délai imparti.
 let private waitPump (predicate: unit -> bool) =
     let sw = Diagnostics.Stopwatch.StartNew()
-    let mutable ok = predicate ()
 
-    while not ok && sw.ElapsedMilliseconds < 10000L do
-        Thread.Sleep(10)
-        ok <- predicate ()
+    let rec poll () =
+        if sw.ElapsedMilliseconds >= 10000L then
+            false
+        else
+            try
+                if predicate () then
+                    true
+                else
+                    Thread.Sleep(10)
+                    poll ()
+            with
+            | :? InvalidOperationException ->
+                Thread.Sleep(10)
+                poll ()
 
-    ok
+    poll ()
 
 // ── ContainerTabViewModel ──────────────────────────────────────
 
