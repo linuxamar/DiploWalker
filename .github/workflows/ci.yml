@@ -82,10 +82,43 @@ jobs:
           if (-not $env:GIT_CRYPT_KEY) {
             throw "Secret GIT_CRYPT_KEY absent : impossible de signer. C'est attendu pour une PR depuis une fork, mais pas pour une publication."
           }
+
+          # `git-crypt unlock` refuse de dechiffrer si `git status` signale la moindre
+          # modification suivi (commands.cpp : `git status -uno --porcelain`). Or la
+          # conversion de fins de ligne est un source de differences sans rapport avec
+          # le contenu : sur le runner Windows, actions/checkout materialise l'arbre
+          # avec core.autocrlf, alors que git-crypt exige des octets exacts. On fige
+          # donc LF (coherent avec .gitattributes) et on rematerialise l'arbre avant
+          # de sonder, sinon le dechiffrement echoue sur une difference de CRLF.
+          # L'etat est affiche : si ce garde-fou masque un vrai fichier modifie, il
+          # faut le voir dans le log plutot que le decouvrir a la signature.
+          $before = @(git status --porcelain -uno)
+          Write-Host "  core.autocrlf avant : '$(git config core.autocrlf)'"
+          Write-Host "  Fichiers modifies avant normalisation : $($before.Count)"
+          if ($before.Count -gt 0) {
+            $before | Select-Object -First 10 | ForEach-Object { Write-Host "    $_" }
+          }
+
+          git config --local core.autocrlf false
+          git config --local core.eol lf
+          git reset --hard --quiet HEAD
+
+          $after = @(git status --porcelain -uno)
+          Write-Host "  Fichiers modifies apres normalisation : $($after.Count)"
+          if ($after.Count -gt 0) {
+            $after | Select-Object -First 10 | ForEach-Object { Write-Host "    $_" }
+            throw "L'arbre reste sale apres normalisation des fins de ligne : dechiffrement refuse pour ne pas ecraser du contenu. Voir la liste ci-dessus."
+          }
+
           $keyFile = Join-Path $env:RUNNER_TEMP "git-crypt.key"
           [System.IO.File]::WriteAllBytes($keyFile, [System.Convert]::FromBase64String($env:GIT_CRYPT_KEY))
-          git-crypt unlock $keyFile
-          Remove-Item $keyFile -Force
+          try {
+            git-crypt unlock $keyFile
+          } finally {
+            # La cle ne doit pas survivre a l'etape, meme en cas d'echec.
+            if (Test-Path $keyFile) { Remove-Item $keyFile -Force }
+          }
+
           $pfx = "certificates/codesigning/leaves/DiploWalker.Installer/DiploWalker.Installer.pfx"
           if (-not (Test-Path $pfx)) { throw "PFX de signature absent après déchiffrement : $pfx" }
       - name: Restauration NuGet
