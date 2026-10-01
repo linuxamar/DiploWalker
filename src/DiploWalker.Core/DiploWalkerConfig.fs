@@ -18,8 +18,8 @@ module DiploWalkerConfig =
     let private configFileName = "DiploWalker.json"
 
     /// Résout l'adresse complète (URL) d'un service à partir de l'adresse configurée :
-    /// - "localhost:5001"            → "http://localhost:5001"
-    /// - "http://pipe:/diplo-container" → inchangé (URL complète, canal par named pipe)
+    /// - "localhost:5001"                    → "http://localhost:5001"
+    /// - "http://pipe:/diplowalker-container" → inchangé (URL complète, canal par named pipe)
     let normalizeAddress (address: string) : string =
         let a = address.Trim()
         if a.Contains("://") then a else "http://" + a
