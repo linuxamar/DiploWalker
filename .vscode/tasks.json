@@ -19,6 +19,42 @@
       }
     },
     {
+      "label": "DiploWalker : recompiler tous les projets",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "msbuild",
+        "-t:rebuild",
+        "-restore",
+        "${workspaceFolder}/DiploWalker.slnx"
+      ],
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+     {
+      "label": "DiploWalker : compiler tous les projets",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "msbuild",
+        "-t:build",
+        "-restore",
+        "${workspaceFolder}/DiploWalker.slnx"
+      ],
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
       "label": "DiploWalker : tester la GUI",
       "type": "process",
       "command": "dotnet",
