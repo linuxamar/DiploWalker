@@ -99,7 +99,7 @@ Ce découpage a trois effets :
 ```
 Poste de travail (client)               Hôte Windows Server (autorité)
 ┌──────────────────────────────┐        ┌──────────────────────────────────────┐
-│  diplowalker (CLI)                 │        │  DiploWalker.Container   :5001/6001  │
+│  diplowalker (CLI)           │        │  DiploWalker.Container   :5001/6001  │
 │  DiploWalker.Gui (Avalonia)  │──gRPC─▶│  DiploWalker.Volume      :5002/6002  │
 │                              │        │  DiploWalker.Network     :5003/6003  │
 │  DiploWalker.json            │        │  DiploWalker.Installer               │
@@ -227,7 +227,7 @@ Le désinstalleur retire les certificats des magasins machine et supprime les fi
 
 Le dépôt fournit le script officiel Microsoft
 [`install-containerd-runtime.ps1`](https://github.com/microsoft/Windows-Containers/blob/Main/helpful_tools/Install-ContainerdRuntime/install-containerd-runtime.ps1)
-(microsoft/Windows-Containers), vendoré tel quel dans `setup/`. Il permet
+(microsoft/Windows-Containers), repris tel quel dans `setup/`. Il permet
 d'installer et de configurer containerd et nerdctl de manière autonome, sans
 l'installateur DiploWalker :
 
