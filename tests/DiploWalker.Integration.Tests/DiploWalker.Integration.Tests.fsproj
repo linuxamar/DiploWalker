@@ -9,7 +9,6 @@
     <Compile Include="VolumeIntegrationTests.fs" />
     <Compile Include="ContainerIntegrationTests.fs" />
     <Compile Include="NetworkIntegrationTests.fs" />
-    <Compile Include="PipeTlsIntegrationTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,4 +29,3 @@
   </ItemGroup>
 
 </Project>
-

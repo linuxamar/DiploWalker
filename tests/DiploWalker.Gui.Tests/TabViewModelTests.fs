@@ -255,14 +255,14 @@ let ``SettingsTabViewModel SaveCommand ecrit la configuration sur le disque`` ()
     withConfigHome (fun home ->
         let port = MockOutputPort()
         let vm = new SettingsTabViewModel(port)
-        vm.ContainerAddress <- "http://pipe:/diplo-container"
+        vm.ContainerAddress <- "localhost:9001"
         vm.VolumeAddress <- "localhost:9002"
         vm.NetworkAddress <- "localhost:9003"
         (vm.SaveCommand).Execute(null)
         let path = Path.Combine(home, "DiploWalker.json")
         File.Exists path |> should equal true
         let (c, v, n) = DiploWalkerConfig.load path
-        c |> should equal (Some "http://pipe:/diplo-container")
+        c |> should equal (Some "http://localhost:9001")
         v |> should equal (Some "http://localhost:9002")
         n |> should equal (Some "http://localhost:9003")
 
@@ -286,13 +286,13 @@ let ``SettingsTabViewModel SaveCommand applique la configuration sans redemarrag
     withConfigHome (fun _ ->
         let port = MockOutputPort()
         let vm = new SettingsTabViewModel(port)
-        vm.ContainerAddress <- "http://pipe:/diplo-container"
+        vm.ContainerAddress <- "localhost:9001"
         vm.VolumeAddress <- "localhost:9002"
         vm.NetworkAddress <- "localhost:9003"
         (vm.SaveCommand).Execute(null)
 
         DiploWalkerConfig.containerAddress ()
-        |> should equal (Some "http://pipe:/diplo-container")
+        |> should equal (Some "http://localhost:9001")
 
         DiploWalkerConfig.volumeAddress () |> should equal (Some "http://localhost:9002"))
 
@@ -533,6 +533,5 @@ let ``ComposeTabViewModel ComposeFilePath charge l'editeur`` () =
         vm.ComposeEditor.Document.Text.Contains("nginx") |> should equal true
     finally
         TestHelpers.cleanupDir dir
-
 
 

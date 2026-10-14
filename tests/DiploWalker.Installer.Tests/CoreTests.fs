@@ -111,7 +111,7 @@ module CoreTests =
         toml.Contains(sprintf "state = \"%s\"" containerdStateDir) |> should equal true
 
     [<Fact>]
-    let ``buildContainerdConfigToml configure l'adresse gRPC par named pipe`` () =
+    let ``buildContainerdConfigToml configure le named pipe du socket containerd`` () =
         let toml = buildContainerdConfigToml ()
         toml.Contains("address = \"npipe:////./pipe/containerd-containerd\"") |> should equal true
 
@@ -143,4 +143,3 @@ module CoreTests =
         else
             getMinContainerdVersion () |> should equal "1.7.27"
             isLegacyContainerd () |> should equal false
-

@@ -62,20 +62,8 @@ module DiploWalkerChannelTests =
         (fun () -> SecurityValidation.validateGrpcAddress "" |> ignore)
         |> should throw typeof<Exception>
 
-    // ── Adresses par named pipe ─────────────────────────────────────
-
     [<Fact>]
-    let ``forAddress avec adresse pipe valide ne lève pas`` () =
-        DiploWalkerChannel.forAddress "http://pipe:/diplo-container"
-
-    [<Fact>]
-    let ``forAddress avec nom de pipe vide lance une exception`` () =
-        (fun () -> DiploWalkerChannel.forAddress "http://pipe:/" |> ignore)
+    let ``forAddress avec hôte pipe lance une exception`` () =
+        (fun () -> DiploWalkerChannel.forAddress "http://pipe:/diplo-container" |> ignore)
         |> should throw typeof<Exception>
-
-    [<Fact>]
-    let ``forAddress avec nom de pipe contenant backslash lance une exception`` () =
-        (fun () -> DiploWalkerChannel.forAddress @"http://pipe:/diplo\evil" |> ignore)
-        |> should throw typeof<Exception>
-
 

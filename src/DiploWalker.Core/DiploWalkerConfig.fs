@@ -19,7 +19,6 @@ module DiploWalkerConfig =
 
     /// Résout l'adresse complète (URL) d'un service à partir de l'adresse configurée :
     /// - "localhost:5001"                    → "http://localhost:5001"
-    /// - "http://pipe:/diplowalker-container" → inchangé (URL complète, canal par named pipe)
     let normalizeAddress (address: string) : string =
         let a = address.Trim()
         if a.Contains("://") then a else "http://" + a
@@ -173,5 +172,4 @@ module DiploWalkerConfig =
                 File.Delete(tmp)
             with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
             reraise ()
-
 

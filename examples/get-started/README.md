@@ -263,26 +263,20 @@ Get-ChildItem "$env:ProgramFiles\Diplo\logs\diplo-container-*.log" |
 
 #### « Impossible de se connecter au serveur gRPC »
 
-Diplo utilise des **Named Pipes** (par défaut) ou **TCP** pour la communication
-inter-services. Le client se connecte automatiquement via le mécanisme configuré.
+Diplo utilise TCP sur la boucle locale pour la communication inter-services.
 
 ```powershell
 # Vérifier que les services sont en cours d'exécution
 diplo status check
 
-# Vérifier les pipes nommées
-Get-ChildItem \\.\pipe\ | Where-Object { $_.Name -like "diplo*" }
-
-# Tester la connexion TCP (si UseTcp=true dans appsettings.json)
+# Tester la connexion TCP (5001 en Debug, 6001 en Release)
 Test-NetConnection -ComputerName localhost -Port 5001  # 5001 en Debug, 6001 en Release
 ```
 
 #### « L'adresse gRPC n'est pas autorisée »
 
 La validation de sécurité impose que les connexions gRPC pointent vers
-`localhost`, `127.0.0.1`, `::1` ou un named pipe (`http://pipe:/<nom>` : ici `http://`
-est une enveloppe et `pipe` est l'hôte qui sélectionne le transport, pas le
-schéma — le tube est la partie qui suit `pipe:/`).
+`localhost`, `127.0.0.1` ou `::1`. Le transport gRPC utilise TCP sur la boucle locale.
 
 ```powershell
 # Vérifier la configuration de connexion
@@ -291,8 +285,6 @@ Get-Content "$env:ProgramFiles\Diplo\DiploWalker.Container\appsettings.json"
 # Les adresses autorisées sont :
 #   http://localhost:5001 (Debug) | http://localhost:6001 (Release)
 #   http://127.0.0.1:5001 (Debug) | http://127.0.0.1:6001 (Release)
-#   http://pipe:/diplo-container
-#     (enveloppe http://, hote pipe, tube diplo-container)
 ```
 
 #### « Token d'authentification invalide ou expiré »
@@ -309,18 +301,6 @@ Remove-Item "C:\ProgramData\Diplo\auth-token.json"
 sc.exe restart "DiploWalker.Container"
 sc.exe restart "DiploWalker.Volume"
 sc.exe restart "DiploWalker.Network"
-```
-
-#### « Le nom du pipe est invalide »
-
-Le format attendu est `http://pipe:/<nom>` sans caractères spéciaux. Attention :
-ne retirez pas le préfixe `http://`, il rend l'adresse valide ; `pipe` est
-l'hôte et non le schéma, et le tube est la partie qui suit `pipe:/`.
-
-```powershell
-# Configuration correcte dans appsettings.json :
-#   "NamedPipeName": "diplo-container"
-#   "UseNamedPipes": true
 ```
 
 ---
@@ -549,4 +529,3 @@ dotnet --list-runtimes
 ```
 
 Envoyez ces informations avec une description détaillée du problème.
-

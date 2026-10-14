@@ -53,13 +53,13 @@ module DiploWalkerConfigTests =
     let ``load avec fichier valide renvoie les adresses normalisées`` () =
         let dir, path =
             tempFile
-                """{ "container": { "address": "localhost:5001" }, "network": { "address": "http://pipe:/diplo-network" } }"""
+                """{ "container": { "address": "localhost:5001" }, "network": { "address": "localhost:5003" } }"""
 
         try
             let (c, v, n) = DiploWalkerConfig.load path
             c |> should equal (Some "http://localhost:5001")
             v |> should equal None
-            n |> should equal (Some "http://pipe:/diplo-network")
+            n |> should equal (Some "http://localhost:5003")
         finally
             Directory.Delete(dir, true)
 
@@ -100,11 +100,11 @@ module DiploWalkerConfigTests =
 
         try
             let path = Path.Combine(dir, "DiploWalker.json")
-            DiploWalkerConfig.save path "localhost:5001" "localhost:5002" "http://pipe:/diplo-network"
+            DiploWalkerConfig.save path "localhost:5001" "localhost:5002" "localhost:5003"
             let (c, v, n) = DiploWalkerConfig.load path
             c |> should equal (Some "http://localhost:5001")
             v |> should equal (Some "http://localhost:5002")
-            n |> should equal (Some "http://pipe:/diplo-network")
+            n |> should equal (Some "http://localhost:5003")
         finally
             Directory.Delete(dir, true)
 
@@ -191,11 +191,6 @@ module DiploWalkerConfigTests =
         |> should equal "http://localhost:5001"
 
     [<Fact>]
-    let ``normalizeAddress avec URL pipe inchangée`` () =
-        DiploWalkerConfig.normalizeAddress "http://pipe:/diplo-container"
-        |> should equal "http://pipe:/diplo-container"
-
-    [<Fact>]
     let ``normalizeAddress avec URL http inchangée`` () =
         DiploWalkerConfig.normalizeAddress "http://localhost:5001"
         |> should equal "http://localhost:5001"
@@ -210,12 +205,12 @@ module DiploWalkerConfigTests =
     [<Fact>]
     let ``parse avec toutes les sections renvoie les adresses normalisées`` () =
         let json =
-            """{ "container": { "address": "localhost:5001" }, "volume": { "address": "localhost:5002" }, "network": { "address": "http://pipe:/diplo-network" } }"""
+            """{ "container": { "address": "localhost:5001" }, "volume": { "address": "localhost:5002" }, "network": { "address": "localhost:5003" } }"""
 
         let (c, v, n) = DiploWalkerConfig.parse json
         c |> should equal (Some "http://localhost:5001")
         v |> should equal (Some "http://localhost:5002")
-        n |> should equal (Some "http://pipe:/diplo-network")
+        n |> should equal (Some "http://localhost:5003")
 
     [<Fact>]
     let ``parse avec section absente renvoie None pour cette section`` () =
@@ -250,6 +245,5 @@ module DiploWalkerConfigTests =
         let json = """{ "container": { "address": 42 } }"""
         let (c, _, _) = DiploWalkerConfig.parse json
         c |> should equal None
-
 
 

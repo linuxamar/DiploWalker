@@ -13,9 +13,6 @@ type InitConfigSettings() =
     [<CommandOption("--path")>]
     member val Path = "" with get, set
 
-    [<CommandOption("--transport")>]
-    member val Transport = "tcp" with get, set
-
 type InitConfigCommand(output: IOutputPort) =
     inherit Command<InitConfigSettings>()
 
@@ -39,59 +36,22 @@ type InitConfigCommand(output: IOutputPort) =
             DiploWalkerPorts.Volume
             DiploWalkerPorts.Network
 
-    let pipeConfig =
-        // TLS par défaut : le client épingle l'empreinte de
-        // `certificates\leaf-tls-server` (cf. PipeTls). `http://pipe:/` reste
-        // accepté pour les déploiements existants, mais il transmet le token
-        // d'authentification en clair.
-        // Les noms de pipes sont suffixés par "-debug" en configuration Debug
-        // pour permettre l'exécution simultanée avec une installation Release.
-        sprintf
-            """{
-  ""container"": {
-    ""address"": ""https://pipe:/%s"",
-    ""namespace"": ""default""
-  },
-  ""volume"": {
-    ""address"": ""https://pipe:/%s""
-  },
-  ""network"": {
-    ""address"": ""https://pipe:/%s""
-  },
-  ""logLevel"": ""Information""
-}"""
-            DiploWalkerPorts.ContainerPipe
-            DiploWalkerPorts.VolumePipe
-            DiploWalkerPorts.NetworkPipe
-
     override _.Execute(_ctx, settings, _ct: CancellationToken) =
-        let content =
-            match settings.Transport.ToLowerInvariant() with
-            | "tcp" -> Some defaultConfig
-            | "pipe" -> Some pipeConfig
-            | other ->
-                output.WriteError(sprintf "Transport inconnu : '%s'. Valeurs acceptées : tcp, pipe" other)
-                None
+        let filePath =
+            if String.IsNullOrWhiteSpace(settings.Path) then
+                Path.Combine(Directory.GetCurrentDirectory(), "DiploWalker.json")
+            else
+                settings.Path
 
-        match content with
-        | None -> 1
-        | Some content ->
-            let filePath =
-                if String.IsNullOrWhiteSpace(settings.Path) then
-                    Path.Combine(Directory.GetCurrentDirectory(), "DiploWalker.json")
-                else
-                    settings.Path
+        let dir = Path.GetDirectoryName(filePath)
 
-            let dir = Path.GetDirectoryName(filePath)
+        if not (String.IsNullOrWhiteSpace(dir)) && not (Directory.Exists(dir)) then
+            Directory.CreateDirectory(dir) |> ignore
 
-            if not (String.IsNullOrWhiteSpace(dir)) && not (Directory.Exists(dir)) then
-                Directory.CreateDirectory(dir) |> ignore
-
-            try
-                File.WriteAllText(filePath, content)
-                output.WriteSuccess(sprintf "Configuration écrite dans %s" filePath)
-                0
-            with ex ->
-                output.WriteError(sprintf "Erreur lors de l'écriture de %s : %s" filePath ex.Message)
-                1
-
+        try
+            File.WriteAllText(filePath, defaultConfig)
+            output.WriteSuccess(sprintf "Configuration écrite dans %s" filePath)
+            0
+        with ex ->
+            output.WriteError(sprintf "Erreur lors de l'écriture de %s : %s" filePath ex.Message)
+            1

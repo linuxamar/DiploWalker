@@ -543,8 +543,6 @@ module SecurityValidation =
 
     /// Vérifie qu'une adresse gRPC pointe vers localhost uniquement.
     /// Empêche la fuite de tokens d'authentification sur le réseau.
-    /// Les adresses par named pipe ("http://pipe:/<nom>") sont acceptées : elles
-    /// désignent un canal local, on ne fait donc qu'en valider le nom de tube.
     let validateGrpcAddress (address: string) =
         if String.IsNullOrWhiteSpace(address) then
             raise (RpcException(Status(StatusCode.InvalidArgument, "L'adresse gRPC ne peut pas être vide")))
@@ -561,42 +559,19 @@ module SecurityValidation =
                     )
                 )
 
-            if String.Equals(uri.Host, "pipe", System.StringComparison.OrdinalIgnoreCase) then
-                // Le Uri de .NET normalise les backslashes du chemin en slashes :
-                // on extrait le nom du pipe de la chaîne brute pour ne rien manquer.
-                let idx = address.IndexOf("pipe:", System.StringComparison.OrdinalIgnoreCase)
-                let name = address.Substring(idx + 5).TrimStart('/')
+            let host = uri.Host.Trim('[', ']')
 
-                if
-                    String.IsNullOrWhiteSpace(name)
-                    || name.Contains("\\")
-                    || name.Contains("..")
-                    || name.Contains("\u0000")
-                then
-                    raise (
-                        RpcException(
-                            Status(
-                                StatusCode.InvalidArgument,
-                                sprintf
-                                    "Le nom du pipe '%s' est invalide. Utilisez une adresse de la forme http://pipe:/<nom>"
-                                    name
-                            )
+            if not (allowedGrpcHosts.Contains(host)) then
+                raise (
+                    RpcException(
+                        Status(
+                            StatusCode.InvalidArgument,
+                            sprintf
+                                "L'adresse gRPC '%s' n'est pas autorisée. Seul l'hôte local est accepté (localhost, 127.0.0.1, ::1)"
+                                address
                         )
                     )
-            else
-                let host = uri.Host.Trim('[', ']')
-
-                if not (allowedGrpcHosts.Contains(host)) then
-                    raise (
-                        RpcException(
-                            Status(
-                                StatusCode.InvalidArgument,
-                                sprintf
-                                    "L'adresse gRPC '%s' n'est pas autorisée. Seul l'hôte local est accepté (localhost, 127.0.0.1, ::1)"
-                                    address
-                            )
-                        )
-                    )
+                )
         | false, _ ->
             raise (
                 RpcException(
@@ -762,4 +737,3 @@ module SecurityValidation =
                         )
                     )
                 )
-

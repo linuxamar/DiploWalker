@@ -10,7 +10,7 @@
 #
 #  Chaine generee :
 #    root-ca (auto-signe, pathlen:2)
-#      |- authentification  (pathlen:0)  - leaf-tls-server (TLS des named pipes)
+#      |- authentification  (pathlen:0)
 #      |- system            (pathlen:0)  - leaf-dll-validation,
 #      |                                  leaf-config-encryption
 #      |- codesigning       (pathlen:0)  - une feuille par projet
@@ -23,7 +23,6 @@
 #    .\certificates\regenerate-pki.ps1                        # bootstrapping
 #    .\certificates\regenerate-pki.ps1 -Force                # regenere les cles
 #    .\certificates\regenerate-pki.ps1 -SkipProjectLeaves     # seulement les CAs
-#    .\certificates\regenerate-pki.ps1 -OnlyTlsLeaf           # seulement la feuille TLS
 #    .\certificates\regenerate-pki.ps1 -OpenSSLPath D:\...\openssl.exe
 #
 #  Les cles et PFX produits sont sans phrase de passe (usage demonstration
@@ -34,7 +33,6 @@
 param(
     [switch]$Force,
     [switch]$SkipProjectLeaves,
-    [switch]$OnlyTlsLeaf,
     [string]$OpenSSLPath
 )
 
@@ -103,42 +101,6 @@ function Invoke-OpenSsl {
             if ([string]::IsNullOrWhiteSpace($detail)) { $detail = "(aucune sortie)" }
             throw "Echec openssl ($What) dans $WorkingDirectory (code $code) : $detail"
         }
-    } finally {
-        Remove-Item $log -Force -ErrorAction SilentlyContinue
-    }
-}
-
-# --- Empreinte SHA-1 d'un certificat PEM -------------------------------------
-# Le client DiploWalker epingle cette empreinte (PipeTls.ExpectedServerThumbprint) :
-# la regenere ci-dessous doit donc rester lisible apres coup.
-function Get-Sha1Thumbprint {
-    param([string]$CertificatePath)
-
-    $dir  = Split-Path -Parent $CertificatePath
-    $leaf = Split-Path -Leaf $CertificatePath
-    $log  = [System.IO.Path]::GetTempFileName()
-
-    try {
-        Push-Location $dir
-        try {
-            # Meme raison que Invoke-OpenSsl : stderr de openssl ne doit pas
-            # terminer le script sous $ErrorActionPreference = "Stop".
-            $ErrorActionPreference = "Continue"
-            $out  = & $openssl x509 -in $leaf -noout -fingerprint -sha1 2> $log
-            $code = $LASTEXITCODE
-        } finally {
-            $ErrorActionPreference = "Stop"
-            Pop-Location
-        }
-
-        if ($code -ne 0) {
-            $detail = Get-Content $log -Raw
-            if ([string]::IsNullOrWhiteSpace($detail)) { $detail = "(aucune sortie)" }
-            throw "Echec openssl (empreinte de $leaf, code $code) : $detail"
-        }
-
-        # "sha1 Fingerprint=AB:CD:..." -> "ABCD..."
-        return (($out -join "").Split("=")[-1]).Replace(":", "").Trim().ToUpperInvariant()
     } finally {
         Remove-Item $log -Force -ErrorAction SilentlyContinue
     }
@@ -286,27 +248,10 @@ function New-ExtraLeaf {
 
     Write-Host "  OK $Name" -ForegroundColor Green
 
-    # Avertissement specifique a la feuille TLS : son empreinte est compilee
-    # dans le client, une regeneration casse donc toute installation en place.
-    if ($Name -eq "leaf-tls-server") {
-        Write-Host "  empreinte SHA-1 : $(Get-Sha1Thumbprint -CertificatePath $crt)" -ForegroundColor Yellow
-        Write-Host "  [!] Mettez a jour ExpectedServerThumbprint dans" -ForegroundColor Yellow
-        Write-Host "      src\DiploWalker.Abstractions\PipeTls.fs, sinon les clients" -ForegroundColor Yellow
-        Write-Host "      epingles refuseront ce tube." -ForegroundColor Yellow
-    }
 }
 
 # --- Deroulement -------------------------------------------------------------
 Write-Host "==> OpenSSL : $openssl" -ForegroundColor Cyan
-
-# Cible : n'emettre que la feuille TLS serveur. Les CAs et les autres feuilles
-# restent intacts, ce qui evite de regenerer des certificats deja signes (la
-# signature de code exige que la feuille Codesigning reste inchangee).
-if ($OnlyTlsLeaf) {
-    Write-Host "==> Feuille TLS serveur" -ForegroundColor Yellow
-    New-ExtraLeaf -Name "leaf-tls-server" -Parent "authentification" -Days 825
-    return
-}
 
 Write-Host "==> Racine" -ForegroundColor Yellow
 New-Authority -Name "root-ca" -Parent $null -Days 3650 -Extensions $null
@@ -321,9 +266,6 @@ foreach ($name in $intermediates) {
 Write-Host "==> Feuilles sous System" -ForegroundColor Yellow
 New-ExtraLeaf -Name "leaf-dll-validation"   -Parent "system" -Days 825
 New-ExtraLeaf -Name "leaf-config-encryption" -Parent "system" -Days 825
-
-Write-Host "==> Feuilles sous Authentification" -ForegroundColor Yellow
-New-ExtraLeaf -Name "leaf-tls-server"        -Parent "authentification" -Days 825
 
 # --- Feuilles de signature de code par projet -------------------------------
 if (-not $SkipProjectLeaves) {

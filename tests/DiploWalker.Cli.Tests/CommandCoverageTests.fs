@@ -977,7 +977,7 @@ module CommandCoverageTests =
 
         try
             let code =
-                run (InitConfigCommand(output)) (InitConfigSettings(Path = file, Transport = "tcp"))
+                run (InitConfigCommand(output)) (InitConfigSettings(Path = file))
 
             code |> should equal 0
             File.Exists(file) |> should equal true
@@ -987,31 +987,4 @@ module CommandCoverageTests =
             output.Successes |> should contain (sprintf "Configuration écrite dans %s" file)
         finally
             TestHelpers.cleanupDir root
-
-    [<Fact>]
-    let ``init-config pipe retourne 0 et écrit la config pipe`` () =
-        let output = MockOutputPort()
-        let root = TestHelpers.createTempDir "cli-config-pipe"
-        let file = Path.Combine(root, "DiploWalker.json")
-
-        try
-            let code =
-                run (InitConfigCommand(output)) (InitConfigSettings(Path = file, Transport = "pipe"))
-
-            code |> should equal 0
-            let content = File.ReadAllText(file, Encoding.UTF8)
-            content |> should haveSubstring "https://pipe:/diplowalker-container"
-        finally
-            TestHelpers.cleanupDir root
-
-    [<Fact>]
-    let ``init-config transport inconnu retourne 1`` () =
-        let output = MockOutputPort()
-
-        let code =
-            run (InitConfigCommand(output)) (InitConfigSettings(Path = "C:\\tmp\\x.json", Transport = "udp"))
-
-        code |> should equal 1
-        output.Errors |> should not' (be Empty)
-
 

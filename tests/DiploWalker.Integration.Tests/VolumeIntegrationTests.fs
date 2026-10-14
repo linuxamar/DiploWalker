@@ -64,28 +64,6 @@ module VolumeIntegrationTests =
         finally
             stopApp app dataRoot
 
-    let private startPipeApp (pipeName: string) =
-        let dataRoot = TestHelpers.createTempDir "pipe"
-        let builder = WebApplication.CreateBuilder()
-        builder.Services.AddCodeFirstGrpc() |> ignore
-
-        builder.Services.AddSingleton<VolumeDriverRegistry>(fun _ ->
-            let reg = VolumeDriverRegistry()
-            reg.Register(StorageDriverType.Local, LocalVolumeDriver(dataRoot) :> Interfaces.IVolumeDriver)
-            reg)
-        |> ignore
-
-        builder.Services.AddSingleton<VolumeServiceImpl>() |> ignore
-
-        builder.WebHost.ConfigureKestrel(fun opts ->
-            opts.ListenNamedPipe(pipeName, fun lo -> lo.Protocols <- HttpProtocols.Http2))
-        |> ignore
-
-        let app = builder.Build()
-        app.MapGrpcService<VolumeServiceImpl>() |> ignore
-        app.StartAsync().GetAwaiter().GetResult()
-        app, dataRoot
-
     [<ServiceContract(Name = "IVolumeService")>]
     type FailingOnceVolumeService(inner: IVolumeService) =
         let mutable _attempts = 0
@@ -144,30 +122,6 @@ module VolumeIntegrationTests =
             let result = client.CreateVolume(req, CancellationToken.None).Result
             result.Name |> should equal "retried-volume"
             svc.Attempts |> should equal 2
-        finally
-            stopApp app dataRoot
-
-    [<Fact>]
-    // Le transport utilise ici est un named pipe Windows ; sur Unix l'adresse
-    // equivalente est un socket de domaine, non couvert par ce test.
-    [<Trait("Platform", "Windows")>]
-    let ``CreateVolume via named pipe fonctionne de bout en bout`` () =
-        let pipeName = "diplo-volume-test-" + Guid.NewGuid().ToString("N")
-        let app, dataRoot = startPipeApp pipeName
-
-        try
-            use channel = DiploWalkerChannel.forAddress (sprintf "http://pipe:/%s" pipeName)
-            let client = channel.CreateGrpcService<IVolumeService>()
-
-            let req =
-                { Name = "pipe-volume"
-                  Driver = StorageDriverType.Local
-                  DriverOpts = Dictionary()
-                  Labels = Dictionary() }
-
-            let result = client.CreateVolume(req, CancellationToken.None).Result
-            String.IsNullOrEmpty(result.Id) |> should equal false
-            result.Name |> should equal "pipe-volume"
         finally
             stopApp app dataRoot
 
@@ -309,5 +263,4 @@ module VolumeIntegrationTests =
             let result = client.PruneVolumes(req, CancellationToken.None).Result
             result.Count |> should equal 0
             result.VolumesDeleted.Count |> should equal 0)
-
 
