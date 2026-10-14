@@ -23,7 +23,6 @@
     <Compile Include="CommandLineTests.fs" />
       <Compile Include="GrpcClientFactoryTests.fs" />
       <Compile Include="DiploWalkerClientsTests.fs" />
-      <Compile Include="PipeTlsFingerprintTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,4 +43,3 @@
   </ItemGroup>
 
 </Project>
-

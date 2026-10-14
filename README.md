@@ -53,11 +53,8 @@ localement** qui dialogue avec les services distants en gRPC.
 - **La cible est configurable par service** dans `DiploWalker.json`
   (adresses, `namespace`, `logLevel`), ce qui permet d'administrer un hôte
   distant comme un hôte local.
-- **Deux transports sont disponibles** : TCP (`localhost:5001-5003` en
-  Debug, `6001-6003` en Release) et named pipes (`diplowalker-container-debug`,
-  `diplowalker-volume-debug`, `diplowalker-network-debug` en Debug ;
-  `diplowalker-container`, `diplowalker-volume`, `diplowalker-network` en Release), ce dernier privilégié pour un usage
-  strictement local.
+- **Le transport gRPC est TCP sur la boucle locale** : `localhost:5001-5003`
+  en Debug et `localhost:6001-6003` en Release.
 - **L'état est consultable à tout moment** : `diplowalker status check`, liste des
   conteneurs, inspection, journaux, métriques et processus.
 
@@ -124,7 +121,7 @@ DiploWalker est composé de quatre services principaux communiquant via gRPC :
 
 | **DiploWalker.Installer** | —    | Installation et configuration de l'ensemble du système                                                     |
 
-> **Ports Debug / Release** : en configuration **Debug**, les services écoutent sur 5001-5003 ; en **Release** (+ installation via l'installateur), sur **6001-6003**. Les deux plages permettent une exécution simultanée. Les named pipes diffèrent selon la configuration : `diplowalker-container-debug`, `diplowalker-volume-debug`, `diplowalker-network-debug` en Debug, et `diplowalker-container`, `diplowalker-volume`, `diplowalker-network` en Release.
+> **Ports Debug / Release** : en configuration **Debug**, les services écoutent sur 5001-5003 ; en **Release** (+ installation via l'installateur), sur **6001-6003**. Les deux plages permettent une exécution simultanée.
 
 ### Clients
 
@@ -138,7 +135,7 @@ DiploWalker est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit v4 (1 627 tests sous Windows, dont 1 ignoré ; 1 626 hors Windows, le test `Platform=Windows` étant exclu)
+- **Tests** : xUnit v4 (1 614 tests sous Windows, dont 1 ignoré faute de privilège de création de liens symboliques NTFS). Aucun test ne porte actuellement le trait `Platform=Windows`.
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -281,39 +278,11 @@ Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `
 S'il est absent ou mal formé, les clients retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003` en Debug, `localhost:6001`/`6002`/`6003` en Release).
 
 ```powershell
-diplowalker config init                       # génère DiploWalker.json avec le transport TCP par défaut
-diplowalker config init --transport pipe      # génère DiploWalker.json avec des adresses par named pipes
-diplowalker config init --path C:\etc\DiploWalker.json --transport pipe
+diplowalker config init                       # génère DiploWalker.json avec les adresses TCP par défaut
+diplowalker config init --path C:\etc\DiploWalker.json
 ```
 
-```json
-{
-    "container": {
-        "address": "https://pipe:/diplowalker-container",
-        "namespace": "default"
-    },
-    "volume": { "address": "https://pipe:/diplowalker-volume" },
-    "network": { "address": "https://pipe:/diplowalker-network" },
-    "logLevel": "Information"
-}
-```
-
-- `tcp` : adresses `localhost:<port>` (http ajouté automatiquement si absent).
-- `pipe` : adresses `https://pipe:/<nom>` — canal local par named pipe (transport privilégié sur la machine, aucun port exposé). Les noms correspondent aux tubes créés par l'installateur : `diplowalker-container-debug`, `diplowalker-volume-debug`, `diplowalker-network-debug` en Debug, et `diplowalker-container`, `diplowalker-volume`, `diplowalker-network` en Release.
-- **Lecture de `https://pipe:/<nom>`** : ce n'est pas une URL web, et les deux parties ne se mélangent jamais.
-  - `https://` est une enveloppe imposée. `pipe` n'est pas le schéma mais **l'hôte**, et c'est cet hôte qui aiguille la connexion vers le named pipe plutôt que vers TCP.
-  - Le tube réel est le **chemin** (ex. `/diplowalker-container` en Release, `/diplowalker-container-debug` en Debug) : c'est le seul segment que le client ouvre.
-  - `https://pipe:/<nom>` est ce qu'on écrit dans la configuration ; `pipe://<nom>` est ce que le client construit à l'exécution pour désigner le tube.
-  - Conséquence : ni `pipe:/<nom>` ni `pipe://<nom>` ne sont acceptés dans la configuration — le premier n'a pas d'hôte, le second porte un schéma rejeté. C'est aussi exactement la forme qu'écrit `diplowalker config init --transport pipe` ci-dessus.
-- Les adresses `https://pipe:/...` sont validées à part : leur hôte étant `pipe`, elles sont traitées comme un canal local et n'ont pas à figurer parmi les hôtes autorisés ; seul le nom de tube est contrôlé (ni `\`, ni `..`, ni caractère nul).
-
-### Chiffrement des named pipes
-
-Le transport pipe est chiffré par défaut. Le serveur (s'il est lancé par l'installateur) active TLS sur le tube dès que `ServiceSettings:PipeCertificatePath` désigne un PFX, et le client épingle l'empreinte attendue du certificat serveur au lieu de faire confiance à n'importe quelle autorité.
-
-- L'installateur dépose `leaf-tls-server.pfx` dans `<configDir>\certs\`, en restreint l'ACL (clé privée) et écrit le chemin dans chaque `*.appsettings.json`. Sans ce PFX, les tubes restent en clair et l'installeur le signale.
-- L'empreinte attendue est compilée dans le client (`PipeTls.ExpectedServerThumbprint`) et vérifiée à chaque connexion : un tube présentant un autre certificat est refusé.
-- `http://pipe:/<nom>` reste accepté pour la compatibilité (pipes en clair, sans authentification du serveur) ; `https://pipe:/<nom>` est la forme à utiliser.
+- Les trois adresses générées ciblent `localhost` sur les ports associés au service.
 
 - La GUI propose un onglet **Paramètres** pour éditer ces adresses (écriture de `DiploWalker.json`, champs `namespace` et `logLevel` conservés) ; la configuration est appliquée dès les opérations suivantes, sans redémarrage.
 
@@ -351,7 +320,7 @@ DiploWalker/
 │   │   ├── ServiceGuards.fs    # Guards de validation d'entrée
 │   │   ├── CachedConfig.fs     # Cache générique avec invalidation
 │   │   ├── Security.fs         # Validation d'entrée, anti-injection
-│   │   ├── ServerConfig.fs     # Configuration Kestrel / named pipes
+│   │   ├── ServerConfig.fs     # Configuration Kestrel et écoute gRPC TCP
 │   │   └── DiploWalkerPorts.fs       # Ports gRPC partagés (#if DEBUG 5001-5003 / Release 6001-6003)
 │   ├── DiploWalker.Container/        # Service gRPC de gestion des conteneurs
 │   ├── DiploWalker.Volume/           # Service gRPC de gestion des volumes
@@ -667,6 +636,4 @@ Le montage réel des images disque et la communication gRPC ont été validés e
 - `exec` est `tasks exec` ; `task info` et `task logs` ont été supprimés en v2.
 - Les logs sont capturés par le service dans `%ProgramData%\DiploWalker\logs\<id>.log` et relus par `container logs --follow`.
 
-Résultats validés : montage bind R/W bidirectionnel, `container logs --follow` en streaming, named pipes et TCP, suppression idempotente (`delete -f`), et write-back d'images disque.
-
-
+Résultats validés : montage bind R/W bidirectionnel, `container logs --follow` en streaming, communication gRPC TCP, suppression idempotente (`delete -f`), et write-back d'images disque.

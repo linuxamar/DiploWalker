@@ -2,13 +2,9 @@
 
 open System
 open System.Net
-open System.IO.Pipes
-open System.Security.AccessControl
-open System.Security.Principal
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Server.Kestrel.Core
-open Microsoft.AspNetCore.Server.Kestrel.Transport.NamedPipes
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
@@ -27,66 +23,10 @@ let private grpcMaxMessageSize = 64 * 1024 * 1024
 
 let configureKestrel (config: IConfiguration) (opts: KestrelServerOptions) =
     let grpcPort = config.GetValue<int>("ServiceSettings:GrpcPort")
-    let pipeName = config.GetValue<string>("ServiceSettings:NamedPipeName")
-    let useTcp = config.GetValue<bool>("ServiceSettings:UseTcp")
-    let usePipes = config.GetValue<bool>("ServiceSettings:UseNamedPipes")
+    Log.Information("Écoute TCP sur localhost:{Port}", grpcPort)
 
-    // Un chemin de certificat renseigne = transport chiffre sur le pipe. La
-    // presence du chemin est l'unique source de verite : un booleen
-    // supplementaire pourrait desynchroniser l'intention du chiffrement et le
-    // certificat reellement charge.
-    let pipeCertificatePath = config.GetValue<string>("ServiceSettings:PipeCertificatePath")
-
-    if not useTcp && not usePipes then
-        failwith "Configuration invalide : ni ServiceSettings:UseTcp ni ServiceSettings:UseNamedPipes sont activés"
-
-    if useTcp then
-        Log.Information("Écoute TCP sur localhost:{Port}", grpcPort)
-
-        opts.Listen(IPAddress.Loopback, grpcPort, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
-        |> ignore
-
-    if usePipes then
-        if String.IsNullOrWhiteSpace pipeCertificatePath then
-            Log.Information("Écoute Named Pipe: {PipeName}", pipeName)
-
-            opts.ListenNamedPipe(pipeName, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
-            |> ignore
-        else
-            let certificate = PipeTls.loadServerCertificate pipeCertificatePath
-
-            Log.Information(
-                "Écoute Named Pipe TLS: {PipeName} (certificat {Thumbprint})",
-                pipeName,
-                certificate.Thumbprint
-            )
-
-            // UseHttps fonctionne sur un endpoint de tube : Kestrel négocie TLS
-            // puis ALPN « h2 » par-dessus la tubulure, ce que gRPC exige.
-            let configurePipeTls (listenOpts: ListenOptions) : unit =
-                listenOpts.Protocols <- HttpProtocols.Http2
-                listenOpts.UseHttps(certificate) |> ignore
-
-            opts.ListenNamedPipe(pipeName, configurePipeTls) |> ignore
-
-let configureNamedPipeSecurity (opts: NamedPipeTransportOptions) =
-    // Kestrel active CurrentUserOnly par défaut ; il faut le désactiver pour
-    // fournir une PipeSecurity explicite (utilisateur courant uniquement).
-    // NB : une règle "Deny Everyone" bloquerait aussi l'utilisateur courant
-    // (sur Windows, les règles Deny priment sur les règles Allow).
-    opts.CurrentUserOnly <- false
-    let pipeSecurity = PipeSecurity()
-
-    // WindowsIdentity détient un handle de token : à disposer.
-    do
-        use currentUser = WindowsIdentity.GetCurrent()
-
-        let allowRule =
-            PipeAccessRule(currentUser.User, PipeAccessRights.FullControl, AccessControlType.Allow)
-
-        pipeSecurity.AddAccessRule(allowRule)
-
-    opts.PipeSecurity <- pipeSecurity
+    opts.Listen(IPAddress.Loopback, grpcPort, fun listenOpts -> listenOpts.Protocols <- HttpProtocols.Http2)
+    |> ignore
 
 let runGrpcHost
     (serviceName: string)
@@ -146,9 +86,6 @@ let runGrpcHost
         builder.WebHost.ConfigureKestrel(fun ctx opts -> configureKestrel ctx.Configuration opts)
         |> ignore
 
-        builder.WebHost.UseNamedPipes(fun opts -> configureNamedPipeSecurity opts)
-        |> ignore
-
         let app = builder.Build()
         app.UseMiddleware<TokenAuthMiddleware>() |> ignore
         mapGrpcService app
@@ -175,4 +112,3 @@ let runGrpcHost
     with ex ->
         Log.Fatal(ex, "Le service {ServiceName} a échoué au démarrage", serviceName)
         1
-

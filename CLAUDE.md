@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | DiploWalker.Installer    | Installation Windows (services, containerd, CNI)                                                                                                                                                                                                              |
 | DiploWalker.Grpc         | Types messages et interfaces de service gRPC (protobuf-net, code-first), mappings de drivers                                                                                                                                                                  |
 | DiploWalker.Contracts    | Types partagés entre services                                                                                                                                                                                                                                 |
-| DiploWalker.Core         | Clients gRPC, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `DiploWalker.json` et support des named pipes (adresse `https://pipe:/<nom>` : enveloppe `https://`, hôte `pipe` = discriminant de transport, chemin = nom du tube, TLS avec épinglage d'empreinte ; `http://pipe:/<nom>` reste accepté en clair pour compatibilité), factory gRPC mutualisée                                                                 |
+| DiploWalker.Core         | Clients gRPC TCP sur la boucle locale, abstraction `IOutputPort`, `MountParser` (format `src=...,dst=...[;ro]`), config client `DiploWalker.json`, factory gRPC mutualisée                                                                 |
 | DiploWalker.Disk         | Montage d'images disque (qcow2, qcow1, raw, vhd, vhdx, vmdk, vdi, dmg, parallels, iso) via DiscUtils/pilotes maison + support R/W Btrfs, XFS, HFS+ via Hawkynt.FileFormats.FileSystems. Création d'images disque (VHD, VHDX, VMDK, VDI, Raw, ISO) via `FsImage.create` ; detection/extraction ISO9660/UDF via le parseur maison `IsoFs`. **Bibliothèque, sans service ni port propre** : référencée par `DiploWalker.Volume` (façade `IsoDriver`), `DiploWalker.Container`, `DiploWalker.Cli` et `DiploWalker.Gui`. Conséquence : `diplo disk create-image` s'exécute dans le processus du client, sans appel gRPC, et `iso` n'est pas exposed par la commande alors que `FsImage.create` le sait produire. |
 | DiploWalker.Cli          | Client CLI (Spectre.Console)                                                                                                                                                                                                                                  |
 | DiploWalker.Gui          | Interface graphique Avalonia                                                                                                                                                                                                                                  |
@@ -36,7 +36,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 | `ServiceGuards`              | DiploWalker.Abstractions | Guards de validation d'entrée réutilisables (`requireNonEmpty`, `requireId`, `requirePositive`, `requireInRange`, `requireSafePath`, `requireLocalAddress`, `requireSafeCommand`). Lèvent `RpcException(InvalidArgument)`.                                                             |
 | `CachedConfig<'T>`           | DiploWalker.Abstractions | Cache générique avec invalidation manuelle, protégé par un verrou. Chargement paresseux via `Value`, invalidation via `Invalidate()`.                                                                                                                                                  |
 | `DriverMappings`             | DiploWalker.Grpc         | Mapping type↔string pour les drivers volume (`StorageDriverType`) et réseau (`NetworkDriver`). Fonctions `parse*`, `isValid*`, `*ToString`, `all*Names`.                                                                                                                               |
-| `GrpcClientFactory`          | DiploWalker.Core         | Construction de canaux gRPC TCP ou named pipe avec retry (5 tentatives, backoff exponentiel) et credentials par token. Sur `https://pipe:/` le canal est en TLS avec épinglage de l'empreinte serveur (`PipeTls.ExpectedServerThumbprint`) ; l'authentification passe par un `DelegatingHandler` car `Grpc.Net.Client` refuse un `ChannelCredentials` composite avec `https`.                                  |
+| `GrpcClientFactory`         | DiploWalker.Core         | Construction de canaux gRPC TCP sur la boucle locale avec retry (5 tentatives, backoff exponentiel) et credentials par token. |
 | `TestHelpers`                | DiploWalker.TestHelpers  | Helpers pour les tests (`createTempDir`, `cleanupDir`).                                                                                                                                                                                                                                |
 | `Cmd`                        | DiploWalker.Gui          | Helpers try/with mutualisés pour les commandes GUI (`run` async, `runSync` synchrone, `runSyncWith` avec callback d'erreur custom).                                                                                                                                                    |
 | `ContainerDetailUserControl` | DiploWalker.Gui          | UserControl XAML pour le détail d'un conteneur sélectionné (propriétés, actions, montage, logs/exec). Chargé via `AvaloniaRuntimeXamlLoader`.                                                                                                                                          |
@@ -62,7 +62,7 @@ Les modules suivants ont été extraits du code dupliqué et centralisés dans D
 - Solution : **`DiploWalker.slnx`** (format XML compact .NET 10).
 - Orientation **100 % F#** (services, drivers, CLI et gRPC en code-first protobuf-net).
 - **GUI** : Avalonia 12.1.2 avec AvalonEdit 12.0.0 (éditeur YAML Compose avec colorisation syntaxique via TextMate). Menu **Fichier** → *Exporter le journal…* (écrit les lignes horodatées du journal dans un `.txt` via le sélecteur de fichier).
-- **Tests** : xUnit v4 + FsUnit.xUnit — **1 627** tests au total sur Windows (1 626 réussis ; 1 ignoré dans `DiploWalker.Disk.Tests` faute de privilège de création de liens symboliques NTFS). Hors Windows, l'unique test `Platform=Windows` (tube nommé, `VolumeIntegrationTests.fs`) est exclu : **1 626** tests, 0 ignoré. Ne pas confondre 1 626 (total Linux) et 1 626 (tests réussis sous Windows) : c'est la même valeur pour deux raisons différentes.
+- **Tests** : xUnit v4 + FsUnit.xUnit — **1 614** tests au total sur Windows (1 613 réussis ; 1 ignoré dans `DiploWalker.Disk.Tests` faute de privilège de création de liens symboliques NTFS). Aucun test ne porte actuellement le trait `Platform=Windows`.
 
 ## Consignes impératives pour les agents
 
@@ -130,8 +130,7 @@ dotnet build DiploWalker.slnx                       # Build complète
 > dépendances Windows irréductibles. Sur les autres systèmes, `pipeline.ps1` les exclut avec
 > `--filter-not-trait "Platform=Windows"` ; sous Windows, toute la suite est exécutée.
 >
-> Il n'en reste qu'**un** : `VolumeIntegrationTests`, le named pipe Windows, sans
-> équivalent Unix. Le helper de credentials est portable : un même script PowerShell
+> Aucun test ne dépend d'un transport gRPC Windows spécifique. Le helper de credentials est portable : un même script PowerShell
 > déchiffre en DPAPI sous Windows et en AES-GCM ailleurs, via le lanceur installé dans
 > le répertoire de données (`.cmd` sous Windows, `sh` ailleurs) que containerd exécute
 > d'après `hosts.toml`. Sous Unix, PowerShell 7 (`pwsh`) doit être présent sur l'hôte,
@@ -185,13 +184,10 @@ Le montage réel des images disque et la communication gRPC ont été validés e
 3. **container create --cmd** — la commande était passée via un spec OCI avec l'option `--spec`, absente de `ctr v2.3.3`. La commande est désormais passée en positionnel (`ctr container create <image> <id> <cmd> [args...]`).
 4. **UpdateContainer** — `ctr task update`/`ctr container update` n'existent pas en v2. Lève `RpcException(Unimplemented)` quand une limite est demandée (no-op sinon).
 5. **container delete -f** — la suppression forcée d'un conteneur inexistant échouait par une erreur gRPC. Elle retourne désormais un succès (échecs journalisés en avertissement) — idempotent.
-6. **Transport named pipes** — `PipeSecurity` contenait une règle « Deny Everyone » qui empêchait la création du pipe (règles Deny priment sur Allow sur Windows). Règle retirée, accès par `Allow FullControl` pour l'utilisateur courant.
-7. **Ctrl+C sur container logs --follow** — le CLI sortait avec `STATUS_CONTROL_C_EXIT` (0xC000013A). Ajout de `CtrlCHandler` (pose `e.Cancel=true` + annulation) et rattrapage de `RpcException(Cancelled)`.
-8. **container exec arguments espacés** — reconstruction de la ligne de commande avec échappement.
-9. **MountState** — état des volumes montés persisté ; restauration au redémarrage du service.
+6. **Ctrl+C sur container logs --follow** — le CLI sortait avec `STATUS_CONTROL_C_EXIT` (0xC000013A). Ajout de `CtrlCHandler` (pose `e.Cancel=true` + annulation) et rattrapage de `RpcException(Cancelled)`.
+7. **container exec arguments espacés** — reconstruction de la ligne de commande avec échappement.
+8. **MountState** — état des volumes montés persisté ; restauration au redémarrage du service.
 
 ### Logs
 
 Les logs sont capturés par le service lors du démarrage détaché dans `%ProgramData%\DiploWalker\logs\<id>.log` et relus par `container logs` (`tail`, `since` ; `--follow` suit le fichier et émet les nouvelles lignes au fil de l'eau).
-
-

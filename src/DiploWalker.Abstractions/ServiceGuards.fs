@@ -77,7 +77,7 @@ module ServiceGuards =
     let requireSafePath (path: string) (label: string) =
         SecurityValidation.validateContainerPath path label
 
-    /// Vérifie que l'adresse gRPC est locale (localhost, 127.0.0.1, ou named pipe).
+    /// Vérifie que l'adresse gRPC est locale (localhost, 127.0.0.1 ou ::1).
     let requireLocalAddress (address: string) =
         SecurityValidation.validateGrpcAddress address
 
@@ -99,4 +99,3 @@ module ServiceGuards =
     let requireTargetPath (path: string) =
         if System.String.IsNullOrWhiteSpace(path) then
             raise (RpcException(Status(StatusCode.InvalidArgument, "Le chemin cible est requis")))
-

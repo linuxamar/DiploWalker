@@ -116,8 +116,9 @@ type ServiceGuardsTests() =
         ServiceGuards.requireLocalAddress "http://127.0.0.1:50051"
 
     [<Fact>]
-    let ``requireLocalAddress accepte un named pipe`` () =
-        ServiceGuards.requireLocalAddress "http://pipe:/diplo-container"
+    let ``requireLocalAddress rejette un hôte pipe`` () =
+        (fun () -> ServiceGuards.requireLocalAddress "http://pipe:/diplo-container")
+        |> should throw typeof<RpcException>
 
     [<Fact>]
     let ``requireLocalAddress rejette hôte distant`` () =
@@ -155,4 +156,3 @@ type ServiceGuardsTests() =
     let ``requireTargetPath lève si chemin vide`` () =
         (fun () -> ServiceGuards.requireTargetPath "")
         |> should throw typeof<RpcException>
-

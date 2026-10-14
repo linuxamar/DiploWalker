@@ -2,13 +2,7 @@
 
 open System
 open System.Collections.Concurrent
-open System.IO
-open System.IO.Pipes
 open System.Net.Http
-open System.Net.Sockets
-open System.Threading
-open System.Threading.Tasks
-open System.Runtime.ExceptionServices
 open Grpc.Core
 open Grpc.Net.Client
 open Grpc.Net.Client.Configuration
@@ -43,15 +37,6 @@ module GrpcClientFactory =
     // l'état Shutdown (disposition explicite, rotation de configuration).
     let private channelCache = ConcurrentDictionary<string, GrpcChannel>()
 
-    let private isPipeAddress (uri: Uri) =
-        String.Equals(uri.Host, "pipe", StringComparison.OrdinalIgnoreCase)
-
-    /// `https://pipe:/…` demande un pipe chiffre ; `http://pipe:/…` le laisse en
-    /// clair. Le schéma est donc ce qui sélectionne le transport — sans lui,
-    /// `https://` serait accepté puis silencieusement traité comme du HTTP.
-    let private isPipeTlsAddress (uri: Uri) =
-        String.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-
     let private buildRetryServiceConfig () =
         let retryPolicy = RetryPolicy()
         retryPolicy.MaxAttempts <- 5
@@ -85,90 +70,6 @@ module GrpcClientFactory =
         options.UnsafeUseInsecureChannelCallCredentials <- true
         (options, callCredentials)
 
-    /// Injecte l'en-tête Authorization sur chaque requête.
-    ///
-    /// Cheminement TLS uniquement : GrpcChannel refuse une adresse `https://`
-    /// dès lors que `GrpcChannelOptions.Credentials` est un composite insecure
-    /// (« Channel is configured with insecure channel credentials and can't use
-    /// a HttpClient with a 'https' scheme »). Or c'est ce composite qui portait
-    /// les CallCredentials. Le jeton est donc ajouté ici explicitement — ce qui
-    /// a l'avantage de l'envoyer par-dessus TLS, ce que le composite insecure
-    /// ne pouvait pas garantir.
-    ///
-    /// `HttpMessageHandler.SendAsync` est `protected internal` : seul un type
-    /// dérivé peut l'appeler, d'où `HttpMessageInvoker`, qui expose un
-    /// `SendAsync` public.
-    type private TokenInjectingHandler(inner: HttpMessageHandler) =
-        inherit DelegatingHandler(inner)
-
-        let invoker = new HttpMessageInvoker(inner)
-
-        override _.SendAsync(request: HttpRequestMessage, ct: CancellationToken) =
-            task {
-                match AuthToken.loadToken () with
-                | Some token -> request.Headers.Authorization <- Headers.AuthenticationHeaderValue("Bearer", token)
-                | None -> ()
-
-                return! invoker.SendAsync(request, ct)
-            }
-
-    let private createPipeChannel (pipeName: string) (useTls: bool) (thumbprintOverride: string option) =
-        let options =
-            if useTls then
-                // Pas de Credentials ici : cf. TokenInjectingHandler.
-                buildBaseOptions ()
-            else
-                let options, _ = buildCredentials ()
-                options
-
-        let connectCallback =
-            Func<SocketsHttpConnectionContext, CancellationToken, ValueTask<Stream>>(fun _ ct ->
-                let t =
-                    task {
-                        let pipe =
-                            new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous)
-
-                        try
-                            do! pipe.ConnectAsync(ct)
-                            return pipe :> Stream
-                        with ex ->
-                            pipe.Dispose()
-                            ExceptionDispatchInfo.Capture(ex).Throw()
-                            return Unchecked.defaultof<Stream>
-                    }
-
-                ValueTask<Stream>(t))
-
-        let handler = new SocketsHttpHandler()
-        // Le flux brut est renvoyé tel quel : SocketsHttpHandler négocie TLS puis
-        // ALPN « h2 » par-dessus, exactement comme sur un socket.
-        handler.ConnectCallback <- connectCallback
-        handler.UseProxy <- false
-        handler.AllowAutoRedirect <- false
-
-        let channelAddress =
-            if useTls then
-                // Aucune validation de nom n'est possible sur un tube : on
-                // ancre l'empreinte du certificat serveur.
-                handler.SslOptions.TargetHost <- PipeTls.TargetHost
-
-                handler.SslOptions.RemoteCertificateValidationCallback <-
-                    thumbprintOverride
-                    |> Option.map PipeTls.pinExpectedCertificate
-                    |> Option.defaultValue PipeTls.pinExpectedServerCertificate
-
-                "https://" + PipeTls.TargetHost
-            else
-                "http://localhost"
-
-        options.HttpHandler <-
-            if useTls then
-                new TokenInjectingHandler(handler) :> HttpMessageHandler
-            else
-                handler
-
-        GrpcChannel.ForAddress(channelAddress, options)
-
     let private createTcpChannel (address: string) =
         let options, _ = buildCredentials ()
 
@@ -190,40 +91,13 @@ module GrpcClientFactory =
         with :? ObjectDisposedException ->
             false
 
-    let private createWithThumbprint (address: string) (thumbprintOverride: string option) =
-        // INVARIANT DE SÉCURITÉ : validateGrpcAddress restreint l'hôte à
-        // localhost/pipe. Les callCredentials partent en clair sur un canal
-        // insecure (UnsafeUseInsecureChannelCallCredentials) — tout
-        // assouplissement de la validation exposerait le token sur le réseau.
-        //
-        // Le token n'est protégé que si le transport l'est aussi : sur un pipe,
-        // `https://pipe:/…` chiffre la connexion (cf. PipeTls) alors que
-        // `http://pipe:/…` la laisse en clair. Le client et le serveur doivent
-        // donc être d'accord sur le schéma.
+    let private create (address: string) =
+        // Les callCredentials sont envoyées sur un canal local non chiffré :
+        // la validation stricte de l'hôte empêche toute fuite du jeton.
         SecurityValidation.validateGrpcAddress address
         let uri = Uri(address)
-
-        // Le schéma participe à la clé de cache : un canal en clair ne doit
-        // jamais être réinvesti pour une adresse `https://pipe:/…` (ni
-        // l'inverse), sans quoi la connexion réutilisée court-circuiterait le
-        // TLS et l'épinglage du certificat.
-        let pipeTls = isPipeAddress uri && isPipeTlsAddress uri
-
-        let key =
-            if isPipeAddress uri then
-                let scheme = if pipeTls then "https" else "http"
-                // L'empreinte entre aussi dans la clé : deux ancrages distincts
-                // ne doivent jamais partager un canal.
-                let anchor = thumbprintOverride |> Option.map (fun t -> t + "/") |> Option.defaultValue ""
-                sprintf "pipe://%s/%s%s" scheme anchor (uri.PathAndQuery.TrimStart('/'))
-            else
-                "tcp://" + uri.Authority
-
-        let fresh =
-            if isPipeAddress uri then
-                createPipeChannel (uri.PathAndQuery.TrimStart('/')) pipeTls thumbprintOverride
-            else
-                createTcpChannel address
+        let key = "tcp://" + uri.Authority
+        let fresh = createTcpChannel address
 
         let mutable cached = Unchecked.defaultof<GrpcChannel>
 
@@ -237,22 +111,10 @@ module GrpcClientFactory =
         else
             channelCache.GetOrAdd(key, fresh)
 
-    let private create (address: string) = createWithThumbprint address None
-
     let forContainer (port: int) = create $"http://localhost:{port}"
     let forVolume (port: int) = create $"http://localhost:{port}"
     let forNetwork (port: int) = create $"http://localhost:{port}"
     let forAddress (address: string) = create address
-
-    /// Variante d'ancrage explicite, réservée aux tests.
-    ///
-    /// La CI n'active pas git-crypt sur le job `test` : le PFX de
-    /// `certificates/leaf-tls-server/` y est illisible, et le test ne peut donc
-    /// pas valider le certificat de production. Il en génère un à l'exécution
-    /// et passe son empreinte ici. Le chemin applicatif, lui, reste ancré sur
-    /// `PipeTls.ExpectedServerThumbprint`.
-    let internal forAddressPinnedTo (address: string) (thumbprint: string) =
-        createWithThumbprint address (Some thumbprint)
 
     let resolveAddress (configAddress: string option) (defaultPort: int) =
         match configAddress with
@@ -264,5 +126,4 @@ module GrpcClientFactory =
                 forNetwork defaultPort
             else
                 forContainer defaultPort
-
 
