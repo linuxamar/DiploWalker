@@ -76,8 +76,7 @@ $Projects = @(
     "DiploWalker.Abstractions",
     "DiploWalker.Contracts",
     "DiploWalker.Grpc",
-    "DiploWalker.Cli",
-    "DiploWalker.Gui"
+    "DiploWalker.Cli"
 )
 
 $Platforms = if ($Platform) { @($Platform) } else { @("x64", "x86") }
@@ -166,7 +165,6 @@ $testProjects = @(
     "DiploWalker.Installer.Tests",
     "DiploWalker.Disk.Tests",
     "DiploWalker.Cli.Tests",
-    "DiploWalker.Gui.Tests",
     "DiploWalker.Integration.Tests"
 )
 
@@ -366,4 +364,3 @@ Write-Host ""
 Write-Host "══════════════════════════════════════" -ForegroundColor Green
 Write-Host " DiploWalker terminé en $($timer.Elapsed.TotalSeconds.ToString('F1'))s" -ForegroundColor Green
 Write-Host "══════════════════════════════════════" -ForegroundColor Green
-

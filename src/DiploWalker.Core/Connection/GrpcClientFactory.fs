@@ -32,8 +32,7 @@ module GrpcClientFactory =
 
     // M1 : les canaux gRPC sont chers (credentials, HttpHandler, politique de
     // retry, pool de connexions). Un seul canal est partagé par endpoint au lieu
-    // d'en créer un nouveau à chaque appel (le GUI et le CLI construisent des
-    // clients fréquemment). Le canal est évincé du cache dès qu'il passe à
+    // d'en créer un nouveau à chaque appel. Le canal est évincé du cache dès qu'il passe à
     // l'état Shutdown (disposition explicite, rotation de configuration).
     let private channelCache = ConcurrentDictionary<string, GrpcChannel>()
 
@@ -126,4 +125,3 @@ module GrpcClientFactory =
                 forNetwork defaultPort
             else
                 forContainer defaultPort
-

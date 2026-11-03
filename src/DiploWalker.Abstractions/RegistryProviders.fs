@@ -12,7 +12,7 @@ module RegistryProviders =
     /// Hôtes canoniques autorisés (liste blanche).
     let hosts: string list = [ "ghcr.io"; "docker.io"; "quay.io"; "mcr.microsoft.com" ]
 
-    /// Libellé lisible des fournisseurs autorisés (messages d'erreur, CLI, GUI).
+    /// Libellé lisible des fournisseurs autorisés (messages d'erreur et CLI).
     let label: string = String.Join(", ", hosts)
 
     /// Alias conviviaux acceptés pour résoudre chaque fournisseur.

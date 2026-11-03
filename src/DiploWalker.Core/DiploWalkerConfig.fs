@@ -122,9 +122,7 @@ module DiploWalkerConfig =
         let (_, _, n) = readCached ()
         n
 
-    /// Vide le cache : la prochaine lecture relira le fichier. Utilisé par la GUI
-    /// après un enregistrement des paramètres pour appliquer la configuration
-    /// sans redémarrage.
+    /// Vide le cache : la prochaine lecture relira le fichier après sa mise à jour.
     let invalidate () =
         lock cacheLock (fun () -> cacheValue.Value <- None)
 
@@ -172,4 +170,3 @@ module DiploWalkerConfig =
                 File.Delete(tmp)
             with ex -> Log.Warning(ex, "Échec de la suppression du fichier temporaire {Tmp}", tmp)
             reraise ()
-

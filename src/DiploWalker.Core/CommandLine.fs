@@ -3,8 +3,8 @@
 open System.Text
 
 /// Découpage d'une ligne de commande en arguments en respectant les
-/// guillemets doubles (ex. `cmd /c "echo bonjour le monde"`). Partagé entre
-/// la CLI et l'interface graphique pour `exec` sur un conteneur.
+/// guillemets doubles (ex. `cmd /c "echo bonjour le monde"`) pour `exec`
+/// sur un conteneur.
 module CommandLine =
 
     /// Découpe une ligne en arguments. Règles :
@@ -61,4 +61,3 @@ module CommandLine =
             else
                 a)
         |> String.concat " "
-

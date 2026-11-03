@@ -576,7 +576,7 @@ type VersionCommand(output: IOutputPort, clients: IDiploClients) =
             output.WriteLine("  Licences des dépendances :")
 
             output.WriteLine(
-                "    MIT (22)              : Avalonia, FSharp.Core, DiscUtils, Microsoft, Spectre, YamlDotNet, ZstdSharp"
+                "    MIT (15)              : FSharp.Core, DiscUtils, Microsoft, Spectre, YamlDotNet, ZstdSharp"
             )
 
             output.WriteLine("    Apache-2.0 (13)       : gRPC, protobuf-net, Serilog, xunit")
@@ -1390,5 +1390,4 @@ type WriteFileCommand(output: IOutputPort, clients: IDiploClients) =
                     output.WriteError(response.Message)
                     return 1
         }
-
 

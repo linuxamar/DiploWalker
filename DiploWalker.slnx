@@ -16,9 +16,6 @@
     <Project Path="src/DiploWalker.Volume/DiploWalker.Volume.fsproj">
       <Platform Project="x64" />
     </Project>
-    <Project Path="src/DiploWalker.Gui/DiploWalker.Gui.fsproj">
-      <Platform Project="x64" />
-    </Project>
     <Project Path="src/DiploWalker.Installer/DiploWalker.Installer.fsproj">
       <Platform Project="x64" />
     </Project>
@@ -60,9 +57,6 @@
     <Project Path="tests/DiploWalker.Volume.Tests/DiploWalker.Volume.Tests.fsproj">
       <Platform Project="x64" />
     </Project>
-    <Project Path="tests/DiploWalker.Gui.Tests/DiploWalker.Gui.Tests.fsproj">
-      <Platform Project="x64" />
-    </Project>
     <Project Path="tests/DiploWalker.Installer.Tests/DiploWalker.Installer.Tests.fsproj">
       <Platform Project="x64" />
     </Project>
@@ -74,5 +68,4 @@
     </Project>
   </Folder>
 </Solution>
-
 

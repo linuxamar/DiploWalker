@@ -43,9 +43,7 @@ L'administration ne se fait pas sur la machine qui porte les conteneurs. Elle
 se fait depuis le poste de travail, au moyen d'un **client installé
 localement** qui dialogue avec les services distants en gRPC.
 
-- **Le client se compose de deux interfaces** : la CLI `diplowalker`
-  (`DiploWalker.Cli`, Spectre.Console) et une interface graphique native
-  (`DiploWalker.Gui`, Avalonia, MVVM). Elles exposent les mêmes opérations.
+- **Le client est la CLI `diplowalker`** (`DiploWalker.Cli`, Spectre.Console).
 - **Le poste de travail ne contient aucun conteneur.** Il ne porte ni
   containerd, ni service DiploWalker, et les images qu'il produit ne sont pas sous
   son autorité : c'est un poste d'administration, éventuellement plusieurs,
@@ -86,7 +84,7 @@ Ce découpage a trois effets :
   de fichiers de l'hôte : il émet une requête, le service dédié décide.
 - **Une configuration uniformisée.** Les mêmes règles — registres autorisés,
   chemins de montage restreints, limites de taille, volumes de contrôle — s'appliquent
-  quelle que soit l'interface utilisée, CLI ou GUI.
+  quel que soit le client utilisé.
 - **Un déploiement standardisé.** `DiploWalker.Installer` installe et configure
   ces services comme services Windows, ce qui rend le déploiement d'un hôte
   reproductible d'un serveur à l'autre.
@@ -96,11 +94,11 @@ Ce découpage a trois effets :
 ```
 Poste de travail (client)               Hôte Windows Server (autorité)
 ┌──────────────────────────────┐        ┌──────────────────────────────────────┐
-│  diplowalker (CLI)                 │        │  DiploWalker.Container   :5001/6001  │
-│  DiploWalker.Gui (Avalonia)  │──gRPC─▶│  DiploWalker.Volume      :5002/6002  │
-│                              │        │  DiploWalker.Network     :5003/6003  │
-│  DiploWalker.json            │        │  DiploWalker.Installer               │
-└──────────────────────────────┘ pipes  │                                      │
+│  diplowalker (CLI)           │──gRPC─▶│  DiploWalker.Container   :5001/6001  │
+│  DiploWalker.json            │        │  DiploWalker.Volume      :5002/6002  │
+└──────────────────────────────┘        │  DiploWalker.Network     :5003/6003  │
+                                        │  DiploWalker.Installer               │
+                                        │                                      │
                                         │  containerd → runhcs.v1              │
                                         │  ┌────────────────────────────────┐  │
                                         │  ┆ Conteneur : microservices .NET ┆  │
@@ -126,7 +124,6 @@ DiploWalker est composé de quatre services principaux communiquant via gRPC :
 ### Clients
 
 - **CLI** : `DiploWalker.Cli` (Spectre.Console) — toutes les opérations de conteneurs, volumes, réseaux, images disque (`disk create-image`) et recherche d'images en ligne
-- **GUI** : `DiploWalker.Gui` (Avalonia) — interface graphique native multi-plateforme avec MVVM
 - **Résilience** : les canaux gRPC (`DiploWalkerChannel`) appliquent une politique de reprise automatique (5 tentatives, backoff exponentiel) sur les échecs `Unavailable` (service en cours de redémarrage) ; les appels streaming ne sont pas rejoués.
 
 ## Stack technique
@@ -135,7 +132,7 @@ DiploWalker est composé de quatre services principaux communiquant via gRPC :
 - **Communication** : gRPC
 - **Conteneurs** : containerd (1.6.x LTS pour WS2016, 1.7.x pour WS2019+)
 - **Réseau** : Plugins CNI Microsoft + standards (bridge, host-local, portmap)
-- **Tests** : xUnit v4 (1 614 tests sous Windows, dont 1 ignoré faute de privilège de création de liens symboliques NTFS). Aucun test ne porte actuellement le trait `Platform=Windows`.
+- **Tests** : xUnit v4 (1 441 tests sous Windows, dont 1 ignoré faute de privilège de création de liens symboliques NTFS). Aucun test ne porte actuellement le trait `Platform=Windows`.
 - **Santé** : gRPC Health Checks (/healthz) + arrêt gracieux (IHostApplicationLifetime)
 
 ## Compatibilité Windows Server
@@ -155,7 +152,7 @@ Le choix de l'image de base Windows est crucial pour le fonctionnement de DiploW
 
 | Capacité                                 | Server Core                                                                                                                                          | Nano Server                                                                                                                                                                                                                                                                              |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Planificateur de tâches** (schtasks)   | ✅ Complet — service Schedule présent, gestion CLI/PowerShell entièrement fonctionnelle                                                              | ⚠️ Partiel — la commande `schtasks` fonctionne en ligne de commande, mais le service Schedule est limité. Pas de PowerShell, pas de GUI. Fiable uniquement pour des scénarios simples.                                                                                                   |
+| **Planificateur de tâches** (schtasks)   | ✅ Complet — service Schedule présent, gestion CLI/PowerShell entièrement fonctionnelle                                                              | ⚠️ Partiel — la commande `schtasks` fonctionne en ligne de commande, mais le service Schedule est limité. Fiable uniquement pour des scénarios simples.                                                                                                   |
 | **Services Windows** (SCM)               | ✅ Complet — Service Control Manager complet. `sc.exe create/start/stop/delete` entièrement fonctionnel. Applications .NET Worker Service hôteables. | ✅ Basique — le SCM (composant noyau) est présent. `sc.exe create`, `net start/stop` fonctionnent pour des services .NET Core/self-contained. Certains composants système manquants (AFD, TCP/IP Protocol Driver) peuvent limiter des services dépendants de pilotes réseau spécifiques. |
 | **containerd / conteneurs Windows**      | ✅ Complet                                                                                                                                           | ✅ Complet                                                                                                                                                                                                                                                                               |
 | **Poids de l'image**                     | ~2 Go (compressé)                                                                                                                                    | ~175 Mo (compressé)                                                                                                                                                                                                                                                                      |
@@ -270,12 +267,12 @@ sc.exe start "DiploWalker.Network"
 
 ### Configuration du client (DiploWalker.json)
 
-Les clients (CLI et GUI) résolvent l'adresse de chaque service via le fichier `DiploWalker.json`. Le fichier est cherché par priorité :
+Le client CLI résout l'adresse de chaque service via le fichier `DiploWalker.json`. Le fichier est cherché par priorité :
 
-1. `%DIPLO_CONFIG_HOME%\DiploWalker.json` si la variable d'environnement est définie (recommandé pour la GUI et les installations : chemin stable, indépendant du répertoire courant) ;
+1. `%DIPLO_CONFIG_HOME%\DiploWalker.json` si la variable d'environnement est définie (recommandé pour les installations : chemin stable, indépendant du répertoire courant) ;
 2. `DiploWalker.json` dans le répertoire courant.
 
-S'il est absent ou mal formé, les clients retombent sur les adresses par défaut (`localhost:5001`/`5002`/`5003` en Debug, `localhost:6001`/`6002`/`6003` en Release).
+S'il est absent ou mal formé, le client retombe sur les adresses par défaut (`localhost:5001`/`5002`/`5003` en Debug, `localhost:6001`/`6002`/`6003` en Release).
 
 ```powershell
 diplowalker config init                       # génère DiploWalker.json avec les adresses TCP par défaut
@@ -283,8 +280,6 @@ diplowalker config init --path C:\etc\DiploWalker.json
 ```
 
 - Les trois adresses générées ciblent `localhost` sur les ports associés au service.
-
-- La GUI propose un onglet **Paramètres** pour éditer ces adresses (écriture de `DiploWalker.json`, champs `namespace` et `logLevel` conservés) ; la configuration est appliquée dès les opérations suivantes, sans redémarrage.
 
 ## Développement
 
@@ -336,20 +331,12 @@ DiploWalker/
 │   │   ├── Qcow1Fs.fs / Qcow2.fs / ParallelsFs.fs / VdiFs.fs / DmgFs.fs / FsImage.fs
 │   │   ├── IsoFs.fs            # Parseur ISO9660/UDF + générateur ISO9660 niveau 1
 │   ├── DiploWalker.Cli/              # Client CLI (Spectre.Console)
-│   ├── DiploWalker.Gui/              # Interface graphique Avalonia
-│   │   ├── Views/MainWindow.axaml(.fs)
-│   │   ├── UserControls/ContainerDetailUserControl.axaml(.fs)
-│   │   ├── ViewModels/
-│   │   ├── Services/
-│   │   ├── App.axaml(.fs)
-│   │   └── Program.fs
 ├── tests/
 │   ├── DiploWalker.Abstractions.Tests/
 │   ├── DiploWalker.Cli.Tests/
 │   ├── DiploWalker.Container.Tests/
 │   ├── DiploWalker.Core.Tests/
 │   ├── DiploWalker.Disk.Tests/
-│   ├── DiploWalker.Gui.Tests/
 │   ├── DiploWalker.Installer.Tests/
 │   ├── DiploWalker.Integration.Tests/
 │   ├── DiploWalker.Network.Tests/
@@ -454,42 +441,9 @@ Les formats QCOW1, QCOW2, Parallels et DMG ne sont pas supportés en création (
 | XFS       | R/W           | —              | Hawkynt (seuil 2 Go) |
 | HFS+      | R/W           | —              | Hawkynt (seuil 2 Go) |
 
-### GUI
-
-L'interface graphique Avalonia utilise un thème système par défaut avec des onglets organisés :
-
-**Onglet Images** :
-
-- **Toolbar** : Lister, Rechercher, Télécharger, Inspecter, Étiqueter, Supprimer, Nettoyer
-- **Champs** : Réf. (pull), User (pull), Espace, image source / image cible (étiqueter), Référence (inspecter/supprimer)
-- **DataGrid** (haut) : images locales (Référentiel, Tag, Taille, Créé le)
-- **Recherche en ligne** (bas) : résultats des catalogues (Registre, Référence, Étoiles, Description) avec bouton **Tirer la sélection** — déclenchée par la touche Entrée dans le champ de recherche (cf. « Recherche d'images en ligne »)
-
-**Onglet Conteneurs** — Vue splitée avec :
-
-- **Toolbar** en haut : Lister, Créer, Télécharger, Inspecter, Espaces, Version, Nettoyer, Événements, Arrêter
-- **Champs** : ID, Nom, Image, User (pull), Espace, Timeout, Tous, Forcer
-- **DataGrid** (gauche) : liste des conteneurs avec sélection
-- **ContainerDetailUserControl** (droite) : panneau de détail pour le conteneur sélectionné
-    - Propriétés : ID, Nom, Image, État, Créé le
-    - Actions : Démarrer, Arrêter, Supprimer, Renommer, Processus, Métriques
-    - Configuration : Nouveau nom, Montages
-    - Journaux & Exec : Suivre, Lignes, Depuis, Commande
-    - **Catalogue d'images** : liste locale persistante (`diplowalker-catalog.json`) avec Lister, Inscrire (pull), Mettre à jour (tag) et Retirer (rmi)
-
-**Onglet Volumes** — Liste + création d'images disque (sélection dossier/fichier, format)
-
-**Onglet Réseaux** — Liste + création de réseaux
-
-**Onglet Compose** — Éditeur YAML avec colorisation syntaxique (AvalonEdit + TextMate) et validation temps réel
-
-**Onglet Paramètres** — Édition de `DiploWalker.json` (adresses services, transport, namespace, logLevel)
-
-**Menu** — *Fichier* → **Exporter le journal…** (écrit les lignes horodatées du journal dans un fichier `.txt` choisi via le sélecteur de fichier), *Quitter* ; *Aide* → **À propos**
-
 ## Recherche d'images en ligne
 
-La recherche d'images interroge les catalogues en ligne depuis le CLI (`diplowalker container image-search`) ou l'onglet **Images** de la GUI (champ de recherche validé par Entrée ; les résultats se tirent via « Tirer la sélection »). Elle est limitée aux **quatre registres autorisés** et ne nécessite **aucun identifiant** (catalogues publics) ; le pull d'un résultat utilise ensuite l'identifiant enregistré pour le registre concerné.
+La recherche d'images interroge les catalogues en ligne depuis le CLI (`diplowalker container image-search`). Elle est limitée aux **quatre registres autorisés** et ne nécessite **aucun identifiant** (catalogues publics) ; le pull d'un résultat utilise ensuite l'identifiant enregistré pour le registre concerné.
 
 | Registre | Mécanisme de recherche |
 | --- | --- |
@@ -502,7 +456,7 @@ Sans registre ciblé, les quatre fournisseurs sont interrogés dans l'ordre de l
 
 ## Authentification aux registres
 
-Les extractions d'images (CLI, GUI) sont limitées à **quatre fournisseurs** : `ghcr.io`, `docker.io`, `quay.io` et `mcr.microsoft.com`. Des alias courts sont acceptés pour `login`/`logout` : `ghcr`, `dockerhub` (ou `docker`), `quay`, `mcr`. Toute autre source est refusée par le serveur, et **toute extraction anonyme est impossible** : un compte doit être enregistré pour le registre concerné (sauf `--user utilisateur:secret` sur la ligne de commande, qui prime sur l'identifiant enregistré).
+Les extractions d'images sont limitées à **quatre fournisseurs** : `ghcr.io`, `docker.io`, `quay.io` et `mcr.microsoft.com`. Des alias courts sont acceptés pour `login`/`logout` : `ghcr`, `dockerhub` (ou `docker`), `quay`, `mcr`. Toute autre source est refusée par le serveur, et **toute extraction anonyme est impossible** : un compte doit être enregistré pour le registre concerné (sauf `--user utilisateur:secret` sur la ligne de commande, qui prime sur l'identifiant enregistré).
 
 Les identifiants sont stockés côté serveur, chiffrés avec DPAPI (portée utilisateur courant) sous Windows et en AES-GCM avec une clé par utilisateur ailleurs, dans le fichier `registry-auth.json` du répertoire de données (`%ProgramData%\DiploWalker` sous Windows, `$XDG_DATA_HOME/DiploWalker` ailleurs). Ils ne transitent **jamais** par la ligne de commande de `ctr` : lors d'un `pull`, le service génère un **helper d'identification** conforme au protocole `docker-credential` (`%ProgramData%\DiploWalker\cred-helper\`) qui retourne les identifiants via stdin, et un répertoire hosts temporaire pointant vers ce helper (nettoyé en fin d'opération). Les identifiants sont automatiquement fournis à containerd pour l'image tirée (`docker.io` redirigé vers `registry-1.docker.io`).
 
@@ -522,10 +476,6 @@ diplowalker container logout ghcr                             # alias accepté
 diplowalker container pull ghcr.io/org/app:latest             # utilise l'identifiant enregistré
 diplowalker container pull ghcr.io/org/app:latest --user user:secret   # identifiant explicite (prime sur l'enregistré)
 ```
-
-### GUI
-
-L'onglet **Conteneurs** propose une ligne « Registre / Utilisateur / Mot de passe » avec les boutons **Se connecter** et **Se déconnecter**. Le pull utilise ensuite l'identifiant enregistré automatiquement.
 
 ## Référence CLI
 
@@ -624,8 +574,6 @@ diplowalker version
 | `FsImage`                    | Disk         | Création, extraction et réécriture d'images disque                   |
 | `RemoteDriverHelpers`        | Volume       | Helpers mutualisés pour drivers distants (NFS, AWS, GCP, Azure, SMB) |
 | `RemoteVolumeDriver`         | Volume       | Classe de base des drivers distants (store, création, montage, prune)|
-| `Cmd`                        | Gui          | Helpers try/with mutualisés pour commandes GUI                       |
-| `ContainerDetailUserControl` | Gui          | UserControl détail conteneur sélectionné                             |
 
 ### Validation ctr v2 (≥ v2.0)
 

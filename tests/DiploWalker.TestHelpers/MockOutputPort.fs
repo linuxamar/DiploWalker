@@ -3,7 +3,7 @@
 open System
 open DiploWalker.Core.Output
 
-/// Mock IOutputPort partagé par les suites de tests (CLI et GUI).
+/// Mock IOutputPort partagé par les suites de tests.
 /// Les alias Messages/Lines et Clear/Reset couvrent les deux conventions.
 type MockOutputPort() =
 
@@ -38,4 +38,3 @@ type MockOutputPort() =
         member _.WriteSuccess(text) = successes.Add(text)
         member _.WriteWarning(text) = warnings.Add(text)
         member _.WriteTable(_items, columns, _selector) = tables.Add(columns)
-

@@ -234,16 +234,6 @@ FunctionEnd
 
 ; ── Sections ────────────────────────────────────────────────────────────────
 
-Section "Diplo.GUI" SecGui
-  SectionIn RO
-  SetOutPath "$INSTDIR\Diplo.Gui"
-  File /r /x "*.pdb" "${PUBLISH_ROOT}\DiploWalker.Gui\*.*"
-
-  CreateShortCut "$DESKTOP\Diplo GUI.lnk"                "$INSTDIR\Diplo.Gui\DiploWalker.Gui.exe"
-  CreateDirectory  "$SMPROGRAMS\${APP_NAME}"
-  CreateShortCut "$SMPROGRAMS\${APP_NAME}\Diplo GUI.lnk" "$INSTDIR\Diplo.Gui\DiploWalker.Gui.exe"
-SectionEnd
-
 Section "Diplo.CLI" SecCli
   SectionIn RO
   SetOutPath "$INSTDIR\Diplo.Cli"
@@ -252,6 +242,7 @@ Section "Diplo.CLI" SecCli
   Push "$INSTDIR\Diplo.Cli"
   Call AddToPath
 
+  CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   CreateShortCut "$SMPROGRAMS\${APP_NAME}\Diplo CLI (cmd).lnk" "%windir%\system32\cmd.exe" "/K $INSTDIR\Diplo.Cli\DiploWalker.Cli.exe --help"
 SectionEnd
 
@@ -307,7 +298,6 @@ Section "Uninstall"
   Push "$INSTDIR\Diplo.Cli"
   Call un.RemoveFromPath
 
-  Delete "$DESKTOP\Diplo GUI.lnk"
   RMDir  /r "$SMPROGRAMS\${APP_NAME}"
 
   ; Arrêt + suppression des services Windows AVANT l'effacement des binaires :
@@ -331,7 +321,6 @@ Section "Uninstall"
   ${EndIf}
   RMDir  /r "$INSTDIR\certificates"
 
-  RMDir  /r "$INSTDIR\Diplo.Gui"
   RMDir  /r "$INSTDIR\Diplo.Cli"
   RMDir  /r "$INSTDIR\Diplo.Installer"
 

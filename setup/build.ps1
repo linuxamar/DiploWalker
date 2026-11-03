@@ -38,10 +38,13 @@ if (-not $PublishRoot) {
 }
 $PublishRoot = Resolve-Path $PublishRoot
 
-if (-not (Test-Path "$PublishRoot\DiploWalker.Gui\DiploWalker.Gui.exe")) {
-    Write-Warning "DiploWalker.Gui.exe introuvable dans $PublishRoot\DiploWalker.Gui\"
-    Write-Host   "Exécutez d'abord : .\pipeline.ps1 -DoPublish -Platform $Platform" -ForegroundColor Yellow
-    exit 1
+foreach ($requiredExecutable in @("DiploWalker.Cli", "DiploWalker.Installer")) {
+    $executablePath = Join-Path (Join-Path $PublishRoot $requiredExecutable) "$requiredExecutable.exe"
+    if (-not (Test-Path $executablePath)) {
+        Write-Warning "$requiredExecutable.exe introuvable dans $PublishRoot"
+        Write-Host   "Exécutez d'abord : .\pipeline.ps1 -DoPublish -Platform $Platform" -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 # Compiler le NSIS
@@ -137,4 +140,3 @@ if ($Sign) {
 
 Write-Host ""
 Write-Host "  ✓ Installateur créé : $outFile" -ForegroundColor Green
-

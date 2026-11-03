@@ -11,7 +11,7 @@
 #  Usage :
 #    .\certificates\codesigning\leaves\regenerate-leaves.ps1          # tous les projets
 #    .\certificates\codesigning\leaves\regenerate-leaves.ps1 -Force   # régénère les clés
-#    ... -Projects "DiploWalker.Cli,DiploWalker.Gui"                              # sous-ensemble
+#    ... -Projects "DiploWalker.Cli,DiploWalker.Installer"                         # sous-ensemble
 # ---------------------------------------------------------------------------
 
 [CmdletBinding()]
@@ -192,4 +192,3 @@ foreach ($name in $names) {
 Write-Host ""
 Write-Host "Certificats de signature de code générés dans $leavesDir" -ForegroundColor Green
 Write-Host "Les binaires seront signés automatiquement à la compilation (Directory.Build.targets)." -ForegroundColor Green
-

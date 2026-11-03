@@ -233,6 +233,4 @@ Write-Host "    diplo container exec $ContainerName cmd # Exécuter une commande
 Write-Host "    diplo container stop $ContainerName     # Arrêter le conteneur"
 Write-Host "    diplo container stats $ContainerName    # Métriques en temps réel"
 Write-Host ""
-Write-Host "  GUI : lancez DiploWalker.Gui.exe pour l'interface graphique" -ForegroundColor Cyan
 Write-Host ""
-

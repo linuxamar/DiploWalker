@@ -8,7 +8,7 @@ open Serilog
 /// Catalogue local persistant des images de conteneurs (`diplo-catalog.json`).
 /// Même convention que `DiploWalkerConfig` : chemin résolu via `DIPLO_CONFIG_HOME`,
 /// lecture tolérante (fichier absent/malformé ⇒ catalogue vide) et écriture
-/// atomique (temp + replace). Le fichier est partagé entre CLI et GUI.
+/// atomique (temp + replace). Le fichier est utilisé par le CLI.
 [<RequireQualifiedAccess>]
 module ImageCatalog =
 
@@ -126,4 +126,3 @@ module ImageCatalog =
             true
         else
             false
-

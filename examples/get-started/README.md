@@ -6,10 +6,9 @@ conteneur déployé. Un script PowerShell automatisé est également fourni.
 Il est utile de garder la répartition en tête dès le départ : **l'autorité est
 sur l'hôte**. Containerd et les trois services gRPC y résident, et c'est eux
 qui détiennent les conteneurs, les volumes, les réseaux et les images.
-**Le poste de travail n'héberge que les clients** — la commande `diplo` et
-l'interface graphique — qui s'y connectent et ne détiennent aucun conteneur.
-Le même installeur dépose les deux moitiés : les services sur l'hôte, les
-clients sur le poste.
+**Le poste de travail n'héberge que le client CLI** — la commande `diplo`,
+qui se connecte aux services et ne détient aucun conteneur. Le même installeur
+dépose les deux moitiés : les services sur l'hôte et le client sur le poste.
 
 ## Prérequis
 
@@ -31,7 +30,6 @@ L'installeur NSIS (`Diplo-Setup-1.0.1-x64.exe`) installe automatiquement :
 - **DiploWalker.Volume** — service gRPC port 5002 (Debug) / 6002 (Release)
 - **DiploWalker.Network** — service gRPC port 5003 (Debug) / 6003 (Release)
 - **DiploWalker.CLI** — ajouté au PATH système
-- **DiploWalker.GUI** — raccourci bureau et menu Démarrer
 - **Certificats PKI** — racine et intermédiaires dans les magasins Windows
 
 ```powershell
@@ -146,17 +144,6 @@ Le script effectue :
 | `diplo network create <nom>`                | Créer un réseau                 |
 | `diplo status check`                        | Vérifier tous les services      |
 | `diplo config init`                         | Générer la config par défaut    |
-
-## Interface graphique
-
-Lancez `DiploWalker.Gui.exe` pour accéder à l'interface graphique Avalonia qui
-propose :
-
-- Liste des conteneurs avec état en temps réel
-- Détail de chaque conteneur (propriétés, actions, config, logs)
-- Gestion des volumes et réseaux
-- Éditeur Compose avec colorisation YAML
-- Journal d'activité centralisé
 
 ## Dépannage
 
@@ -454,29 +441,6 @@ le contenu du fichier :
 # Vérifier l'en-tête du fichier
 Format-Hex -Path <CHEMIN> -Count 64
 ```
-
----
-
-### Problèmes de l'interface graphique
-
-#### La fenêtre ne s'affiche pas
-
-```powershell
-# Lancer en mode console pour voir les erreurs
-& "$env:ProgramFiles\Diplo\DiploWalker.Gui\DiploWalker.Gui.exe" 2>&1
-```
-
-#### Les onglets sont vides
-
-Les services Diplo doivent être démarrés pour que la GUI fonctionne :
-
-```powershell
-diplo status check
-```
-
-#### Erreur « Assembly FSharp.Core non trouvé »
-
-Vérifiez que le runtime .NET 10 est installé et que le PATH est correct.
 
 ---
 
