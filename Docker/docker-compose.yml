@@ -1,0 +1,22 @@
+﻿version: "3.8"
+
+services:
+  diplowalker-tests:
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile
+    image: diplowalker-tests:latest
+    container_name: diplowalker-tests
+    volumes:
+      - ..:/workspaces/DiploWalker
+    working_dir: /workspaces/DiploWalker
+    entrypoint: ["pwsh", "-File", "./pipeline.ps1"]
+    command: ["-DoTests", "-NoSignTests"]
+    environment:
+      - DOTNET_CLI_TELEMETRY_OPTOUT=1
+      - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+      - DOTNET_NOLOGO=1
+      - DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+
+# Compatible Podman :
+#   podman-compose -f Docker/docker-compose.yml run --rm diplowalker-tests

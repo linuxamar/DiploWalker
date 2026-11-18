@@ -1,0 +1,30 @@
+﻿{
+    "name": "DiploWalker",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "diplowalker",
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "features": {
+        "ghcr.io/thediveo/devcontainer-features/nerdctl:0": {
+            "cni": true
+        },
+        "ghcr.io/devcontainers/features/dotnet:2": {
+            "tabCompletions": true,
+            "version": "lts"
+        }
+    },
+    // "forwardPorts": [
+    //     5432,
+    //     8181,
+    //     27017,
+    //     "influxdb-explorer:8080",
+    //     "mongo-express:8081",
+    //     "adminer:8080"
+    // ],
+    // "portsAttributes": {
+    //     "influxdb-explorer:8080": { "label": "InfluxDB 3 Explorer" },
+    //     "mongo-express:8081": { "label": "Mongo Express" },
+    //     "adminer:8080": { "label": "Adminer (PostgreSQL)" }
+    // },
+    "postCreateCommand": "dotnet --info",
+    "remoteUser": "root"
+}

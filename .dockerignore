@@ -1,0 +1,66 @@
+# --- Fichiers à exclure du contexte de build Docker/Podman ---
+
+# Binaires et objets
+**/bin/
+**/obj/
+**/publish/
+**/TestResults/
+**/pipeline-tests/
+
+# Fichiers de projet Visual Studio / VS Code
+.vscode/
+.idea/
+*.user
+*.suo
+.opencode/
+
+# Fichiers de configuration locale
+**/appsettings.json
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/DiploWalker.json
+**/DiploWalker.Development.json
+
+# Certificats (contenu par .gitignore)
+certificates/
+
+# Fichiers de build locaux
+Directory.Build.user.props
+
+# Logs
+**/*.log
+
+# Fichiers temporaires
+**/*.tmp
+**/*.temp
+**/*.bak
+
+# .git
+.git/
+.gitattributes
+
+# Installateurs et binaires
+*.exe
+Diplo-Setup-*.exe
+
+# Documentation non essentielle
+docs/
+THIRD-PARTY-NOTICES.txt
+
+# Package.json (Node.js — non requis pour les tests .NET)
+package.json
+package-lock.json
+node_modules/
+
+# Setup et outils
+setup/
+tools/
+examples/
+
+# Fichiers de test locaux
+tests/TestDataRoot/
+
+# Fichiers d'instructions pour les agents
+AGENTS.md
+CLAUDE.md
+CONTEXT.md
