@@ -34,6 +34,9 @@
     <Project Path="src/DiploWalker.Contracts/DiploWalker.Contracts.fsproj">
       <Platform Project="x64" />
     </Project>
+    <Project Path="src/DiploWalker.Gui/DiploWalker.Gui.fsproj">
+      <Platform Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DiploWalker.Abstractions.Tests/DiploWalker.Abstractions.Tests.fsproj">
@@ -68,4 +71,3 @@
     </Project>
   </Folder>
 </Solution>
-

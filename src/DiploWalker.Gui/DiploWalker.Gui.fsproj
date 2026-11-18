@@ -1,0 +1,57 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <!--
+      Avalonia nécessite <OutputType>WinExe</OutputType> pour le packaging
+      desktop (pas de fenêtre console). Le projet reste 100% F#.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Ordre de compilation F# : infrastructure → ViewModels → Vues → Program -->
+    <Compile Include="ViewModels\ViewModelBase.fs" />
+    <Compile Include="ViewModels\ContainerViewModel.fs" />
+    <Compile Include="ViewModels\VolumeViewModel.fs" />
+    <Compile Include="ViewModels\NetworkViewModel.fs" />
+    <Compile Include="ViewModels\DiskViewModel.fs" />
+    <Compile Include="ViewModels\ComposeViewModel.fs" />
+    <Compile Include="ViewModels\CatalogViewModel.fs" />
+    <Compile Include="ViewModels\LogViewModel.fs" />
+    <Compile Include="ViewModels\MainWindowViewModel.fs" />
+    <Compile Include="Adapters\DiploClientsAdapter.fs" />
+    <Compile Include="Views\ContainerView.fs" />
+    <Compile Include="Views\VolumeView.fs" />
+    <Compile Include="Views\NetworkView.fs" />
+    <Compile Include="Views\DiskView.fs" />
+    <Compile Include="Views\ComposeView.fs" />
+    <Compile Include="Views\CatalogView.fs" />
+    <Compile Include="Views\LogView.fs" />
+    <Compile Include="Views\MainWindow.fs" />
+    <Compile Include="App.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Références aux projets DiploWalker -->
+    <ProjectReference Include="..\DiploWalker.Core\DiploWalker.Core.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Disk\DiploWalker.Disk.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Abstractions\DiploWalker.Abstractions.fsproj" />
+    <ProjectReference Include="..\DiploWalker.Cli\DiploWalker.Cli.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Paquets Avalonia + ReactiveUI -->
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.ReactiveUI" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="ReactiveUI.Fody" />
+    <!-- Spectre.Console pour le journal (cohérent avec la CLI) -->
+    <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="FSharp.Core" />
+  </ItemGroup>
+
+</Project>

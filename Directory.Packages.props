@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <!--
@@ -40,5 +40,14 @@
     <PackageVersion Include="ZstdSharp.Port" Version="0.8.8" />
     <PackageVersion Include="LTRData.DiscUtils" Version="1.0.90" />
     <PackageVersion Include="Hawkynt.FileFormats.FileSystems" Version="1.0.0.776" />
+    <!-- Avalonia UI (11.3.9 stable avec ReactiveUI intégré) -->
+    <PackageVersion Include="Avalonia" Version="11.3.9" />
+    <PackageVersion Include="Avalonia.Desktop" Version="11.3.9" />
+    <PackageVersion Include="Avalonia.ReactiveUI" Version="11.3.9" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="11.3.9" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="11.3.9" />
+    <PackageVersion Include="ReactiveUI.Fody" Version="19.5.1" />
+    <!-- Pin transitive : corrige la CVE de Tmds.DBus.Protocol 0.21.2 (dépendance d'Avalonia.Desktop) -->
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.95.2" />
   </ItemGroup>
 </Project>
