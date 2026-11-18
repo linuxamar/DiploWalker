@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # ---------------------------------------------------------------------------
 # run-tests-in-docker.sh – Lance les tests DiploWalker depuis un conteneur
 # Compatible Docker et Podman.

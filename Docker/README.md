@@ -1,4 +1,4 @@
-# DiploWalker – Tests en conteneur Linux (Podman)
+﻿# DiploWalker – Tests en conteneur Linux (Podman)
 
 Ce répertoire contient les fichiers nécessaires pour lancer la suite de tests
 du projet DiploWalker dans un conteneur Linux, compatible **Docker** et **Podman**.

@@ -1,4 +1,4 @@
-# --- Fichiers à exclure du contexte de build Docker/Podman ---
+﻿# --- Fichiers à exclure du contexte de build Docker/Podman ---
 
 # Binaires et objets
 **/bin/
