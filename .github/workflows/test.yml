@@ -1,4 +1,4 @@
-name: Build & Test (Windows Containers)
+﻿name: Build & Test (Windows Containers)
 
 on:
   push:
@@ -9,16 +9,13 @@ on:
 jobs:
   build-and-test:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           lfs: true  # Git LFS requis par le projet
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Build Windows test image
         run: docker build -t diplowalker-tests -f Docker/Dockerfile .
