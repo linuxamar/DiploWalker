@@ -49,6 +49,7 @@ COPY src/ src/
 COPY tests/ tests/
 COPY pipeline.ps1 .
 COPY Docker/ Docker/
+COPY eng/ eng/
 
 RUN dotnet restore DiploWalker.slnx
 
