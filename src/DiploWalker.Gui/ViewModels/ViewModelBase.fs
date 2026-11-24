@@ -19,6 +19,4 @@ type ViewModelBase() =
 
     /// Log simple pour le débogage (pas de dépendance externe).
     member _.LogDebug (msg: string) =
-#if DEBUG
         System.Diagnostics.Debug.WriteLine(sprintf "[Gui] %s" msg)
-#endif
