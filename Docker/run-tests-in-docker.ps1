@@ -6,12 +6,12 @@
 #   .\run-tests-in-docker.ps1 -DoTests -DoPublish # tests + publication
 #   .\run-tests-in-docker.ps1 -Clean -Restore     # nettoyage + restauration
 #
-# Ce script est destiné à être exécuté à l'intérieur du conteneur Linux
-# (Docker ou Podman). Il déléguera à pipeline.ps1 qui gère déjà la logique
-# de build, de tests (avec exclusion des tests Windows) et de publication.
+# Ce script est destiné à être exécuté à l'intérieur du conteneur Windows
+# (Docker). Il déléguera à pipeline.ps1 qui gère déjà la logique
+# de build, de tests et de publication.
 #
-# Compatible Podman :
-#   podman run --rm -v ${PWD}:/workspaces/DiploWalker diplowalker-tests
+# Compatible Docker :
+#   docker run --rm -v ${PWD}:/workspaces/DiploWalker diplowalker-tests
 # ---------------------------------------------------------------------------
 
 [CmdletBinding()]
@@ -28,8 +28,10 @@ $ErrorActionPreference = "Stop"
 
 # --- Vérifications préliminaires -------------------------------------------
 
-if ($env:OS -eq "Windows_NT") {
-    Write-Warning "Ce script est destiné à un conteneur Linux. Exécutez pipeline.ps1 directement sur Windows."
+if ($env:OS -ne "Windows_NT") {
+    Write-Error "Ce script doit s'exécuter dans un conteneur Windows (Docker Desktop en mode Windows containers)."
+    Write-Error "Sur un hôte Linux/macOS, utilisez un runner Windows en CI ou Docker Desktop sur Windows."
+    exit 1
 }
 
 if (-not (Test-Path (Join-Path $PSScriptRoot "pipeline.ps1"))) {
@@ -50,14 +52,13 @@ if ($TestLogDir)  { $psArgs += "-TestLogDir"; $psArgs += $TestLogDir }
 # Par défaut : lancer les tests si aucun flag n'est fourni
 if (-not $Clean -and -not $Restore -and -not $DoTests -and -not $DoPublish) {
     $psArgs += "-DoTests"
-    $psArgs += "-NoSignTests"  # Signature Authenticode impossible sur Linux
 }
 
 # --- Lancement --------------------------------------------------------------
 
 Write-Host ""
 Write-Host "══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host " DiploWalker – Tests depuis le conteneur Linux (Podman)" -ForegroundColor Cyan
+Write-Host " DiploWalker – Tests depuis le conteneur Windows (Docker)" -ForegroundColor Cyan
 Write-Host "══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 

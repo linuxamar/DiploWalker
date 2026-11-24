@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env bash
 # ---------------------------------------------------------------------------
 # run-tests-in-docker.sh – Lance les tests DiploWalker depuis un conteneur
-# Compatible Docker et Podman.
+# Compatible Docker.
 #
 # Usage :
 #   ./run-tests-in-docker.sh                          # tests unitaires
@@ -16,8 +16,10 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # --- Vérifications préliminaires -------------------------------------------
 
-if [[ "$(uname -s)" != "Linux" ]]; then
-    echo "⚠️  Ce script est destiné à être exécuté dans un conteneur Linux."
+if [[ "$(uname -s)" != "Windows_NT" ]]; then
+    echo "✗ Ce script doit s'exécuter dans un conteneur Windows (Docker Desktop en mode Windows containers)."
+    echo "  Sur un hôte Linux/macOS, utilisez un runner Windows en CI ou Docker Desktop sur Windows."
+    exit 1
 fi
 
 if [[ ! -f "$PROJECT_ROOT/pipeline.ps1" ]]; then
@@ -43,14 +45,13 @@ done
 # Par défaut : lancer les tests si aucun flag n'est fourni
 if [[ ${#PS_ARGS[@]} -eq 0 ]]; then
     PS_ARGS+=("-DoTests")
-    PS_ARGS+=("-NoSignTests")  # Signature Authenticode impossible sur Linux
 fi
 
 # --- Lancement --------------------------------------------------------------
 
 echo ""
 echo "══════════════════════════════════════════════════════════════"
-echo " DiploWalker – Tests depuis le conteneur Linux (Podman)"
+echo " DiploWalker – Tests depuis le conteneur Windows (Docker)"
 echo "══════════════════════════════════════════════════════════════"
 echo ""
 

@@ -7,9 +7,10 @@ services:
       dockerfile: Docker/Dockerfile
     image: diplowalker-tests:latest
     container_name: diplowalker-tests
+    platform: windows/amd64
     volumes:
-      - ..:/workspaces/DiploWalker
-    working_dir: /workspaces/DiploWalker
+      - ..:C:/workspaces/DiploWalker
+    working_dir: C:/workspaces/DiploWalker
     entrypoint: ["pwsh", "-File", "./pipeline.ps1"]
     command: ["-DoTests", "-NoSignTests"]
     environment:
@@ -18,5 +19,5 @@ services:
       - DOTNET_NOLOGO=1
       - DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 
-# Compatible Podman :
-#   podman-compose -f Docker/docker-compose.yml run --rm diplowalker-tests
+# Compatible Docker Desktop (Windows containers mode) :
+#   docker compose -f Docker/docker-compose.yml run --rm diplowalker-tests
