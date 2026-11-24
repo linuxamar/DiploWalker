@@ -165,6 +165,7 @@ $testProjects = @(
     "DiploWalker.Installer.Tests",
     "DiploWalker.Disk.Tests",
     "DiploWalker.Cli.Tests",
+    "DiploWalker.Gui.Tests",
     "DiploWalker.Integration.Tests"
 )
 

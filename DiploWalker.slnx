@@ -63,6 +63,9 @@
     <Project Path="tests/DiploWalker.Installer.Tests/DiploWalker.Installer.Tests.fsproj">
       <Platform Project="x64" />
     </Project>
+    <Project Path="tests/DiploWalker.Gui.Tests/DiploWalker.Gui.Tests.fsproj">
+      <Platform Project="x64" />
+    </Project>
     <Project Path="tests/DiploWalker.Integration.Tests/DiploWalker.Integration.Tests.fsproj">
       <Platform Project="x64" />
     </Project>
